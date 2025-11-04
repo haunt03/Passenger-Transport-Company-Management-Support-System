@@ -7,6 +7,24 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: true
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+openapi:
+  service:
+    api-docs: Computer_sell
+    server: http://localhost:8080
+    title: Transport Application
+    version: 1.0.0
+jwt:
+  expriMinutes: 3600
+  expireDate: 5
+  accesskey: 2mfGKBhdCa0K8X2uV1Fzn9o6sR8V0s5GUelGlxsFQAc=
+  refreshkey: /AqIfLpfbWqy36D3VBmkskYtmnpsJrLpRx00WVRnJlE=
 
 server:
   port: 8080

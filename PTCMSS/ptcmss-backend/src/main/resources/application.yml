@@ -3,14 +3,43 @@ spring:
     url: jdbc:mysql://localhost:3306/ptcmss_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
     username: root
     password: root
+
   jpa:
+    show-sql: true
     hibernate:
       ddl-auto: update
-    show-sql: true
+      naming:
+        # Dùng đúng tên bạn khai báo/annotate, KHÔNG tự convert sang snake_case
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+        implicit-strategy: org.hibernate.boot.model.naming.ImplicitNamingStrategyLegacyJpaImpl
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: macuongthi012@gmail.com
+    password: C0342417658
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+  profiles:
+    active: dev
+
+openapi:
+  service:
+    api-docs: Computer_sell
+    server: http://localhost:8080
+    title: Transport Application
+    version: 1.0.0
 
 server:
   port: 8080
 
 management:
   endpoints:
-    web.exposure.include: health,info
+    web:
+      exposure:
+        include: health,info
