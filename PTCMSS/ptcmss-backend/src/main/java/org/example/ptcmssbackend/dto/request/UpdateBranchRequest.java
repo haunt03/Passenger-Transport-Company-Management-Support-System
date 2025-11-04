@@ -1,0 +1,14 @@
+package org.example.ptcmssbackend.dto.request;
+
+import lombok.Getter;
+import lombok.Setter;
+import org.example.ptcmssbackend.enums.BranchStatus;
+
+@Getter
+@Setter
+public class UpdateBranchRequest {
+    private String branchName;
+    private String location;
+    private Integer managerId;
+    private BranchStatus status;
+}

@@ -1,8 +1,8 @@
 package org.example.ptcmssbackend.controller;
 
 import lombok.RequiredArgsConstructor;
-import org.example.ptcmssbackend.dto.LoginRequest;
-import org.example.ptcmssbackend.dto.LoginResponse;
+import org.example.ptcmssbackend.dto.request.LoginRequest;
+import org.example.ptcmssbackend.dto.response.LoginResponse;
 import org.example.ptcmssbackend.service.AuthService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;

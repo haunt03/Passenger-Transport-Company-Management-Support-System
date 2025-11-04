@@ -1,8 +1,8 @@
 package org.example.ptcmssbackend.service.impl;
 
 import lombok.RequiredArgsConstructor;
-import org.example.ptcmssbackend.dto.LoginRequest;
-import org.example.ptcmssbackend.dto.LoginResponse;
+import org.example.ptcmssbackend.dto.request.LoginRequest;
+import org.example.ptcmssbackend.dto.response.LoginResponse;
 import org.example.ptcmssbackend.entity.Users;
 import org.example.ptcmssbackend.enums.UserStatus;
 import org.example.ptcmssbackend.repository.UsersRepository;

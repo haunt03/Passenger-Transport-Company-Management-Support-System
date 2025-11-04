@@ -1,24 +1,33 @@
-package org.example.ptcmssbackend.dto;
+package org.example.ptcmssbackend.dto.request;
 
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 import org.example.ptcmssbackend.enums.SettingStatus;
 import org.example.ptcmssbackend.enums.ValueType;
-
-import java.time.Instant;
 
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class SystemSettingResponse {
-    private Integer id;
+public class SystemSettingRequest {
+
+    private Integer id; // dùng cho update
+
+    @NotNull
+    @Size(max = 100)
     private String settingKey;
+
+    @NotNull
+    @Size(max = 255)
     private String settingValue;
+
+    @NotNull
     private ValueType valueType;
+
     private String category;
     private String description;
     private SettingStatus status;
-    private String updatedByName;
-    private Instant updatedAt;
+    private Integer updatedById; // ID của Employee cập nhật
 }

@@ -1,4 +1,4 @@
-package org.example.ptcmssbackend.dto;
+package org.example.ptcmssbackend.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
