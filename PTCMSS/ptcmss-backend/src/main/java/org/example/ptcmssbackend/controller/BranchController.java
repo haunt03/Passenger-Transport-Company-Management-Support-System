@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.example.ptcmssbackend.dto.request.Branch.CreateBranchRequest;
 
+import org.example.ptcmssbackend.dto.request.Branch.UpdateBranchRequest;
 import org.example.ptcmssbackend.dto.response.common.ResponseData;
 import org.example.ptcmssbackend.service.BranchService;
 import org.springframework.http.HttpStatus;
@@ -37,5 +38,68 @@ public class BranchController {
         }
     }
 
+    // ======================= UPDATE =======================
+    @Operation(summary = "Cập nhật chi nhánh", description = "Cho phép Admin hoặc Manager chỉnh sửa chi nhánh.")
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    public ResponseData<?> updateBranch(
+            @Parameter(description = "ID chi nhánh") @PathVariable Integer id,
+            @RequestBody UpdateBranchRequest request) {
+        try {
+            return new ResponseData<>(HttpStatus.OK.value(),
+                    "Update branch successfully",
+                    branchService.updateBranch(id, request));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    // ======================= GET ALL =======================
+    @Operation(summary = "Danh sách chi nhánh", description = "Cho phép Admin, Manager và Accountant xem danh sách chi nhánh.")
+    @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT')")
+    public ResponseData<?> getAllBranches(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String sortBy) {
+        try {
+            return new ResponseData<>(HttpStatus.OK.value(),
+                    "Get all branches successfully",
+                    branchService.getAllBranches(keyword, page, size, sortBy));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    // ======================= GET BY ID =======================
+    @Operation(summary = "Chi tiết chi nhánh", description = "Cho phép Admin, Manager và Accountant xem chi tiết chi nhánh.")
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT')")
+    public ResponseData<?> getBranchById(
+            @Parameter(description = "ID chi nhánh") @PathVariable Integer id) {
+        try {
+            return new ResponseData<>(HttpStatus.OK.value(),
+                    "Get branch by id successfully",
+                    branchService.getBranchById(id));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    // ======================= DELETE =======================
+    @Operation(summary = "Vô hiệu hóa chi nhánh", description = "Chỉ Admin có quyền vô hiệu hóa (INACTIVE) chi nhánh.")
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseData<String> deleteBranch(
+            @Parameter(description = "ID chi nhánh") @PathVariable Integer id) {
+        try {
+            log.info("Delete branch {}", id);
+            branchService.deleteBranch(id);
+            return new ResponseData<>(HttpStatus.OK.value(), "Delete branch successfully");
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 
 }

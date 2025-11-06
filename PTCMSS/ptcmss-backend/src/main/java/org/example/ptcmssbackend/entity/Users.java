@@ -18,7 +18,7 @@ import java.util.Collections;
 @Getter
 @Setter
 @Entity
-@Table(name = "Users")
+@Table(name = "users")
 public class Users implements UserDetails {
 
     @Id
@@ -26,7 +26,7 @@ public class Users implements UserDetails {
     @Column(name = "userId", nullable = false)
     private Integer id;
 
-    // ✅ Load luôn role để tránh LazyInitializationException khi Spring Security gọi getAuthorities()
+    // Load luôn role để tránh LazyInitializationException khi Spring Security gọi getAuthorities()
     @NotNull
     @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "roleId", nullable = false)
@@ -79,7 +79,7 @@ public class Users implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // ✅ Role sẽ luôn được load (EAGER), không còn lỗi "no Session"
+        //  Role sẽ luôn được load (EAGER), không còn lỗi "no Session"
         String roleName = role != null ? role.getRoleName().toUpperCase() : "USER";
         return Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + roleName));
     }
