@@ -1,4 +1,4 @@
-package org.example.ptcmssbackend.dto.request;
+package org.example.ptcmssbackend.dto.request.Branch;
 
 import lombok.Getter;
 import lombok.Setter;
