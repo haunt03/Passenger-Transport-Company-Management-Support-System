@@ -1,4 +1,4 @@
-package org.example.ptcmssbackend.dto.request;
+package org.example.ptcmssbackend.dto.request.Auth;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
