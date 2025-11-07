@@ -5,9 +5,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-
 import org.example.ptcmssbackend.dto.request.Branch.CreateBranchRequest;
-
 import org.example.ptcmssbackend.dto.request.Branch.UpdateBranchRequest;
 import org.example.ptcmssbackend.dto.response.common.ResponseData;
 import org.example.ptcmssbackend.service.BranchService;
@@ -101,5 +99,4 @@ public class BranchController {
             throw new RuntimeException(e);
         }
     }
-
 }
