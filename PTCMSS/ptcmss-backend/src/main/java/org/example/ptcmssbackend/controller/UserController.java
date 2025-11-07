@@ -34,14 +34,14 @@ public class UserController {
     @ApiResponse(responseCode = "200", description = "Tạo thành công",
             content = @Content(schema = @Schema(implementation = Users.class)))
     @PostMapping("/register")
-    @PreAuthorize("hasRole('ADMIN')") // ✅ Chỉ admin mới được tạo user
+    @PreAuthorize("hasRole('ADMIN')") // Chỉ admin mới được tạo user
     public ResponseData<?> createUser(@RequestBody CreateUserRequest request) {
         return new ResponseData<>(HttpStatus.OK.value(), "Create user successfully", userService.createUser(request));
     }
 
     @Operation(summary = "Cập nhật người dùng", description = "Cập nhật thông tin người dùng (dành cho Admin hoặc chính người đó).")
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or #id == authentication.principal.id") // ✅ Cho phép admin hoặc chính user đó
+    @PreAuthorize("hasRole('ADMIN') or #id == authentication.principal.id") // Cho phép admin hoặc chính user đó
     public ResponseData<?> updateUser(
             @Parameter(description = "ID người dùng") @PathVariable Integer id,
             @RequestBody UpdateUserRequest request) {
@@ -61,7 +61,7 @@ public class UserController {
 
     @Operation(summary = "Xem chi tiết người dùng", description = "Lấy thông tin chi tiết của 1 người dùng.")
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or #id == authentication.principal.id") // ✅ Admin hoặc chính người đó
+    @PreAuthorize("hasRole('ADMIN') or #id == authentication.principal.id") // Admin hoặc chính người đó
     public ResponseData<?> getUserById(
             @Parameter(description = "ID người dùng") @PathVariable Integer id) {
         return new ResponseData<>(HttpStatus.OK.value(), "Get user by id successfully",
@@ -77,4 +77,3 @@ public class UserController {
         return ResponseEntity.ok("User status updated successfully");
     }
 }
-

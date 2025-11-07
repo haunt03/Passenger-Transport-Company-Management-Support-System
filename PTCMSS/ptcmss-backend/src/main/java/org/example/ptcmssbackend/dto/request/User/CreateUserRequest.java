@@ -9,13 +9,18 @@ import lombok.Setter;
 @Setter
 public class CreateUserRequest {
 
-    @NotNull(message = "Full name is required")
+    @NotNull(message = "Yêu cầu nhâp đầy đủ họ và tên")
     private String fullName;
-    @NotNull(message = "Username is required")
+
+    @NotNull(message = "Yêu cầu nhâp đầy đủ tên đăng nhập")
     private String username;
-    @Email(message = "Email is invalid")
+
+    @Email(message = "Email không hợp lệ")
     private String email;
-    @NotNull(message = "Phone is required")
+
+
+    @NotNull(message = "Yêu cầu nhâp số điện thoại")
+
     private String phone;
     @NotNull
     private String address;

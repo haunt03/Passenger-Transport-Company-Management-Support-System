@@ -4,7 +4,7 @@ import io.micrometer.common.util.StringUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.example.ptcmssbackend.dto.request.LoginRequest;
+import org.example.ptcmssbackend.dto.request.Auth.LoginRequest;
 import org.example.ptcmssbackend.dto.response.TokenResponse;
 import org.example.ptcmssbackend.entity.Token;
 import org.example.ptcmssbackend.entity.Users;
