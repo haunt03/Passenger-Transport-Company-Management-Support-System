@@ -1,7 +1,7 @@
 package org.example.ptcmssbackend.service;
 
-import org.example.ptcmssbackend.dto.request.CreateUserRequest;
-import org.example.ptcmssbackend.dto.request.UpdateUserRequest;
+import org.example.ptcmssbackend.dto.request.User.CreateUserRequest;
+import org.example.ptcmssbackend.dto.request.User.UpdateUserRequest;
 import org.example.ptcmssbackend.dto.response.UserResponse;
 import org.example.ptcmssbackend.enums.UserStatus;
 
