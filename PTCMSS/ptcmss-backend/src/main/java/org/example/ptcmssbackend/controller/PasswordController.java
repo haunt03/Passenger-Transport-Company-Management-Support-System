@@ -10,6 +10,11 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j(topic = "PASSWORD_CONTROLLER")
 @Controller // Để render views
 @RequiredArgsConstructor
+/**
+ * Controller xử lý việc đặt lại mật khẩu thông qua token.
+ * Người dùng truy cập trang đặt mật khẩu mới qua liên kết có token.
+ * @author Nguyen Thuy Hau
+ */
 public class PasswordController {
 
     private final PasswordService passwordService;
