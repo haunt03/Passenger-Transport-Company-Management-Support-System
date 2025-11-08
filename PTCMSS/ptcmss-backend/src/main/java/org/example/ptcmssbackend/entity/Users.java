@@ -40,6 +40,7 @@ public class Users implements UserDetails {
     @Size(max = 50)
     @NotNull
     @Column(name = "username", nullable = false, length = 50, unique = true)
+
     private String username;
 
     @Size(max = 255)
