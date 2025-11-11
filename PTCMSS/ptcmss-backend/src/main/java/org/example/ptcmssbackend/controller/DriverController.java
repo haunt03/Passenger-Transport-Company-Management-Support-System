@@ -118,4 +118,24 @@ public class DriverController {
             throw new RuntimeException(e);
         }
     }
+
+    // ======================================================
+    //  4️ Nghỉ phép tài xế
+    // ======================================================
+    @Operation(summary = "Gửi yêu cầu nghỉ phép", description = "Tài xế gửi yêu cầu nghỉ trong khoảng ngày, đợi duyệt từ quản lý chi nhánh.")
+    @PostMapping("/{driverId}/dayoff")
+    @PreAuthorize("hasRole('DRIVER')")
+    public ResponseData<DriverDayOffResponse> requestDayOff(
+            @Parameter(description = "ID tài xế") @PathVariable Integer driverId,
+            @RequestBody DriverDayOffRequest request) {
+        try{
+            log.info("Request day off successfully");
+            return new ResponseData<>(HttpStatus.OK.value(),
+                    "Request day off successfully",
+                    driverService.requestDayOff(driverId, request));
+        } catch (Exception e) {
+            log.error("Request day off failed", e);
+            throw new RuntimeException(e);
+        }
+    }
 }
