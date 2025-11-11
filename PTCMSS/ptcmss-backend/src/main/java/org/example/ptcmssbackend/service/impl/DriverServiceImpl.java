@@ -7,6 +7,7 @@ import org.example.ptcmssbackend.dto.request.Driver.DriverDayOffRequest;
 import org.example.ptcmssbackend.dto.request.Driver.DriverProfileUpdateRequest;
 import org.example.ptcmssbackend.dto.request.Driver.ReportIncidentRequest;
 import org.example.ptcmssbackend.dto.response.DriverDashboardResponse;
+import org.example.ptcmssbackend.dto.response.DriverDayOffResponse;
 import org.example.ptcmssbackend.dto.response.DriverProfileResponse;
 import org.example.ptcmssbackend.dto.response.DriverScheduleResponse;
 import org.example.ptcmssbackend.entity.DriverDayOff;
@@ -14,10 +15,7 @@ import org.example.ptcmssbackend.entity.Drivers;
 import org.example.ptcmssbackend.entity.TripIncidents;
 import org.example.ptcmssbackend.enums.DriverDayOffStatus;
 import org.example.ptcmssbackend.enums.TripStatus;
-import org.example.ptcmssbackend.repository.BranchesRepository;
-import org.example.ptcmssbackend.repository.DriverRepository;
-import org.example.ptcmssbackend.repository.EmployeeRepository;
-import org.example.ptcmssbackend.repository.TripDriverRepository;
+import org.example.ptcmssbackend.repository.*;
 import org.example.ptcmssbackend.service.DriverService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,7 +33,7 @@ public class DriverServiceImpl implements DriverService {
     private final TripDriverRepository tripDriverRepository;
     private final BranchesRepository branchRepository;
     private final EmployeeRepository employeeRepository;
-
+    private final DriverDayOffRepository driverDayOffRepository;
     @Override
     public DriverDashboardResponse getDashboard(Integer driverId) {
         log.info("[DriverDashboard] Fetching dashboard for driver {}", driverId);
@@ -101,5 +99,20 @@ public class DriverServiceImpl implements DriverService {
         return new DriverProfileResponse(driver);
     }
 
+    @Override
+    public DriverDayOffResponse requestDayOff(Integer driverId, DriverDayOffRequest request) {
+        log.info("[DriverDayOff] Request day off for driver {}", driverId);
+        var driver = driverRepository.findById(driverId)
+                .orElseThrow(() -> new RuntimeException("Driver not found"));
 
+        var dayOff = new DriverDayOff();
+        dayOff.setDriver(driver);
+        dayOff.setStartDate(request.getStartDate());
+        dayOff.setEndDate(request.getEndDate());
+        dayOff.setReason(request.getReason());
+        dayOff.setStatus(DriverDayOffStatus.Pending);
+
+        var saved = driverDayOffRepository.save(dayOff);
+        return new DriverDayOffResponse(saved);
+    }
 }
