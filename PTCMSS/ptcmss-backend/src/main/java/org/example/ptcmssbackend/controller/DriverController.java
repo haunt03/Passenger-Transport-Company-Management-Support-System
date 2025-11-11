@@ -66,4 +66,56 @@ public class DriverController {
     }
 
 
+    // ======================================================
+    //  3️ Hồ sơ cá nhân tài xế
+    // ======================================================
+    @Operation(summary = "Xem hồ sơ tài xế", description = "Hiển thị thông tin chi tiết cá nhân và nghiệp vụ của tài xế.")
+    @GetMapping("/{driverId}/profile")
+    @PreAuthorize("hasAnyRole('DRIVER', 'MANAGER', 'ADMIN')")
+    public ResponseData<DriverProfileResponse> getDriverProfile(
+            @Parameter(description = "ID tài xế") @PathVariable Integer driverId) {
+        try{
+            log.info("Get driver profile successfully");
+            return new ResponseData<>(HttpStatus.OK.value(),
+                    "Get driver profile successfully",
+                    driverService.getProfile(driverId));
+        } catch (Exception e) {
+            log.error("Get driver profile failed", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    // Endpoint tra cứu theo userId để FE dễ gọi khi chỉ có userId trong phiên
+    @Operation(summary = "Xem hồ sơ theo userId", description = "Dùng khi FE chỉ có userId trong session")
+    @GetMapping("/by-user/{userId}/profile")
+    @PreAuthorize("hasAnyRole('DRIVER', 'MANAGER', 'ADMIN')")
+    public ResponseData<DriverProfileResponse> getDriverProfileByUser(
+            @Parameter(description = "ID user") @PathVariable Integer userId) {
+        try {
+            log.info("Get driver profile by userId successfully");
+            return new ResponseData<>(HttpStatus.OK.value(),
+                    "Get driver profile by userId successfully",
+                    driverService.getProfileByUserId(userId));
+        } catch (Exception e) {
+            log.error("Get driver profile by userId failed", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Operation(summary = "Cập nhật hồ sơ tài xế", description = "Tài xế có thể chỉnh sửa số điện thoại, địa chỉ hoặc ghi chú.")
+    @PutMapping("/{driverId}/profile")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','DRIVER')")
+    public ResponseData<DriverProfileResponse> updateDriverProfile(
+            @Parameter(description = "ID tài xế") @PathVariable Integer driverId,
+            @RequestBody DriverProfileUpdateRequest request) {
+        try{
+            log.info("Update driver profile successfully");
+            return new ResponseData<>(HttpStatus.OK.value(),
+                    "Update driver profile successfully",
+                    driverService.updateProfile(driverId, request));
+        } catch (Exception e) {
+            log.error("Update driver profile failed", e);
+            throw new RuntimeException(e);
+        }
+    }
 }

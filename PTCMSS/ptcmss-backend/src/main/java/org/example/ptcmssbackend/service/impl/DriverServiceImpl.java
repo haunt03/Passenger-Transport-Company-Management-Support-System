@@ -6,13 +6,18 @@ import org.example.ptcmssbackend.dto.request.Driver.CreateDriverRequest;
 import org.example.ptcmssbackend.dto.request.Driver.DriverDayOffRequest;
 import org.example.ptcmssbackend.dto.request.Driver.DriverProfileUpdateRequest;
 import org.example.ptcmssbackend.dto.request.Driver.ReportIncidentRequest;
-import org.example.ptcmssbackend.dto.response.*;
+import org.example.ptcmssbackend.dto.response.DriverDashboardResponse;
+import org.example.ptcmssbackend.dto.response.DriverProfileResponse;
+import org.example.ptcmssbackend.dto.response.DriverScheduleResponse;
 import org.example.ptcmssbackend.entity.DriverDayOff;
 import org.example.ptcmssbackend.entity.Drivers;
 import org.example.ptcmssbackend.entity.TripIncidents;
 import org.example.ptcmssbackend.enums.DriverDayOffStatus;
 import org.example.ptcmssbackend.enums.TripStatus;
-import org.example.ptcmssbackend.repository.*;
+import org.example.ptcmssbackend.repository.BranchesRepository;
+import org.example.ptcmssbackend.repository.DriverRepository;
+import org.example.ptcmssbackend.repository.EmployeeRepository;
+import org.example.ptcmssbackend.repository.TripDriverRepository;
 import org.example.ptcmssbackend.service.DriverService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,9 +31,10 @@ import java.util.List;
 @Transactional
 public class DriverServiceImpl implements DriverService {
 
-
+    private final DriverRepository driverRepository;
     private final TripDriverRepository tripDriverRepository;
-
+    private final BranchesRepository branchRepository;
+    private final EmployeeRepository employeeRepository;
 
     @Override
     public DriverDashboardResponse getDashboard(Integer driverId) {
@@ -59,6 +65,40 @@ public class DriverServiceImpl implements DriverService {
                         td.getTrip().getStartTime(),
                         td.getTrip().getStatus()))
                 .toList();
+    }
+
+    @Override
+    public DriverProfileResponse getProfile(Integer driverId) {
+        log.info("[DriverProfile] Loading profile for driver {}", driverId);
+        var driver = driverRepository.findById(driverId)
+                .orElseThrow(() -> new RuntimeException("Driver not found"));
+        return new DriverProfileResponse(driver);
+    }
+
+    @Override
+    public DriverProfileResponse getProfileByUserId(Integer userId) {
+        log.info("[DriverProfile] Loading profile by userId {}", userId);
+        var employee = employeeRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("Employee not found for user"));
+        var driver = driverRepository.findByEmployee_Id(employee.getId())
+                .orElseThrow(() -> new RuntimeException("Driver not found for employee"));
+        return new DriverProfileResponse(driver);
+    }
+
+    @Override
+    public DriverProfileResponse updateProfile(Integer driverId, DriverProfileUpdateRequest request) {
+        log.info("[DriverProfile] Updating profile for driver {}", driverId);
+        var driver = driverRepository.findById(driverId)
+                .orElseThrow(() -> new RuntimeException("Driver not found"));
+        var user = driver.getEmployee().getUser();
+
+        if (request.getPhone() != null) user.setPhone(request.getPhone());
+        if (request.getAddress() != null) user.setAddress(request.getAddress());
+        if (request.getNote() != null) driver.setNote(request.getNote());
+        if (request.getHealthCheckDate() != null) driver.setHealthCheckDate(request.getHealthCheckDate());
+
+        driverRepository.save(driver);
+        return new DriverProfileResponse(driver);
     }
 
 
