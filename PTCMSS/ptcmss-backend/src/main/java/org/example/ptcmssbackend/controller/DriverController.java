@@ -173,4 +173,21 @@ public class DriverController {
             return new ResponseError(HttpStatus.BAD_REQUEST.value(), "Complete trip failed");
         }
     }
+
+    // ======================================================
+    //  6️ Báo cáo sự cố
+    // ======================================================
+    @Operation(summary = "Báo cáo sự cố", description = "Tài xế báo cáo các sự cố trong chuyến đi như hỏng xe, kẹt đường, tai nạn, ...")
+    @PostMapping("/report-incident")
+    @PreAuthorize("hasRole('DRIVER')")
+    public ResponseData<TripIncidentResponse> reportIncident(
+            @RequestBody ReportIncidentRequest request) {
+        try {
+            log.info("Report incident successfully");
+            return new ResponseData<>(HttpStatus.OK.value(), "Report incident successfully", driverService.reportIncident(request));
+        } catch (Exception e) {
+            log.error("Report incident failed", e);
+            return new ResponseError(HttpStatus.BAD_REQUEST.value(), "Report incident failed");
+        }
+    }
 }

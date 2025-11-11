@@ -3,10 +3,8 @@ package org.example.ptcmssbackend.service;
 
 import org.example.ptcmssbackend.dto.request.Driver.DriverDayOffRequest;
 import org.example.ptcmssbackend.dto.request.Driver.DriverProfileUpdateRequest;
-import org.example.ptcmssbackend.dto.response.DriverDashboardResponse;
-import org.example.ptcmssbackend.dto.response.DriverDayOffResponse;
-import org.example.ptcmssbackend.dto.response.DriverProfileResponse;
-import org.example.ptcmssbackend.dto.response.DriverScheduleResponse;
+import org.example.ptcmssbackend.dto.request.Driver.ReportIncidentRequest;
+import org.example.ptcmssbackend.dto.response.*;
 
 import java.util.List;
 
@@ -19,4 +17,5 @@ public interface DriverService {
     DriverDayOffResponse requestDayOff(Integer driverId, DriverDayOffRequest request);
     Integer startTrip(Integer tripId, Integer driverId);
     Integer completeTrip(Integer tripId, Integer driverId);
+    TripIncidentResponse reportIncident(ReportIncidentRequest request);
 }
