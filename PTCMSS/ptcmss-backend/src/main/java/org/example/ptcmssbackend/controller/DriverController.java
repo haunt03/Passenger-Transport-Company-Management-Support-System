@@ -37,7 +37,7 @@ public class DriverController {
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','DRIVER')")
     public ResponseData<DriverDashboardResponse> getDriverDashboard(
             @Parameter(description = "ID tài xế") @PathVariable Integer driverId) {
-        try{
+        try {
             return new ResponseData<>(HttpStatus.OK.value(),
                     "Get driver dashboard successfully",
                     driverService.getDashboard(driverId));
@@ -54,15 +54,15 @@ public class DriverController {
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','DRIVER')")
     public ResponseData<List<DriverScheduleResponse>> getDriverSchedule(
             @Parameter(description = "ID tài xế") @PathVariable Integer driverId) {
-         try{
-             log.info("Get driver schedule successfully");
-             return new ResponseData<>(HttpStatus.OK.value(),
-                     "Get driver schedule successfully",
-                     driverService.getSchedule(driverId));
-         } catch (Exception e) {
-             log.error("Get driver schedule failed", e);
-             throw new RuntimeException(e);
-         }
+        try {
+            log.info("Get driver schedule successfully");
+            return new ResponseData<>(HttpStatus.OK.value(),
+                    "Get driver schedule successfully",
+                    driverService.getSchedule(driverId));
+        } catch (Exception e) {
+            log.error("Get driver schedule failed", e);
+            throw new RuntimeException(e);
+        }
     }
 
 
@@ -74,7 +74,7 @@ public class DriverController {
     @PreAuthorize("hasAnyRole('DRIVER', 'MANAGER', 'ADMIN')")
     public ResponseData<DriverProfileResponse> getDriverProfile(
             @Parameter(description = "ID tài xế") @PathVariable Integer driverId) {
-        try{
+        try {
             log.info("Get driver profile successfully");
             return new ResponseData<>(HttpStatus.OK.value(),
                     "Get driver profile successfully",
@@ -108,7 +108,7 @@ public class DriverController {
     public ResponseData<DriverProfileResponse> updateDriverProfile(
             @Parameter(description = "ID tài xế") @PathVariable Integer driverId,
             @RequestBody DriverProfileUpdateRequest request) {
-        try{
+        try {
             log.info("Update driver profile successfully");
             return new ResponseData<>(HttpStatus.OK.value(),
                     "Update driver profile successfully",
@@ -128,7 +128,7 @@ public class DriverController {
     public ResponseData<DriverDayOffResponse> requestDayOff(
             @Parameter(description = "ID tài xế") @PathVariable Integer driverId,
             @RequestBody DriverDayOffRequest request) {
-        try{
+        try {
             log.info("Request day off successfully");
             return new ResponseData<>(HttpStatus.OK.value(),
                     "Request day off successfully",
@@ -136,6 +136,41 @@ public class DriverController {
         } catch (Exception e) {
             log.error("Request day off failed", e);
             throw new RuntimeException(e);
+        }
+    }
+
+    // ======================================================
+    //  5 Bắt đầu và hoàn thành chuyến đi
+    // ======================================================
+    @Operation(summary = "Bắt đầu chuyến đi", description = "Tài xế xác nhận bắt đầu một chuyến đã được gán.")
+    @PostMapping("/{driverId}/trips/{tripId}/start")
+    @PreAuthorize("hasRole('DRIVER')")
+    public ResponseData<?> startTrip(
+            @Parameter(description = "ID tài xế") @PathVariable Integer driverId,
+            @Parameter(description = "ID chuyến đi") @PathVariable Integer tripId) {
+        try {
+            log.info("Start trip successfully");
+            return new ResponseData<>(HttpStatus.OK.value(),
+                    "Start trip successfully", driverService.startTrip(tripId, driverId));
+        } catch (Exception e) {
+            log.error("Start trip failed", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Operation(summary = "Hoàn thành chuyến đi", description = "Tài xế xác nhận hoàn tất chuyến đi.")
+    @PostMapping("/{driverId}/trips/{tripId}/complete")
+    @PreAuthorize("hasRole('DRIVER')")
+    public ResponseData<?> completeTrip(
+            @Parameter(description = "ID tài xế") @PathVariable Integer driverId,
+            @Parameter(description = "ID chuyến đi") @PathVariable Integer tripId) {
+        try {
+            log.info("Complete trip successfully");
+            return new ResponseData<>(HttpStatus.OK.value(),
+                    "Complete trip successfully", driverService.completeTrip(tripId, driverId));
+        } catch (Exception e) {
+            log.error("Complete trip failed", e);
+            return new ResponseError(HttpStatus.BAD_REQUEST.value(), "Complete trip failed");
         }
     }
 }
