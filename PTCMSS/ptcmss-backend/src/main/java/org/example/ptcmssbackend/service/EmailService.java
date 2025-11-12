@@ -47,4 +47,28 @@ public class EmailService {
 
         mailSender.send(message);
     }
+
+    public void sendPasswordResetEmail(String toEmail, String fullName, String token, String baseUrl)
+            throws MessagingException, UnsupportedEncodingException {
+
+        String subject = "Đặt lại mật khẩu";
+        String resetUrl = baseUrl + "/set-password?token=" + token;
+
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("fullName", fullName);
+        variables.put("resetUrl", resetUrl);
+
+        Context context = new Context();
+        context.setVariables(variables);
+        String htmlContent = templateEngine.process("forgot-password-email", context);
+
+        MimeMessage message = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, "UTF-8");
+        helper.setFrom(fromEmail, "Hệ thống quản lý nhân sự");
+        helper.setTo(toEmail);
+        helper.setSubject(subject);
+        helper.setText(htmlContent, true);
+
+        mailSender.send(message);
+    }
 }

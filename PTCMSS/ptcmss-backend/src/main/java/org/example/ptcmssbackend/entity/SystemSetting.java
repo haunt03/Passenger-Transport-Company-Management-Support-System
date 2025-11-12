@@ -9,6 +9,7 @@ import org.example.ptcmssbackend.enums.ValueType;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.Instant;
+import java.time.LocalDate;
 
 @Getter
 @Setter
@@ -16,6 +17,7 @@ import java.time.Instant;
 @AllArgsConstructor
 @Builder
 @Entity
+@Table(name = "SystemSettings")  // Match với tên bảng trong DB (camelCase)
 public class SystemSetting {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -33,8 +35,16 @@ public class SystemSetting {
     private String settingValue;
 
     @NotNull
+    @Column(name = "effectiveStartDate", nullable = false)
+    private LocalDate effectiveStartDate;
+
+    @Column(name = "effectiveEndDate")
+    private LocalDate effectiveEndDate;
+
+    @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "valueType", nullable = false)
+    @Builder.Default
     private ValueType valueType = ValueType.STRING;
 
     @Size(max = 100)
@@ -55,6 +65,7 @@ public class SystemSetting {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
+    @Builder.Default
     private SettingStatus status = SettingStatus.ACTIVE;
 
 }

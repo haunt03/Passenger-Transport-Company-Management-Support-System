@@ -10,7 +10,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.example.ptcmssbackend.dto.request.User.CreateUserRequest;
 import org.example.ptcmssbackend.dto.request.User.UpdateUserRequest;
-import org.example.ptcmssbackend.dto.response.UserResponse;
+import org.example.ptcmssbackend.dto.response.User.UserResponse;
 import org.example.ptcmssbackend.dto.response.common.ResponseData;
 import org.example.ptcmssbackend.entity.Users;
 import org.example.ptcmssbackend.enums.UserStatus;

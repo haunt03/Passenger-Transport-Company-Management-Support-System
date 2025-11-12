@@ -15,6 +15,7 @@ import java.time.LocalDate;
 public class Vehicles {
     @Id
     @Column(name = "vehicleId", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @NotNull
@@ -36,6 +37,10 @@ public class Vehicles {
     @Column(name = "model", length = 100)
     private String model;
 
+    @Size(max = 100)
+    @Column(name = "brand", length = 100)
+    private String brand;
+
     @Column(name = "capacity")
     private Integer capacity;
 
@@ -48,8 +53,14 @@ public class Vehicles {
     @Column(name = "inspectionExpiry")
     private LocalDate inspectionExpiry;
 
+    @Column(name = "insuranceExpiry")
+    private LocalDate insuranceExpiry;
+
+    @Column(name = "odometer")
+    private Long odometer;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
-    private VehicleStatus status= VehicleStatus.AVAILABLE;
+    private VehicleStatus status= VehicleStatus.Available;
 
 }

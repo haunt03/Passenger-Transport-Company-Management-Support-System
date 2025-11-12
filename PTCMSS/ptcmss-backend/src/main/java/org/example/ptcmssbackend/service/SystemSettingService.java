@@ -1,7 +1,7 @@
 package org.example.ptcmssbackend.service;
 
-import org.example.ptcmssbackend.dto.request.SystemSettingRequest;
-import org.example.ptcmssbackend.dto.response.SystemSettingResponse;
+import org.example.ptcmssbackend.dto.request.SystemSetting.SystemSettingRequest;
+import org.example.ptcmssbackend.dto.response.SystemSetting.SystemSettingResponse;
 
 import java.util.List;
 

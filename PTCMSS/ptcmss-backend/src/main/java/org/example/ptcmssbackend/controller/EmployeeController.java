@@ -7,7 +7,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import lombok.RequiredArgsConstructor;
-import org.example.ptcmssbackend.dto.EmployeeDTO;
+import org.example.ptcmssbackend.dto.response.Employee.EmployeeResponse;
 import org.example.ptcmssbackend.entity.Employees;
 import org.example.ptcmssbackend.mapper.EmployeeMapper;
 import org.example.ptcmssbackend.service.EmployeeService;
@@ -31,8 +31,8 @@ public class EmployeeController {
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     @Operation(summary = "Lấy danh sách tất cả nhân viên")
     @GetMapping
-    public ResponseEntity<List<EmployeeDTO>> getAllEmployees() {
-        List<EmployeeDTO> result = employeeService.findAll()
+    public ResponseEntity<List<EmployeeResponse>> getAllEmployees() {
+        List<EmployeeResponse> result = employeeService.findAll()
                 .stream()
                 .map(employeeMapper::toDTO)
                 .collect(Collectors.toList());
@@ -50,7 +50,7 @@ public class EmployeeController {
     })
     @GetMapping("/role/{roleName}")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
-    public ResponseEntity<List<EmployeeDTO>> getEmployeesByRole(
+    public ResponseEntity<List<EmployeeResponse>> getEmployeesByRole(
             @Parameter(description = "Tên vai trò (roleName), ví dụ: Manager, Driver, Admin", example = "Manager")
             @PathVariable String roleName) {
 
@@ -59,7 +59,7 @@ public class EmployeeController {
             return ResponseEntity.notFound().build();
         }
 
-        List<EmployeeDTO> result = employees.stream()
+        List<EmployeeResponse> result = employees.stream()
                 .map(employeeMapper::toDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(result);
@@ -68,7 +68,7 @@ public class EmployeeController {
     // ----------- API: Lấy chi tiết nhân viên -----------
     @Operation(summary = "Lấy thông tin nhân viên theo ID")
     @GetMapping("/{id}")
-    public ResponseEntity<EmployeeDTO> getEmployeeById(@PathVariable Integer id) {
+    public ResponseEntity<EmployeeResponse> getEmployeeById(@PathVariable Integer id) {
         Employees employee = employeeService.findById(id);
         if (employee == null) {
             return ResponseEntity.notFound().build();
@@ -79,7 +79,7 @@ public class EmployeeController {
     // ----------- API: Tạo hoặc cập nhật nhân viên -----------
     @Operation(summary = "Tạo mới hoặc cập nhật nhân viên")
     @PostMapping
-    public ResponseEntity<EmployeeDTO> createOrUpdateEmployee(@RequestBody Employees employee) {
+    public ResponseEntity<EmployeeResponse> createOrUpdateEmployee(@RequestBody Employees employee) {
         Employees saved = employeeService.save(employee);
         return ResponseEntity.ok(employeeMapper.toDTO(saved));
     }

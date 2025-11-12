@@ -1,8 +1,8 @@
 package org.example.ptcmssbackend.controller;
 
 import lombok.RequiredArgsConstructor;
-import org.example.ptcmssbackend.dto.request.SystemSettingRequest;
-import org.example.ptcmssbackend.dto.response.SystemSettingResponse;
+import org.example.ptcmssbackend.dto.request.SystemSetting.SystemSettingRequest;
+import org.example.ptcmssbackend.dto.response.SystemSetting.SystemSettingResponse;
 import org.example.ptcmssbackend.service.SystemSettingService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
