@@ -7,8 +7,6 @@ import org.example.ptcmssbackend.enums.UserStatus;
 
 import java.util.List;
 
-
-
 public interface RoleService {
     Roles createRole(CreateRoleRequest request);
     Roles updateRole(Integer id, UpdateRoleRequest request);

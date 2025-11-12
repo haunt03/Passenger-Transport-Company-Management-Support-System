@@ -1,6 +1,6 @@
 package org.example.ptcmssbackend.service;
 
-
+import org.example.ptcmssbackend.dto.request.Driver.CreateDriverRequest;
 import org.example.ptcmssbackend.dto.request.Driver.DriverDayOffRequest;
 import org.example.ptcmssbackend.dto.request.Driver.DriverProfileUpdateRequest;
 import org.example.ptcmssbackend.dto.request.Driver.ReportIncidentRequest;
@@ -18,4 +18,5 @@ public interface DriverService {
     Integer startTrip(Integer tripId, Integer driverId);
     Integer completeTrip(Integer tripId, Integer driverId);
     TripIncidentResponse reportIncident(ReportIncidentRequest request);
+    DriverResponse createDriver(CreateDriverRequest request);
 }

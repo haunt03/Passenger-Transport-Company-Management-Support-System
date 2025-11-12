@@ -6,10 +6,7 @@ import org.example.ptcmssbackend.dto.request.Driver.CreateDriverRequest;
 import org.example.ptcmssbackend.dto.request.Driver.DriverDayOffRequest;
 import org.example.ptcmssbackend.dto.request.Driver.DriverProfileUpdateRequest;
 import org.example.ptcmssbackend.dto.request.Driver.ReportIncidentRequest;
-import org.example.ptcmssbackend.dto.response.DriverDashboardResponse;
-import org.example.ptcmssbackend.dto.response.DriverDayOffResponse;
-import org.example.ptcmssbackend.dto.response.DriverProfileResponse;
-import org.example.ptcmssbackend.dto.response.DriverScheduleResponse;
+import org.example.ptcmssbackend.dto.response.*;
 import org.example.ptcmssbackend.entity.DriverDayOff;
 import org.example.ptcmssbackend.entity.Drivers;
 import org.example.ptcmssbackend.entity.TripIncidents;
@@ -30,10 +27,13 @@ import java.util.List;
 public class DriverServiceImpl implements DriverService {
 
     private final DriverRepository driverRepository;
+    private final TripRepository tripRepository;
     private final TripDriverRepository tripDriverRepository;
+    private final DriverDayOffRepository driverDayOffRepository;
+    private final TripIncidentRepository tripIncidentRepository;
     private final BranchesRepository branchRepository;
     private final EmployeeRepository employeeRepository;
-    private final DriverDayOffRepository driverDayOffRepository;
+
     @Override
     public DriverDashboardResponse getDashboard(Integer driverId) {
         log.info("[DriverDashboard] Fetching dashboard for driver {}", driverId);
@@ -114,5 +114,81 @@ public class DriverServiceImpl implements DriverService {
 
         var saved = driverDayOffRepository.save(dayOff);
         return new DriverDayOffResponse(saved);
+    }
+
+    @Override
+    public Integer startTrip(Integer tripId, Integer driverId) {
+        log.info("[Trip] Driver {} started trip {}", driverId, tripId);
+        var trip = tripRepository.findById(tripId)
+                .orElseThrow(() -> new RuntimeException("Trip not found"));
+        trip.setStatus(TripStatus.ONGOING);
+        trip.setStartTime(Instant.now());
+        tripRepository.save(trip);
+
+        return tripId;
+    }
+
+    @Override
+    public Integer completeTrip(Integer tripId, Integer driverId) {
+        log.info("[Trip] Driver {} completed trip {}", driverId, tripId);
+        var trip = tripRepository.findById(tripId)
+                .orElseThrow(() -> new RuntimeException("Trip not found"));
+        trip.setStatus(TripStatus.COMPLETED);
+        trip.setEndTime(Instant.now());
+        tripRepository.save(trip);
+
+        return tripId;
+    }
+
+    @Override
+    public TripIncidentResponse reportIncident(ReportIncidentRequest request) {
+        log.info("[TripIncident] Driver reports issue for trip {}: {}", request.getTripId(), request.getDescription());
+
+        var trip = tripRepository.findById(request.getTripId())
+                .orElseThrow(() -> new RuntimeException("Trip not found"));
+        var driver = driverRepository.findById(request.getDriverId())
+                .orElseThrow(() -> new RuntimeException("Driver not found"));
+
+        var incident = new TripIncidents();
+        incident.setTrip(trip);
+        incident.setDriver(driver);
+        incident.setDescription(request.getDescription());
+        incident.setSeverity(request.getSeverity());
+        incident.setResolved(false);
+
+        var saved = tripIncidentRepository.save(incident);
+
+        return new TripIncidentResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public DriverResponse createDriver(CreateDriverRequest request) {
+
+        log.info("[DriverService] Creating new driver for employeeId={}, branchId={}",
+                request.getEmployeeId(), request.getBranchId());
+
+        var branch = branchRepository.findById(request.getBranchId())
+                .orElseThrow(() -> new RuntimeException("Branch not found"));
+
+        var employee = employeeRepository.findById(request.getEmployeeId())
+                .orElseThrow(() -> new RuntimeException("Employee not found"));
+
+        if (driverRepository.existsByLicenseNumber(request.getLicenseNumber())) {
+            throw new RuntimeException("Driver with this license number already exists");
+        }
+
+        var driver = new Drivers();
+        driver.setEmployee(employee);
+        driver.setBranch(branch);
+        driver.setLicenseNumber(request.getLicenseNumber());
+        driver.setLicenseClass(request.getLicenseClass());
+        driver.setLicenseExpiry(request.getLicenseExpiry());
+        driver.setHealthCheckDate(request.getHealthCheckDate());
+        driver.setPriorityLevel(request.getPriorityLevel());
+        driver.setNote(request.getNote());
+
+        var saved = driverRepository.save(driver);
+        return new DriverResponse(saved);
     }
 }

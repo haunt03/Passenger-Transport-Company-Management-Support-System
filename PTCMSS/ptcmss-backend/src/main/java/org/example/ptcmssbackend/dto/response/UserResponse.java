@@ -13,5 +13,8 @@ public class UserResponse {
     private String email;
     private String phone;
     private String roleName;
+    private String imgUrl;
     private String status;
+    private String address;
 }
+
