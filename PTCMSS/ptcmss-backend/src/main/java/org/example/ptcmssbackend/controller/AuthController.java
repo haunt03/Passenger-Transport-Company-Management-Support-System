@@ -8,8 +8,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.ptcmssbackend.dto.request.Auth.ForgotPasswordRequest;
 import org.example.ptcmssbackend.dto.request.Auth.LoginRequest;
-import org.example.ptcmssbackend.dto.response.TokenResponse;
+import org.example.ptcmssbackend.dto.response.Auth.TokenResponse;
 import org.example.ptcmssbackend.service.AuthenticationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -97,5 +98,21 @@ public class AuthController {
         String frontendUrl = authService.verifyAccount(token);
         log.info("[VERIFY] Redirecting to frontend: {}", frontendUrl);
         return new RedirectView(frontendUrl);
+    }
+
+    // ---------------- FORGOT PASSWORD ----------------
+    @Operation(
+            summary = "Quên mật khẩu",
+            description = "Gửi email chứa link đặt lại mật khẩu đến địa chỉ email đã đăng ký.",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Nếu email tồn tại, link đặt lại mật khẩu đã được gửi"),
+                    @ApiResponse(responseCode = "400", description = "Email không hợp lệ")
+            }
+    )
+    @PostMapping("/forgot-password")
+    public ResponseEntity<String> forgotPassword(@Validated @RequestBody ForgotPasswordRequest request) {
+        log.info("[FORGOT_PASSWORD] Request received for email: {}", request.getEmail());
+        String message = authService.forgotPassword(request.getEmail());
+        return ResponseEntity.ok(message);
     }
 }

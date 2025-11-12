@@ -1,19 +1,23 @@
 package org.example.ptcmssbackend.service.impl;
 
-import io.micrometer.common.util.StringUtils;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.Cookie;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.ptcmssbackend.dto.request.Auth.LoginRequest;
-import org.example.ptcmssbackend.dto.response.TokenResponse;
+import org.example.ptcmssbackend.dto.response.Auth.TokenResponse;
 import org.example.ptcmssbackend.entity.Token;
 import org.example.ptcmssbackend.entity.Users;
 import org.example.ptcmssbackend.exception.ForBiddenException;
 import org.example.ptcmssbackend.exception.InvalidDataException;
 import org.example.ptcmssbackend.repository.UsersRepository;
 import org.example.ptcmssbackend.service.AuthenticationService;
+import org.example.ptcmssbackend.service.EmailService;
 import org.example.ptcmssbackend.service.JwtService;
 import org.example.ptcmssbackend.service.TokenService;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import jakarta.mail.MessagingException;
+import java.io.UnsupportedEncodingException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -34,10 +38,24 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
     private final TokenService tokenService;
+    private final EmailService emailService;
 
     @Override
     public TokenResponse getAccessToken(LoginRequest request) {
-        log.info("Authenticating user: {}", request.getUsername());
+        log.info("[LOGIN] Authenticating user: {}", request.getUsername());
+
+        // Kiểm tra user có tồn tại không trước
+        Users user = userRepository.findByUsername(request.getUsername())
+                .orElseThrow(() -> {
+                    log.error("[LOGIN] User not found: {}", request.getUsername());
+                    throw new InvalidDataException("Invalid username or password");
+                });
+
+        // Kiểm tra user có enabled không
+        if (!user.isEnabled()) {
+            log.error("[LOGIN] User is disabled: {} (status: {})", request.getUsername(), user.getStatus());
+            throw new AccessDeniedException("Account is disabled. Please contact administrator.");
+        }
 
         try {
             Authentication authentication = authenticationManager.authenticate(
@@ -47,13 +65,16 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                     )
             );
             SecurityContextHolder.getContext().setAuthentication(authentication);
+            log.info("[LOGIN] Authentication successful for user: {}", request.getUsername());
+        } catch (org.springframework.security.authentication.BadCredentialsException e) {
+            log.error("[LOGIN] Bad credentials for user: {} - {}", request.getUsername(), e.getMessage());
+            throw new AccessDeniedException("Invalid username or password");
         } catch (Exception e) {
-            log.error("Error authenticating user: {}", e.getMessage());
+            log.error("[LOGIN] Error authenticating user: {} - {}", request.getUsername(), e.getMessage(), e);
             throw new AccessDeniedException("Invalid username or password");
         }
 
-        Users user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new InvalidDataException("User not found"));
+        // User đã được load ở trên, không cần load lại
 
         // Tạo JWT token
         String accessToken = jwtService.generateAccessToken(
@@ -79,6 +100,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         return TokenResponse.builder()
                 .AccessToken(accessToken)
                 .RefreshToken(refreshToken)
+                .userId(user.getId())
                 .username(user.getUsername())
                 .roleName(user.getRole().getRoleName())
                 .build();
@@ -117,13 +139,46 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     public String removeToken(HttpServletRequest request) {
         log.info("---------- removeToken ----------");
 
-        final String token = request.getHeader("Authorization");
-        if (StringUtils.isBlank(token)) {
+        // 1) Try Authorization header (case-insensitive)
+        String authHeader = request.getHeader("Authorization");
+        if (!org.springframework.util.StringUtils.hasLength(authHeader)) {
+            authHeader = request.getHeader("authorization");
+        }
+
+        String jwt = null;
+        if (org.springframework.util.StringUtils.hasLength(authHeader)) {
+            jwt = authHeader.startsWith("Bearer ") ? authHeader.substring(7) : authHeader.trim();
+        }
+
+        // 2) Fallback to cookie "accessToken"
+        if (!org.springframework.util.StringUtils.hasLength(jwt)) {
+            Cookie[] cookies = request.getCookies();
+            if (cookies != null) {
+                for (Cookie c : cookies) {
+                    if ("accessToken".equals(c.getName())) {
+                        jwt = c.getValue();
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 3) Fallback to request parameter
+        if (!org.springframework.util.StringUtils.hasLength(jwt)) {
+            jwt = request.getParameter("accessToken");
+        }
+
+        if (!org.springframework.util.StringUtils.hasLength(jwt)) {
             throw new InvalidDataException("Token must not be blank");
         }
 
-        final String jwt = token.replace("Bearer ", "");
-        final String userName = jwtService.extractUsername(jwt, ACCESS_TOKEN);
+        String userName;
+        try {
+            userName = jwtService.extractUsername(jwt, ACCESS_TOKEN);
+        } catch (Exception ex) {
+            log.error("[LOGOUT] ACCESS token invalid signature. Trying REFRESH. cause: {}", ex.getMessage());
+            userName = jwtService.extractUsername(jwt, REFRESH_TOKEN);
+        }
         tokenService.delete(userName);
         return "Removed!";
     }
@@ -149,5 +204,43 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         } catch (Exception e) {
             throw new ForBiddenException("Invalid or expired verification token. " + e.getMessage());
         }
+    }
+
+    @Override
+    public String forgotPassword(String email) {
+        log.info("[FORGOT_PASSWORD] Request password reset for email: {}", email);
+
+        // Tìm user theo email
+        Users user = userRepository.findByEmail(email)
+                .orElse(null);
+
+        // Luôn trả về message thành công để không tiết lộ thông tin user
+        // (Security best practice: không cho attacker biết email có tồn tại hay không)
+        if (user == null) {
+            log.warn("[FORGOT_PASSWORD] Email not found: {}", email);
+            return "Nếu email tồn tại trong hệ thống, bạn sẽ nhận được link đặt lại mật khẩu.";
+        }
+
+        // Tạo password reset token
+        String passwordResetToken = jwtService.generatePasswordResetToken(user.getUsername());
+
+        // Tạo URL reset password
+        String baseUrl = ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString();
+
+        // Gửi email
+        try {
+            emailService.sendPasswordResetEmail(
+                    user.getEmail(),
+                    user.getFullName(),
+                    passwordResetToken,
+                    baseUrl
+            );
+            log.info("[FORGOT_PASSWORD] Password reset email sent to: {}", email);
+        } catch (MessagingException | UnsupportedEncodingException e) {
+            log.error("[FORGOT_PASSWORD] Failed to send email: {}", e.getMessage());
+            throw new RuntimeException("Không thể gửi email đặt lại mật khẩu. Vui lòng thử lại sau.");
+        }
+
+        return "Nếu email tồn tại trong hệ thống, bạn sẽ nhận được link đặt lại mật khẩu.";
     }
 }

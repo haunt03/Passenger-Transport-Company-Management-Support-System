@@ -2,7 +2,7 @@ package org.example.ptcmssbackend.service;
 
 import org.example.ptcmssbackend.dto.request.Branch.CreateBranchRequest;
 import org.example.ptcmssbackend.dto.request.Branch.UpdateBranchRequest;
-import org.example.ptcmssbackend.dto.response.BranchResponse;
+import org.example.ptcmssbackend.dto.response.Branch.BranchResponse;
 import org.example.ptcmssbackend.dto.response.common.PageResponse;
 
 public interface BranchService {

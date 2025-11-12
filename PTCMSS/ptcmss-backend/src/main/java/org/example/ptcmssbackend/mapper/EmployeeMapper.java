@@ -1,16 +1,16 @@
 package org.example.ptcmssbackend.mapper;
 
-import org.example.ptcmssbackend.dto.EmployeeDTO;
+import org.example.ptcmssbackend.dto.response.Employee.EmployeeResponse;
 import org.example.ptcmssbackend.entity.Employees;
 import org.springframework.stereotype.Component;
 
 @Component
 public class EmployeeMapper {
 
-    public EmployeeDTO toDTO(Employees employee) {
+    public EmployeeResponse toDTO(Employees employee) {
         if (employee == null) return null;
 
-        return EmployeeDTO.builder()
+        return EmployeeResponse.builder()
                 .id(employee.getId())
                 .userId(employee.getUser() != null ? employee.getUser().getId() : null)
                 .userFullName(employee.getUser() != null ? employee.getUser().getFullName() : null)
@@ -22,7 +22,7 @@ public class EmployeeMapper {
                 .build();
     }
 
-    public Employees toEntity(EmployeeDTO dto) {
+    public Employees toEntity(EmployeeResponse dto) {
         if (dto == null) return null;
 
         Employees employee = new Employees();

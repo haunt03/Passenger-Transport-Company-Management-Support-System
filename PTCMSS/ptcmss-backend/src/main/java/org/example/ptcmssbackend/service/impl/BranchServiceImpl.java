@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.ptcmssbackend.dto.request.Branch.CreateBranchRequest;
 import org.example.ptcmssbackend.dto.request.Branch.UpdateBranchRequest;
-import org.example.ptcmssbackend.dto.response.BranchResponse;
+import org.example.ptcmssbackend.dto.response.Branch.BranchResponse;
 import org.example.ptcmssbackend.dto.response.common.PageResponse;
 import org.example.ptcmssbackend.entity.Branches;
 import org.example.ptcmssbackend.entity.Employees;

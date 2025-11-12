@@ -2,7 +2,7 @@ package org.example.ptcmssbackend.service;
 
 import org.example.ptcmssbackend.dto.request.User.CreateUserRequest;
 import org.example.ptcmssbackend.dto.request.User.UpdateUserRequest;
-import org.example.ptcmssbackend.dto.response.UserResponse;
+import org.example.ptcmssbackend.dto.response.User.UserResponse;
 import org.example.ptcmssbackend.enums.UserStatus;
 import org.springframework.web.multipart.MultipartFile;
 

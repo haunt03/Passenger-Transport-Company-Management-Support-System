@@ -1,8 +1,8 @@
 package org.example.ptcmssbackend.service.impl;
 
 import lombok.RequiredArgsConstructor;
-import org.example.ptcmssbackend.dto.request.SystemSettingRequest;
-import org.example.ptcmssbackend.dto.response.SystemSettingResponse;
+import org.example.ptcmssbackend.dto.request.SystemSetting.SystemSettingRequest;
+import org.example.ptcmssbackend.dto.response.SystemSetting.SystemSettingResponse;
 import org.example.ptcmssbackend.entity.Employees;
 import org.example.ptcmssbackend.entity.SystemSetting;
 import org.example.ptcmssbackend.enums.SettingStatus;
