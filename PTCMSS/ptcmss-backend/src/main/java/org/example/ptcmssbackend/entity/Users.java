@@ -40,8 +40,11 @@ public class Users implements UserDetails {
     @Size(max = 50)
     @NotNull
     @Column(name = "username", nullable = false, length = 50, unique = true)
-
     private String username;
+
+    @Size(max = 255)
+    @Column(name = "avatar")
+    private String avatar;
 
     @Size(max = 255)
     @NotNull
@@ -82,7 +85,7 @@ public class Users implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // Role sẽ luôn được load (EAGER), không còn lỗi "no Session"
+        //  Role sẽ luôn được load (EAGER), không còn lỗi "no Session"
         String roleName = role != null ? role.getRoleName().toUpperCase() : "USER";
         return Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + roleName));
     }
