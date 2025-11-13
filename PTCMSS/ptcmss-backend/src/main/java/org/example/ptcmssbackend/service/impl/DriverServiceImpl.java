@@ -78,7 +78,7 @@ public class DriverServiceImpl implements DriverService {
         log.info("[DriverProfile] Loading profile by userId {}", userId);
         var employee = employeeRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Employee not found for user"));
-        var driver = driverRepository.findByEmployee_Id(employee.getId())
+        var driver = driverRepository.findByEmployee_Id(employee.getEmployeeId())
                 .orElseThrow(() -> new RuntimeException("Driver not found for employee"));
         return new DriverProfileResponse(driver);
     }
@@ -159,6 +159,15 @@ public class DriverServiceImpl implements DriverService {
         var saved = tripIncidentRepository.save(incident);
 
         return new TripIncidentResponse(saved);
+    }
+
+    @Override
+    public List<DriverDayOffResponse> getDayOffHistory(Integer driverId) {
+        log.info("[DriverDayOff] Loading day off history for driver {}", driverId);
+        return driverDayOffRepository.findByDriver_Id(driverId).stream()
+                .map(DriverDayOffResponse::new)
+                .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt())) // Mới nhất trước
+                .collect(java.util.stream.Collectors.toList());
     }
 
     @Override
