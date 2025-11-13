@@ -17,6 +17,7 @@ import java.time.Instant;
 public class Trips {
     @Id
     @Column(name = "tripId", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @NotNull

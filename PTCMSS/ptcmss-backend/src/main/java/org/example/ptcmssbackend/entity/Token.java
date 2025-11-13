@@ -1,8 +1,9 @@
 package org.example.ptcmssbackend.entity;
 
 
-import jakarta.persistence.*;
+import jakarta.persistence.Entity;
 import lombok.*;
+import jakarta.persistence.*;
 
 
 @Setter

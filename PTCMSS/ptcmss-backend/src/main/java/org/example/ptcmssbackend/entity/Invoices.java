@@ -20,6 +20,7 @@ import java.time.Instant;
 public class Invoices {
     @Id
     @Column(name = "invoiceId", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @NotNull
@@ -39,6 +40,10 @@ public class Invoices {
     @Enumerated(EnumType.STRING)
     @Column(name = "type", nullable = false)
     private InvoiceType type;
+
+    @Size(max = 50)
+    @Column(name = "costType", length = 50)
+    private String costType;
 
     @NotNull
     @ColumnDefault("0")

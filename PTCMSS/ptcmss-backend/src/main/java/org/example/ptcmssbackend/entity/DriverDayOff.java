@@ -17,6 +17,7 @@ import java.time.LocalDate;
 public class DriverDayOff {
     @Id
     @Column(name = "dayOffId", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @NotNull

@@ -15,6 +15,7 @@ import java.time.Instant;
 public class TripVehicles {
     @Id
     @Column(name = "tripVehicleId", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @NotNull
@@ -35,5 +36,12 @@ public class TripVehicles {
     @Size(max = 255)
     @Column(name = "note")
     private String note;
+
+    @PrePersist
+    public void prePersist() {
+        if (assignedAt == null) {
+            assignedAt = Instant.now();
+        }
+    }
 
 }

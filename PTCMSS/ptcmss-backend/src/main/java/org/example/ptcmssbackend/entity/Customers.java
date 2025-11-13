@@ -16,6 +16,7 @@ import java.time.Instant;
 public class Customers {
     @Id
     @Column(name = "customerId", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @Size(max = 100)

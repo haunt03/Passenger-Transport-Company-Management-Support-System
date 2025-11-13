@@ -20,6 +20,7 @@ import java.time.LocalDate;
 public class AccountsReceivable {
     @Id
     @Column(name = "arId", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @NotNull

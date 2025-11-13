@@ -1,5 +1,10 @@
 package org.example.ptcmssbackend.enums;
 
 public enum BookingStatus {
-    PENDING, CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED
+    PENDING,           // Chờ báo giá (Lưu nháp)
+    QUOTATION_SENT,    // Đã gửi báo giá (chờ khách xác nhận)
+    CONFIRMED,         // Khách đã đồng ý (chờ điều phối)
+    IN_PROGRESS,       // Đang thực hiện
+    COMPLETED,         // Hoàn thành
+    CANCELLED          // Hủy bỏ
 }
