@@ -19,6 +19,7 @@ import java.time.LocalDate;
 public class Drivers {
     @Id
     @Column(name = "driverId", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @NotNull
@@ -60,7 +61,7 @@ public class Drivers {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
-    private DriverStatus status=DriverStatus.AVAILABLE;
+    private DriverStatus status=DriverStatus.Available;
 
     @CreationTimestamp
     @Column(name = "createdAt")

@@ -19,6 +19,7 @@ import java.time.LocalDate;
 public class VehicleCategoryPricing {
     @Id
     @Column(name = "categoryId", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @Size(max = 100)

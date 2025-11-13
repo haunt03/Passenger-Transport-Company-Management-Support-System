@@ -61,6 +61,6 @@ public class Vehicles {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
-    private VehicleStatus status= VehicleStatus.Available;
+    private VehicleStatus status= VehicleStatus.AVAILABLE;
 
 }

@@ -1,5 +1,6 @@
 package org.example.ptcmssbackend.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
@@ -9,10 +10,12 @@ import org.example.ptcmssbackend.enums.EmployeeStatus;
 @Getter
 @Setter
 @Entity
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Employees {
     @Id
     @Column(name = "employeeId", nullable = false)
-    private Integer id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer employeeId;
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -28,6 +31,7 @@ public class Employees {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "roleId", nullable = false)
     private Roles role;
+
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status")

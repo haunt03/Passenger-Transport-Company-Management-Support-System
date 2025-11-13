@@ -19,6 +19,7 @@ import java.time.Instant;
 public class Bookings {
     @Id
     @Column(name = "bookingId", nullable = false)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @NotNull
