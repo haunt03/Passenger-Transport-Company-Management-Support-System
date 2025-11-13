@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.ptcmssbackend.dto.request.Driver.CreateDriverRequest;
 import org.example.ptcmssbackend.dto.request.Driver.DriverDayOffRequest;
 import org.example.ptcmssbackend.dto.request.Driver.DriverProfileUpdateRequest;
 import org.example.ptcmssbackend.dto.request.Driver.ReportIncidentRequest;
@@ -137,6 +138,22 @@ public class DriverController {
             throw new RuntimeException(e);
         }
     }
+    @Operation(summary = "Lịch sử nghỉ phép", description = "Lấy danh sách các yêu cầu nghỉ phép của tài xế (đã gửi, đã duyệt, bị từ chối).")
+    @GetMapping("/{driverId}/dayoff")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','DRIVER')")
+    public ResponseData<List<DriverDayOffResponse>> getDayOffHistory(
+            @Parameter(description = "ID tài xế") @PathVariable Integer driverId) {
+        try {
+            log.info("Get day off history for driver {}", driverId);
+            return new ResponseData<>(HttpStatus.OK.value(),
+                    "Get day off history successfully",
+                    driverService.getDayOffHistory(driverId));
+        } catch (Exception e) {
+            log.error("Get day off history failed", e);
+            throw new RuntimeException(e);
+        }
+    }
+
 
     // ======================================================
     //  5 Bắt đầu và hoàn thành chuyến đi
@@ -187,6 +204,21 @@ public class DriverController {
         } catch (Exception e) {
             log.error("Report incident failed", e);
             return new ResponseError(HttpStatus.BAD_REQUEST.value(), "Report incident failed");
+        }
+    }
+
+    // ======================================================
+    //  7 Tạo mới tài xế
+    // ======================================================
+    @Operation(summary = "Tạo tài xế mới", description = "Admin hoặc Manager tạo mới tài xế và gán vào chi nhánh.")
+    @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public ResponseData<DriverResponse> createDriver(@RequestBody CreateDriverRequest request) {
+        try{
+            log.info("Create driver: ", request);
+            return new ResponseData<>(HttpStatus.OK.value(), "Tạo tài xế thành công", driverService.createDriver(request));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 }
