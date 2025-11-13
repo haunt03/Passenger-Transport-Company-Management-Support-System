@@ -11,7 +11,7 @@ public class EmployeeMapper {
         if (employee == null) return null;
 
         return EmployeeResponse.builder()
-                .id(employee.getId())
+                .id(employee.getEmployeeId())
                 .userId(employee.getUser() != null ? employee.getUser().getId() : null)
                 .userFullName(employee.getUser() != null ? employee.getUser().getFullName() : null)
                 .branchId(employee.getBranch() != null ? employee.getBranch().getId() : null)
@@ -26,7 +26,7 @@ public class EmployeeMapper {
         if (dto == null) return null;
 
         Employees employee = new Employees();
-        employee.setId(dto.getId());
+        employee.setEmployeeId(dto.getId());
         // phần này có thể được xử lý ở service khi gán entity user, branch, role
         return employee;
     }
