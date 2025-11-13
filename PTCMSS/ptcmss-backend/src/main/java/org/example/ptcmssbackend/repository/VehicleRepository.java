@@ -1,0 +1,20 @@
+package org.example.ptcmssbackend.repository;
+
+import org.example.ptcmssbackend.entity.Vehicles;
+import org.example.ptcmssbackend.enums.VehicleStatus;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+
+import java.util.List;
+
+public interface VehicleRepository extends JpaRepository<Vehicles, Integer> {
+
+    List<Vehicles> findByLicensePlateContainingIgnoreCase(String licensePlate);
+
+    List<Vehicles> findByStatus(VehicleStatus status);
+
+    @Query("SELECT v FROM Vehicles v WHERE (:categoryId IS NULL OR v.category.id = :categoryId) " +
+            "AND (:branchId IS NULL OR v.branch.id = :branchId) " +
+            "AND (:status IS NULL OR v.status = :status)")
+    List<Vehicles> filterVehicles(Integer categoryId, Integer branchId, VehicleStatus status);
+}
