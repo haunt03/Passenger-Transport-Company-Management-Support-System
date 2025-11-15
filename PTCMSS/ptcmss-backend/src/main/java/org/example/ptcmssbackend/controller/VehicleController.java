@@ -72,7 +72,7 @@ public class VehicleController {
                         .data(pageResponse)
                         .build());
             }
-            
+
             // Nếu không có pagination, trả về list như cũ (backward compatible)
             List<VehicleResponse> list;
             if (licensePlate != null && !licensePlate.isBlank()) {
@@ -151,5 +151,104 @@ public class VehicleController {
         }
     }
 
+    // ==================== Vehicle Detail Tabs ====================
 
+    @Operation(summary = "Lịch sử chuyến đi của phương tiện", description = "Tab 3 trong Vehicle Detail")
+    @GetMapping("/{id}/trips")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT','CONSULTANT')")
+    public ResponseEntity<ApiResponse<?>> getVehicleTrips(
+            @Parameter(description = "ID phương tiện") @PathVariable Integer id) {
+        try {
+            return ResponseEntity.ok(ApiResponse.builder()
+                    .success(true)
+                    .message("Lấy lịch sử chuyến đi thành công")
+                    .data(vehicleService.getVehicleTrips(id))
+                    .build());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.builder()
+                    .success(false)
+                    .message("Lỗi khi lấy lịch sử chuyến đi: " + e.getMessage())
+                    .build());
+        }
+    }
+
+    @Operation(summary = "Lịch sử chi phí vận hành của phương tiện", description = "Tab 2 trong Vehicle Detail (xăng dầu, cầu đường, sửa chữa)")
+    @GetMapping("/{id}/expenses")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT')")
+    public ResponseEntity<ApiResponse<?>> getVehicleExpenses(
+            @Parameter(description = "ID phương tiện") @PathVariable Integer id) {
+        try {
+            return ResponseEntity.ok(ApiResponse.builder()
+                    .success(true)
+                    .message("Lấy lịch sử chi phí thành công")
+                    .data(vehicleService.getVehicleExpenses(id))
+                    .build());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.builder()
+                    .success(false)
+                    .message("Lỗi khi lấy lịch sử chi phí: " + e.getMessage())
+                    .build());
+        }
+    }
+
+    @Operation(summary = "Lịch sử bảo trì và đăng kiểm của phương tiện", description = "Tab 1 trong Vehicle Detail")
+    @GetMapping("/{id}/maintenance")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT')")
+    public ResponseEntity<ApiResponse<?>> getVehicleMaintenance(
+            @Parameter(description = "ID phương tiện") @PathVariable Integer id) {
+        try {
+            return ResponseEntity.ok(ApiResponse.builder()
+                    .success(true)
+                    .message("Lấy lịch sử bảo trì thành công")
+                    .data(vehicleService.getVehicleMaintenance(id))
+                    .build());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.builder()
+                    .success(false)
+                    .message("Lỗi khi lấy lịch sử bảo trì: " + e.getMessage())
+                    .build());
+        }
+    }
+
+    @Operation(summary = "Thêm nhật ký bảo trì", description = "Tạo mới một bản ghi bảo trì cho phương tiện")
+    @PostMapping("/{id}/maintenance")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    public ResponseEntity<ApiResponse<?>> createMaintenance(
+            @Parameter(description = "ID phương tiện") @PathVariable Integer id,
+            @Parameter(description = "Thông tin bảo trì") @RequestBody CreateMaintenanceRequest request) {
+        try {
+            VehicleMaintenanceResponse response = vehicleService.createMaintenance(id, request);
+            return ResponseEntity.ok(ApiResponse.builder()
+                    .success(true)
+                    .message("Thêm nhật ký bảo trì thành công")
+                    .data(response)
+                    .build());
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.builder()
+                    .success(false)
+                    .message("Lỗi khi thêm nhật ký bảo trì: " + e.getMessage())
+                    .build());
+        }
+    }
+
+    @Operation(summary = "Thêm chi phí vận hành", description = "Tạo mới một bản ghi chi phí (xăng dầu, cầu đường, sửa chữa) cho phương tiện")
+    @PostMapping("/{id}/expenses")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    public ResponseEntity<ApiResponse<?>> createExpense(
+            @Parameter(description = "ID phương tiện") @PathVariable Integer id,
+            @Parameter(description = "Thông tin chi phí (costType: fuel, toll, repair)") @RequestBody CreateExpenseRequest request) {
+        try {
+            VehicleExpenseResponse response = vehicleService.createExpense(id, request);
+            return ResponseEntity.ok(ApiResponse.builder()
+                    .success(true)
+                    .message("Thêm chi phí thành công")
+                    .data(response)
+                    .build());
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.builder()
+                    .success(false)
+                    .message("Lỗi khi thêm chi phí: " + e.getMessage())
+                    .build());
+        }
+    }
 }
