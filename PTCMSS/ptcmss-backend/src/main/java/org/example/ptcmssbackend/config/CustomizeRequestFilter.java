@@ -30,9 +30,9 @@ public class CustomizeRequestFilter extends OncePerRequestFilter {
     private static final String[] PUBLIC_ENDPOINTS = {
             "/swagger-ui",
             "/v3/api-docs",
-            "/api/auth/login",
-            "/api/auth/register",
-            "/api/auth/refresh-token",
+            "/api/auth/",
+
+            "/api/test/",          // test endpoints (generate hash, test password)
             "/verify",
             "/set-password"
     };
@@ -46,34 +46,36 @@ public class CustomizeRequestFilter extends OncePerRequestFilter {
         String uri = request.getRequestURI();
         log.info("{} {}", request.getMethod(), uri);
 
-        // Thêm CORS header cho tất cả request
-        setCorsHeaders(response);
-
-        // Bỏ qua preflight OPTIONS request
-        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
-            response.setStatus(HttpServletResponse.SC_OK);
-            return;
-        }
-
         // Bỏ qua các endpoint công khai
         if (isPublicEndpoint(uri)) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        // Kiểm tra Authorization header
+        // Try Authorization header first; fallback to cookie "access_token"
+        String token = null;
         String authHeader = request.getHeader("Authorization");
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+        } else if (request.getCookies() != null) {
+            for (var c : request.getCookies()) {
+                if ("access_token".equals(c.getName()) && c.getValue() != null && !c.getValue().isEmpty()) {
+                    token = c.getValue();
+                    break;
+                }
+            }
+        }
+        if (token == null || token.isEmpty()) {
             filterChain.doFilter(request, response);
             return;
         }
-
-        String token = authHeader.substring(7);
         try {
             String username = jwtService.extractUsername(token, TokenType.ACCESS_TOKEN);
-            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            if (username != null) {
                 UserDetails userDetails = userServiceDetail.loadUserByUsername(username);
 
+                log.debug("[Filter] Setting authentication for user: {} with authorities: {}",
+                        username, userDetails.getAuthorities());
 
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
@@ -83,22 +85,16 @@ public class CustomizeRequestFilter extends OncePerRequestFilter {
                 SecurityContext context = SecurityContextHolder.createEmptyContext();
                 context.setAuthentication(authentication);
                 SecurityContextHolder.setContext(context);
+
+                log.debug("[Filter] Authentication set successfully for user: {}", username);
             }
         } catch (Exception e) {
-            log.error("JWT validation error: {}", e.getMessage());
+            log.error("JWT validation error: {}", e.getMessage(), e);
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid or expired token");
             return;
         }
 
         filterChain.doFilter(request, response);
-    }
-
-    private void setCorsHeaders(HttpServletResponse response) {
-        response.setHeader("Access-Control-Allow-Origin", "http://localhost:4200");
-        response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-        response.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
-        response.setHeader("Access-Control-Allow-Credentials", "true");
-        response.setHeader("Access-Control-Max-Age", "3600");
     }
 
     private boolean isPublicEndpoint(String uri) {

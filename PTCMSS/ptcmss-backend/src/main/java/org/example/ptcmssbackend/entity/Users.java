@@ -18,7 +18,7 @@ import java.util.Collections;
 @Getter
 @Setter
 @Entity
-@Table(name = "users")
+@Table(name = "Users")
 public class Users implements UserDetails {
 
     @Id

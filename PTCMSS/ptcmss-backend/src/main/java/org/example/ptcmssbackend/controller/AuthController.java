@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:4200")
+@CrossOrigin(origins = "http://localhost:5173")
 @Tag(name = "Authentication API", description = "Xử lý đăng nhập, refresh token và đăng xuất người dùng")
 public class AuthController {
 
