@@ -2,14 +2,20 @@ package org.example.ptcmssbackend.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.ptcmssbackend.dto.request.Branch.CreateBranchRequest;
 import org.example.ptcmssbackend.dto.request.Branch.UpdateBranchRequest;
+import org.example.ptcmssbackend.dto.response.Branch.BranchResponse;
 import org.example.ptcmssbackend.dto.response.common.ResponseData;
 import org.example.ptcmssbackend.service.BranchService;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -98,5 +104,29 @@ public class BranchController {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Operation(
+            summary = "Lấy chi nhánh theo userId",
+            description = """
+                    API trả về thông tin chi nhánh mà user đang thuộc về.
+                    Mapping dữ liệu: Users → Employees → Branches.
+
+                    Ví dụ:
+                    GET /api/branches/by-user/10
+                    """
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Lấy chi nhánh thành công",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = BranchResponse.class))),
+            @ApiResponse(responseCode = "404", description = "User không có chi nhánh"),
+    })
+    @GetMapping("/by-user/{userId}")
+    public ResponseEntity<BranchResponse> getBranchByUserId(
+            @Parameter(description = "ID của User", example = "5")
+            @PathVariable Integer userId
+    ) {
+        return ResponseEntity.ok(branchService.getBranchByUserId(userId));
     }
 }

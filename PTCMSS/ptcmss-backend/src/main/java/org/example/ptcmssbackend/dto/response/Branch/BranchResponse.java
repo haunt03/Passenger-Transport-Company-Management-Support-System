@@ -1,20 +1,20 @@
 package org.example.ptcmssbackend.dto.response.Branch;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-import java.time.Instant;
-
-
-@Getter
-@Setter
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 @Builder
 public class BranchResponse {
     private Integer id;
     private String branchName;
     private String location;
-    private String manager;
+    private Integer managerId;
+    private String managerName;
     private String status;
-    private Instant createdAt;
 }
+

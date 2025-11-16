@@ -32,6 +32,7 @@ public class RoleController {
 
     @Operation(summary = "Cập nhật vai trò", description = "Sửa tên hoặc mô tả vai trò.")
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Roles> updateRole(
             @Parameter(description = "ID vai trò") @PathVariable Integer id,
             @RequestBody UpdateRoleRequest request) {
@@ -40,7 +41,7 @@ public class RoleController {
 
     @Operation(summary = "Danh sách vai trò", description = "Lấy danh sách tất cả các vai trò trong hệ thống.")
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<List<Roles>> getAllRoles(
             @Parameter(description = "Từ khóa tìm kiếm") @RequestParam(required = false) String keyword,
             @Parameter(description = "Trạng thái vai trò") @RequestParam(required = false) UserStatus status) {
@@ -49,14 +50,14 @@ public class RoleController {
 
     @Operation(summary = "Chi tiết vai trò", description = "Xem thông tin chi tiết của một vai trò.")
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<Roles> getRoleById(@Parameter(description = "ID vai trò") @PathVariable Integer id) {
         return ResponseEntity.ok(roleService.getRoleById(id));
     }
 
     @Operation(summary = "Vô hiệu hóa vai trò", description = "Đánh dấu vai trò là INACTIVE.")
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<String> deleteRole(@Parameter(description = "ID vai trò") @PathVariable Integer id) {
         roleService.deleteRole(id);
         return ResponseEntity.ok("Role disabled successfully");

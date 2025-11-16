@@ -11,7 +11,6 @@ import org.example.ptcmssbackend.entity.Employees;
 import org.example.ptcmssbackend.enums.BranchStatus;
 import org.example.ptcmssbackend.repository.BranchesRepository;
 import org.example.ptcmssbackend.repository.EmployeeRepository;
-import org.example.ptcmssbackend.repository.UsersRepository;
 import org.example.ptcmssbackend.service.BranchService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -31,7 +30,6 @@ import java.util.regex.Pattern;
 public class BranchServiceImpl implements BranchService {
 
     private final BranchesRepository branchesRepository;
-    private final UsersRepository usersRepository;
     private final EmployeeRepository employeeRepository;
 
     @Override
@@ -49,7 +47,9 @@ public class BranchServiceImpl implements BranchService {
         return BranchResponse.builder()
                 .id(branch.getId())
                 .branchName(branch.getBranchName())
-                .manager(branch.getManager().getUser().getFullName())
+                .managerId(branch.getManager() != null ? branch.getManager().getEmployeeId() : null)
+                .managerName(branch.getManager() != null && branch.getManager().getUser() != null
+                        ? branch.getManager().getUser().getFullName() : null)
                 .location(branch.getLocation())
                 .status(branch.getStatus().name())
                 .build();
@@ -67,6 +67,7 @@ public class BranchServiceImpl implements BranchService {
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy employee tương ứng với userId: " + request.getManagerId()));
             branch.setManager(manager);
         }
+        branchesRepository.save(branch);
         return branch.getId();
     }
 
@@ -108,7 +109,9 @@ public class BranchServiceImpl implements BranchService {
         return BranchResponse.builder()
                 .id(branch.getId())
                 .branchName(branch.getBranchName())
-                .manager(branch.getManager().getUser().getFullName())
+                .managerId(branch.getManager() != null ? branch.getManager().getEmployeeId() : null)
+                .managerName(branch.getManager() != null && branch.getManager().getUser() != null
+                        ? branch.getManager().getUser().getFullName() : null)
                 .location(branch.getLocation())
                 .status(branch.getStatus().name())
                 .build();
@@ -123,19 +126,42 @@ public class BranchServiceImpl implements BranchService {
         return branch.getId();
     }
 
-    private static PageResponse<Object> getBranchPageResponse(int pageNo, int pageSize, Page<Branches> branches) {
-        List<BranchResponse> bracnhResponse = branches.stream()
+    @Override
+    public BranchResponse getBranchByUserId(Integer userId) {
+
+        Employees employee = employeeRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("User không thuộc chi nhánh nào"));
+
+        Branches branch = employee.getBranch();
+
+        return BranchResponse.builder()
+                .id(branch.getId())
+                .branchName(branch.getBranchName())
+                .location(branch.getLocation())
+                .status(branch.getStatus().name())
+                .managerId(
+                        branch.getManager() != null ?
+                                branch.getManager().getEmployeeId() : null
+                )
+                .build();
+    }
+
+    private static PageResponse<List<BranchResponse>> getBranchPageResponse(int pageNo, int pageSize, Page<Branches> branches) {
+        List<BranchResponse> branchResponse = branches.stream()
                 .map(branch -> BranchResponse.builder()
                         .id(branch.getId())
                         .branchName(branch.getBranchName())
-                        .manager(branch.getManager().getUser().getFullName())
+                        .managerId(branch.getManager() != null ? branch.getManager().getEmployeeId() : null)
+                        .managerName(branch.getManager() != null && branch.getManager().getUser() != null
+                                ? branch.getManager().getUser().getFullName() : null)
                         .location(branch.getLocation())
                         .status(branch.getStatus().name())
                         .build())
                 .toList();
-        return PageResponse.builder()
-                .items(bracnhResponse)
-                .totalPages(pageSize)
+        return PageResponse.<List<BranchResponse>>builder()
+                .items(branchResponse)
+                .totalPages(branches.getTotalPages())
+                .totalElements(branches.getTotalElements())
                 .pageNo(pageNo)
                 .pageSize(pageSize)
                 .build();
