@@ -1,4 +1,6 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
+import { login as apiLogin } from "../../api/auth";
 import {
     Mail,
     Lock,
@@ -26,6 +28,7 @@ import {
 const cls = (...a) => a.filter(Boolean).join(" ");
 
 export default function LoginPage() {
+    const navigate = useNavigate();
     // form state
     const [email, setEmail] = React.useState("");
     const [password, setPassword] = React.useState("");
@@ -58,31 +61,22 @@ export default function LoginPage() {
         setLoading(true);
         setError("");
 
-        const body = {
-            email: email.trim(),
+        const creds = {
+            username: email.trim(),
             password: password.trim(),
-            remember_me: rememberMe,
         };
 
         try {
-            // mock delay
-            await new Promise((r) => setTimeout(r, 600));
-
-            // rule demo: pass phải "123456"
-            if (password !== "123456") {
-                throw new Error("WRONG_PASSWORD");
+            const data = await apiLogin(creds);
+            // Optional: store username/role for UI
+            if (rememberMe) {
+                try {
+                    localStorage.setItem("username", data?.username || creds.username);
+                    localStorage.setItem("roleName", data?.roleName || "");
+                } catch {}
             }
-
-            console.log("POST /api/auth/login", body);
-            console.log("→ response demo:", {
-                token: "JWT_TOKEN_HERE",
-                user: { id: 10, role: "DRIVER", branch_id: 1 },
-            });
-
-            // TODO:
-            // localStorage.setItem("token", data.token)
-            // điều hướng theo role ở đây
-        } catch {
+            navigate("/analytics/admin", { replace: true });
+        } catch (err) {
             setError("Email hoặc mật khẩu không chính xác.");
         } finally {
             setLoading(false);
@@ -95,6 +89,7 @@ export default function LoginPage() {
                 {/* LEFT: LOGIN CARD */}
                 <form
                     onSubmit={handleLogin}
+                    noValidate
                     className={cls(
                         "rounded-xl border border-slate-200 bg-white shadow-sm",
                         "flex flex-col gap-6 p-6 md:p-8"
@@ -139,11 +134,11 @@ export default function LoginPage() {
                         <div className="group flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus-within:border-sky-500 focus-within:ring-2 focus-within:ring-sky-500/30">
                             <Mail className="h-4 w-4 text-slate-400 group-focus-within:text-sky-600" />
                             <input
-                                type="email"
+                                type="text"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 className="w-full bg-transparent text-sm text-slate-800 placeholder:text-slate-400 outline-none"
-                                placeholder="a@example.com"
+                                placeholder="tentaikhoan ho?c a@example.com"
                                 autoComplete="username"
                             />
                         </div>
