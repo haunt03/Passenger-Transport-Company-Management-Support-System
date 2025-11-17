@@ -11,4 +11,6 @@ public interface BranchService {
     PageResponse<?> getAllBranches(String keyword, int pageNo, int pageSize, String sortBy);
     BranchResponse getBranchById(Integer id);
     Integer deleteBranch(Integer id);
+
+    BranchResponse getBranchByUserId(Integer userId);
 }

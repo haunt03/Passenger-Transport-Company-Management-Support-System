@@ -139,4 +139,48 @@ public class UserServiceImpl implements UserService {
 
         return imageUrl;
     }
+
+    @Override
+    public List<UserResponse> searchUsers(String keyword, Integer roleId, Integer branchId, UserStatus status) {
+
+        // Keyword rỗng thì set NULL để query ko bị lỗi
+        if (keyword != null && keyword.trim().isEmpty()) {
+            keyword = null;
+        }
+
+        List<Users> users = usersRepository.searchUsers(keyword, roleId, branchId, status);
+
+        return users.stream()
+                .map(u -> UserResponse.builder()
+                        .id(u.getId())
+                        .fullName(u.getFullName())
+                        .email(u.getEmail())
+                        .phone(u.getPhone())
+                        .address(u.getAddress())
+                        .imgUrl(u.getAvatar())
+                        .roleName(u.getRole().getRoleName())
+                        .status(u.getStatus().name())
+                        .build()
+                ).toList();
+    }
+
+    @Override
+    public List<UserResponse> getUsersByBranch(Integer branchId) {
+        List<Users> users = usersRepository.findUsersByBranchId(branchId);
+
+        return users.stream().map(u ->
+                UserResponse.builder()
+                        .id(u.getId())
+                        .fullName(u.getFullName())
+                        .email(u.getEmail())
+                        .phone(u.getPhone())
+                        .address(u.getAddress())
+                        .imgUrl(u.getAvatar())
+                        .roleName(u.getRole().getRoleName())
+                        .status(u.getStatus().name())
+                        .build()
+        ).toList();
+    }
+
 }
+

@@ -1,12 +1,9 @@
 package org.example.ptcmssbackend.service.impl;
 
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.Cookie;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.ptcmssbackend.dto.request.Auth.LoginRequest;
 import org.example.ptcmssbackend.dto.response.Auth.TokenResponse;
-import org.example.ptcmssbackend.entity.Token;
 import org.example.ptcmssbackend.entity.Users;
 import org.example.ptcmssbackend.exception.ForBiddenException;
 import org.example.ptcmssbackend.exception.InvalidDataException;
@@ -14,7 +11,6 @@ import org.example.ptcmssbackend.repository.UsersRepository;
 import org.example.ptcmssbackend.service.AuthenticationService;
 import org.example.ptcmssbackend.service.EmailService;
 import org.example.ptcmssbackend.service.JwtService;
-import org.example.ptcmssbackend.service.TokenService;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import jakarta.mail.MessagingException;
 import java.io.UnsupportedEncodingException;
@@ -25,7 +21,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
-import static org.example.ptcmssbackend.common.TokenType.ACCESS_TOKEN;
 import static org.example.ptcmssbackend.common.TokenType.EMAIL_VERIFY_TOKEN;
 import static org.example.ptcmssbackend.common.TokenType.REFRESH_TOKEN;
 
@@ -37,7 +32,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final UsersRepository userRepository;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
-    private final TokenService tokenService;
+
     private final EmailService emailService;
 
     @Override
@@ -89,13 +84,6 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         );
 
         // Lưu token vào DB
-        tokenService.save(
-                Token.builder()
-                        .username(user.getUsername())
-                        .accessToken(accessToken)
-                        .refreshToken(refreshToken)
-                        .build()
-        );
 
         return TokenResponse.builder()
                 .AccessToken(accessToken)
@@ -135,53 +123,6 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         }
     }
 
-    @Override
-    public String removeToken(HttpServletRequest request) {
-        log.info("---------- removeToken ----------");
-
-        // 1) Try Authorization header (case-insensitive)
-        String authHeader = request.getHeader("Authorization");
-        if (!org.springframework.util.StringUtils.hasLength(authHeader)) {
-            authHeader = request.getHeader("authorization");
-        }
-
-        String jwt = null;
-        if (org.springframework.util.StringUtils.hasLength(authHeader)) {
-            jwt = authHeader.startsWith("Bearer ") ? authHeader.substring(7) : authHeader.trim();
-        }
-
-        // 2) Fallback to cookie "accessToken"
-        if (!org.springframework.util.StringUtils.hasLength(jwt)) {
-            Cookie[] cookies = request.getCookies();
-            if (cookies != null) {
-                for (Cookie c : cookies) {
-                    if ("accessToken".equals(c.getName())) {
-                        jwt = c.getValue();
-                        break;
-                    }
-                }
-            }
-        }
-
-        // 3) Fallback to request parameter
-        if (!org.springframework.util.StringUtils.hasLength(jwt)) {
-            jwt = request.getParameter("accessToken");
-        }
-
-        if (!org.springframework.util.StringUtils.hasLength(jwt)) {
-            throw new InvalidDataException("Token must not be blank");
-        }
-
-        String userName;
-        try {
-            userName = jwtService.extractUsername(jwt, ACCESS_TOKEN);
-        } catch (Exception ex) {
-            log.error("[LOGOUT] ACCESS token invalid signature. Trying REFRESH. cause: {}", ex.getMessage());
-            userName = jwtService.extractUsername(jwt, REFRESH_TOKEN);
-        }
-        tokenService.delete(userName);
-        return "Removed!";
-    }
 
     @Override
     public String verifyAccount(String token) {

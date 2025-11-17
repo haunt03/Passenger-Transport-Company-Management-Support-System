@@ -67,21 +67,7 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
-    // ---------------- LOGOUT ----------------
-    @Operation(
-            summary = "Đăng xuất",
-            description = "Xóa token trong DB, kết thúc phiên đăng nhập hiện tại.",
-            responses = {
-                    @ApiResponse(responseCode = "200", description = "Đăng xuất thành công"),
-                    @ApiResponse(responseCode = "400", description = "Không có token trong header"),
-            }
-    )
-    @PostMapping("/logout")
-    public ResponseEntity<String> logout(HttpServletRequest request) {
-        log.info("[LOGOUT] Logout request received");
-        String message = authService.removeToken(request);
-        return ResponseEntity.ok(message);
-    }
+
 
     // ---------------- VERIFY TOKEN ----------------
     @Operation(

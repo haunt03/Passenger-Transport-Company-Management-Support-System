@@ -11,7 +11,6 @@ public interface AuthenticationService {
 
     String verifyAccount(String token);
 
-    String removeToken(HttpServletRequest request);
 
     String forgotPassword(String email);
 }
