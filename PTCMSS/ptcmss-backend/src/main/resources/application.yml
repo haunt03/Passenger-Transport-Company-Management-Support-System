@@ -43,3 +43,16 @@ management:
     web:
       exposure:
         include: health,info
+
+# Payment Configuration
+payment:
+  bank:
+    code: ${PAYMENT_BANK_CODE:970418}  # Mã ngân hàng (970418 = Vietcombank)
+    account:
+      number: ${PAYMENT_BANK_ACCOUNT_NUMBER:1234567890}  # Số tài khoản nhận tiền
+      name: ${PAYMENT_BANK_ACCOUNT_NAME:CONG TY VAN TAI HANH KHACH}  # Tên chủ tài khoản
+
+# VietQR API Configuration
+vietqr:
+  client-id: ${VIETQR_CLIENT_ID:}  # Lấy từ https://my.vietqr.io/profile
+  api-key: ${VIETQR_API_KEY:}      # Lấy từ https://my.vietqr.io/profile
