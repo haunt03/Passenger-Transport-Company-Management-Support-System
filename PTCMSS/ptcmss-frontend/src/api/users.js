@@ -9,6 +9,12 @@ export function listUsers({ keyword, roleId, status } = {}) {
     return apiFetch(`/api/users${qs ? `?${qs}` : ""}`);
 }
 
+export function listUsersByBranch(branchId) {
+    const id = Number(branchId);
+    if (!Number.isFinite(id)) throw new Error("INVALID_BRANCH_ID");
+    return apiFetch(`/api/users/branch/${id}`);
+}
+
 export function getUser(id) {
     return apiFetch(`/api/users/${id}`);
 }
