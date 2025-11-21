@@ -33,4 +33,19 @@ public interface VehicleRepository extends JpaRepository<Vehicles, Integer> {
             @Param("status") VehicleStatus status,
             @Param("licensePlate") String licensePlate,
             Pageable pageable);
+
+    @Query("""
+        SELECT v FROM Vehicles v
+        WHERE v.branch.id = :branchId
+          AND v.status = 'AVAILABLE'
+    """)
+    List<Vehicles> findAvailableVehicles(Integer branchId);
+
+    List<Vehicles> findByBranch_IdAndStatus(Integer branchId, VehicleStatus status);
+
+
+    @Query("SELECT v FROM Vehicles v WHERE v.branch.id = :branchId")
+    List<Vehicles> findAllByBranchId(Integer branchId);
+
+
 }

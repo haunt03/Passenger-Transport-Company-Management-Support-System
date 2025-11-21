@@ -35,4 +35,10 @@ public interface TripRepository extends JpaRepository<Trips, Integer> {
             Instant startTime,
             Instant endTime
     );
+
+    List<Trips> findByBooking_Branch_IdAndStartTimeBetween(
+            Integer branchId,
+            Instant startTime,
+            Instant endTime
+    );
 }
