@@ -7,7 +7,7 @@ spring:
   jpa:
     show-sql: true
     hibernate:
-      ddl-auto: none
+      ddl-auto: update
       naming:
         # Dùng đúng tên bạn khai báo/annotate, KHÔNG tự convert sang snake_case
         physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
@@ -47,12 +47,12 @@ management:
 # Payment Configuration
 payment:
   bank:
-    code: ${PAYMENT_BANK_CODE:970418}  # Mã ngân hàng (970418 = Vietcombank)
+    code: ${PAYMENT_BANK_CODE:970423}  # Mã ngân hàng (TP bank)
     account:
-      number: ${PAYMENT_BANK_ACCOUNT_NUMBER:1234567890}  # Số tài khoản nhận tiền
-      name: ${PAYMENT_BANK_ACCOUNT_NAME:CONG TY VAN TAI HANH KHACH}  # Tên chủ tài khoản
+      number: ${PAYMENT_BANK_ACCOUNT_NUMBER:00005505543}  # Số tài khoản nhận tiền
+      name: ${PAYMENT_BANK_ACCOUNT_NAME:NGUYEN THUY HAU}  # Tên chủ tài khoản
 
 # VietQR API Configuration
 vietqr:
-  client-id: ${VIETQR_CLIENT_ID:}  # Lấy từ https://my.vietqr.io/profile
-  api-key: ${VIETQR_API_KEY:}      # Lấy từ https://my.vietqr.io/profile
+  client-id: ${VIETQR_CLIENT_ID:2c533c20-80aa-41dc-b346-cde4bd3fb8de}  # Lấy từ https://my.vietqr.io/profile
+  api-key: ${VIETQR_API_KEY:9db359c9-a744-4479-83b0-b8861178b081}      # Lấy từ https://my.vietqr.io/profile
