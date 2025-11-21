@@ -110,7 +110,7 @@ public class DriverServiceImpl implements DriverService {
         dayOff.setStartDate(request.getStartDate());
         dayOff.setEndDate(request.getEndDate());
         dayOff.setReason(request.getReason());
-        dayOff.setStatus(DriverDayOffStatus.Pending);
+        dayOff.setStatus(DriverDayOffStatus.PENDING);
 
         var saved = driverDayOffRepository.save(dayOff);
         return new DriverDayOffResponse(saved);

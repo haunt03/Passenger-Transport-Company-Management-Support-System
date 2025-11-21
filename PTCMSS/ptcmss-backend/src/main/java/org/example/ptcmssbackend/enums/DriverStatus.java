@@ -9,5 +9,10 @@ public enum DriverStatus {
     // Legacy (TitleCase)
     Available,
     OnTrip,
-    Inactive
+    Inactive,
+
+    // Uppercase variants (for existing DB rows)
+    AVAILABLE,
+    ONTRIP,
+    INACTIVE
 }
