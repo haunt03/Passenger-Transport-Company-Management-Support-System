@@ -1,4 +1,5 @@
 import React from "react";
+import { useParams } from "react-router-dom";
 import {
     Phone,
     MapPin,
@@ -11,8 +12,17 @@ import {
     Flag,
     ChevronRight,
     AlertTriangle,
+    Loader2,
 } from "lucide-react";
 import TripExpenseModal from "./TripExpenseModal.jsx";
+import { getCookie } from "../../utils/cookies";
+import {
+    getDriverProfileByUser,
+    getDriverDashboard,
+    startTrip as apiStartTrip,
+    completeTrip as apiCompleteTrip,
+} from "../../api/drivers";
+import { getTripDetail } from "../../api/dispatch";
 
 /**
  * DriverTripDetailPage (light theme)
@@ -29,7 +39,7 @@ import TripExpenseModal from "./TripExpenseModal.jsx";
 
 const cls = (...a) => a.filter(Boolean).join(" ");
 const fmtDateTime = (isoLike) => {
-    if (!isoLike) return "—";
+    if (!isoLike) return "â€”";
     const safe = isoLike.replace(" ", "T");
     const d = new Date(safe);
     if (isNaN(d.getTime())) return isoLike;
@@ -39,6 +49,35 @@ const fmtDateTime = (isoLike) => {
     const MM = String(d.getMonth() + 1).padStart(2, "0");
     return `${hh}:${mm} ${dd}/${MM}`;
 };
+
+const STATUS_FROM_BACKEND = {
+    SCHEDULED: "NOT_STARTED",
+    ONGOING: "IN_PROGRESS",
+    COMPLETED: "COMPLETED",
+};
+
+const STATUS_TO_LABEL = {
+    NOT_STARTED: "SCHEDULED",
+    IN_PROGRESS: "ONGOING",
+    COMPLETED: "COMPLETED",
+};
+
+function normalizeTripDetail(payload) {
+    if (!payload) return null;
+    return {
+        id: payload.tripId,
+        code: payload.bookingId ? `TRIP-${payload.tripId}` : `TRIP-${payload.tripId}`,
+        status: STATUS_FROM_BACKEND[payload.status] || "NOT_STARTED",
+        pickup_location: payload.startLocation || "",
+        dropoff_location: payload.endLocation || "",
+        pickup_time: payload.startTime || "",
+        customer_name: payload.customerName || "",
+        customer_phone: payload.customerPhone || "",
+        vehicle_plate: payload.vehiclePlate || "ChÆ°a gÃ¡n xe",
+        vehicle_type: payload.vehicleModel || "",
+        note: "",
+    };
+}
 
 /* -------------------- Toast mini (light) -------------------- */
 function useToasts() {
@@ -76,7 +115,7 @@ function Toasts({ toasts }) {
     );
 }
 
-/* -------------------- Confirm modal đổi trạng thái -------------------- */
+/* -------------------- Confirm modal Ä‘á»•i tráº¡ng thÃ¡i -------------------- */
 function ConfirmModal({ open, title, message, onCancel, onConfirm }) {
     if (!open) return null;
     return (
@@ -101,13 +140,13 @@ function ConfirmModal({ open, title, message, onCancel, onConfirm }) {
                         onClick={onCancel}
                         className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 shadow-sm"
                     >
-                        Huỷ
+                        Huá»·
                     </button>
                     <button
                         onClick={onConfirm}
                         className="rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3 py-2 text-sm font-medium text-white shadow-sm"
                     >
-                        Xác nhận
+                        XÃ¡c nháº­n
                     </button>
                 </div>
             </div>
@@ -115,26 +154,26 @@ function ConfirmModal({ open, title, message, onCancel, onConfirm }) {
     );
 }
 
-/* -------------------- Chip trạng thái chuyến -------------------- */
+/* -------------------- Chip tráº¡ng thÃ¡i chuyáº¿n -------------------- */
 function StatusChip({ status }) {
     const map = {
         NOT_STARTED: {
-            label: "Chưa bắt đầu",
+            label: "ChÆ°a báº¯t Ä‘áº§u",
             cls: "bg-slate-100 text-slate-700 border-slate-300",
             icon: <Flag className="h-3.5 w-3.5 text-slate-500" />,
         },
         IN_PROGRESS: {
-            label: "Đang di chuyển",
+            label: "Äang di chuyá»ƒn",
             cls: "bg-sky-50 text-sky-700 border-sky-200",
             icon: <Navigation className="h-3.5 w-3.5 text-sky-600" />,
         },
         PICKED_UP: {
-            label: "Đã đón khách",
+            label: "ÄÃ£ Ä‘Ã³n khÃ¡ch",
             cls: "bg-amber-50 text-amber-700 border-amber-200",
             icon: <CheckCircle2 className="h-3.5 w-3.5 text-amber-600" />,
         },
         COMPLETED: {
-            label: "Đã hoàn thành",
+            label: "ÄÃ£ hoÃ n thÃ nh",
             cls: "bg-emerald-50 text-emerald-700 border-emerald-200",
             icon: (
                 <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
@@ -155,13 +194,12 @@ function StatusChip({ status }) {
     );
 }
 
-/* -------------------- Tiến trình 4 bước -------------------- */
+/* -------------------- Tiáº¿n trÃ¬nh 4 bÆ°á»›c -------------------- */
 function ProgressSteps({ status }) {
     const steps = [
-        { key: "NOT_STARTED", label: "Chưa bắt đầu" },
-        { key: "IN_PROGRESS", label: "Đang chạy" },
-        { key: "PICKED_UP", label: "Đã đón KH" },
-        { key: "COMPLETED", label: "Hoàn thành" },
+        { key: "NOT_STARTED", label: "ChÆ°a báº¯t Ä‘áº§u" },
+        { key: "IN_PROGRESS", label: "Äang cháº¡y" },
+        { key: "COMPLETED", label: "HoÃ n thÃ nh" },
     ];
     const idxActive = steps.findIndex((s) => s.key === status);
 
@@ -203,17 +241,17 @@ function ProgressSteps({ status }) {
     );
 }
 
-/* -------------------- Card lộ trình -------------------- */
+/* -------------------- Card lá»™ trÃ¬nh -------------------- */
 function RouteCard({ pickupLocation, dropoffLocation, pickupTime }) {
     return (
         <div className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-4 shadow-xl shadow-slate-900/5">
             <div className="flex items-center gap-2 text-slate-600 text-xs font-medium uppercase tracking-wide">
                 <Navigation className="h-4 w-4 text-sky-600" />
-                Lộ trình
+                Lá»™ trÃ¬nh
             </div>
 
             <div className="flex flex-col md:flex-row md:items-start gap-6">
-                {/* Left block: đón / trả */}
+                {/* Left block: Ä‘Ã³n / tráº£ */}
                 <div className="flex-1 flex gap-3">
                     <div className="flex flex-col items-center">
                         <div className="h-3 w-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,.5)]" />
@@ -226,15 +264,15 @@ function RouteCard({ pickupLocation, dropoffLocation, pickupTime }) {
                         <div>
                             <div className="text-[11px] text-slate-500 mb-1 flex items-center gap-1 font-medium">
                                 <MapPin className="h-3.5 w-3.5 text-emerald-600" />
-                                Điểm đón
+                                Äiá»ƒm Ä‘Ã³n
                             </div>
                             <div className="text-slate-900 font-medium leading-relaxed">
-                                {pickupLocation || "—"}
+                                {pickupLocation || "â€”"}
                             </div>
 
                             <div className="text-[12px] text-slate-500 flex items-center gap-1 mt-1 leading-tight">
                                 <Clock className="h-3.5 w-3.5 text-slate-400" />
-                                Giờ đón:{" "}
+                                Giá» Ä‘Ã³n:{" "}
                                 <span className="text-slate-800 font-semibold">
                                     {fmtDateTime(pickupTime)}
                                 </span>
@@ -245,10 +283,10 @@ function RouteCard({ pickupLocation, dropoffLocation, pickupTime }) {
                         <div>
                             <div className="text-[11px] text-slate-500 mb-1 flex items-center gap-1 font-medium">
                                 <MapPin className="h-3.5 w-3.5 text-rose-600" />
-                                Điểm đến
+                                Äiá»ƒm Ä‘áº¿n
                             </div>
                             <div className="text-slate-900 font-medium leading-relaxed">
-                                {dropoffLocation || "—"}
+                                {dropoffLocation || "â€”"}
                             </div>
                         </div>
                     </div>
@@ -259,11 +297,11 @@ function RouteCard({ pickupLocation, dropoffLocation, pickupTime }) {
                     <div className="flex items-start gap-2 leading-relaxed">
                         <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
                         <div>
-                            Đến điểm đón{" "}
+                            Äáº¿n Ä‘iá»ƒm Ä‘Ã³n{" "}
                             <span className="text-slate-800 font-semibold">
-                                đúng giờ
+                                Ä‘Ãºng giá»
                             </span>{" "}
-                            và gọi khách trước ~10 phút.
+                            vÃ  gá»i khÃ¡ch trÆ°á»›c ~10 phÃºt.
                         </div>
                     </div>
                 </div>
@@ -272,15 +310,15 @@ function RouteCard({ pickupLocation, dropoffLocation, pickupTime }) {
     );
 }
 
-/* -------------------- Card meta chuyến -------------------- */
+/* -------------------- Card meta chuyáº¿n -------------------- */
 function TripMetaCard({ trip }) {
     return (
         <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-4 shadow-xl shadow-slate-900/5 text-slate-700">
-            {/* Top row: mã chuyến + trạng thái + thời gian */}
+            {/* Top row: mÃ£ chuyáº¿n + tráº¡ng thÃ¡i + thá»i gian */}
             <div className="flex flex-wrap items-start gap-2">
                 <div className="flex items-center gap-2 text-slate-900 text-lg font-semibold leading-tight">
                     <Flag className="h-5 w-5 text-emerald-600" />
-                    <span>Mã chuyến {trip.code}</span>
+                    <span>MÃ£ chuyáº¿n {trip.code}</span>
                 </div>
 
                 <StatusChip status={trip.status} />
@@ -288,7 +326,7 @@ function TripMetaCard({ trip }) {
                 <div className="ml-auto flex items-center gap-2 text-xs text-slate-500 font-medium leading-tight">
                     <Clock className="h-3.5 w-3.5 text-slate-400" />
                     <span>
-                        Thời gian đón:{" "}
+                        Thá»i gian Ä‘Ã³n:{" "}
                         <span className="text-slate-800 font-semibold">
                             {fmtDateTime(trip.pickup_time)}
                         </span>
@@ -297,17 +335,17 @@ function TripMetaCard({ trip }) {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 text-sm">
-                {/* Khách hàng */}
+                {/* KhÃ¡ch hÃ ng */}
                 <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 flex flex-col gap-2 shadow-inner">
                     <div className="text-[11px] uppercase tracking-wide text-slate-500 flex items-center gap-2 font-medium">
                         <Phone className="h-3.5 w-3.5 text-sky-600" />
-                        Khách hàng
+                        KhÃ¡ch hÃ ng
                     </div>
                     <div className="text-slate-900 font-medium">
                         {trip.customer_name}
                     </div>
                     <div className="text-slate-600 text-[12px] flex items-center gap-2 break-all leading-tight">
-                        <span className="text-slate-500">SĐT:</span>
+                        <span className="text-slate-500">SÄT:</span>
                         <a
                             className="text-sky-600 hover:underline font-medium"
                             href={"tel:" + trip.customer_phone}
@@ -321,13 +359,13 @@ function TripMetaCard({ trip }) {
                 <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 flex flex-col gap-2 shadow-inner">
                     <div className="text-[11px] uppercase tracking-wide text-slate-500 flex items-center gap-2 font-medium">
                         <CarFront className="h-3.5 w-3.5 text-emerald-600" />
-                        Thông tin xe
+                        ThÃ´ng tin xe
                     </div>
                     <div className="text-slate-900 font-medium">
-                        Biển số: {trip.vehicle_plate}
+                        Biá»ƒn sá»‘: {trip.vehicle_plate}
                     </div>
                     <div className="text-slate-600 text-[12px] leading-tight">
-                        Loại xe:{" "}
+                        Loáº¡i xe:{" "}
                         <span className="text-slate-800 font-semibold">
                             {trip.vehicle_type}
                         </span>
@@ -335,14 +373,14 @@ function TripMetaCard({ trip }) {
                 </div>
             </div>
 
-            {/* Ghi chú điều phối */}
+            {/* Ghi chÃº Ä‘iá»u phá»‘i */}
             <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 flex flex-col gap-2 text-sm text-slate-700 shadow-inner">
                 <div className="text-[11px] uppercase tracking-wide text-slate-500 flex items-center gap-2 font-medium">
                     <StickyNote className="h-3.5 w-3.5 text-amber-500" />
-                    Ghi chú từ điều phối
+                    Ghi chÃº tá»« Ä‘iá»u phá»‘i
                 </div>
                 <div className="text-slate-800 leading-relaxed whitespace-pre-line text-[13px]">
-                    {trip.note || "Không có ghi chú."}
+                    {trip.note || "KhÃ´ng cÃ³ ghi chÃº."}
                 </div>
             </div>
         </div>
@@ -351,26 +389,19 @@ function TripMetaCard({ trip }) {
 
 /* -------------------- MAIN PAGE -------------------- */
 export default function DriverTripDetailPage() {
-    // mock chuyến (GET /api/driver/trips/{tripId})
-    const [trip, setTrip] = React.useState({
-        id: 123,
-        code: "TRIP-2025-045",
-        status: "IN_PROGRESS", // NOT_STARTED | IN_PROGRESS | PICKED_UP | COMPLETED
-        pickup_location: "Sân bay Nội Bài - T1, Cột 5",
-        dropoff_location:
-            "Khách sạn Pearl Westlake, Tây Hồ, Hà Nội",
-        pickup_time: "2025-10-26 08:30",
-        customer_name: "Nguyễn Văn A",
-        customer_phone: "0901 234 567",
-        vehicle_plate: "29A-123.45",
-        vehicle_type: "Sedan 4 chỗ",
-        note: "Khách có hành lý lớn (2 vali). Đi đường cầu Nhật Tân.\nThanh toán sau, vui lòng xuất hóa đơn công ty.",
-    });
+    const { tripId: tripIdParam } = useParams();
+    const [trip, setTrip] = React.useState(null);
+    const [driverInfo, setDriverInfo] = React.useState(null);
+    const [loading, setLoading] = React.useState(true);
+    const [detailLoading, setDetailLoading] = React.useState(false);
+    const [error, setError] = React.useState("");
+    const [activeTripId, setActiveTripId] = React.useState(null);
 
     // confirm modal đổi trạng thái
     const [confirmOpen, setConfirmOpen] = React.useState(false);
     const [nextStatus, setNextStatus] = React.useState("");
     const [nextLabel, setNextLabel] = React.useState("");
+    const [actionLoading, setActionLoading] = React.useState(false);
 
     // modal báo cáo chi phí
     const [expenseOpen, setExpenseOpen] = React.useState(false);
@@ -378,170 +409,289 @@ export default function DriverTripDetailPage() {
     // toast
     const { toasts, pushToast } = useToasts();
 
+    const loadTripDetail = React.useCallback(
+        async (targetTripId, { silent } = {}) => {
+            if (!targetTripId) return;
+            if (silent) setDetailLoading(true);
+            else setLoading(true);
+            try {
+                const detail = await getTripDetail(targetTripId);
+                setTrip(normalizeTripDetail(detail));
+                setError("");
+                setActiveTripId(targetTripId);
+            } catch (err) {
+                setTrip(null);
+                setError(
+                    err?.data?.message ||
+                        err?.message ||
+                        "Không tải được chi tiết chuyến."
+                );
+            } finally {
+                if (silent) setDetailLoading(false);
+                else setLoading(false);
+            }
+        },
+        []
+    );
+
+    React.useEffect(() => {
+        let cancelled = false;
+        async function init() {
+            try {
+                const uid = getCookie("userId");
+                if (!uid) {
+                    throw new Error("Không xác định được tài khoản.");
+                }
+                const profile = await getDriverProfileByUser(uid);
+                if (cancelled) return;
+                setDriverInfo(profile);
+
+                let explicitTripId = Number(tripIdParam);
+                if (!Number.isFinite(explicitTripId) || explicitTripId <= 0) {
+                    explicitTripId = null;
+                }
+
+                let targetTripId = explicitTripId;
+                if (!targetTripId) {
+                    const dash = await getDriverDashboard(profile.driverId);
+                    if (cancelled) return;
+                    targetTripId = dash?.tripId || null;
+                }
+
+                if (cancelled) return;
+                if (!targetTripId) {
+                    setTrip(null);
+                    setActiveTripId(null);
+                    setError("Hiện bạn chưa có chuyến nào được giao.");
+                    setLoading(false);
+                    return;
+                }
+
+                await loadTripDetail(targetTripId);
+            } catch (err) {
+                if (!cancelled) {
+                    setTrip(null);
+                    setError(
+                        err?.data?.message ||
+                            err?.message ||
+                            "Không tải được chi tiết chuyến."
+                    );
+                    setLoading(false);
+                }
+            }
+        }
+        init();
+        return () => {
+            cancelled = true;
+        };
+    }, [tripIdParam, loadTripDetail]);
+
     // logic nút tiếp theo dựa vào trạng thái hiện tại
     function getNextStepInfo(st) {
         if (st === "NOT_STARTED") {
             return {
-                btnText: "Bắt đầu chuyến",
+                btnText: "Bat dau chuyen",
                 to: "IN_PROGRESS",
-                desc: "Xác nhận bạn đã bắt đầu di chuyển đến điểm đón.",
+                desc: "Xac nhan ban da bat dau di chuyen den diem don.",
             };
         }
         if (st === "IN_PROGRESS") {
             return {
-                btnText: "Đã đón khách",
-                to: "PICKED_UP",
-                desc: "Xác nhận khách đã lên xe.",
-            };
-        }
-        if (st === "PICKED_UP") {
-            return {
-                btnText: "Hoàn thành chuyến",
+                btnText: "Hoan thanh chuyen",
                 to: "COMPLETED",
-                desc: "Xác nhận đã đưa khách đến điểm đến.",
+                desc: "Xac nhan da dua khach den diem den.",
             };
         }
-        return null; // COMPLETED => không còn action
+        return null;
     }
-
-    const stepInfo = getNextStepInfo(trip.status);
+    const stepInfo = trip ? getNextStepInfo(trip.status) : null;
 
     // mở confirm modal
     const requestStatusChange = () => {
-        if (!stepInfo) return;
+        if (!stepInfo || actionLoading || detailLoading) return;
         setNextStatus(stepInfo.to);
         setNextLabel(stepInfo.btnText);
         setConfirmOpen(true);
     };
 
-    // PUT trạng thái (mock)
     const doChangeStatus = async () => {
+        if (!trip || !driverInfo || !nextStatus) return;
         setConfirmOpen(false);
-        const newStatus = nextStatus;
-
-        // fake PUT /api/driver/trips/{id}/status
-        await new Promise((r) => setTimeout(r, 300));
-
-        setTrip((t) => ({ ...t, status: newStatus }));
-        pushToast(
-            "Đã cập nhật trạng thái chuyến: " + newStatus,
-            "success"
-        );
+        setActionLoading(true);
+        try {
+            if (nextStatus === "IN_PROGRESS") {
+                await apiStartTrip(driverInfo.driverId, trip.id);
+            } else if (nextStatus === "COMPLETED") {
+                await apiCompleteTrip(driverInfo.driverId, trip.id);
+            }
+            pushToast("Da cap nhat trang thai chuyen.", "success");
+            await loadTripDetail(trip.id, { silent: true });
+        } catch (err) {
+            pushToast(
+                err?.data?.message ||
+                    err?.message ||
+                    "Khong the cap nhat trang thai chuyen.",
+                "error"
+            );
+        } finally {
+            setActionLoading(false);
+        }
     };
 
-    // mở modal báo cáo chi phí
-    const openExpenseModal = () => setExpenseOpen(true);
+    const openExpenseModal = () => {
+        if (!trip) return;
+        setExpenseOpen(true);
+    };
 
     // callback sau khi gửi chi phí thành công
     const handleExpenseSubmitted = ({ amount }) => {
         pushToast(
             "Đã gửi báo cáo chi phí +" +
-            Number(amount).toLocaleString("vi-VN") +
-            "đ",
+                Number(amount).toLocaleString("vi-VN") +
+                "đ",
             "success"
         );
     };
 
-    const tripRouteLabel =
-        trip.pickup_location +
-        " → " +
-        trip.dropoff_location;
+    const tripRouteLabel = trip
+        ? trip.pickup_location + " -> " + trip.dropoff_location
+        : "";
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 p-5">
             <Toasts toasts={toasts} />
 
-            {/* HEADER CHÍNH */}
-            <div className="flex flex-col lg:flex-row lg:items-start gap-4 mb-5">
-                <div className="flex-1 flex flex-col gap-2">
-                    <div className="flex flex-wrap items-start gap-3">
-                        <div className="text-2xl font-semibold text-slate-900 flex items-center gap-2 leading-tight">
-                            <Flag className="h-6 w-6 text-emerald-600" />
-                            <span>Chi tiết chuyến</span>
-                        </div>
-                        <StatusChip status={trip.status} />
-                    </div>
-
-                    <div className="text-[12px] text-slate-600 flex flex-wrap items-center gap-3 leading-relaxed">
-                        <div className="flex items-center gap-1">
-                            <Clock className="h-3.5 w-3.5 text-slate-400" />
-                            <span>
-                                Đón lúc{" "}
-                                <span className="text-slate-800 font-semibold">
-                                    {fmtDateTime(trip.pickup_time)}
-                                </span>
-                            </span>
-                        </div>
-
-                        <div className="hidden sm:block text-slate-300">•</div>
-
-                        <div className="flex items-center gap-1">
-                            <CarFront className="h-3.5 w-3.5 text-emerald-600" />
-                            <span className="text-slate-700">
-                                {trip.vehicle_plate} · {trip.vehicle_type}
-                            </span>
-                        </div>
-
-                        <div className="hidden sm:block text-slate-300">•</div>
-
-                        <div className="flex items-center gap-1">
-                            <Phone className="h-3.5 w-3.5 text-sky-600" />
-                            <a
-                                className="text-sky-600 hover:underline font-medium"
-                                href={"tel:" + trip.customer_phone}
-                            >
-                                {trip.customer_phone}
-                            </a>
-                        </div>
-                    </div>
+            {loading ? (
+                <div className="rounded-2xl border border-slate-200 bg-white p-6 flex items-center gap-3 text-slate-600 shadow-sm">
+                    <Loader2 className="h-5 w-5 animate-spin text-sky-600" />
+                    <span>Dang tai chi tiet chuyen...</span>
                 </div>
-
-                {/* ACTIONS BÊN PHẢI */}
-                <div className="flex flex-col gap-2 w-full max-w-[240px]">
-                    {stepInfo ? (
-                        <button
-                            onClick={requestStatusChange}
-                            className="rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-semibold text-sm px-4 py-2 shadow-[0_12px_24px_rgba(16,185,129,0.35)] hover:from-emerald-500 hover:to-emerald-400 transition-colors"
-                        >
-                            {stepInfo.btnText}
-                        </button>
-                    ) : (
-                        <div className="rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-700 text-xs font-medium px-4 py-2 flex items-center gap-2 justify-center shadow-sm">
-                            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                            Đã hoàn thành chuyến
+            ) : trip ? (
+                <>
+                    {detailLoading && (
+                        <div className="mb-4 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 shadow-sm">
+                            <Loader2 className="h-4 w-4 animate-spin text-sky-600" />
+                            <span>Dang cap nhat du lieu...</span>
                         </div>
                     )}
 
-                    <button
-                        onClick={openExpenseModal}
-                        className="rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm text-slate-700 px-4 py-2 flex items-center justify-center gap-2 shadow-sm"
-                    >
-                        <BadgeDollarSign className="h-4 w-4 text-emerald-600" />
-                        <span>Báo cáo chi phí</span>
-                    </button>
+                    {/* HEADER CHÍNH */}
+                    <div className="flex flex-col lg:flex-row lg:items-start gap-4 mb-5">
+                        <div className="flex-1 flex flex-col gap-2">
+                            <div className="flex flex-wrap items-start gap-3">
+                                <div className="text-2xl font-semibold text-slate-900 flex items-center gap-2 leading-tight">
+                                    <Flag className="h-6 w-6 text-emerald-600" />
+                                    <span>Chi tiết chuyến</span>
+                                </div>
+                                <StatusChip status={trip.status} />
+                            </div>
+
+                            <div className="text-[12px] text-slate-600 flex flex-wrap items-center gap-3 leading-relaxed">
+                                <div className="flex items-center gap-1">
+                                    <Clock className="h-3.5 w-3.5 text-slate-400" />
+                                    <span>
+                                        Đón lúc{" "}
+                                        <span className="text-slate-800 font-semibold">
+                                            {fmtDateTime(trip.pickup_time)}
+                                        </span>
+                                    </span>
+                                </div>
+
+                                <div className="hidden sm:block text-slate-300">
+                                    •
+                                </div>
+
+                                <div className="flex items-center gap-1">
+                                    <CarFront className="h-3.5 w-3.5 text-emerald-600" />
+                                    <span className="text-slate-700">
+                                        {trip.vehicle_plate} ·{" "}
+                                        {trip.vehicle_type}
+                                    </span>
+                                </div>
+
+                                <div className="hidden sm:block text-slate-300">
+                                    •
+                                </div>
+
+                                <div className="flex items-center gap-1">
+                                    <Phone className="h-3.5 w-3.5 text-sky-600" />
+                                    <a
+                                        className="text-sky-600 hover:underline font-medium"
+                                        href={"tel:" + trip.customer_phone}
+                                    >
+                                        {trip.customer_phone}
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ACTIONS BÊN PHẢI */}
+                        <div className="flex flex-col gap-2 w-full max-w-[240px]">
+                            {stepInfo ? (
+                                <button
+                                    onClick={requestStatusChange}
+                                    disabled={
+                                        actionLoading || detailLoading
+                                    }
+                                    className={cls(
+                                        "rounded-xl text-white font-semibold text-sm px-4 py-2 shadow-[0_12px_24px_rgba(16,185,129,0.35)] transition-colors bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400",
+                                        actionLoading || detailLoading
+                                            ? "opacity-60 cursor-not-allowed"
+                                            : ""
+                                    )}
+                                >
+                                    {actionLoading ? (
+                                        <span className="inline-flex items-center gap-2">
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                            Dang cap nhat...
+                                        </span>
+                                    ) : (
+                                        stepInfo.btnText
+                                    )}
+                                </button>
+                            ) : (
+                                <div className="rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-700 text-xs font-medium px-4 py-2 flex items-center gap-2 justify-center shadow-sm">
+                                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                                    Da hoan thanh chuyen
+                                </div>
+                            )}
+
+                            <button
+                                onClick={openExpenseModal}
+                                className="rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm text-slate-700 px-4 py-2 flex items-center justify-center gap-2 shadow-sm"
+                            >
+                                <BadgeDollarSign className="h-4 w-4 text-emerald-600" />
+                                <span>Báo cáo chi phí</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* TIẾN TRÌNH */}
+                    <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl shadow-slate-900/5">
+                        <div className="text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center gap-2 mb-3">
+                            <Navigation className="h-4 w-4 text-sky-600" />
+                            Tiến trình chuyến đi
+                        </div>
+                        <ProgressSteps status={trip.status} />
+                    </div>
+
+                    {/* THÔNG TIN CHI TIẾT */}
+                    <div className="grid xl:grid-cols-2 gap-5">
+                        <TripMetaCard trip={trip} />
+                        <RouteCard
+                            pickupLocation={trip.pickup_location}
+                            dropoffLocation={trip.dropoff_location}
+                            pickupTime={trip.pickup_time}
+                        />
+                    </div>
+                </>
+            ) : (
+                <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600 shadow-sm">
+                    {error || "Ban hien chua co chuyen nao duoc giao."}
                 </div>
-            </div>
+            )}
 
-            {/* TIẾN TRÌNH */}
-            <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl shadow-slate-900/5">
-                <div className="text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center gap-2 mb-3">
-                    <Navigation className="h-4 w-4 text-sky-600" />
-                    Tiến trình chuyến đi
-                </div>
-                <ProgressSteps status={trip.status} />
-            </div>
-
-            {/* THÔNG TIN CHI TIẾT */}
-            <div className="grid xl:grid-cols-2 gap-5">
-                <TripMetaCard trip={trip} />
-                <RouteCard
-                    pickupLocation={trip.pickup_location}
-                    dropoffLocation={trip.dropoff_location}
-                    pickupTime={trip.pickup_time}
-                />
-            </div>
-
-            {/* MODAL XÁC NHẬN ĐỔI TRẠNG THÁI */}
+            {/* MODAL CONFIRM CẬP NHẬT TRẠNG THÁI */}
             <ConfirmModal
                 open={confirmOpen}
                 title="Xác nhận cập nhật trạng thái"
@@ -554,10 +704,10 @@ export default function DriverTripDetailPage() {
                 onConfirm={doChangeStatus}
             />
 
-            {/* MODAL BÁO CÁO CHI PHÍ (TripExpenseModal) */}
+            {/* MODAL BÁO CÁO CHI PHÍ */}
             <TripExpenseModal
                 open={expenseOpen}
-                tripId={trip.id}
+                tripId={trip?.id}
                 tripLabel={tripRouteLabel}
                 onClose={() => setExpenseOpen(false)}
                 onSubmitted={handleExpenseSubmitted}
@@ -565,3 +715,19 @@ export default function DriverTripDetailPage() {
         </div>
     );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
