@@ -52,11 +52,11 @@ public class Users implements UserDetails {
     private String passwordHash;
 
     @Size(max = 100)
-    @Column(name = "email", length = 100)
+    @Column(name = "email", length = 100, unique = true)
     private String email;
 
     @Size(max = 20)
-    @Column(name = "phone", length = 20)
+    @Column(name = "phone", length = 20, unique = true)
     private String phone;
 
     @Size(max = 255)

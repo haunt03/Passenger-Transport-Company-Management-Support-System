@@ -61,7 +61,7 @@ public class Drivers {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
-    private DriverStatus status=DriverStatus.Available;
+    private DriverStatus status=DriverStatus.AVAILABLE;
 
     @CreationTimestamp
     @Column(name = "createdAt")

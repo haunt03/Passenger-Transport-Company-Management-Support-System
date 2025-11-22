@@ -42,6 +42,9 @@ public class Trips {
     @Column(name = "endLocation")
     private String endLocation;
 
+    @Column(name = "distance", precision = 10, scale = 2)
+    private BigDecimal distance;
+
     @ColumnDefault("0.00")
     @Column(name = "incidentalCosts", precision = 10, scale = 2)
     private BigDecimal incidentalCosts;
