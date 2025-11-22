@@ -36,6 +36,8 @@ public class AppConfig implements WebMvcConfigurer {
             "/v3/api-docs/**",
             "/swagger-ui.html",
             "/api/auth/**",          // login, register, refresh
+            "/api/test/**",          // test endpoints (generate hash, test password)
+            "/api/graphhopper/**",   // GraphHopper API for geocoding and routing
             "/verify",
             "/set-password"
     };
@@ -91,4 +93,3 @@ public class AppConfig implements WebMvcConfigurer {
                 .addResourceLocations("file:uploads/");
     }
 }
-
