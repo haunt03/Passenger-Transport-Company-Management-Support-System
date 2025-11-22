@@ -61,7 +61,7 @@ public class BranchController {
     // ======================= GET ALL =======================
     @Operation(summary = "Danh sách chi nhánh", description = "Cho phép Admin, Manager và Accountant xem danh sách chi nhánh.")
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT','CONSULTANT')")
     public ResponseData<?> getAllBranches(
             @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "0") int page,
@@ -79,7 +79,7 @@ public class BranchController {
     // ======================= GET BY ID =======================
     @Operation(summary = "Chi tiết chi nhánh", description = "Cho phép Admin, Manager và Accountant xem chi tiết chi nhánh.")
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT')")
+//    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT','CONSULTANT')")
     public ResponseData<?> getBranchById(
             @Parameter(description = "ID chi nhánh") @PathVariable Integer id) {
         try {

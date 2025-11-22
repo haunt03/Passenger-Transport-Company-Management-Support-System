@@ -23,7 +23,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -107,6 +112,339 @@ public class DispatchServiceImpl implements DispatchService {
         // Có thể sort theo startTime tăng dần
         result.sort(Comparator.comparing(PendingTripResponse::getStartTime));
         return result;
+    }
+
+    @Override
+    public List<PendingTripResponse> getAllPendingTrips() {
+        log.info("[Dispatch] Loading all pending trips (all branches)");
+
+        LocalDate today = LocalDate.now();
+        Instant from = today.atStartOfDay(ZoneId.systemDefault()).toInstant();
+        Instant to = today.plusDays(7).atStartOfDay(ZoneId.systemDefault()).toInstant(); // 7 ngày tới
+
+        // Lấy tất cả trips SCHEDULED trong khoảng thời gian
+        List<Trips> trips = tripRepository.findByStatusAndStartTimeBetween(TripStatus.SCHEDULED, from, to);
+
+        List<PendingTripResponse> result = new ArrayList<>();
+
+        for (Trips t : trips) {
+            // Chỉ lấy các trip CHƯA gán driver và CHƯA gán vehicle
+            List<TripDrivers> tripDrivers = tripDriverRepository.findByTripId(t.getId());
+            List<TripVehicles> tripVehicles = tripVehicleRepository.findByTripId(t.getId());
+            if (!tripDrivers.isEmpty() || !tripVehicles.isEmpty()) {
+                continue;
+            }
+
+            Bookings b = t.getBooking();
+            if (!DISPATCHABLE_BOOKING_STATUSES.contains(b.getStatus())) {
+                continue;
+            }
+
+            result.add(PendingTripResponse.builder()
+                    .tripId(t.getId())
+                    .bookingId(b.getId())
+                    .branchId(b.getBranch().getId())
+                    .branchName(b.getBranch().getBranchName())
+                    .customerName(b.getCustomer().getFullName())
+                    .customerPhone(b.getCustomer().getPhone())
+                    .startTime(t.getStartTime())
+                    .endTime(t.getEndTime())
+                    .startLocation(t.getStartLocation())
+                    .endLocation(t.getEndLocation())
+                    .bookingStatus(b.getStatus())
+                    .build()
+            );
+        }
+
+        result.sort(Comparator.comparing(PendingTripResponse::getStartTime));
+        return result;
+    }
+
+    @Override
+    public org.example.ptcmssbackend.dto.response.dispatch.AssignmentSuggestionResponse getAssignmentSuggestions(Integer tripId) {
+        log.info("[Dispatch] Getting assignment suggestions for trip {}", tripId);
+
+        Trips trip = tripRepository.findById(tripId)
+                .orElseThrow(() -> new RuntimeException("Trip not found: " + tripId));
+
+        Bookings booking = trip.getBooking();
+        Integer branchId = booking.getBranch().getId();
+
+        // Build trip summary
+        org.example.ptcmssbackend.dto.response.dispatch.AssignmentSuggestionResponse.TripSummary summary =
+                org.example.ptcmssbackend.dto.response.dispatch.AssignmentSuggestionResponse.TripSummary.builder()
+                        .tripId(trip.getId())
+                        .bookingId(booking.getId())
+                        .branchId(branchId)
+                        .branchName(booking.getBranch().getBranchName())
+                        .customerName(booking.getCustomer().getFullName())
+                        .customerPhone(booking.getCustomer().getPhone())
+                        .startTime(trip.getStartTime())
+                        .endTime(trip.getEndTime())
+                        .startLocation(trip.getStartLocation())
+                        .endLocation(trip.getEndLocation())
+                        .hireType(booking.getHireType() != null ? booking.getHireType().getName() : null)
+                        .bookingStatus(booking.getStatus())
+                        .routeLabel(routeLabel(trip))
+                        .build();
+
+        // Get all drivers and vehicles in branch
+        List<Drivers> allDrivers = driverRepository.findByBranchId(branchId);
+        List<Vehicles> allVehicles = vehicleRepository.findByBranch_IdAndStatus(branchId, VehicleStatus.AVAILABLE);
+
+        LocalDate tripDate = trip.getStartTime().atZone(ZoneId.systemDefault()).toLocalDate();
+
+        // Evaluate driver candidates with fairness scoring
+        List<org.example.ptcmssbackend.dto.response.dispatch.AssignmentSuggestionResponse.DriverCandidate> driverCandidates =
+                evaluateDriverCandidates(allDrivers, trip, tripDate);
+
+        // Evaluate vehicle candidates
+        List<org.example.ptcmssbackend.dto.response.dispatch.AssignmentSuggestionResponse.VehicleCandidate> vehicleCandidates =
+                evaluateVehicleCandidates(allVehicles, trip);
+
+        // Build pair suggestions (top eligible combinations)
+        List<org.example.ptcmssbackend.dto.response.dispatch.AssignmentSuggestionResponse.PairSuggestion> pairSuggestions =
+                buildPairSuggestions(driverCandidates, vehicleCandidates);
+
+        // Recommend best pair
+        Integer recommendedDriverId = null;
+        Integer recommendedVehicleId = null;
+        if (!pairSuggestions.isEmpty()) {
+            var best = pairSuggestions.get(0);
+            recommendedDriverId = best.getDriver().getId();
+            recommendedVehicleId = best.getVehicle().getId();
+        }
+
+        return org.example.ptcmssbackend.dto.response.dispatch.AssignmentSuggestionResponse.builder()
+                .summary(summary)
+                .suggestions(pairSuggestions)
+                .drivers(driverCandidates)
+                .vehicles(vehicleCandidates)
+                .recommendedDriverId(recommendedDriverId)
+                .recommendedVehicleId(recommendedVehicleId)
+                .build();
+    }
+
+    private List<org.example.ptcmssbackend.dto.response.dispatch.AssignmentSuggestionResponse.DriverCandidate>
+    evaluateDriverCandidates(List<Drivers> drivers, Trips trip, LocalDate tripDate) {
+
+        List<org.example.ptcmssbackend.dto.response.dispatch.AssignmentSuggestionResponse.DriverCandidate> candidates = new ArrayList<>();
+
+        for (Drivers d : drivers) {
+            List<String> reasons = new ArrayList<>();
+            boolean eligible = true;
+            int score = 0;
+
+            // 1) Check day-off (nghỉ phép)
+            boolean dayOff = !driverDayOffRepository
+                    .findApprovedDayOffOnDate(d.getId(), DriverDayOffStatus.APPROVED, tripDate)
+                    .isEmpty();
+            if (dayOff) {
+                eligible = false;
+                reasons.add("Đang nghỉ phép");
+            } else {
+                reasons.add("Không nghỉ phép");
+            }
+
+            // 2) Check license expiry
+            if (d.getLicenseExpiry() != null && d.getLicenseExpiry().isBefore(tripDate)) {
+                eligible = false;
+                reasons.add("Bằng lái hết hạn");
+            } else {
+                reasons.add("Bằng lái còn hạn");
+            }
+
+            // 3) Check time overlap
+            List<TripDrivers> driverTrips = tripDriverRepository.findAllByDriverId(d.getId());
+            boolean overlap = driverTrips.stream().anyMatch(td -> {
+                Trips t = td.getTrip();
+                if (t.getId().equals(trip.getId())) return false;
+                if (t.getStatus() == TripStatus.CANCELLED || t.getStatus() == TripStatus.COMPLETED) return false;
+                Instant s1 = t.getStartTime();
+                Instant e1 = t.getEndTime();
+                Instant s2 = trip.getStartTime();
+                Instant e2 = trip.getEndTime();
+                if (s1 == null || e1 == null || s2 == null || e2 == null) return false;
+                return s1.isBefore(e2) && s2.isBefore(e1);
+            });
+            if (overlap) {
+                eligible = false;
+                reasons.add("Trùng giờ với chuyến khác");
+            } else {
+                reasons.add("Rảnh tại thời điểm này");
+            }
+
+            // 4) Fairness scoring: số chuyến trong ngày
+            long tripsToday = driverTrips.stream().filter(td -> {
+                Trips t = td.getTrip();
+                if (t.getStartTime() == null) return false;
+                LocalDate dDate = t.getStartTime().atZone(ZoneId.systemDefault()).toLocalDate();
+                return dDate.equals(tripDate);
+            }).count();
+
+            // 5) Fairness: số chuyến trong tuần
+            LocalDate weekStart = tripDate.minusDays(tripDate.getDayOfWeek().getValue() - 1);
+            LocalDate weekEnd = weekStart.plusDays(6);
+            long tripsThisWeek = driverTrips.stream().filter(td -> {
+                Trips t = td.getTrip();
+                if (t.getStartTime() == null) return false;
+                LocalDate dDate = t.getStartTime().atZone(ZoneId.systemDefault()).toLocalDate();
+                return !dDate.isBefore(weekStart) && !dDate.isAfter(weekEnd);
+            }).count();
+
+            // 6) Fairness: mức độ được gán gần đây (recent assignment)
+            long recentAssignments = driverTrips.stream().filter(td -> {
+                Trips t = td.getTrip();
+                if (t.getStartTime() == null) return false;
+                LocalDate dDate = t.getStartTime().atZone(ZoneId.systemDefault()).toLocalDate();
+                return !dDate.isBefore(tripDate.minusDays(3)); // 3 ngày gần đây
+            }).count();
+
+            // Calculate fairness score (lower is better)
+            // Trọng số: ngày (40%), tuần (30%), gần đây (30%)
+            score = (int) (tripsToday * 40 + tripsThisWeek * 30 + recentAssignments * 30);
+
+            if (eligible) {
+                reasons.add(String.format("Số chuyến hôm nay: %d", tripsToday));
+                reasons.add(String.format("Số chuyến tuần này: %d", tripsThisWeek));
+                reasons.add(String.format("Điểm công bằng: %d (thấp = ưu tiên)", score));
+            }
+
+            String driverName = extractDriverName(d);
+            String phone = d.getEmployee() != null && d.getEmployee().getUser() != null
+                    ? d.getEmployee().getUser().getPhone() : null;
+
+            candidates.add(org.example.ptcmssbackend.dto.response.dispatch.AssignmentSuggestionResponse.DriverCandidate.builder()
+                    .id(d.getId())
+                    .name(driverName)
+                    .phone(phone)
+                    .branchName(d.getBranch() != null ? d.getBranch().getBranchName() : null)
+                    .licenseClass(d.getLicenseClass())
+                    .rating(d.getRating())
+                    .tripsToday((int) tripsToday)
+                    .score(score)
+                    .eligible(eligible)
+                    .reasons(reasons)
+                    .build());
+        }
+
+        // Sort: eligible first, then by score (ascending)
+        candidates.sort((a, b) -> {
+            if (a.isEligible() != b.isEligible()) {
+                return a.isEligible() ? -1 : 1;
+            }
+            return Integer.compare(a.getScore(), b.getScore());
+        });
+
+        return candidates;
+    }
+
+    private List<org.example.ptcmssbackend.dto.response.dispatch.AssignmentSuggestionResponse.VehicleCandidate>
+    evaluateVehicleCandidates(List<Vehicles> vehicles, Trips trip) {
+
+        List<org.example.ptcmssbackend.dto.response.dispatch.AssignmentSuggestionResponse.VehicleCandidate> candidates = new ArrayList<>();
+
+        for (Vehicles v : vehicles) {
+            List<String> reasons = new ArrayList<>();
+            boolean eligible = true;
+            int score = 0;
+
+            // 1) Check status
+            if (v.getStatus() != VehicleStatus.AVAILABLE) {
+                eligible = false;
+                reasons.add("Xe không sẵn sàng: " + v.getStatus());
+            } else {
+                reasons.add("Xe sẵn sàng");
+            }
+
+            // 2) Check time overlap
+            List<TripVehicles> overlaps = tripVehicleRepository.findOverlapsForVehicle(
+                    v.getId(),
+                    trip.getStartTime(),
+                    trip.getEndTime()
+            );
+            boolean busy = overlaps.stream().anyMatch(tv ->
+                    tv.getTrip().getStatus() != TripStatus.CANCELLED
+                            && !tv.getTrip().getId().equals(trip.getId())
+            );
+            if (busy) {
+                eligible = false;
+                reasons.add("Trùng giờ với chuyến khác");
+            } else {
+                reasons.add("Rảnh tại thời điểm này");
+            }
+
+            // 3) Score based on capacity, mileage, etc. (simple for now)
+            score = 0; // Could add: mileage, last maintenance, etc.
+
+            if (eligible) {
+                reasons.add("Đủ điều kiện gán");
+            }
+
+            candidates.add(org.example.ptcmssbackend.dto.response.dispatch.AssignmentSuggestionResponse.VehicleCandidate.builder()
+                    .id(v.getId())
+                    .plate(v.getLicensePlate())
+                    .model(v.getModel())
+                    .capacity(v.getCapacity())
+                    .status(v.getStatus())
+                    .score(score)
+                    .eligible(eligible)
+                    .reasons(reasons)
+                    .build());
+        }
+
+        // Sort: eligible first, then by score
+        candidates.sort((a, b) -> {
+            if (a.isEligible() != b.isEligible()) {
+                return a.isEligible() ? -1 : 1;
+            }
+            return Integer.compare(a.getScore(), b.getScore());
+        });
+
+        return candidates;
+    }
+
+    private List<org.example.ptcmssbackend.dto.response.dispatch.AssignmentSuggestionResponse.PairSuggestion>
+    buildPairSuggestions(
+            List<org.example.ptcmssbackend.dto.response.dispatch.AssignmentSuggestionResponse.DriverCandidate> drivers,
+            List<org.example.ptcmssbackend.dto.response.dispatch.AssignmentSuggestionResponse.VehicleCandidate> vehicles) {
+
+        List<org.example.ptcmssbackend.dto.response.dispatch.AssignmentSuggestionResponse.PairSuggestion> pairs = new ArrayList<>();
+
+        // Only pair eligible candidates
+        var eligibleDrivers = drivers.stream().filter(d -> d.isEligible()).limit(5).collect(Collectors.toList());
+        var eligibleVehicles = vehicles.stream().filter(v -> v.isEligible()).limit(5).collect(Collectors.toList());
+
+        for (var driver : eligibleDrivers) {
+            for (var vehicle : eligibleVehicles) {
+                int pairScore = driver.getScore() + vehicle.getScore();
+                List<String> pairReasons = new ArrayList<>();
+                pairReasons.add(String.format("Tài xế: %s (điểm: %d)", driver.getName(), driver.getScore()));
+                pairReasons.add(String.format("Xe: %s (điểm: %d)", vehicle.getPlate(), vehicle.getScore()));
+                pairReasons.add(String.format("Tổng điểm: %d", pairScore));
+
+                pairs.add(org.example.ptcmssbackend.dto.response.dispatch.AssignmentSuggestionResponse.PairSuggestion.builder()
+                        .driver(org.example.ptcmssbackend.dto.response.dispatch.AssignmentSuggestionResponse.DriverBrief.builder()
+                                .id(driver.getId())
+                                .name(driver.getName())
+                                .phone(driver.getPhone())
+                                .build())
+                        .vehicle(org.example.ptcmssbackend.dto.response.dispatch.AssignmentSuggestionResponse.VehicleBrief.builder()
+                                .id(vehicle.getId())
+                                .plate(vehicle.getPlate())
+                                .model(vehicle.getModel())
+                                .build())
+                        .score(pairScore)
+                        .reasons(pairReasons)
+                        .build());
+            }
+        }
+
+        // Sort by score (ascending - lower is better)
+        pairs.sort(Comparator.comparingInt(org.example.ptcmssbackend.dto.response.dispatch.AssignmentSuggestionResponse.PairSuggestion::getScore));
+
+        // Return top 10 suggestions
+        return pairs.stream().limit(10).collect(Collectors.toList());
     }
 
     @Override
@@ -254,7 +592,7 @@ public class DispatchServiceImpl implements DispatchService {
     // 3) UNASSIGN
     // =========================================================
     @Override
-    public void unassign(Integer tripId) {
+    public void unassign(Integer tripId, String note) {
         log.info("[Dispatch] Unassign trip {}", tripId);
         Trips trip = tripRepository.findById(tripId)
                 .orElseThrow(() -> new RuntimeException("Trip not found: " + tripId));
@@ -279,12 +617,12 @@ public class DispatchServiceImpl implements DispatchService {
         // Thực chất là unassign rồi assign lại
         if (request.getTripIds() != null && !request.getTripIds().isEmpty()) {
             for (Integer tid : request.getTripIds()) {
-                unassign(tid);
+                unassign(tid, request.getNote());
             }
         } else if (request.getBookingId() != null) {
             List<Trips> trips = tripRepository.findByBooking_Id(request.getBookingId());
             for (Trips t : trips) {
-                unassign(t.getId());
+                unassign(t.getId(), request.getNote());
             }
         }
         return assign(request);

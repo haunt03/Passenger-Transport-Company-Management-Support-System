@@ -4,11 +4,13 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import org.example.ptcmssbackend.enums.AssignmentAction;
+import org.hibernate.annotations.CreationTimestamp;
+
 
 import java.time.Instant;
 
 @Entity
-@Table(name = "trip_assignment_history")
+@Table(name = "Trip_assignment_history")
 @Getter
 @Setter
 public class TripAssignmentHistory {
