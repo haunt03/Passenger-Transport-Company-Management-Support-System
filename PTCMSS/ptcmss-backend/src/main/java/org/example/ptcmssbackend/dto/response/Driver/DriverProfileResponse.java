@@ -20,6 +20,7 @@ public class DriverProfileResponse {
     private LocalDate licenseExpiry;
     private DriverStatus status;
 
+
     // Thống kê
     private Long totalTrips; // Tổng số chuyến đã hoàn thành
     private Double totalKm; // Tổng km (tùy chọn, có thể null nếu không có dữ liệu)
@@ -37,4 +38,3 @@ public class DriverProfileResponse {
         this.totalKm = null; // Chưa có dữ liệu km trong database
     }
 }
-

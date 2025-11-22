@@ -14,6 +14,7 @@ public class TripResponse {
     private Instant endTime;
     private String startLocation;
     private String endLocation;
+    private Double distance; // Distance in kilometers
     private Boolean useHighway;
     private String status;
 
