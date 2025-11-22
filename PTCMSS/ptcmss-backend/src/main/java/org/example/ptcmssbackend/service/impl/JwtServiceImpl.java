@@ -1,11 +1,8 @@
 package org.example.ptcmssbackend.service.impl;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.*;
+import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
-import io.jsonwebtoken.security.SignatureException;
 import lombok.extern.slf4j.Slf4j;
 import org.example.ptcmssbackend.common.TokenType;
 import org.example.ptcmssbackend.service.JwtService;
@@ -15,10 +12,9 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 
 import java.security.Key;
-import java.util.Collection;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.*;
 import java.util.function.Function;
 
 import static org.example.ptcmssbackend.common.TokenType.ACCESS_TOKEN;
@@ -28,103 +24,103 @@ import static org.example.ptcmssbackend.common.TokenType.REFRESH_TOKEN;
 @Slf4j(topic = "JWT_SERVICE")
 public class JwtServiceImpl implements JwtService {
 
-    @Value("${jwt.expriMinutes}")
-    private long expriMinutes;
+    //  Đọc đúng key, có default để chạy ngay nếu thiếu cấu hình
+    @Value("${jwt.expireMinutes:15}")          // access token: phút
+    private long accessExpireMinutes;
 
-    @Value("${jwt.expireDate}")
-    private long expriDate;
+    @Value("${jwt.refreshExpireMinutes:43200}") // refresh token: phút (30 ngày)
+    private long refreshExpireMinutes;
 
-    @Value("${jwt.accesskey}")
-    private String accesskey;
+    //  Nếu bạn dùng chuỗi Base64 cho secret thì để true (khuyên dùng)
+    @Value("${jwt.secretsAreBase64:true}")
+    private boolean secretsAreBase64;
 
-    @Value("${jwt.refreshkey}")
-    private String refreshkey;
+    //  Tên key chuẩn: accessKey / refreshKey
+    @Value("${jwt.accessKey}")
+    private String accessKeyRaw;
 
-    /**
-     * Tạo Access Token (thời hạn ngắn)
-     */
+    @Value("${jwt.refreshKey}")
+    private String refreshKeyRaw;
+
+    private Key getSecretKey(TokenType type) {
+        String raw = (type == ACCESS_TOKEN ? accessKeyRaw : refreshKeyRaw);
+        byte[] keyBytes = secretsAreBase64 ? Decoders.BASE64.decode(raw) : raw.getBytes();
+        return Keys.hmacShaKeyFor(keyBytes); // cần >= 256 bit cho HS256
+    }
+
     @Override
     public String generateAccessToken(Integer userId, String username, Collection<? extends GrantedAuthority> authorities) {
         log.info("[JWT] Generating access token for user: {}", username);
-
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
         claims.put("username", username);
         claims.put("roles", authorities.stream().map(GrantedAuthority::getAuthority).toList());
 
+        Instant now = Instant.now();
+        Instant exp = now.plus(accessExpireMinutes, ChronoUnit.MINUTES);
+
         return Jwts.builder()
                 .setClaims(claims)
                 .setSubject(username)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + expriMinutes * 60 * 1000))
+                .setIssuedAt(Date.from(now))
+                .setExpiration(Date.from(exp))
                 .signWith(getSecretKey(ACCESS_TOKEN), SignatureAlgorithm.HS256)
                 .compact();
     }
 
-    /**
-     * Tạo Refresh Token (thời hạn dài)
-     */
     @Override
     public String generateRefreshToken(Integer userId, String username, Collection<? extends GrantedAuthority> authorities) {
         log.info("[JWT] Generating refresh token for user: {}", username);
-
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
         claims.put("username", username);
         claims.put("roles", authorities.stream().map(GrantedAuthority::getAuthority).toList());
 
+        Instant now = Instant.now();
+        Instant exp = now.plus(refreshExpireMinutes, ChronoUnit.MINUTES);
+
         return Jwts.builder()
                 .setClaims(claims)
                 .setSubject(username)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 24 * 60 * 60 * 1000 * expriDate))
+                .setIssuedAt(Date.from(now))
+                .setExpiration(Date.from(exp))
                 .signWith(getSecretKey(REFRESH_TOKEN), SignatureAlgorithm.HS256)
                 .compact();
     }
 
-    /**
-     * Trích xuất username từ token
-     */
     @Override
     public String extractUsername(String token, TokenType tokenType) {
         log.info("[JWT] Extracting username (type: {})", tokenType);
         return extractClaim(tokenType, token, Claims::getSubject);
     }
 
-    /**
-     * Tạo token cho reset mật khẩu
-     */
     @Override
     public String generatePasswordResetToken(String username) {
         log.info("[JWT] Generating password reset token for user: {}", username);
-
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("username", username);
+        Instant now = Instant.now();
+        Instant exp = now.plus(accessExpireMinutes, ChronoUnit.MINUTES);
 
         return Jwts.builder()
-                .setClaims(claims)
                 .setSubject(username)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + expriMinutes * 60 * 1000))
+                .setIssuedAt(Date.from(now))
+                .setExpiration(Date.from(exp))
+                .claim("purpose", "password_reset")
                 .signWith(getSecretKey(ACCESS_TOKEN), SignatureAlgorithm.HS256)
                 .compact();
     }
 
-    // ================== PRIVATE UTILS =================== //
-
-    private <T> T extractClaim(TokenType type, String token, Function<Claims, T> claimsExtractor) {
-        final Claims claims = extractAllClaim(token, type);
-        return claimsExtractor.apply(claims);
+    private <T> T extractClaim(TokenType type, String token, Function<Claims, T> extractor) {
+        return extractor.apply(extractAllClaims(token, type));
     }
 
-    private Claims extractAllClaim(String token, TokenType type) {
+    private Claims extractAllClaims(String token, TokenType type) {
         try {
             return Jwts.parserBuilder()
                     .setSigningKey(getSecretKey(type))
                     .build()
                     .parseClaimsJws(token)
                     .getBody();
-        } catch (SignatureException e) {
+        } catch (io.jsonwebtoken.security.SignatureException e) {
             log.error("[JWT] Invalid signature for {} token", type);
             throw new AccessDeniedException("Access denied! Invalid JWT signature.");
         } catch (ExpiredJwtException e) {
@@ -135,142 +131,4 @@ public class JwtServiceImpl implements JwtService {
             throw new AccessDeniedException("Access denied! " + e.getMessage());
         }
     }
-
-    /**
-     * ✅ KHÔNG decode Base64 nữa.
-     * Secret key được lấy trực tiếp từ chuỗi plain text.
-     * (Miễn là dài ≥ 32 ký tự)
-     */
-    private Key getSecretKey(TokenType type) {
-        return switch (type) {
-            case ACCESS_TOKEN -> Keys.hmacShaKeyFor(accesskey.getBytes());
-            case REFRESH_TOKEN -> Keys.hmacShaKeyFor(refreshkey.getBytes());
-            default -> throw new IllegalArgumentException("Invalid token type: " + type);
-        };
-    }
 }
-
-
-//package org.example.ptcmssbackend.service.impl;
-//
-//import io.jsonwebtoken.Claims;
-//import io.jsonwebtoken.ExpiredJwtException;
-//import io.jsonwebtoken.Jwts;
-//import io.jsonwebtoken.SignatureAlgorithm;
-//import io.jsonwebtoken.io.Decoders;
-//import io.jsonwebtoken.security.Keys;
-//import io.jsonwebtoken.security.SignatureException;
-//import lombok.extern.slf4j.Slf4j;
-//import org.example.ptcmssbackend.common.TokenType;
-//import org.example.ptcmssbackend.service.JwtService;
-//import org.springframework.beans.factory.annotation.Value;
-//import org.springframework.security.access.AccessDeniedException;
-//import org.springframework.security.core.GrantedAuthority;
-//import org.springframework.stereotype.Service;
-//
-//import java.security.Key;
-//import java.util.*;
-//import java.util.function.Function;
-//
-//import static org.example.ptcmssbackend.common.TokenType.ACCESS_TOKEN;
-//import static org.example.ptcmssbackend.common.TokenType.REFRESH_TOKEN;
-//
-//@Service
-//@Slf4j(topic = "JWT_SERVICE")
-//public class JwtServiceImpl implements JwtService {
-//
-//    @Value("${jwt.expriMinutes}")
-//    private long expriMinutes;
-//
-//    @Value("${jwt.expireDate}")
-//    private long expriDate;
-//
-//    @Value("${jwt.accesskey}")
-//    private String accesskey;
-//
-//    @Value("${jwt.refreshkey}")
-//    private String refreshkey;
-//
-//    @Override
-//    public String generateAccessToken(Integer userId, String username, Collection<? extends GrantedAuthority> authorities) {
-//        log.info("Generating access token for user: {}", username);
-//        Map<String, Object> claims = new HashMap<>();
-//        claims.put("userId", userId);
-//        claims.put("username", username);
-//        claims.put("roles", authorities.stream().map(GrantedAuthority::getAuthority).toList());
-//
-//        return Jwts.builder()
-//                .setClaims(claims)
-//                .setSubject(username)
-//                .setIssuedAt(new Date())
-//                .setExpiration(new Date(System.currentTimeMillis() + expriMinutes * 60 * 1000))
-//                .signWith(getSecretKey(ACCESS_TOKEN), SignatureAlgorithm.HS256)
-//                .compact();
-//    }
-//
-//    @Override
-//    public String generateRefreshToken(Integer userId, String username, Collection<? extends GrantedAuthority> authorities) {
-//        log.info("Generating refresh token for user: {}", username);
-//        Map<String, Object> claims = new HashMap<>();
-//        claims.put("userId", userId);
-//        claims.put("username", username);
-//        claims.put("roles", authorities.stream().map(GrantedAuthority::getAuthority).toList());
-//
-//        return Jwts.builder()
-//                .setClaims(claims)
-//                .setSubject(username)
-//                .setIssuedAt(new Date())
-//                .setExpiration(new Date(System.currentTimeMillis() + 24 * 60 * 60 * 1000 * expriDate))
-//                .signWith(getSecretKey(REFRESH_TOKEN), SignatureAlgorithm.HS256)
-//                .compact();
-//    }
-//
-//    @Override
-//    public String extractUsername(String token, TokenType tokenType) {
-//        log.info("Extracting username from token: {}, type: {}", tokenType);
-//        return extractClaim(tokenType, token, Claims::getSubject);
-//    }
-//
-//    @Override
-//    public String generatePasswordResetToken(String username) {
-//        log.info("Generating password reset token for user: {}", username);
-//        Map<String, Object> claims = new HashMap<>();
-//        claims.put("username", username);
-//        return Jwts.builder()
-//                .setClaims(claims)
-//                .setSubject(username)
-//                .setIssuedAt(new Date())
-//                .setExpiration(new Date(System.currentTimeMillis() + expriMinutes * 60 * 1000))
-//                .signWith(getSecretKey(ACCESS_TOKEN), SignatureAlgorithm.HS256)
-//                .compact();
-//    }
-//
-//    private <T> T extractClaim(TokenType type, String token, Function<Claims, T> claimsExtractor) {
-//        final Claims claims = extractAllClaim(token, type);
-//        return claimsExtractor.apply(claims);
-//    }
-//
-//    private Claims extractAllClaim(String token, TokenType type) {
-//        try {
-//            return Jwts.parserBuilder()
-//                    .setSigningKey(getSecretKey(type))
-//                    .build()
-//                    .parseClaimsJws(token)
-//                    .getBody();
-//        } catch (SignatureException | ExpiredJwtException e) {
-//            throw new AccessDeniedException("Access denied!!! error " + e.getMessage());
-//        }
-//    }
-//
-//    private Key getSecretKey(TokenType type) {
-//        switch (type) {
-//            case ACCESS_TOKEN -> {
-//                return Keys.hmacShaKeyFor(Decoders.BASE64.decode(accesskey));
-//            }
-//            case REFRESH_TOKEN -> {
-//                return Keys.hmacShaKeyFor(Decoders.BASE64.decode(refreshkey));
-//            }
-//            default -> throw new IllegalArgumentException("Invalid token type: " + type);
-//        }
-//    }
-//}

@@ -6,8 +6,8 @@ package org.example.ptcmssbackend.enums;
  * and uppercase values (AVAILABLE, ONTRIP, INACTIVE) that may exist in DB.
  */
 public enum DriverStatus {
-    // Legacy (TitleCase)
-    Available,
-    OnTrip,
-    Inactive
+    // Uppercase variants (for existing DB rows)
+    AVAILABLE,
+    ONTRIP,
+    INACTIVE
 }

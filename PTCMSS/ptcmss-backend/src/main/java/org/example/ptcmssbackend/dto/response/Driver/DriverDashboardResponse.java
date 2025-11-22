@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.example.ptcmssbackend.enums.TripStatus;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 
 @Data
@@ -17,4 +18,9 @@ public class DriverDashboardResponse {
     private Instant startTime;
     private Instant endTime;
     private TripStatus status;
+    private String customerName;
+    private String customerPhone;
+    private BigDecimal distance; // km
+
 }
+

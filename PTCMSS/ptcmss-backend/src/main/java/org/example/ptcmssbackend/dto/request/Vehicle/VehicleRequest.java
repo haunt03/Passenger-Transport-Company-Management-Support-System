@@ -1,14 +1,20 @@
 package org.example.ptcmssbackend.dto.request.Vehicle;
 
 
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
-
 import java.time.LocalDate;
 
 @Data
 public class VehicleRequest {
+
+    @NotNull(message = "Category ID is required")
     private Integer categoryId;        // ID loại xe
-    private Integer branchId;          // ID chi nhánh
+
+    @NotNull(message = "Branch ID is required")
+    private Integer branchId; // ID chi nhánh
+
+
     private String licensePlate;       // Biển số
     private String model;              // Hãng xe / Mẫu
     private String brand;              // Hãng sản xuất

@@ -7,7 +7,7 @@ spring:
   jpa:
     show-sql: true
     hibernate:
-      ddl-auto: none
+      ddl-auto: update
       naming:
         # Dùng đúng tên bạn khai báo/annotate, KHÔNG tự convert sang snake_case
         physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
@@ -43,3 +43,25 @@ management:
     web:
       exposure:
         include: health,info
+
+# Payment Configuration
+payment:
+  bank:
+    code: ${PAYMENT_BANK_CODE:970423}  # Mã ngân hàng (TP bank)
+    account:
+      number: ${PAYMENT_BANK_ACCOUNT_NUMBER:00005505543}  # Số tài khoản nhận tiền
+      name: ${PAYMENT_BANK_ACCOUNT_NAME:NGUYEN THUY HAU}  # Tên chủ tài khoản
+
+# VietQR API Configuration
+vietqr:
+  client-id: ${VIETQR_CLIENT_ID:2c533c20-80aa-41dc-b346-cde4bd3fb8de}  # Lấy từ https://my.vietqr.io/profile
+  api-key: ${VIETQR_API_KEY:9db359c9-a744-4479-83b0-b8861178b081}      # Lấy từ https://my.vietqr.io/profile
+
+# ===== JWT (bổ sung) =====
+jwt:
+  # NÊN dùng Base64 cho secret (độ dài >= 256-bit). Hai chuỗi dưới đây chỉ là ví dụ.
+  accessKey: "bXktc3VwZXItc2VjcmV0LWFjY2Vzcy1rZXktMzItYnl0ZXMtb3ItbW9yZQ=="
+  refreshKey: "bXktc3VwZXItc2VjcmV0LXJlZnJlc2gta2V5LTMyLWJ5dGVzLW9yLW1vcmU="
+  secretsAreBase64: true
+  expireMinutes: 15           # Access Token sống 15 phút
+  refreshExpireMinutes: 43200 # Refresh Token sống 30 ngày (43200 phút)

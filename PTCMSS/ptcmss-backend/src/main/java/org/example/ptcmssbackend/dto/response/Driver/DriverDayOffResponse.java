@@ -1,7 +1,5 @@
 package org.example.ptcmssbackend.dto.response.Driver;
 
-
-
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -27,7 +25,7 @@ public class DriverDayOffResponse {
     @Schema(description = "Tên tài xế", example = "Nguyễn Văn A")
     private String driverName;
 
-    @Schema(description = "Chi nhánh làm việc", example = "Chi nhánh Cần Thơ")
+    @Schema(description = "Chi nhánh làm việc", example = "Chi nhánh Hà Nội")
     private String branchName;
 
     @Schema(description = "Ngày bắt đầu nghỉ", example = "2025-11-10")

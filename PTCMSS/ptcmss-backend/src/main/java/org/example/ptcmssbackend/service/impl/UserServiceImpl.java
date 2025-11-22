@@ -1,6 +1,7 @@
 package org.example.ptcmssbackend.service.impl;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.ptcmssbackend.dto.request.User.CreateUserRequest;
 import org.example.ptcmssbackend.dto.request.User.UpdateUserRequest;
 import org.example.ptcmssbackend.dto.response.User.UserResponse;
@@ -12,15 +13,20 @@ import org.example.ptcmssbackend.repository.UsersRepository;
 import org.example.ptcmssbackend.service.EmailService;
 import org.example.ptcmssbackend.service.LocalImageService;
 import org.example.ptcmssbackend.service.UserService;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.io.UnsupportedEncodingException;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import jakarta.mail.MessagingException;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
@@ -34,6 +40,20 @@ public class UserServiceImpl implements UserService {
     public Integer createUser(CreateUserRequest request) {
         Roles role = rolesRepository.findById(request.getRoleId())
                 .orElseThrow(() -> new RuntimeException("Role not found"));
+
+
+        String email = Optional.ofNullable(request.getEmail()).map(String::trim).orElse(null);
+        if (StringUtils.hasText(email) && usersRepository.existsByEmailIgnoreCase(email)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email already exists");
+        }
+        String phone = Optional.ofNullable(request.getPhone()).map(String::trim).orElse(null);
+        if (StringUtils.hasText(phone) && usersRepository.existsByPhone(phone)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Phone already exists");
+        }
+        String username = Optional.ofNullable(request.getUsername()).map(String::trim).orElse(null);
+        if (StringUtils.hasText(username) && usersRepository.existsByUsername(username)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Username already exists");
+        }
 
         // Tạo user mới (chưa kích hoạt)
         Users user = new Users();
@@ -60,9 +80,12 @@ public class UserServiceImpl implements UserService {
                     user.getVerificationToken(),
                     baseUrl
             );
+            log.info("gửi email thành công");
         } catch (MessagingException | UnsupportedEncodingException e) {
             throw new RuntimeException("Gửi email xác thực thất bại!", e);
         }
+
+        log.info("create user thành công");
 
         return user.getId();
     }
@@ -183,4 +206,3 @@ public class UserServiceImpl implements UserService {
     }
 
 }
-

@@ -20,6 +20,11 @@ public class DriverProfileResponse {
     private LocalDate licenseExpiry;
     private DriverStatus status;
 
+
+    // Thống kê
+    private Long totalTrips; // Tổng số chuyến đã hoàn thành
+    private Double totalKm; // Tổng km (tùy chọn, có thể null nếu không có dữ liệu)
+
     public DriverProfileResponse(Drivers driver) {
         this.driverId = driver.getId();
         this.fullName = driver.getEmployee().getUser().getFullName();
@@ -28,5 +33,8 @@ public class DriverProfileResponse {
         this.licenseClass = driver.getLicenseClass();
         this.licenseExpiry = driver.getLicenseExpiry();
         this.status = driver.getStatus();
+        // Thống kê sẽ được set từ service
+        this.totalTrips = 0L;
+        this.totalKm = null; // Chưa có dữ liệu km trong database
     }
 }

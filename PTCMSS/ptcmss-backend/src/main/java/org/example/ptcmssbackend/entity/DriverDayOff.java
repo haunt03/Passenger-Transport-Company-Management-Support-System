@@ -43,7 +43,7 @@ public class DriverDayOff {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
-    private DriverDayOffStatus status=DriverDayOffStatus.Pending;
+    private DriverDayOffStatus status=DriverDayOffStatus.PENDING;
 
     @CreationTimestamp
     @Column(name = "createdAt")

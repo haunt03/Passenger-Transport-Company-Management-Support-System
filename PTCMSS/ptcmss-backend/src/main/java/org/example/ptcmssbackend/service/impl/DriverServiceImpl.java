@@ -6,9 +6,15 @@ import org.example.ptcmssbackend.dto.request.Driver.CreateDriverRequest;
 import org.example.ptcmssbackend.dto.request.Driver.DriverDayOffRequest;
 import org.example.ptcmssbackend.dto.request.Driver.DriverProfileUpdateRequest;
 import org.example.ptcmssbackend.dto.request.Driver.ReportIncidentRequest;
-import org.example.ptcmssbackend.dto.response.Driver.*;
+import org.example.ptcmssbackend.dto.response.Driver.DriverDashboardResponse;
+import org.example.ptcmssbackend.dto.response.Driver.DriverDayOffResponse;
+import org.example.ptcmssbackend.dto.response.Driver.DriverProfileResponse;
+import org.example.ptcmssbackend.dto.response.Driver.DriverResponse;
+import org.example.ptcmssbackend.dto.response.Driver.DriverScheduleResponse;
+import org.example.ptcmssbackend.dto.response.Driver.TripIncidentResponse;
 import org.example.ptcmssbackend.entity.DriverDayOff;
 import org.example.ptcmssbackend.entity.Drivers;
+import org.example.ptcmssbackend.entity.TripDrivers;
 import org.example.ptcmssbackend.entity.TripIncidents;
 import org.example.ptcmssbackend.enums.DriverDayOffStatus;
 import org.example.ptcmssbackend.enums.TripStatus;
@@ -19,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +42,7 @@ public class DriverServiceImpl implements DriverService {
     private final EmployeeRepository employeeRepository;
 
     @Override
+    @Transactional(readOnly = true)
     public DriverDashboardResponse getDashboard(Integer driverId) {
         log.info("[DriverDashboard] Fetching dashboard for driver {}", driverId);
         var driverTrips = tripDriverRepository.findAllByDriverId(driverId);
@@ -42,20 +50,43 @@ public class DriverServiceImpl implements DriverService {
                 .filter(td -> td.getTrip().getStatus() == TripStatus.SCHEDULED
                         || td.getTrip().getStatus() == TripStatus.ONGOING)
                 .findFirst()
-                .map(td -> new DriverDashboardResponse(
-                        td.getTrip().getId(),
-                        td.getTrip().getStartLocation(),
-                        td.getTrip().getEndLocation(),
-                        td.getTrip().getStartTime(),
-                        td.getTrip().getEndTime(),
-                        td.getTrip().getStatus()))
+                .map(td -> {
+                    var trip = td.getTrip();
+                    log.info("[DriverDashboard] Trip ID: {}, Distance: {}", trip.getId(), trip.getDistance());
+
+                    var booking = trip.getBooking();
+                    log.info("[DriverDashboard] Booking: {}", booking != null ? booking.getId() : "null");
+
+                    var customer = booking != null ? booking.getCustomer() : null;
+                    var customerName = customer != null ? customer.getFullName() : null;
+                    var customerPhone = customer != null ? customer.getPhone() : null;
+                    log.info("[DriverDashboard] Customer: {} - {}", customerName, customerPhone);
+
+                    return new DriverDashboardResponse(
+                            trip.getId(),
+                            trip.getStartLocation(),
+                            trip.getEndLocation(),
+                            trip.getStartTime(),
+                            trip.getEndTime(),
+                            trip.getStatus(),
+                            customerName,
+                            customerPhone,
+                            trip.getDistance()
+                    );
+                })
                 .orElse(null);
     }
 
     @Override
-    public List<DriverScheduleResponse> getSchedule(Integer driverId) {
-        log.info("[DriverSchedule] Loading schedule for driver {}", driverId);
-        return tripDriverRepository.findAllByDriverId(driverId).stream()
+    public List<DriverScheduleResponse> getSchedule(Integer driverId, java.time.Instant startDate, java.time.Instant endDate) {
+        log.info("[DriverSchedule] Loading schedule for driver {} from {} to {}", driverId, startDate, endDate);
+        List<TripDrivers> trips;
+        if (startDate != null || endDate != null) {
+            trips = tripDriverRepository.findAllByDriverIdAndDateRange(driverId, startDate, endDate);
+        } else {
+            trips = tripDriverRepository.findAllByDriverId(driverId);
+        }
+        return trips.stream()
                 .map(td -> new DriverScheduleResponse(
                         td.getTrip().getId(),
                         td.getTrip().getStartLocation(),
@@ -70,7 +101,21 @@ public class DriverServiceImpl implements DriverService {
         log.info("[DriverProfile] Loading profile for driver {}", driverId);
         var driver = driverRepository.findById(driverId)
                 .orElseThrow(() -> new RuntimeException("Driver not found"));
-        return new DriverProfileResponse(driver);
+
+        DriverProfileResponse response = new DriverProfileResponse(driver);
+
+        // Tính thống kê: Tổng số chuyến đã hoàn thành
+        long totalTrips = tripDriverRepository.findAllByDriverId(driverId).stream()
+                .filter(td -> td.getTrip().getStatus() != null &&
+                        td.getTrip().getStatus().name().equals("COMPLETED"))
+                .count();
+        response.setTotalTrips(totalTrips);
+
+        // TODO: Tính tổng km nếu có dữ liệu khoảng cách trong database
+        // Hiện tại database không có trường distance/km trong Trips
+        response.setTotalKm(null);
+
+        return response;
     }
 
     @Override
@@ -80,7 +125,9 @@ public class DriverServiceImpl implements DriverService {
                 .orElseThrow(() -> new RuntimeException("Employee not found for user"));
         var driver = driverRepository.findByEmployee_EmployeeId(employee.getEmployeeId())
                 .orElseThrow(() -> new RuntimeException("Driver not found for employee"));
-        return new DriverProfileResponse(driver);
+
+        // Sử dụng getProfile để có thống kê
+        return getProfile(driver.getId());
     }
 
     @Override
@@ -110,10 +157,19 @@ public class DriverServiceImpl implements DriverService {
         dayOff.setStartDate(request.getStartDate());
         dayOff.setEndDate(request.getEndDate());
         dayOff.setReason(request.getReason());
-        dayOff.setStatus(DriverDayOffStatus.Pending);
+        dayOff.setStatus(DriverDayOffStatus.PENDING);
 
         var saved = driverDayOffRepository.save(dayOff);
         return new DriverDayOffResponse(saved);
+    }
+
+    @Override
+    public List<DriverDayOffResponse> getDayOffHistory(Integer driverId) {
+        log.info("[DriverDayOff] Loading day off history for driver {}", driverId);
+        return driverDayOffRepository.findByDriver_Id(driverId).stream()
+                .map(DriverDayOffResponse::new)
+                .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt())) // Mới nhất trước
+                .collect(java.util.stream.Collectors.toList());
     }
 
     @Override
@@ -121,10 +177,22 @@ public class DriverServiceImpl implements DriverService {
         log.info("[Trip] Driver {} started trip {}", driverId, tripId);
         var trip = tripRepository.findById(tripId)
                 .orElseThrow(() -> new RuntimeException("Trip not found"));
-        trip.setStatus(TripStatus.ONGOING);
-        trip.setStartTime(Instant.now());
-        tripRepository.save(trip);
 
+        // check driver có được gán không
+        if (!tripDriverRepository.existsByTrip_IdAndDriver_Id(tripId, driverId)) {
+            throw new RuntimeException("Driver is not assigned to this trip");
+        }
+
+        // chỉ cho start từ trạng thái SCHEDULED
+        if (trip.getStatus() != TripStatus.SCHEDULED) {
+            throw new RuntimeException("Trip is not in SCHEDULED status");
+        }
+
+        trip.setStatus(TripStatus.ONGOING);
+        if (trip.getStartTime() == null) {
+            trip.setStartTime(Instant.now());
+        }
+        tripRepository.save(trip);
         return tripId;
     }
 
@@ -133,6 +201,15 @@ public class DriverServiceImpl implements DriverService {
         log.info("[Trip] Driver {} completed trip {}", driverId, tripId);
         var trip = tripRepository.findById(tripId)
                 .orElseThrow(() -> new RuntimeException("Trip not found"));
+
+        if (!tripDriverRepository.existsByTrip_IdAndDriver_Id(tripId, driverId)) {
+            throw new RuntimeException("Driver is not assigned to this trip");
+        }
+
+        if (trip.getStatus() != TripStatus.ONGOING) {
+            throw new RuntimeException("Trip is not in ONGOING status");
+        }
+
         trip.setStatus(TripStatus.COMPLETED);
         trip.setEndTime(Instant.now());
         tripRepository.save(trip);
@@ -159,15 +236,6 @@ public class DriverServiceImpl implements DriverService {
         var saved = tripIncidentRepository.save(incident);
 
         return new TripIncidentResponse(saved);
-    }
-
-    @Override
-    public List<DriverDayOffResponse> getDayOffHistory(Integer driverId) {
-        log.info("[DriverDayOff] Loading day off history for driver {}", driverId);
-        return driverDayOffRepository.findByDriver_Id(driverId).stream()
-                .map(DriverDayOffResponse::new)
-                .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt())) // Mới nhất trước
-                .collect(java.util.stream.Collectors.toList());
     }
 
     @Override
@@ -199,5 +267,14 @@ public class DriverServiceImpl implements DriverService {
 
         var saved = driverRepository.save(driver);
         return new DriverResponse(saved);
+    }
+
+    @Override
+    public List<DriverResponse> getDriversByBranchId(Integer branchId) {
+        log.info("[Driver] Get drivers by branch {}", branchId);
+
+        var branch = branchRepository.findById(branchId)
+                .orElseThrow(() -> new RuntimeException("Branch not found"));
+        return driverRepository.findAllByBranchId(branchId);
     }
 }

@@ -46,10 +46,23 @@ public class VehicleServiceImpl implements VehicleService {
 
     @Override
     public VehicleResponse create(VehicleRequest request) {
+
+        // 1. Validate trùng biển số theo chi nhánh
+        boolean exists = vehicleRepository.existsByBranch_IdAndLicensePlateIgnoreCase(
+                request.getBranchId(),
+                request.getLicensePlate()
+        );
+
+        if (exists) {
+            throw new RuntimeException("Biển số xe đã tồn tại trong chi nhánh này");
+        }
+
+        // 2. Map + save
         Vehicles vehicle = mapToEntity(request);
         vehicleRepository.save(vehicle);
         return mapToResponse(vehicle);
     }
+
 
     @Override
     public VehicleResponse update(Integer id, VehicleRequest request) {
@@ -297,6 +310,17 @@ public class VehicleServiceImpl implements VehicleService {
                 .approvedByName(null)
                 .approvedAt(null)
                 .build();
+    }
+
+    @Override
+    public List<VehicleResponse> getVehiclesByBranch(Integer branchId) {
+        var branch = branchRepository.findById(branchId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy chi nhánh ID = " + branchId));
+
+        return vehicleRepository.findAllByBranchId(branchId)
+                .stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
     // -------------------- Private helpers --------------------
