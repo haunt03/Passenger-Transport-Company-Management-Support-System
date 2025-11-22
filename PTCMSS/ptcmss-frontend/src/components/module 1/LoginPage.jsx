@@ -138,7 +138,7 @@ export default function LoginPage() {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 className="w-full bg-transparent text-sm text-slate-800 placeholder:text-slate-400 outline-none"
-                                placeholder="tentaikhoan ho?c a@example.com"
+                                placeholder="Nhập thông tin của bạn vào đây nhé "
                                 autoComplete="username"
                             />
                         </div>
