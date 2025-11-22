@@ -124,9 +124,13 @@ public class BookingServiceImpl implements BookingService {
                 trip.setBooking(booking);
                 trip.setUseHighway(tripReq.getUseHighway() != null ? tripReq.getUseHighway() : booking.getUseHighway());
                 trip.setStartTime(tripReq.getStartTime());
-                trip.setEndTime(tripReq.getEndTime());
+                // Don't set endTime when creating new trip - it will be set when trip is completed
+                // This avoids violating trips_chk_1 constraint (startTime < endTime)
                 trip.setStartLocation(tripReq.getStartLocation());
                 trip.setEndLocation(tripReq.getEndLocation());
+                if (tripReq.getDistance() != null && tripReq.getDistance() > 0) {
+                    trip.setDistance(BigDecimal.valueOf(tripReq.getDistance()));
+                }
                 trip.setStatus(TripStatus.SCHEDULED);
                 tripRepository.save(trip);
             }
@@ -268,6 +272,9 @@ public class BookingServiceImpl implements BookingService {
                 trip.setEndTime(tripReq.getEndTime());
                 trip.setStartLocation(tripReq.getStartLocation());
                 trip.setEndLocation(tripReq.getEndLocation());
+                if (tripReq.getDistance() != null && tripReq.getDistance() > 0) {
+                    trip.setDistance(BigDecimal.valueOf(tripReq.getDistance()));
+                }
                 trip.setStatus(TripStatus.SCHEDULED);
                 tripRepository.save(trip);
             }
@@ -703,6 +710,7 @@ public class BookingServiceImpl implements BookingService {
                     .endTime(trip.getEndTime())
                     .startLocation(trip.getStartLocation())
                     .endLocation(trip.getEndLocation())
+                    .distance(trip.getDistance() != null ? trip.getDistance().doubleValue() : null)
                     .useHighway(trip.getUseHighway())
                     .status(trip.getStatus() != null ? trip.getStatus().name() : null)
                     .driverId(driverId)
