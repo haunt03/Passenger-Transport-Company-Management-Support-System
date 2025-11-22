@@ -3,6 +3,7 @@ package org.example.ptcmssbackend.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.ptcmssbackend.dto.request.Vehicle.CreateExpenseRequest;
 import org.example.ptcmssbackend.dto.request.Vehicle.CreateMaintenanceRequest;
 import org.example.ptcmssbackend.dto.request.Vehicle.VehicleRequest;
@@ -22,6 +23,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/vehicles")
 @RequiredArgsConstructor
+@Slf4j(topic = "VEHICLE_CONTROLLER")
 public class VehicleController {
 
     private final VehicleService vehicleService;
@@ -249,6 +251,18 @@ public class VehicleController {
                     .success(false)
                     .message("Lỗi khi thêm chi phí: " + e.getMessage())
                     .build());
+        }
+    }
+
+    @Operation(summary = "Lọc xe theo chi nhánh", description = "Lấy danh sách xe theo chi nhánh")
+    @GetMapping("/branch/{branchId}")
+    public ResponseEntity<?> getVehiclesByBranch(@PathVariable Integer branchId) {
+        try {
+            List<VehicleResponse> vehicles = vehicleService.getVehiclesByBranch(branchId);
+            return ResponseEntity.ok(vehicles);
+        } catch (Exception ex) {
+            log.error("[Vehicle] Error get vehicles for branch {}: {}", branchId, ex.getMessage());
+            return ResponseEntity.badRequest().body(ex.getMessage());
         }
     }
 }

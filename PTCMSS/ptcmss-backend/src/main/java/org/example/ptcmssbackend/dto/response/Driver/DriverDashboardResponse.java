@@ -23,3 +23,4 @@ public class DriverDashboardResponse {
     private BigDecimal distance; // km
 
 }
+

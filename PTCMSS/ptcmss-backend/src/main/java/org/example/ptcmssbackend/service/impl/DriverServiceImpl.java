@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +42,7 @@ public class DriverServiceImpl implements DriverService {
     private final EmployeeRepository employeeRepository;
 
     @Override
+    @Transactional(readOnly = true)
     public DriverDashboardResponse getDashboard(Integer driverId) {
         log.info("[DriverDashboard] Fetching dashboard for driver {}", driverId);
         var driverTrips = tripDriverRepository.findAllByDriverId(driverId);
@@ -48,13 +50,30 @@ public class DriverServiceImpl implements DriverService {
                 .filter(td -> td.getTrip().getStatus() == TripStatus.SCHEDULED
                         || td.getTrip().getStatus() == TripStatus.ONGOING)
                 .findFirst()
-                .map(td -> new DriverDashboardResponse(
-                        td.getTrip().getId(),
-                        td.getTrip().getStartLocation(),
-                        td.getTrip().getEndLocation(),
-                        td.getTrip().getStartTime(),
-                        td.getTrip().getEndTime(),
-                        td.getTrip().getStatus()))
+                .map(td -> {
+                    var trip = td.getTrip();
+                    log.info("[DriverDashboard] Trip ID: {}, Distance: {}", trip.getId(), trip.getDistance());
+
+                    var booking = trip.getBooking();
+                    log.info("[DriverDashboard] Booking: {}", booking != null ? booking.getId() : "null");
+
+                    var customer = booking != null ? booking.getCustomer() : null;
+                    var customerName = customer != null ? customer.getFullName() : null;
+                    var customerPhone = customer != null ? customer.getPhone() : null;
+                    log.info("[DriverDashboard] Customer: {} - {}", customerName, customerPhone);
+
+                    return new DriverDashboardResponse(
+                            trip.getId(),
+                            trip.getStartLocation(),
+                            trip.getEndLocation(),
+                            trip.getStartTime(),
+                            trip.getEndTime(),
+                            trip.getStatus(),
+                            customerName,
+                            customerPhone,
+                            trip.getDistance()
+                    );
+                })
                 .orElse(null);
     }
 
