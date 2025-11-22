@@ -4,8 +4,8 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.*;
-import org.example.ptcmssbackend.enums.AlertType;
 import org.example.ptcmssbackend.enums.AlertSeverity;
+import org.example.ptcmssbackend.enums.AlertType;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.Instant;

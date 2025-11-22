@@ -1,5 +1,6 @@
 package org.example.ptcmssbackend.entity;
 
+import SystemAlertsjakarta.persistence.*;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
