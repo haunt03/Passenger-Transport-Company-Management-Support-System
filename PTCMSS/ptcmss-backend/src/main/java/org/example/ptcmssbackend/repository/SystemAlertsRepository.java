@@ -1,8 +1,8 @@
 package org.example.ptcmssbackend.repository;
 
 import org.example.ptcmssbackend.entity.SystemAlerts;
-import org.example.ptcmssbackend.enums.AlertType;
 import org.example.ptcmssbackend.enums.AlertSeverity;
+import org.example.ptcmssbackend.enums.AlertType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
