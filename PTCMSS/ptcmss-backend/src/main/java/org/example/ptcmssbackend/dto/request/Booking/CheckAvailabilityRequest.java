@@ -8,16 +8,17 @@ import java.time.Instant;
 
 @Data
 public class CheckAvailabilityRequest {
-    @NotNull
+
+    @NotNull(message = "Branch ID is required")
     private Integer branchId;
 
-    @NotNull
+    @NotNull(message = "Category ID is required")
     private Integer categoryId;
 
-    @NotNull
+    @NotNull(message = "Start time is required")
     private Instant startTime;
 
-    @NotNull
+    @NotNull(message = "End time is required")
     private Instant endTime;
 
     @Min(1)
