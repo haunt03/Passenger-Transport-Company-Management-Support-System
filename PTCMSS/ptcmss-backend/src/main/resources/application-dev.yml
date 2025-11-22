@@ -5,8 +5,27 @@ spring:
     password: root
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: update  # Disable DDL auto (DB already exists with correct schema)
     show-sql: true
+    properties:
+      hibernate:
+        # Use physical naming strategy to match database column names exactly
+        physical_naming_strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+
+# GraphHopper Configuration
+graphhopper:
+  api-key: ${GRAPHHOPPER_KEY:56f6f3a5-1958-408c-8788-225991ec1d3d}
+
+# VietQR Payment Configuration
+payment:
+  qr:
+    provider-url: https://img.vietqr.io/image
+    bank-code: ${PAYMENT_BANK_CODE:970423}
+    account-number: ${PAYMENT_BANK_ACCOUNT_NUMBER:00005505543}
+    account-name: ${PAYMENT_BANK_ACCOUNT_NAME:NGUYEN THUY HAU}
+    template: compact
+    description-prefix: PTCMSS
+    expires-in-minutes: 120
 springdoc:
   api-docs:
     enabled: true
