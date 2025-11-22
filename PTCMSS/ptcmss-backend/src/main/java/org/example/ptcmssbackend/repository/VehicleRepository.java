@@ -47,5 +47,8 @@ public interface VehicleRepository extends JpaRepository<Vehicles, Integer> {
     @Query("SELECT v FROM Vehicles v WHERE v.branch.id = :branchId")
     List<Vehicles> findAllByBranchId(Integer branchId);
 
+    boolean existsByBranch_IdAndLicensePlateIgnoreCase(Integer branchId, String licensePlate);
+
+
 
 }
