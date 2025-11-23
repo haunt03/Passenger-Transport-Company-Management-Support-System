@@ -1,0 +1,18 @@
+package org.example.ptcmssbackend.service;
+
+
+
+import org.example.ptcmssbackend.dto.response.DriverPerformanceResponse;
+import org.example.ptcmssbackend.dto.response.RatingRequest;
+import org.example.ptcmssbackend.dto.response.TripForRatingResponse;
+import org.example.ptcmssbackend.dto.response.rating.RatingResponse;
+
+import java.util.List;
+
+public interface RatingService {
+    RatingResponse createRating(RatingRequest request, Integer userId);
+    RatingResponse getRatingByTrip(Integer tripId);
+    List<RatingResponse> getDriverRatings(Integer driverId, Integer limit);
+    DriverPerformanceResponse getDriverPerformance(Integer driverId, Integer days);
+    List<TripForRatingResponse> getCompletedTripsForRating();
+}
