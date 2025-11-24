@@ -1,6 +1,6 @@
 package org.example.ptcmssbackend.service;
 
-import org.example.ptcmssbackend.common.TokenType;
+import org.example.ptcmssbackend.enums.TokenType;
 import org.springframework.security.core.GrantedAuthority;
 
 import java.util.Collection;
