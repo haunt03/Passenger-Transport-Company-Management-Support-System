@@ -1,11 +1,9 @@
 package org.example.ptcmssbackend.service;
 
-
-
-import org.example.ptcmssbackend.dto.response.DriverPerformanceResponse;
-import org.example.ptcmssbackend.dto.response.RatingRequest;
-import org.example.ptcmssbackend.dto.response.TripForRatingResponse;
-import org.example.ptcmssbackend.dto.response.rating.RatingResponse;
+import org.example.ptcmssbackend.dto.DriverPerformanceResponse;
+import org.example.ptcmssbackend.dto.RatingRequest;
+import org.example.ptcmssbackend.dto.RatingResponse;
+import org.example.ptcmssbackend.dto.TripForRatingResponse;
 
 import java.util.List;
 

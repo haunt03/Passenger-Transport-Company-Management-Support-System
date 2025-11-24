@@ -10,6 +10,7 @@ import java.io.Serializable;
 @Getter
 @Setter
 @Entity
+@Table(name = "booking_vehicle_details")
 public class BookingVehicleDetails implements Serializable {
     @EmbeddedId
     private BookingVehicleDetailsId id;

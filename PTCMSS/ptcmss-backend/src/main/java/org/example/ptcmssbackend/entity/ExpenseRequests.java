@@ -1,6 +1,5 @@
 package org.example.ptcmssbackend.entity;
 
-import SystemAlertsjakarta.persistence.*;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -16,7 +15,7 @@ import java.util.List;
 @Getter
 @Setter
 @Entity
-@Table(name = "Expense_requests")
+@Table(name = "expense_requests")
 public class ExpenseRequests {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -50,7 +49,7 @@ public class ExpenseRequests {
 
     @ElementCollection
     @CollectionTable(
-            name = "Expense_request_attachments",
+            name = "=expense_request_attachments",
             joinColumns = @JoinColumn(name = "expenseRequestId")
     )
     @Column(name = "fileUrl")

@@ -17,6 +17,7 @@ import java.time.LocalDate;
 @Getter
 @Setter
 @Entity
+@Table(name = "accounts_receivable")
 public class AccountsReceivable {
     @Id
     @Column(name = "arId", nullable = false)

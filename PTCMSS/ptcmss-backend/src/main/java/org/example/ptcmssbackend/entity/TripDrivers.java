@@ -11,6 +11,7 @@ import java.time.Instant;
 @Getter
 @Setter
 @Entity
+@Table(name = "trip_drivers")
 public class TripDrivers {
     @EmbeddedId
     private TripDriverId id;
