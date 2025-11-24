@@ -7,7 +7,8 @@ import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.SignatureException;
 import lombok.extern.slf4j.Slf4j;
-import org.example.ptcmssbackend.common.TokenType;
+
+import org.example.ptcmssbackend.enums.TokenType;
 import org.example.ptcmssbackend.service.JwtService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.AccessDeniedException;
@@ -18,8 +19,8 @@ import java.security.Key;
 import java.util.*;
 import java.util.function.Function;
 
-import static org.example.ptcmssbackend.common.TokenType.ACCESS_TOKEN;
-import static org.example.ptcmssbackend.common.TokenType.REFRESH_TOKEN;
+import static org.example.ptcmssbackend.enums.TokenType.ACCESS_TOKEN;
+import static org.example.ptcmssbackend.enums.TokenType.REFRESH_TOKEN;
 
 @Service
 @Slf4j(topic = "JWT_SERVICE")
@@ -90,10 +91,7 @@ public class JwtServiceImpl implements JwtService {
                 .compact();
     }
 
-    @Override
-    public String extractUsername(String token, org.example.ptcmssbackend.enums.TokenType tokenType) {
-        return "";
-    }
+
 
     /**
      * Trích xuất username từ token
