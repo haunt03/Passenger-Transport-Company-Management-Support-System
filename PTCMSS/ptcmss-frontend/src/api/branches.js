@@ -31,3 +31,11 @@ export function getBranchByUserId(userId) {
     if (userId == null) throw new Error("USER_ID_REQUIRED");
     return apiFetch(`/api/branches/by-user/${userId}`);
 }
+
+export function getManagerDashboardStats(branchId, period) {
+    if (branchId == null) throw new Error("BRANCH_ID_REQUIRED");
+    const params = new URLSearchParams();
+    if (period) params.append("period", period);
+    const qs = params.toString();
+    return apiFetch(`/api/branches/${branchId}/dashboard-stats${qs ? `?${qs}` : ""}`);
+}

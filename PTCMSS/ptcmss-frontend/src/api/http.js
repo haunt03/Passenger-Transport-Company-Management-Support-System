@@ -61,8 +61,38 @@ export async function apiFetch(path, { method = "GET", headers = {}, body, auth 
     // - Variant A: { code, message, data }
     // - Variant B: { status, message, data }
     // - Variant C: { success, message, data }
-    if (data && typeof data === "object" && "data" in data && ("code" in data || "status" in data || "success" in data)) {
-        return data.data;
+    // Note: Only treat as wrapper if status/code is a number (HTTP status code)
+    // Business entities may have "status" field (string) which should not be treated as HTTP status
+    const hasDataField = "data" in data;
+    const hasSuccessField = "success" in data && typeof data.success === "boolean";
+    const hasCodeField = "code" in data && typeof data.code === "number";
+    const hasStatusField = "status" in data && typeof data.status === "number";
+    const hasMessageField = "message" in data && typeof data.message === "string";
+
+    // Only treat as wrapper if it has explicit wrapper indicators:
+    // - Has "data" field (ResponseData wrapper)
+    // - Has "success" boolean field
+    // - Has numeric "code" or "status" field (HTTP status code, not business status)
+    // - Has both "message" and numeric "status"/"code" (ErrorResponse pattern)
+    const isWrapper = hasDataField ||
+        hasSuccessField ||
+        hasCodeField ||
+        (hasStatusField && (hasMessageField || hasDataField));
+
+    if (data && typeof data === "object" && isWrapper) {
+        const code = data.code ?? data.status;
+        const successFlag = typeof data.success === "boolean" ? data.success : undefined;
+        const isOk =
+            successFlag !== undefined
+                ? successFlag
+                : code === undefined || (typeof code === "number" && code >= 200 && code < 300);
+
+        if (isOk) return "data" in data ? data.data : data;
+
+        const err = new Error(data.message || "API_ERROR");
+        err.status = code;
+        err.data = data;
+        throw err;
     }
     return data;
 }

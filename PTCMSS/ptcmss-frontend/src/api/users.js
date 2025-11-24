@@ -19,11 +19,16 @@ export function getUser(id) {
     return apiFetch(`/api/users/${id}`);
 }
 
-export function createUser(req) {
-    // req: { fullName, username, email, phone, address, roleId }
-    return apiFetch("/api/users/register", { method: "POST", body: req });
+// export function createUser(req) {
+//   // req: { fullName, username, email, phone, address, roleId }
+//   return apiFetch("/api/users/register", { method: "POST", body: req });
+// }
+export async function createUser(body) {
+    return await apiFetch("/api/users/register", {
+        method: "POST",
+        body,
+    });
 }
-
 export function updateUser(id, req) {
     // req: UpdateUserRequest fields
     return apiFetch(`/api/users/${id}`, { method: "PUT", body: req });

@@ -45,6 +45,89 @@ export function deleteVehicle(id) {
     return apiFetch(`/api/vehicles/${id}`, { method: "DELETE" });
 }
 
+// ==================== Vehicle Category APIs ====================
+
 export function listVehicleCategories() {
     return apiFetch("/api/vehicle-categories");
+}
+
+export function getVehicleCategory(id) {
+    return apiFetch(`/api/vehicle-categories/${id}`);
+}
+
+export function createVehicleCategory(body) {
+    return apiFetch("/api/vehicle-categories", {
+        method: "POST",
+        body,
+    });
+}
+
+export function updateVehicleCategory(id, body) {
+    return apiFetch(`/api/vehicle-categories/${id}`, {
+        method: "PUT",
+        body,
+    });
+}
+
+export function deleteVehicleCategory(id) {
+    return apiFetch(`/api/vehicle-categories/${id}`, {
+        method: "DELETE",
+    });
+}
+
+export function listVehiclesByBranch(branchId) {
+    if (branchId == null || branchId === "") throw new Error("BRANCH_ID_REQUIRED");
+    return apiFetch(`/api/vehicles/branch/${branchId}`);
+}
+
+// ==================== Vehicle History APIs ====================
+
+/**
+ * Get vehicle trips history
+ * GET /api/vehicles/{id}/trips
+ */
+export function getVehicleTrips(id) {
+    return apiFetch(`/api/vehicles/${id}/trips`);
+}
+
+/**
+ * Get vehicle expenses history
+ * GET /api/vehicles/{id}/expenses
+ */
+export function getVehicleExpenses(id) {
+    return apiFetch(`/api/vehicles/${id}/expenses`);
+}
+
+/**
+ * Get vehicle maintenance history
+ * GET /api/vehicles/{id}/maintenance
+ */
+export function getVehicleMaintenance(id) {
+    return apiFetch(`/api/vehicles/${id}/maintenance`);
+}
+
+/**
+ * Add maintenance record for vehicle
+ * POST /api/vehicles/{id}/maintenance
+ * @param {number} id - Vehicle ID
+ * @param {Object} body - { maintenanceDate, maintenanceType, description, cost, odometer, nextMaintenanceDate }
+ */
+export function addVehicleMaintenance(id, body) {
+    return apiFetch(`/api/vehicles/${id}/maintenance`, {
+        method: "POST",
+        body,
+    });
+}
+
+/**
+ * Add expense record for vehicle
+ * POST /api/vehicles/{id}/expenses
+ * @param {number} id - Vehicle ID
+ * @param {Object} body - { costType, amount, description, expenseDate, odometer }
+ */
+export function addVehicleExpense(id, body) {
+    return apiFetch(`/api/vehicles/${id}/expenses`, {
+        method: "POST",
+        body,
+    });
 }
