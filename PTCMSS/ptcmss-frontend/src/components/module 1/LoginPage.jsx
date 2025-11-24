@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { login as apiLogin } from "../../api/auth";
+import { login as apiLogin, forgotPassword as apiForgotPassword } from "../../api/auth";
 import {
     Mail,
     Lock,
@@ -38,21 +38,15 @@ export default function LoginPage() {
     // ui state
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState("");
+    const [showForgotPassword, setShowForgotPassword] = React.useState(false);
+    const [forgotEmail, setForgotEmail] = React.useState("");
+    const [forgotLoading, setForgotLoading] = React.useState(false);
+    const [forgotSuccess, setForgotSuccess] = React.useState(false);
 
     const canSubmit =
         email.trim() !== "" &&
         password.trim() !== "" &&
         !loading;
-
-    // preview body để hiển thị panel phải
-    const payloadPreview = React.useMemo(
-        () => ({
-            email: email || "...",
-            password: password ? "***" : "",
-            remember_me: rememberMe,
-        }),
-        [email, password, rememberMe]
-    );
 
     async function handleLogin(e) {
         e.preventDefault();
@@ -68,157 +62,170 @@ export default function LoginPage() {
 
         try {
             const data = await apiLogin(creds);
-            // Optional: store username/role for UI
+            console.log("Login response:", data);
+
+            // Store user info
             if (rememberMe) {
                 try {
                     localStorage.setItem("username", data?.username || creds.username);
                     localStorage.setItem("roleName", data?.roleName || "");
-                } catch {}
+                    if (data?.userId) {
+                        localStorage.setItem("userId", String(data.userId));
+                    }
+                } catch (err) {
+                    console.error("Failed to save user info:", err);
+                }
             }
-            navigate("/analytics/admin", { replace: true });
+
+            // Navigate based on role
+            const role = data?.roleName || "";
+            console.log("User role:", role);
+
+            if (role === "ADMIN") {
+                navigate("/analytics/admin", { replace: true });
+            } else if (role === "MANAGER") {
+                navigate("/analytics/manager", { replace: true });
+            } else if (role === "DRIVER") {
+                navigate("/driver/dashboard", { replace: true });
+            } else if (role === "CONSULTANT") {
+                navigate("/orders/dashboard", { replace: true });
+            } else if (role === "COORDINATOR") {
+                navigate("/dispatch", { replace: true });
+            } else if (role === "ACCOUNTANT") {
+                navigate("/accounting", { replace: true });
+            } else {
+                // Default fallback
+                navigate("/analytics/admin", { replace: true });
+            }
         } catch (err) {
-            setError("Email hoặc mật khẩu không chính xác.");
+            console.error("Login error:", err);
+            setError(err?.data?.message || "Email hoặc mật khẩu không chính xác.");
         } finally {
             setLoading(false);
         }
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center p-6">
-            <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-8">
-                {/* LEFT: LOGIN CARD */}
+        <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-slate-50 text-slate-900 flex items-center justify-center p-6 relative overflow-hidden">
+            {/* Background decorative elements */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                <div className="absolute -top-40 -right-40 w-80 h-80 bg-sky-100 rounded-full blur-3xl opacity-30"></div>
+                <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-100 rounded-full blur-3xl opacity-30"></div>
+            </div>
+
+            <div className="w-full max-w-md relative z-10">
+                {/* LOGIN CARD */}
                 <form
                     onSubmit={handleLogin}
                     noValidate
                     className={cls(
-                        "rounded-xl border border-slate-200 bg-white shadow-sm",
-                        "flex flex-col gap-6 p-6 md:p-8"
+                        "rounded-2xl border border-slate-200/60 bg-white/80 backdrop-blur-xl shadow-2xl shadow-slate-900/5",
+                        "flex flex-col gap-6 p-8 md:p-10"
                     )}
                 >
                     {/* HEADER / BRAND */}
-                    <div className="space-y-3 text-center md:text-left">
-                        {/* badge */}
-                        <div className="inline-flex items-start gap-3">
-                            <div className="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-sky-600 text-white shadow-[0_10px_30px_rgba(2,132,199,.35)] ring-1 ring-sky-500/50">
-                                <ShieldCheck className="h-5 w-5" />
-                            </div>
-
-                            <div className="flex flex-col leading-tight">
-                                <div className="text-slate-900 text-sm font-semibold">
-                                    FleetOps Console
-                                </div>
-                                <div className="text-[11px] text-slate-500 leading-snug">
-                                    Internal Access Portal
-                                </div>
+                    <div className="space-y-4 text-center">
+                        {/* Logo badge */}
+                        <div className="inline-flex items-center justify-center">
+                            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-sky-600 text-white shadow-lg shadow-sky-500/40 ring-4 ring-sky-100">
+                                <ShieldCheck className="h-8 w-8" strokeWidth={2} />
                             </div>
                         </div>
 
-                        {/* big title */}
-                        <div className="text-xl md:text-[22px] font-semibold text-slate-900 leading-tight tracking-tight">
-                            Đăng nhập hệ thống điều hành
-                        </div>
-
-                        <div className="text-[12px] leading-relaxed text-slate-500 max-w-[320px]">
-                            Truy cập dashboard vận hành đội xe, tài chính và điều phối.
-                            Quyền hiển thị tùy vai trò &amp; chi nhánh.
+                        {/* Title */}
+                        <div className="space-y-2">
+                            <div className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
+                                FleetOps Console
+                            </div>
+                            <div className="text-sm text-slate-500 font-medium">
+                                Đăng nhập hệ thống điều hành
+                            </div>
                         </div>
                     </div>
 
                     {/* EMAIL FIELD */}
-                    <div className="space-y-2">
-                        <label className="text-[11px] text-slate-600 flex items-center gap-2">
-                            <span>Email / Tài khoản</span>
-                            <span className="text-[10px] text-slate-400">(bắt buộc)</span>
+                    <div className="space-y-2.5">
+                        <label className="text-sm font-medium text-slate-700">
+                            Email / Tên đăng nhập
                         </label>
 
-                        <div className="group flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus-within:border-sky-500 focus-within:ring-2 focus-within:ring-sky-500/30">
-                            <Mail className="h-4 w-4 text-slate-400 group-focus-within:text-sky-600" />
+                        <div className="group relative">
+                            <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors">
+                                <Mail className="h-5 w-5" />
+                            </div>
                             <input
                                 type="text"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="w-full bg-transparent text-sm text-slate-800 placeholder:text-slate-400 outline-none"
-                                placeholder="Nhập thông tin của bạn vào đây nhé "
+                                className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100 transition-all"
+                                placeholder="Nhập email hoặc tên đăng nhập"
                                 autoComplete="username"
                             />
                         </div>
                     </div>
 
                     {/* PASSWORD FIELD */}
-                    <div className="space-y-2">
-                        <div className="flex items-start justify-between text-[11px]">
-                            <label className="text-slate-600 flex items-center gap-2">
-                                <span>Mật khẩu</span>
-                                <span className="text-[10px] text-slate-400">(bắt buộc)</span>
+                    <div className="space-y-2.5">
+                        <div className="flex items-center justify-between">
+                            <label className="text-sm font-medium text-slate-700">
+                                Mật khẩu
                             </label>
 
                             <button
                                 type="button"
-                                className="text-[10px] text-sky-600 hover:text-sky-500 font-medium"
-                                onClick={() => {
-                                    alert(
-                                        "Đi tới luồng 'Quên mật khẩu' (prototype)."
-                                    );
-                                }}
+                                className="text-xs text-sky-600 hover:text-sky-700 font-medium hover:underline transition-colors"
+                                onClick={() => setShowForgotPassword(true)}
                             >
                                 Quên mật khẩu?
                             </button>
                         </div>
 
-                        <div className="group flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus-within:border-sky-500 focus-within:ring-2 focus-within:ring-sky-500/30">
-                            <Lock className="h-4 w-4 text-slate-400 group-focus-within:text-sky-600" />
+                        <div className="group relative">
+                            <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors">
+                                <Lock className="h-5 w-5" />
+                            </div>
                             <input
                                 type={showPw ? "text" : "password"}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="flex-1 bg-transparent text-sm text-slate-800 placeholder:text-slate-400 outline-none"
-                                placeholder="••••••"
+                                className="w-full pl-11 pr-12 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100 transition-all"
+                                placeholder="Nhập mật khẩu của bạn"
                                 autoComplete="current-password"
                             />
 
                             <button
                                 type="button"
                                 onClick={() => setShowPw(!showPw)}
-                                className="text-slate-400 hover:text-slate-600 transition-colors"
+                                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
                                 title={showPw ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
                             >
                                 {showPw ? (
-                                    <EyeOff className="h-4 w-4" />
+                                    <EyeOff className="h-5 w-5" />
                                 ) : (
-                                    <Eye className="h-4 w-4" />
+                                    <Eye className="h-5 w-5" />
                                 )}
                             </button>
                         </div>
+                    </div>
 
-                        {/* remember + info */}
-                        <div className="flex flex-wrap items-start justify-between gap-3 text-[11px] leading-relaxed">
-                            <label className="flex items-center gap-2 text-slate-600 cursor-pointer select-none">
-                                <input
-                                    type="checkbox"
-                                    className="h-3.5 w-3.5 accent-sky-600"
-                                    checked={rememberMe}
-                                    onChange={(e) =>
-                                        setRememberMe(e.target.checked)
-                                    }
-                                />
-                                <span>Ghi nhớ đăng nhập</span>
-                            </label>
-
-                            <div className="text-slate-500 flex items-start gap-1 max-w-[220px]">
-                                <Info className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
-                                <span>
-                                    Tài khoản sẽ bị tạm khoá nếu đăng nhập sai
-                                    quá nhiều lần.
-                                </span>
-                            </div>
-                        </div>
+                    {/* REMEMBER ME */}
+                    <div className="flex items-center justify-between">
+                        <label className="flex items-center gap-2.5 text-sm text-slate-600 cursor-pointer select-none group">
+                            <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-2 focus:ring-sky-500/30 cursor-pointer"
+                                checked={rememberMe}
+                                onChange={(e) => setRememberMe(e.target.checked)}
+                            />
+                            <span className="group-hover:text-slate-900 transition-colors">Ghi nhớ đăng nhập</span>
+                        </label>
                     </div>
 
                     {/* ERROR BOX */}
                     {error ? (
-                        <div className="rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-[12px] text-rose-700 leading-relaxed flex items-start gap-2 shadow-sm">
-                            <Info className="h-4 w-4 flex-shrink-0 text-rose-500" />
-                            <div>{error}</div>
+                        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-start gap-3">
+                            <Info className="h-5 w-5 flex-shrink-0 text-red-500 mt-0.5" />
+                            <div className="font-medium">{error}</div>
                         </div>
                     ) : null}
 
@@ -227,107 +234,170 @@ export default function LoginPage() {
                         type="submit"
                         disabled={!canSubmit}
                         className={cls(
-                            "w-full rounded-md px-3 py-2.5 text-sm font-medium shadow-sm",
-                            "flex items-center justify-center gap-2 transition-colors",
+                            "w-full rounded-xl px-4 py-3.5 text-sm font-semibold shadow-lg",
+                            "flex items-center justify-center gap-2 transition-all duration-200",
                             canSubmit && !loading
-                                ? "bg-sky-600 text-white hover:bg-sky-500"
-                                : "bg-slate-200 text-slate-500 cursor-not-allowed"
+                                ? "bg-gradient-to-r from-sky-500 to-sky-600 text-white hover:from-sky-600 hover:to-sky-700 hover:shadow-xl hover:shadow-sky-500/30 active:scale-[0.98]"
+                                : "bg-slate-200 text-slate-400 cursor-not-allowed"
                         )}
                     >
                         {loading ? (
                             <>
-                                <Loader2 className="h-4 w-4 animate-spin text-white" />
+                                <Loader2 className="h-5 w-5 animate-spin" />
                                 <span>Đang đăng nhập...</span>
                             </>
                         ) : (
                             <>
                                 <span>Đăng nhập</span>
-                                <ArrowRight className="h-4 w-4" />
+                                <ArrowRight className="h-5 w-5" />
                             </>
                         )}
                     </button>
 
-                    {/* TRUST ROW */}
-                    <div className="flex items-center justify-center gap-2 text-[11px] text-slate-500 leading-relaxed">
-                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                        <span>
-                            Kết nối bảo mật · Phiên đăng nhập được mã hoá
-                        </span>
+                    {/* SECURITY INFO */}
+                    <div className="flex items-center justify-center gap-2 text-xs text-slate-500 pt-2">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                        <span>Kết nối bảo mật · Mã hóa end-to-end</span>
+                    </div>
+
+                    {/* FOOTER */}
+                    <div className="text-center text-xs text-slate-400 pt-4 border-t border-slate-100">
+                        © 2025 FleetOps Console · Internal Access Portal
                     </div>
                 </form>
-
-                {/* RIGHT: TECH PANEL / PREVIEW */}
-                <aside className="rounded-xl border border-slate-200 bg-white shadow-sm p-5 md:p-6 text-[11px] leading-relaxed flex flex-col gap-4">
-                    {/* headline */}
-                    <div className="space-y-1">
-                        <div className="text-xs font-semibold text-slate-800 flex items-center gap-2">
-                            <ShieldCheck className="h-4 w-4 text-sky-600" />
-                            <span>Thông tin kỹ thuật</span>
-                        </div>
-                        <div className="text-slate-600 text-[11px] leading-relaxed">
-                            Sau khi đăng nhập thành công, hệ thống trả về{" "}
-                            <span className="text-slate-900 font-medium">
-                                token
-                            </span>{" "}
-                            và thông tin người dùng. Token dùng cho các API nội bộ.
-                        </div>
-                    </div>
-
-                    {/* endpoint preview */}
-                    <section className="space-y-1">
-                        <div className="text-[10px] uppercase tracking-wide text-slate-500 font-medium">
-                            Endpoint
-                        </div>
-                        <div className="rounded-md border border-slate-200 bg-slate-50/70 px-3 py-2 font-mono text-[11px] text-slate-700 break-all leading-relaxed shadow-sm">
-                            POST /api/auth/login
-                        </div>
-                    </section>
-
-                    {/* request body preview */}
-                    <section className="space-y-1">
-                        <div className="text-[10px] uppercase tracking-wide text-slate-500 font-medium">
-                            Request Body Preview
-                        </div>
-                        <pre className="rounded-md border border-slate-200 bg-slate-50/70 px-3 py-2 font-mono text-[11px] text-slate-700 whitespace-pre-wrap break-words leading-relaxed shadow-sm">
-{JSON.stringify(payloadPreview, null, 2)}
-                        </pre>
-                    </section>
-
-                    {/* success preview */}
-                    <section className="space-y-1">
-                        <div className="text-[10px] uppercase tracking-wide text-slate-500 font-medium">
-                            Response (200 OK) – ví dụ
-                        </div>
-                        <pre className="rounded-md border border-slate-200 bg-slate-50/70 px-3 py-2 font-mono text-[11px] text-slate-700 whitespace-pre-wrap break-words leading-relaxed shadow-sm">
-{`{
-  "token": "JWT_TOKEN_HERE",
-  "user": {
-    "id": 10,
-    "role": "DRIVER",
-    "branch_id": 1
-  }
-}`}
-                        </pre>
-                    </section>
-
-                    {/* tips */}
-                    <section className="text-[10px] text-slate-500 leading-relaxed">
-                        Nếu đăng nhập thành công:
-                        <br />
-                        • Lưu token an toàn (localStorage / cookie httpOnly tuỳ mô hình).{"\n"}
-                        • Điều hướng theo vai trò:
-                        <span className="text-slate-800">
-                            {" "}
-                            Admin → Admin Dashboard · Manager → Manager Dashboard ·
-                            Accountant → Accountant Dashboard · Driver → Driver App
-                        </span>
-                    </section>
-
-                    <footer className="pt-2 text-center text-[10px] text-slate-400">
-                        © 2025 FleetOps Prototype · Internal Only
-                    </footer>
-                </aside>
             </div>
+
+            {/* FORGOT PASSWORD MODAL */}
+            {showForgotPassword && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6 z-50 animate-fadeIn">
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-8 space-y-5 animate-slideUp">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-xl font-bold text-slate-900">
+                                Quên mật khẩu
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowForgotPassword(false);
+                                    setForgotEmail("");
+                                    setForgotSuccess(false);
+                                    setError("");
+                                }}
+                                className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition-colors"
+                            >
+                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {forgotSuccess ? (
+                            <div className="space-y-4">
+                                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+                                    <div className="flex items-start gap-3">
+                                        <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-emerald-500 mt-0.5" />
+                                        <div>
+                                            <p className="font-semibold">Email đã được gửi!</p>
+                                            <p className="mt-1.5 text-emerald-600">
+                                                Chúng tôi đã gửi link đặt lại mật khẩu đến email <strong>{forgotEmail}</strong>.
+                                                Vui lòng kiểm tra hộp thư của bạn.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowForgotPassword(false);
+                                        setForgotEmail("");
+                                        setForgotSuccess(false);
+                                    }}
+                                    className="w-full rounded-xl bg-gradient-to-r from-sky-500 to-sky-600 px-4 py-3 text-sm font-semibold text-white hover:from-sky-600 hover:to-sky-700 transition-all"
+                                >
+                                    Đóng
+                                </button>
+                            </div>
+                        ) : (
+                            <form
+                                onSubmit={async (e) => {
+                                    e.preventDefault();
+                                    if (!forgotEmail.trim()) {
+                                        setError("Vui lòng nhập email");
+                                        return;
+                                    }
+
+                                    setForgotLoading(true);
+                                    setError("");
+
+                                    try {
+                                        await apiForgotPassword(forgotEmail.trim());
+                                        setForgotSuccess(true);
+                                    } catch (err) {
+                                        setError(err.message || "Không thể gửi email. Vui lòng thử lại sau.");
+                                    } finally {
+                                        setForgotLoading(false);
+                                    }
+                                }}
+                                className="space-y-4"
+                            >
+                                <div className="space-y-2.5">
+                                    <label className="text-sm font-medium text-slate-700">
+                                        Email đăng ký
+                                    </label>
+                                    <input
+                                        type="email"
+                                        value={forgotEmail}
+                                        onChange={(e) => setForgotEmail(e.target.value)}
+                                        className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100 outline-none transition-all"
+                                        placeholder="Nhập email của bạn"
+                                        autoFocus
+                                    />
+                                </div>
+
+                                {error && (
+                                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-start gap-3">
+                                        <Info className="h-5 w-5 flex-shrink-0 text-red-500" />
+                                        <div className="font-medium">{error}</div>
+                                    </div>
+                                )}
+
+                                <div className="flex gap-3 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setShowForgotPassword(false);
+                                            setForgotEmail("");
+                                            setError("");
+                                        }}
+                                        className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                                    >
+                                        Hủy
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={!forgotEmail.trim() || forgotLoading}
+                                        className={cls(
+                                            "flex-1 rounded-xl px-4 py-3 text-sm font-semibold transition-all",
+                                            forgotEmail.trim() && !forgotLoading
+                                                ? "bg-gradient-to-r from-sky-500 to-sky-600 text-white hover:from-sky-600 hover:to-sky-700"
+                                                : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                                        )}
+                                    >
+                                        {forgotLoading ? (
+                                            <>
+                                                <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
+                                                Đang gửi...
+                                            </>
+                                        ) : (
+                                            "Gửi email"
+                                        )}
+                                    </button>
+                                </div>
+                            </form>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

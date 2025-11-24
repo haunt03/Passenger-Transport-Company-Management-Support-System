@@ -2,7 +2,7 @@
 import { useNavigate } from "react-router-dom";
 import { listUsers, listUsersByBranch, listRoles, toggleUserStatus } from "../../api/users";
 import { listEmployeesByRole } from "../../api/employees";
-import { RefreshCw, PlusCircle, Edit2, ShieldCheck } from "lucide-react";
+import { RefreshCw, PlusCircle, Edit2, ShieldCheck, Users, Search, Filter, Mail, Phone, Shield } from "lucide-react";
 import { getCurrentRole, getStoredUserId, ROLES } from "../../utils/session";
 
 const cls = (...a) => a.filter(Boolean).join(" ");
@@ -14,9 +14,9 @@ function StatusBadge({ value }) {
   };
   const label = value === "ACTIVE" ? "Hoạt động" : "Vô hiệu hóa";
   return (
-    <span className={cls("inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] border", map[value] || map.INACTIVE)}>
+      <span className={cls("inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] border", map[value] || map.INACTIVE)}>
       <ShieldCheck className="h-3.5 w-3.5" />
-      {label}
+        {label}
     </span>
   );
 }
@@ -87,31 +87,34 @@ export default function AdminUsersPage() {
   }, [roleId, roles]);
 
   const applyFilters = React.useCallback(
-    (records) => {
-      const source = Array.isArray(records) ? records : [];
-      return source.filter((u) => {
-        if (normalizedKeyword) {
-          const haystack = `${u.fullName || ""} ${u.email || ""} ${u.phone || ""}`.toLowerCase();
-          if (!haystack.includes(normalizedKeyword)) return false;
-        }
-        if (selectedRoleName) {
-          const role = String(u.roleName || "").trim().toLowerCase();
-          if (role !== selectedRoleName) return false;
-        }
-        if (normalizedStatus) {
-          const st = String(u.status || "").trim().toUpperCase();
-          if (st !== normalizedStatus) return false;
-        }
-        return true;
-      });
-    },
-    [normalizedKeyword, selectedRoleName, normalizedStatus]
+      (records) => {
+        const source = Array.isArray(records) ? records : [];
+        return source.filter((u) => {
+          if (normalizedKeyword) {
+            const haystack = `${u.fullName || ""} ${u.email || ""} ${u.phone || ""}`.toLowerCase();
+            if (!haystack.includes(normalizedKeyword)) return false;
+          }
+          if (selectedRoleName) {
+            const role = String(u.roleName || "").trim().toLowerCase();
+            if (role !== selectedRoleName) return false;
+          }
+          if (normalizedStatus) {
+            const st = String(u.status || "").trim().toUpperCase();
+            if (st !== normalizedStatus) return false;
+          }
+          return true;
+        });
+      },
+      [normalizedKeyword, selectedRoleName, normalizedStatus]
   );
+
+  const [allUsers, setAllUsers] = React.useState([]);
 
   const onRefresh = React.useCallback(async () => {
     if (isManagerView) {
       if (managerBranchLoading) return;
       if (!branchFilterValue) {
+        setAllUsers([]);
         setUsers([]);
         return;
       }
@@ -122,25 +125,18 @@ export default function AdminUsersPage() {
       if (isManagerView) {
         data = await listUsersByBranch(branchFilterValue);
       } else {
-        data = await listUsers({
-          keyword: keyword || undefined,
-          roleId: roleId ? Number(roleId) : undefined,
-          status: status || undefined,
-        });
+        // Load tất cả users, không filter ở API level
+        data = await listUsers();
       }
-      const arr = Array.isArray(data) ? data : data?.items || [];
-      setUsers(applyFilters(arr));
+      const arr = Array.isArray(data) ? data : data?.items || data?.data?.items || data?.data?.content || [];
+      setAllUsers(arr);
     } finally {
       setLoading(false);
     }
   }, [
-    keyword,
-    roleId,
-    status,
     branchFilterValue,
     isManagerView,
     managerBranchLoading,
-    applyFilters,
   ]);
 
   const refreshRef = React.useRef(onRefresh);
@@ -155,12 +151,29 @@ export default function AdminUsersPage() {
     refreshRef.current();
   }, [isManagerView, managerBranchLoading, branchFilterValue]);
 
+  // Apply filters whenever allUsers or filter values change
+  React.useEffect(() => {
+    const filtered = applyFilters(allUsers);
+    setUsers(filtered);
+  }, [allUsers, applyFilters]);
+
   React.useEffect(() => {
     (async () => {
       try {
         const rs = await listRoles();
-        setRoles(Array.isArray(rs) ? rs : []);
-      } catch {}
+        // Handle different response formats
+        const rolesList = Array.isArray(rs)
+            ? rs
+            : Array.isArray(rs?.data)
+                ? rs.data
+                : Array.isArray(rs?.items)
+                    ? rs.items
+                    : [];
+        setRoles(rolesList);
+      } catch (error) {
+        console.error("Failed to load roles:", error);
+        setRoles([]);
+      }
     })();
   }, []);
 
@@ -168,85 +181,224 @@ export default function AdminUsersPage() {
     try {
       await toggleUserStatus(id);
       await onRefresh();
-    } catch {}
+    } catch { /* empty */ }
   };
 
+  const BRAND_COLOR = "#0079BC";
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 p-5">
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <div className="text-lg font-semibold">Quản lý người dùng</div>
-        <div className="ml-auto flex items-center gap-2">
-          <button onClick={() => navigate("/admin/users/new")} className="inline-flex items-center gap-1 rounded-md bg-sky-600 hover:bg-sky-500 px-3 py-2 text-sm font-medium text-white shadow-sm">
-            <PlusCircle className="h-4 w-4" /> Tạo mới
-          </button>
-          <button onClick={onRefresh} disabled={loading || (isManagerView && (managerBranchLoading || !branchFilterValue))} className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white hover:bg-slate-50 px-3 py-2 text-sm text-slate-700 shadow-sm disabled:opacity-50">
-            <RefreshCw className={cls("h-4 w-4", loading && "animate-spin")} /> Làm mới
-          </button>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 text-slate-900 p-5">
+        <div className="max-w-7xl mx-auto space-y-5">
+          {/* Header */}
+          <div className="flex flex-wrap items-start gap-4 mb-6">
+            <div className="flex items-start gap-3 flex-1 min-w-[220px]">
+              <div className="h-12 w-12 rounded-xl flex items-center justify-center text-white shadow-lg" style={{ backgroundColor: BRAND_COLOR }}>
+                <Users className="h-6 w-6" />
+              </div>
+              <div className="flex flex-col">
+                <div className="text-xs text-slate-500 leading-none mb-1">
+                  Quản trị hệ thống
+                </div>
+                <h1 className="text-xl font-bold text-slate-900 leading-tight">
+                  Quản lý người dùng
+                </h1>
+                <p className="text-xs text-slate-500 mt-1">Quản lý tài khoản và phân quyền người dùng</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+              <button
+                  onClick={() => navigate("/admin/users/new")}
+                  className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-lg hover:shadow-xl transition-all active:scale-[0.98]"
+                  style={{ backgroundColor: BRAND_COLOR }}
+              >
+                <PlusCircle className="h-4 w-4" />
+                <span>Tạo mới</span>
+              </button>
+              <button
+                  onClick={onRefresh}
+                  disabled={loading || (isManagerView && (managerBranchLoading || !branchFilterValue))}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm disabled:opacity-50 transition-all active:scale-[0.98]"
+              >
+                <RefreshCw className={cls("h-4 w-4", loading && "animate-spin")} />
+                <span>Làm mới</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Manager View Notice */}
+          {isManagerView && (
+              <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-3">
+                <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+                  <ShieldCheck className="h-4 w-4 text-amber-700" />
+                </div>
+                <div className="flex-1">
+                  <div className="font-semibold text-amber-800 text-sm mb-1">Chế độ Manager</div>
+                  <div className="text-sm text-amber-700">
+                    {managerBranchLoading
+                        ? "Đang xác định chi nhánh phụ trách..."
+                        : branchFilterValue
+                            ? "Chỉ hiển thị tài khoản thuộc chi nhánh " + (managerBranchInfo.name || ("#" + branchFilterValue)) + "."
+                            : managerBranchError || "Không xác định được chi nhánh của bạn. Hãy liên hệ Admin."}
+                  </div>
+                </div>
+              </div>
+          )}
+
+          {/* Filter Bar */}
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-lg p-4">
+            <div className="flex flex-wrap gap-3 items-center">
+              <div className="flex-1 min-w-[240px] flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2.5 focus-within:border-[#0079BC]/50 focus-within:ring-2 focus-within:ring-[#0079BC]/20 transition-all">
+                <Search className="h-4 w-4 text-slate-400" />
+                <input
+                    value={keyword}
+                    onChange={(e)=>setKeyword(e.target.value)}
+                    placeholder="Tìm theo tên hoặc email"
+                    className="flex-1 bg-transparent outline-none text-sm text-slate-900 placeholder:text-slate-400"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2.5 focus-within:border-[#0079BC]/50 focus-within:ring-2 focus-within:ring-[#0079BC]/20 transition-all">
+                <Shield className="h-4 w-4 text-slate-400" />
+                <select
+                    value={roleId}
+                    onChange={(e)=>setRoleId(e.target.value)}
+                    className="bg-transparent outline-none text-sm text-slate-900 border-none cursor-pointer"
+                >
+                  <option value="">-- Vai trò --</option>
+                  {roles.map(r => (<option key={r.id} value={r.id}>{r.roleName || r.name}</option>))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2.5 focus-within:border-[#0079BC]/50 focus-within:ring-2 focus-within:ring-[#0079BC]/20 transition-all">
+                <ShieldCheck className="h-4 w-4 text-slate-400" />
+                <select
+                    value={status}
+                    onChange={(e)=>setStatus(e.target.value)}
+                    className="bg-transparent outline-none text-sm text-slate-900 border-none cursor-pointer"
+                >
+                  <option value="">-- Trạng thái --</option>
+                  <option value="ACTIVE">ACTIVE</option>
+                  <option value="INACTIVE">INACTIVE</option>
+                </select>
+              </div>
+
+              <button
+                  onClick={onRefresh}
+                  disabled={isManagerView && (managerBranchLoading || !branchFilterValue)}
+                  className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-lg disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-xl transition-all active:scale-[0.98]"
+                  style={{ backgroundColor: BRAND_COLOR }}
+              >
+                <Filter className="h-4 w-4" />
+                <span>Lọc</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-lg overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-slate-900">Danh sách người dùng</h3>
+                <div className="text-xs text-slate-500">
+                  {users.length} người dùng
+                </div>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                <tr className="bg-slate-50/80 border-b border-slate-200">
+                  <th className="text-left font-semibold px-6 py-3.5 text-xs text-slate-700 uppercase tracking-wider">
+                    Họ tên
+                  </th>
+                  <th className="text-left font-semibold px-6 py-3.5 text-xs text-slate-700 uppercase tracking-wider">
+                    Email
+                  </th>
+                  <th className="text-left font-semibold px-6 py-3.5 text-xs text-slate-700 uppercase tracking-wider">
+                    SĐT
+                  </th>
+                  <th className="text-left font-semibold px-6 py-3.5 text-xs text-slate-700 uppercase tracking-wider">
+                    Vai trò
+                  </th>
+                  <th className="text-left font-semibold px-6 py-3.5 text-xs text-slate-700 uppercase tracking-wider">
+                    Trạng thái
+                  </th>
+                  <th className="text-right font-semibold px-6 py-3.5 text-xs text-slate-700 uppercase tracking-wider">
+                    Hành động
+                  </th>
+                </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                {users.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-12 text-center">
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center">
+                            <Users className="h-8 w-8 text-slate-400" />
+                          </div>
+                          <div className="text-slate-500 font-medium">Không có dữ liệu</div>
+                          <div className="text-xs text-slate-400">Thử thay đổi bộ lọc hoặc tạo người dùng mới</div>
+                        </div>
+                      </td>
+                    </tr>
+                ) : users.map(u => (
+                    <tr key={u.id} className="hover:bg-gradient-to-r hover:from-slate-50 hover:to-white transition-colors group">
+                      <td className="px-6 py-4">
+                        <div className="font-semibold text-slate-900">{u.fullName}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2 text-slate-700">
+                          <Mail className="h-4 w-4 text-slate-400" />
+                          <span className="text-sm">{u.email}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2 text-slate-700">
+                          <Phone className="h-4 w-4 text-slate-400" />
+                          <span className="text-sm">{u.phone || "—"}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <Shield className="h-4 w-4 text-slate-400" />
+                          <span className="text-sm font-medium text-slate-700">{u.roleName}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <StatusBadge value={u.status} />
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                              onClick={() => navigate(`/admin/users/${u.id}`)}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 hover:border-[#0079BC]/50 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition-all active:scale-[0.98] group-hover:shadow-md"
+                          >
+                            <Edit2 className="h-3.5 w-3.5" />
+                            Chỉnh sửa
+                          </button>
+                          <button
+                              onClick={() => onToggle(u.id)}
+                              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium shadow-sm transition-all active:scale-[0.98] ${
+                                  u.status === "ACTIVE"
+                                      ? "border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                                      : "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                              }`}
+                          >
+                            {u.status === "ACTIVE" ? "Vô hiệu hóa" : "Kích hoạt"}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
-
-      {isManagerView && (
-        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-700">
-          {managerBranchLoading
-            ? "Đang xác định chi nhánh phụ trách..."
-            : branchFilterValue
-            ? "Chỉ hiển thị tài khoản thuộc chi nhánh " + (managerBranchInfo.name || ("#" + branchFilterValue)) + "."
-            : managerBranchError || "Không xác định được chi nhánh của bạn. Hãy liên hệ Admin."}
-        </div>
-      )}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-3 mb-3 flex flex-wrap gap-2 items-center">
-        <input value={keyword} onChange={(e)=>setKeyword(e.target.value)} placeholder="Tìm theo tên hoặc email" className="flex-1 min-w-[220px] border border-slate-300 rounded-md px-3 py-2 text-sm" />
-        <select value={roleId} onChange={(e)=>setRoleId(e.target.value)} className="border border-slate-300 rounded-md px-2 py-2 text-sm">
-          <option value="">-- Vai trò --</option>
-          {roles.map(r => (<option key={r.id} value={r.id}>{r.roleName || r.name}</option>))}
-        </select>
-        <select value={status} onChange={(e)=>setStatus(e.target.value)} className="border border-slate-300 rounded-md px-2 py-2 text-sm">
-          <option value="">-- Trạng thái --</option>
-          <option value="ACTIVE">ACTIVE</option>
-          <option value="INACTIVE">INACTIVE</option>
-        </select>
-        <button onClick={onRefresh} disabled={isManagerView && (managerBranchLoading || !branchFilterValue)} className="rounded-md bg-sky-600 hover:bg-sky-500 text-white px-3 py-2 text-sm disabled:opacity-50">Lọc</button>
-      </div>
-
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-x-auto">
-        <table className="min-w-full text-sm">
-          <thead>
-            <tr className="bg-slate-50 text-slate-600">
-              <th className="text-left font-medium px-4 py-2">H? tên</th>
-              <th className="text-left font-medium px-4 py-2">Email</th>
-              <th className="text-left font-medium px-4 py-2">SÐT</th>
-              <th className="text-left font-medium px-4 py-2">Vai trò</th>
-              <th className="text-left font-medium px-4 py-2">Tr?ng thái</th>
-              <th className="text-right font-medium px-4 py-2">Hành d?ng</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200">
-            {users.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-500">Không có dữ liệu.</td></tr>
-            ) : users.map(u => (
-              <tr key={u.id} className="hover:bg-slate-50">
-                <td className="px-4 py-2 text-slate-800 font-medium">{u.fullName}</td>
-                <td className="px-4 py-2">{u.email}</td>
-                <td className="px-4 py-2">{u.phone}</td>
-                <td className="px-4 py-2">{u.roleName}</td>
-                <td className="px-4 py-2"><StatusBadge value={u.status} /></td>
-                <td className="px-4 py-2 text-right space-x-2">
-                  <button onClick={() => navigate(`/admin/users/${u.id}`)} className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white hover:bg-slate-50 px-2 py-1 text-xs text-slate-700 shadow-sm">
-                    <Edit2 className="h-3.5 w-3.5" /> Chỉnh sửa
-                  </button>
-                  <button onClick={() => onToggle(u.id)} className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white hover:bg-slate-50 px-2 py-1 text-xs text-slate-700 shadow-sm">
-                    {u.status === "ACTIVE" ? "Vô hiệu hóa" : "Kích hoạt"}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
   );
 }
-
 
 
 
