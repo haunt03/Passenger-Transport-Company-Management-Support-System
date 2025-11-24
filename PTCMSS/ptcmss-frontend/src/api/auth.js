@@ -59,3 +59,16 @@ export async function logout() {
         deleteCookie("access_token");
     }
 }
+
+/**
+ * Forgot password - send reset link to email
+ * POST /api/auth/forgot-password
+ * @param {string} email - User email
+ */
+export async function forgotPassword(email) {
+    return apiFetch("/api/auth/forgot-password", {
+        method: "POST",
+        auth: false,
+        body: { email },
+    });
+}
