@@ -4,15 +4,15 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.*;
-import org.example.ptcmssbackend.enums.AlertSeverity;
 import org.example.ptcmssbackend.enums.AlertType;
+import org.example.ptcmssbackend.enums.AlertSeverity;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.Instant;
 
 /**
  * SystemAlerts - Cảnh báo hệ thống
- * 
+ *
  * Các loại cảnh báo:
  * - VEHICLE_INSPECTION_EXPIRING: Xe sắp hết đăng kiểm
  * - VEHICLE_INSURANCE_EXPIRING: Bảo hiểm xe sắp hết hạn
@@ -27,7 +27,7 @@ import java.time.Instant;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "System_alerts")
+@Table(name = "system_alerts")
 public class SystemAlerts {
     
     @Id

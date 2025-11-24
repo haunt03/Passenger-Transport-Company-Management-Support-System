@@ -13,6 +13,7 @@ import java.time.Instant;
 @Getter
 @Setter
 @Entity
+@Table(name = "notifications")
 public class Notifications {
     @Id
     @Column(name = "notificationId", nullable = false)

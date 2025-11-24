@@ -13,6 +13,7 @@ import java.time.Instant;
 @Getter
 @Setter
 @Entity
+@Table(name = "customers")
 public class Customers {
     @Id
     @Column(name = "customerId", nullable = false)

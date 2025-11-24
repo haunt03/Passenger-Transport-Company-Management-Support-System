@@ -10,6 +10,7 @@ import org.hibernate.annotations.ColumnDefault;
 @Getter
 @Setter
 @Entity
+@Table(name = "hire_types")
 public class HireTypes {
     @Id
     @Column(name = "hireTypeId", nullable = false)
