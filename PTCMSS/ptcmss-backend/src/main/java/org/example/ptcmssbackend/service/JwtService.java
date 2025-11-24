@@ -12,5 +12,7 @@ public interface JwtService {
     String extractUsername(String token,  TokenType tokenType);
 
 
+    String extractUsername(String token, org.example.ptcmssbackend.common.TokenType tokenType);
+
     String generatePasswordResetToken(String username);
 }
