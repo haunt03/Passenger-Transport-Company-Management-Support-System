@@ -239,10 +239,7 @@ public class DriverController {
     // =====================================================================
     @Operation(
             summary = "Driver xác nhận nhận chuyến",
-            description = """
-                          Chỉ tài xế được phép thao tác này.
-                          Khi nhận chuyến: chuyển trạng thái từ SCHEDULED → ONGOING.
-                          """
+            description = "Chỉ tài xế được phép thao tác này. Khi nhận chuyến: chuyển trạng thái từ SCHEDULED -> ONGOING."
     )
     @PreAuthorize("hasRole('DRIVER')")
     @PostMapping("/accept/{tripId}")
@@ -262,9 +259,7 @@ public class DriverController {
     // =====================================================================
     @Operation(
             summary = "Danh sách driver theo chi nhánh",
-            description = """
-                          Danh sách tài xế theo chi nhánh
-                          """
+            description = "Danh sách tài xế theo chi nhánh"
     )
     @GetMapping("/branch/{branchId}")
     public ResponseEntity<?> getDriversByBranch(@PathVariable Integer branchId) {
