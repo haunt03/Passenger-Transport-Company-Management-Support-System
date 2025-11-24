@@ -21,8 +21,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
-import static org.example.ptcmssbackend.common.TokenType.EMAIL_VERIFY_TOKEN;
-import static org.example.ptcmssbackend.common.TokenType.REFRESH_TOKEN;
+import static org.example.ptcmssbackend.enums.TokenType.EMAIL_VERIFY_TOKEN;
+import static org.example.ptcmssbackend.enums.TokenType.REFRESH_TOKEN;
 
 @Service
 @Slf4j(topic = "AUTHENTICATION_SERVICE")

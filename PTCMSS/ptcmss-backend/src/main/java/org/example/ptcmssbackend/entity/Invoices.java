@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
+import org.example.ptcmssbackend.converter.InvoiceTypeConverter;
 import org.example.ptcmssbackend.enums.InvoiceStatus;
 import org.example.ptcmssbackend.enums.InvoiceType;
 import org.example.ptcmssbackend.enums.PaymentStatus;
@@ -13,15 +14,21 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 
 @Getter
 @Setter
 @Entity
+@Table(name = "invoices")
 public class Invoices {
     @Id
     @Column(name = "invoiceId", nullable = false)
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
+
+    @Size(max = 50)
+    @Column(name = "invoiceNumber", unique = true, length = 50)
+    private String invoiceNumber;
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -37,7 +44,7 @@ public class Invoices {
     private Customers customer;
 
     @NotNull
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = InvoiceTypeConverter.class)
     @Column(name = "type", nullable = false)
     private InvoiceType type;
 
@@ -54,9 +61,38 @@ public class Invoices {
     @Column(name = "amount", nullable = false, precision = 18, scale = 2)
     private BigDecimal amount;
 
+    @ColumnDefault("0.00")
+    @Column(name = "vatAmount", precision = 18, scale = 2)
+    private BigDecimal vatAmount = BigDecimal.ZERO;
+
+    @Column(name = "subtotal", precision = 18, scale = 2)
+    private BigDecimal subtotal;
+
     @Size(max = 50)
     @Column(name = "paymentMethod", length = 50)
     private String paymentMethod;
+
+    // Bank transfer info
+    @Size(max = 100)
+    @Column(name = "bankName", length = 100)
+    private String bankName;
+
+    @Size(max = 50)
+    @Column(name = "bankAccount", length = 50)
+    private String bankAccount;
+
+    @Size(max = 50)
+    @Column(name = "referenceNumber", length = 50)
+    private String referenceNumber;
+
+    // Cash info
+    @Size(max = 100)
+    @Column(name = "cashierName", length = 100)
+    private String cashierName;
+
+    @Size(max = 50)
+    @Column(name = "receiptNumber", length = 50)
+    private String receiptNumber;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "paymentStatus")
@@ -69,6 +105,13 @@ public class Invoices {
     @CreationTimestamp
     @Column(name = "invoiceDate")
     private Instant invoiceDate;
+
+    @Column(name = "dueDate")
+    private LocalDate dueDate;
+
+    @Size(max = 20)
+    @Column(name = "paymentTerms", length = 20)
+    private String paymentTerms = "NET_7"; // NET_7, NET_14, NET_30, NET_60
 
     @CreationTimestamp
     @Column(name = "createdAt")
@@ -96,5 +139,37 @@ public class Invoices {
 
     @Column(name = "approvedAt")
     private Instant approvedAt;
+
+    // Cancellation
+    @Column(name = "cancelledAt")
+    private Instant cancelledAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cancelledBy")
+    private Employees cancelledBy;
+
+    @Size(max = 500)
+    @Column(name = "cancellationReason", length = 500)
+    private String cancellationReason;
+
+    // Sending
+    @Column(name = "sentAt")
+    private Instant sentAt;
+
+    @Size(max = 100)
+    @Column(name = "sentToEmail", length = 100)
+    private String sentToEmail;
+
+    // Debt management
+    @Column(name = "promiseToPayDate")
+    private LocalDate promiseToPayDate;
+
+    @Size(max = 50)
+    @Column(name = "debtLabel", length = 50)
+    private String debtLabel; // VIP, TRANH_CHAP, NORMAL
+
+    @Lob
+    @Column(name = "contactNote", columnDefinition = "TEXT")
+    private String contactNote;
 
 }
