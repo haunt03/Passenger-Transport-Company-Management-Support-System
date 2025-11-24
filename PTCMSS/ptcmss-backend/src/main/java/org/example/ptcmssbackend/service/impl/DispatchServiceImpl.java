@@ -45,7 +45,7 @@ public class DispatchServiceImpl implements DispatchService {
                     BookingStatus.PENDING,
                     BookingStatus.QUOTATION_SENT,
                     BookingStatus.CONFIRMED,
-                    BookingStatus.IN_PROGRESS,
+                    BookingStatus.INPROGRESS,
                     BookingStatus.COMPLETED
             );
 
