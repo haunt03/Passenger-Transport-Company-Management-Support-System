@@ -72,40 +72,7 @@ function Toasts({ toasts }) {
     );
 }
 
-// mock notifications (demo)
-const DEMO_NOTIFS = [
-    {
-        id: 1109,
-        type: "ASSIGN_TRIP",
-        message:
-            "Bạn được gán chuyến TRIP-8891. Giờ đón 14:30 tại 12 Phạm Hùng.",
-        created_at: "2025-10-26T14:05:00",
-        unread: true,
-    },
-    {
-        id: 1108,
-        type: "LEAVE_APPROVED",
-        message: "Yêu cầu nghỉ ngày 29/10 đã được duyệt.",
-        created_at: "2025-10-26T09:10:00",
-        unread: false,
-    },
-    {
-        id: 1107,
-        type: "VEHICLE_INSPECTION",
-        message:
-            "Xe 29A-12345 sắp hết hạn đăng kiểm (còn 3 ngày).",
-        created_at: "2025-10-25T18:40:00",
-        unread: true,
-    },
-    {
-        id: 1106,
-        type: "REMINDER",
-        message:
-            "Nhớ chụp ảnh đồng hồ km sau mỗi chuyến.",
-        created_at: "2025-10-25T07:55:00",
-        unread: false,
-    },
-];
+// Removed DEMO_NOTIFS - chỉ dùng data từ API, báo lỗi nếu không fetch được
 
 // icon + màu theo loại thông báo
 function NotificationIcon({ type }) {
@@ -270,7 +237,8 @@ export default function DriverNotificationsPage() {
     const { toasts, push } = useToasts();
 
     const [loading, setLoading] = React.useState(false);
-    const [notifs, setNotifs] = React.useState(DEMO_NOTIFS);
+    const [notifs, setNotifs] = React.useState([]);
+    const [error, setError] = React.useState(null);
 
     // paging state
     const [page, setPage] = React.useState(1);
@@ -325,14 +293,41 @@ export default function DriverNotificationsPage() {
         // TODO: gọi API hàng loạt nếu có
     };
 
-    // refresh mock
-    const onRefresh = () => {
+    // Load notifications from API
+    const loadNotifications = React.useCallback(async () => {
         setLoading(true);
-        setTimeout(() => {
+        setError(null);
+        try {
+            const { getDriverNotifications } = await import("../../api/notifications");
+            const { getStoredUserId } = await import("../../utils/session");
+            const userId = getStoredUserId();
+
+            if (!userId) {
+                throw new Error("Bạn cần đăng nhập để xem thông báo");
+            }
+
+            const response = await getDriverNotifications({ userId, page, limit: pageSize });
+            const data = response?.data || response || [];
+            setNotifs(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error("Failed to load notifications:", err);
+            const errorMsg = err.message || "Lỗi không xác định";
+            setError("Không thể tải thông báo: " + errorMsg);
+            push("Không thể tải thông báo: " + errorMsg, "error");
+            setNotifs([]);
+        } finally {
             setLoading(false);
-            push("Đã làm mới danh sách (mock)", "info");
-            // TODO: GET /api/driver/notifications?page=&limit=
-        }, 500);
+        }
+    }, [page, pageSize, push]);
+
+    // Load on mount
+    React.useEffect(() => {
+        loadNotifications();
+    }, [loadNotifications]);
+
+    // refresh
+    const onRefresh = () => {
+        loadNotifications();
     };
 
     // count unread

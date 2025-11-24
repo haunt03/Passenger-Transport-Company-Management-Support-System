@@ -108,23 +108,49 @@ export default function TripExpenseModal({
             fd.append("receipt_image[" + i + "]", fObj.file);
         });
 
-        const endpoint =
-            "/api/driver/trips/" + String(tripId) + "/expenses";
-
-        // demo log
-        console.log("POST", endpoint);
-        for (const [k, v] of fd.entries()) {
-            console.log(" ", k, "=>", v);
-        }
-
         try {
-            // TODO gọi API thật sau
-            // const res = await fetch(endpoint, { method: "POST", body: fd });
-            // if (!res.ok) throw new Error("API lỗi " + res.status);
-            // const data = await res.json();
+            // Import API function
+            const { createExpenseRequest } = await import("../../api/expenses");
+            const { getStoredUserId } = await import("../../utils/session");
+            const { getBranchByUserId } = await import("../../api/branches");
 
-            // fake delay
-            await new Promise((r) => setTimeout(r, 400));
+            // Get user context
+            const userId = getStoredUserId();
+            if (!userId) {
+                throw new Error("Bạn cần đăng nhập để gửi yêu cầu chi phí");
+            }
+
+            // Get branch from user
+            let branchId = null;
+            try {
+                const branch = await getBranchByUserId(userId);
+                branchId = branch?.branchId || branch?.id;
+            } catch (err) {
+                console.warn("Could not get branch:", err);
+            }
+
+            if (!branchId) {
+                throw new Error("Không thể xác định chi nhánh. Vui lòng thử lại.");
+            }
+
+            // Build FormData for ExpenseRequestController
+            // Expected fields: type, amount, note, branchId, vehicleId (optional), requesterUserId
+            const expenseFormData = new FormData();
+            expenseFormData.append("type", costType);
+            expenseFormData.append("amount", String(amount));
+            expenseFormData.append("note", notes || "");
+            expenseFormData.append("branchId", String(branchId));
+            if (userId) {
+                expenseFormData.append("requesterUserId", String(userId));
+            }
+            // Note: vehicleId can be added if available from trip context
+
+            // Add files (ExpenseRequestController expects "files" parameter)
+            files.forEach((fObj) => {
+                expenseFormData.append("files", fObj.file);
+            });
+
+            const data = await createExpenseRequest(expenseFormData);
 
             if (typeof onSubmitted === "function") {
                 onSubmitted(
@@ -140,15 +166,16 @@ export default function TripExpenseModal({
                     },
                     {
                         tripId,
-                        endpoint,
+                        expenseRequestId: data?.id || data?.expenseRequestId,
                     }
                 );
             }
 
             if (typeof onClose === "function") onClose();
-        } catch {
+        } catch (err) {
+            console.error("Error submitting trip expense:", err);
             setError(
-                "Không thể gửi yêu cầu chi phí. Vui lòng thử lại."
+                err.message || "Không thể gửi yêu cầu chi phí. Vui lòng thử lại."
             );
         } finally {
             setLoading(false);
