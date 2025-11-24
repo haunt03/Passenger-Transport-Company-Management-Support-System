@@ -63,9 +63,9 @@ function buildMonthMatrix(year, monthIdx /*0-11*/) {
     const week = [];
     for (let d = 0; d < 7; d++) {
       const curr = new Date(
-        startDate.getFullYear(),
-        startDate.getMonth(),
-        startDate.getDate() + w * 7 + d
+          startDate.getFullYear(),
+          startDate.getMonth(),
+          startDate.getDate() + w * 7 + d
       );
       week.push(curr);
     }
@@ -78,18 +78,18 @@ function buildMonthMatrix(year, monthIdx /*0-11*/) {
 function buildWeekArray(dateObj) {
   const dowMon = (dateObj.getDay() + 6) % 7; // Mon=0
   const monday = new Date(
-    dateObj.getFullYear(),
-    dateObj.getMonth(),
-    dateObj.getDate() - dowMon
+      dateObj.getFullYear(),
+      dateObj.getMonth(),
+      dateObj.getDate() - dowMon
   );
   const arr = [];
   for (let i = 0; i < 7; i++) {
     arr.push(
-      new Date(
-        monday.getFullYear(),
-        monday.getMonth(),
-        monday.getDate() + i
-      )
+        new Date(
+            monday.getFullYear(),
+            monday.getMonth(),
+            monday.getDate() + i
+        )
     );
   }
   // để dùng chung logic render như month matrix
@@ -107,72 +107,72 @@ function DayTripCard({ record }) {
   const isTrip = record.type === "TRIP";
 
   return (
-    <div
-      className={cls(
-        "rounded-xl border p-3 text-[13px] shadow-sm flex flex-col gap-2",
-        isTrip
-          ? "border-[#0079BC] bg-white" // chuyến: viền brand
-          : "border-slate-200 bg-slate-50" // nghỉ: tone xám
-      )}
-    >
-      <div className="flex items-start gap-3">
-        {/* icon box */}
-        <div
+      <div
           className={cls(
-            "h-8 w-8 rounded-md flex items-center justify-center shrink-0 border text-[11px] font-medium shadow-sm",
-            isTrip
-              ? "bg-[#E6F4FF] text-[#0079BC] border-[#0079BC]"
-              : "bg-slate-100 text-slate-600 border-slate-200"
+              "rounded-xl border p-3 text-[13px] shadow-sm flex flex-col gap-2",
+              isTrip
+                  ? "border-[#0079BC] bg-white" // chuyến: viền brand
+                  : "border-slate-200 bg-slate-50" // nghỉ: tone xám
           )}
-        >
-          {isTrip ? (
-            <CarFront className="h-4 w-4 text-[#0079BC]" />
-          ) : (
-            <CalendarDays className="h-4 w-4 text-slate-600" />
-          )}
-        </div>
-
-        {/* main text */}
-        <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-semibold leading-tight text-slate-900 truncate">
-            {record.title || "—"}
+      >
+        <div className="flex items-start gap-3">
+          {/* icon box */}
+          <div
+              className={cls(
+                  "h-8 w-8 rounded-md flex items-center justify-center shrink-0 border text-[11px] font-medium shadow-sm",
+                  isTrip
+                      ? "bg-[#E6F4FF] text-[#0079BC] border-[#0079BC]"
+                      : "bg-slate-100 text-slate-600 border-slate-200"
+              )}
+          >
+            {isTrip ? (
+                <CarFront className="h-4 w-4 text-[#0079BC]" />
+            ) : (
+                <CalendarDays className="h-4 w-4 text-slate-600" />
+            )}
           </div>
 
-          {isTrip ? (
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500 leading-relaxed mt-1">
-              <div className="flex items-center gap-1">
-                <Clock className="h-3.5 w-3.5 text-slate-400" />
-                <span className="tabular-nums font-medium text-slate-700">
+          {/* main text */}
+          <div className="flex-1 min-w-0">
+            <div className="text-[13px] font-semibold leading-tight text-slate-900 truncate">
+              {record.title || "—"}
+            </div>
+
+            {isTrip ? (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500 leading-relaxed mt-1">
+                  <div className="flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5 text-slate-400" />
+                    <span className="tabular-nums font-medium text-slate-700">
                   {fmtTime(record.time)}
                 </span>
-              </div>
+                  </div>
 
-              <div className="flex items-center gap-1">
-                <MapPin className="h-3.5 w-3.5 text-[#0079BC]" />
-                <span className="text-slate-700">
+                  <div className="flex items-center gap-1">
+                    <MapPin className="h-3.5 w-3.5 text-[#0079BC]" />
+                    <span className="text-slate-700">
                   {record.pickup || "—"}
                 </span>
+                  </div>
+                </div>
+            ) : (
+                <div className="text-[11px] text-slate-500 leading-relaxed mt-1">
+                  Nghỉ được duyệt / không phân công chuyến.
+                </div>
+            )}
+          </div>
+
+          {/* ID trip */}
+          {isTrip ? (
+              <div className="text-[11px] text-slate-400 font-medium shrink-0 whitespace-nowrap">
+                ID {record.trip_id}
               </div>
-            </div>
           ) : (
-            <div className="text-[11px] text-slate-500 leading-relaxed mt-1">
-              Nghỉ được duyệt / không phân công chuyến.
-            </div>
+              <div className="text-[11px] text-slate-400 font-medium shrink-0 whitespace-nowrap">
+                OFF
+              </div>
           )}
         </div>
-
-        {/* ID trip */}
-        {isTrip ? (
-          <div className="text-[11px] text-slate-400 font-medium shrink-0 whitespace-nowrap">
-            ID {record.trip_id}
-          </div>
-        ) : (
-          <div className="text-[11px] text-slate-400 font-medium shrink-0 whitespace-nowrap">
-            OFF
-          </div>
-        )}
       </div>
-    </div>
   );
 }
 
@@ -180,16 +180,16 @@ function DayTripCard({ record }) {
 function NextTripPill({ schedule, selectedDate }) {
   const ym = toYMD(selectedDate);
   const todaysTrips = schedule.filter(
-    (r) => r.date === ym && r.type === "TRIP"
+      (r) => r.date === ym && r.type === "TRIP"
   );
 
   if (!todaysTrips.length) {
     return (
-      <div className="rounded-lg border border-slate-200 bg-slate-50 text-[12px] text-slate-600 px-3 py-2 flex flex-wrap items-center gap-2 leading-relaxed shadow-sm">
+        <div className="rounded-lg border border-slate-200 bg-slate-50 text-[12px] text-slate-600 px-3 py-2 flex flex-wrap items-center gap-2 leading-relaxed shadow-sm">
         <span className="font-medium text-slate-700">
           Không có chuyến trong ngày
         </span>
-      </div>
+        </div>
     );
   }
 
@@ -197,149 +197,149 @@ function NextTripPill({ schedule, selectedDate }) {
   const trip = todaysTrips[0];
 
   return (
-    <div className="rounded-lg border border-[#0079BC] bg-[#E6F4FF] text-[12px] text-[#0079BC] px-3 py-2 flex flex-wrap items-center gap-2 leading-relaxed shadow-sm">
+      <div className="rounded-lg border border-[#0079BC] bg-[#E6F4FF] text-[12px] text-[#0079BC] px-3 py-2 flex flex-wrap items-center gap-2 leading-relaxed shadow-sm">
       <span className="inline-flex items-center gap-1 font-semibold text-[#0079BC]">
         <CheckCircle2 className="h-4 w-4 text-[#0079BC]" />
         Chuyến kế tiếp
       </span>
 
-      <div className="hidden sm:block text-slate-400">•</div>
+        <div className="hidden sm:block text-slate-400">•</div>
 
-      <div className="flex items-center gap-1">
-        <Clock className="h-3.5 w-3.5 text-slate-500" />
-        <span className="tabular-nums font-medium text-slate-900">
+        <div className="flex items-center gap-1">
+          <Clock className="h-3.5 w-3.5 text-slate-500" />
+          <span className="tabular-nums font-medium text-slate-900">
           {fmtTime(trip.time)}
         </span>
-      </div>
+        </div>
 
-      <div className="hidden sm:block text-slate-400">•</div>
+        <div className="hidden sm:block text-slate-400">•</div>
 
-      <div className="flex items-center gap-1">
-        <MapPin className="h-3.5 w-3.5 text-[#0079BC]" />
-        <span className="font-medium text-slate-900">
+        <div className="flex items-center gap-1">
+          <MapPin className="h-3.5 w-3.5 text-[#0079BC]" />
+          <span className="font-medium text-slate-900">
           {trip.pickup || "—"}
         </span>
-      </div>
+        </div>
 
-      <div className="hidden sm:block text-slate-400">•</div>
+        <div className="hidden sm:block text-slate-400">•</div>
 
-      <span className="font-medium text-slate-900">
+        <span className="font-medium text-slate-900">
         {trip.title || "—"}
       </span>
-    </div>
+      </div>
   );
 }
 
 // Header tài xế + KPI + toggle Tháng/Tuần
 function DriverHeader({
-  driver,
-  currentMonth,
-  currentYear,
-  selectedDate,
-  monthlyTripCount,
-  monthlyLeaveDays,
-  viewMode,
-  setViewMode,
-  schedule,
-}) {
+                        driver,
+                        currentMonth,
+                        currentYear,
+                        selectedDate,
+                        monthlyTripCount,
+                        monthlyLeaveDays,
+                        viewMode,
+                        setViewMode,
+                        schedule,
+                      }) {
   const monthLabel = `${String(currentMonth + 1).padStart(2, "0")}/${currentYear}`;
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 shadow-sm flex flex-col gap-4">
-      <div className="flex flex-col lg:flex-row lg:items-start gap-4">
-        {/* left side */}
-        <div className="flex-1 flex flex-col gap-3 min-w-[200px]">
-          <div className="flex items-start gap-3">
-            {/* avatar với brand #0079BC */}
-            <div
-              className="relative h-10 w-10 rounded-md text-white text-[12px] font-semibold flex items-center justify-center shadow-[0_12px_30px_rgba(0,121,188,.4)]"
-              style={{ backgroundColor: "#0079BC" }}
-            >
-              {driver?.name
-                ?.split(" ")
-                .slice(-2)
-                .map((p) => p[0]?.toUpperCase())
-                .join("") || "TX"}
-
-              {/* online dot */}
-              <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-[#0079BC] ring-2 ring-white" />
-            </div>
-
-            <div className="flex flex-col leading-tight">
-              <div className="text-[15px] font-semibold text-slate-900 leading-tight">
-                {driver?.name || "—"}
-              </div>
-              <div className="text-[12px] text-slate-600 leading-snug">
-                {driver?.role || "Tài xế"} · {driver?.branch || "—"}
-              </div>
-              <div className="text-[11px] text-slate-500 leading-snug mt-1">
-                Tháng {monthLabel} · Ngày chọn {toDMY(selectedDate)}
-              </div>
-            </div>
-          </div>
-
-          {/* chuyến kế tiếp */}
-          <NextTripPill schedule={schedule} selectedDate={selectedDate} />
-        </div>
-
-        {/* right side stats */}
-        <div className="flex flex-wrap items-start gap-3 ml-auto">
-          {/* Số chuyến tháng */}
-          <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-left shadow-sm min-w-[120px]">
-            <div className="text-[11px] text-slate-500 leading-none mb-1">
-              Số chuyến (tháng)
-            </div>
-            <div className="text-[15px] font-semibold text-slate-900 leading-none">
-              {monthlyTripCount}
-            </div>
-          </div>
-
-          {/* Ngày nghỉ tháng */}
-          <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-left shadow-sm min-w-[120px]">
-            <div className="text-[11px] text-slate-500 leading-none mb-1">
-              Ngày nghỉ
-            </div>
-            <div className="text-[15px] font-semibold text-slate-900 leading-none">
-              {monthlyLeaveDays}
-            </div>
-          </div>
-
-          {/* Chế độ xem Tháng / Tuần */}
-          <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-left shadow-sm flex flex-col gap-2">
-            <div className="text-[11px] text-slate-500 leading-none">
-              Chế độ xem
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setViewMode("month")}
-                className={cls(
-                  "rounded-md px-2 py-1 text-[12px] font-medium leading-none border shadow-sm",
-                  viewMode === "month"
-                    ? "bg-[#0079BC] border-[#0079BC] text-white"
-                    : "bg-white border-slate-300 text-slate-700 hover:bg-slate-50"
-                )}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 shadow-sm flex flex-col gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+          {/* left side */}
+          <div className="flex-1 flex flex-col gap-3 min-w-[200px]">
+            <div className="flex items-start gap-3">
+              {/* avatar với brand #0079BC */}
+              <div
+                  className="relative h-10 w-10 rounded-md text-white text-[12px] font-semibold flex items-center justify-center shadow-[0_12px_30px_rgba(0,121,188,.4)]"
+                  style={{ backgroundColor: "#0079BC" }}
               >
-                Tháng
-              </button>
-              <button
-                onClick={() => setViewMode("week")}
-                className={cls(
-                  "rounded-md px-2 py-1 text-[12px] font-medium leading-none border shadow-sm",
-                  viewMode === "week"
-                    ? "bg-[#0079BC] border-[#0079BC] text-white"
-                    : "bg-white border-slate-300 text-slate-700 hover:bg-slate-50"
-                )}
-              >
-                Tuần
-              </button>
+                {driver?.name
+                    ?.split(" ")
+                    .slice(-2)
+                    .map((p) => p[0]?.toUpperCase())
+                    .join("") || "TX"}
+
+                {/* online dot */}
+                <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-[#0079BC] ring-2 ring-white" />
+              </div>
+
+              <div className="flex flex-col leading-tight">
+                <div className="text-[15px] font-semibold text-slate-900 leading-tight">
+                  {driver?.name || "—"}
+                </div>
+                <div className="text-[12px] text-slate-600 leading-snug">
+                  {driver?.role || "Tài xế"} · {driver?.branch || "—"}
+                </div>
+                <div className="text-[11px] text-slate-500 leading-snug mt-1">
+                  Tháng {monthLabel} · Ngày chọn {toDMY(selectedDate)}
+                </div>
+              </div>
             </div>
-            <div className="text-[11px] text-slate-500 leading-none">
-              {monthLabel} / {toDMY(selectedDate)}
+
+            {/* chuyến kế tiếp */}
+            <NextTripPill schedule={schedule} selectedDate={selectedDate} />
+          </div>
+
+          {/* right side stats */}
+          <div className="flex flex-wrap items-start gap-3 ml-auto">
+            {/* Số chuyến tháng */}
+            <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-left shadow-sm min-w-[120px]">
+              <div className="text-[11px] text-slate-500 leading-none mb-1">
+                Số chuyến (tháng)
+              </div>
+              <div className="text-[15px] font-semibold text-slate-900 leading-none">
+                {monthlyTripCount}
+              </div>
+            </div>
+
+            {/* Ngày nghỉ tháng */}
+            <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-left shadow-sm min-w-[120px]">
+              <div className="text-[11px] text-slate-500 leading-none mb-1">
+                Ngày nghỉ
+              </div>
+              <div className="text-[15px] font-semibold text-slate-900 leading-none">
+                {monthlyLeaveDays}
+              </div>
+            </div>
+
+            {/* Chế độ xem Tháng / Tuần */}
+            <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-left shadow-sm flex flex-col gap-2">
+              <div className="text-[11px] text-slate-500 leading-none">
+                Chế độ xem
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                    onClick={() => setViewMode("month")}
+                    className={cls(
+                        "rounded-md px-2 py-1 text-[12px] font-medium leading-none border shadow-sm",
+                        viewMode === "month"
+                            ? "bg-[#0079BC] border-[#0079BC] text-white"
+                            : "bg-white border-slate-300 text-slate-700 hover:bg-slate-50"
+                    )}
+                >
+                  Tháng
+                </button>
+                <button
+                    onClick={() => setViewMode("week")}
+                    className={cls(
+                        "rounded-md px-2 py-1 text-[12px] font-medium leading-none border shadow-sm",
+                        viewMode === "week"
+                            ? "bg-[#0079BC] border-[#0079BC] text-white"
+                            : "bg-white border-slate-300 text-slate-700 hover:bg-slate-50"
+                    )}
+                >
+                  Tuần
+                </button>
+              </div>
+              <div className="text-[11px] text-slate-500 leading-none">
+                {monthLabel} / {toDMY(selectedDate)}
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
   );
 }
 
@@ -347,179 +347,179 @@ function DriverHeader({
    Calendar Grid
 ========================================================= */
 function CalendarGrid({
-  year,
-  monthIdx,
-  scheduleMap,
-  selectedDate,
-  setSelectedDate,
-  viewMode,
-  goPrev,
-  goNext,
-}) {
+                        year,
+                        monthIdx,
+                        scheduleMap,
+                        selectedDate,
+                        setSelectedDate,
+                        viewMode,
+                        goPrev,
+                        goNext,
+                      }) {
   const matrix =
-    viewMode === "month"
-      ? buildMonthMatrix(year, monthIdx)
-      : buildWeekArray(selectedDate);
+      viewMode === "month"
+          ? buildMonthMatrix(year, monthIdx)
+          : buildWeekArray(selectedDate);
 
   const monthLabel = `Tháng ${String(monthIdx + 1).padStart(
-    2,
-    "0"
+      2,
+      "0"
   )}/${year}`;
 
-  const apiHint = `GET /api/drivers/{driverId}/schedule?month=${String(
-    monthIdx + 1
-  )}&year=${year}`;
+  // const apiHint = `GET /api/drivers/{driverId}/schedule?month=${String(
+  //     monthIdx + 1
+  // )}&year=${year}`;
 
   const weekdays = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm flex flex-col overflow-hidden">
-      {/* header lịch */}
-      <div className="flex flex-col lg:flex-row lg:items-start gap-4 border-b border-slate-200 p-4">
-        <div className="flex-1 flex flex-col gap-1 min-w-0">
-          <div className="flex items-center gap-2 text-[13px] font-semibold text-slate-900 leading-tight">
-            <CalendarDays className="h-4 w-4 text-[#0079BC]" />
-            <span>{monthLabel}</span>
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm flex flex-col overflow-hidden">
+        {/* header lịch */}
+        <div className="flex flex-col lg:flex-row lg:items-start gap-4 border-b border-slate-200 p-4">
+          <div className="flex-1 flex flex-col gap-1 min-w-0">
+            <div className="flex items-center gap-2 text-[13px] font-semibold text-slate-900 leading-tight">
+              <CalendarDays className="h-4 w-4 text-[#0079BC]" />
+              <span>{monthLabel}</span>
+            </div>
+
+            {/* <div className="text-[11px] text-slate-500 leading-relaxed">
+              {apiHint}
+            </div> */}
           </div>
 
-          <div className="text-[11px] text-slate-500 leading-relaxed">
-            {apiHint}
+          {/* điều hướng tháng / tuần */}
+          <div className="flex items-center gap-2 ml-auto">
+            <button
+                onClick={goPrev}
+                className="rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 p-2 text-[12px] shadow-sm"
+                title="Trước"
+            >
+              <ChevronLeft className="h-4 w-4 text-slate-600" />
+            </button>
+            <button
+                onClick={goNext}
+                className="rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 p-2 text-[12px] shadow-sm"
+                title="Sau"
+            >
+              <ChevronRight className="h-4 w-4 text-slate-600" />
+            </button>
           </div>
         </div>
 
-        {/* điều hướng tháng / tuần */}
-        <div className="flex items-center gap-2 ml-auto">
-          <button
-            onClick={goPrev}
-            className="rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 p-2 text-[12px] shadow-sm"
-            title="Trước"
-          >
-            <ChevronLeft className="h-4 w-4 text-slate-600" />
-          </button>
-          <button
-            onClick={goNext}
-            className="rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 p-2 text-[12px] shadow-sm"
-            title="Sau"
-          >
-            <ChevronRight className="h-4 w-4 text-slate-600" />
-          </button>
-        </div>
-      </div>
-
-      {/* tên thứ */}
-      <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50 text-[11px] font-medium text-slate-600">
-        {weekdays.map((w) => (
-          <div
-            key={w}
-            className="px-2 py-2 border-r last:border-r-0 border-slate-200 text-center uppercase tracking-wide"
-          >
-            {w}
-          </div>
-        ))}
-      </div>
-
-      {/* body calendar */}
-      <div
-        className={cls(
-          "grid text-[11px] text-slate-700",
-          viewMode === "month" ? "grid-rows-6" : "grid-rows-1",
-          "grid-cols-7"
-        )}
-      >
-        {matrix.map((week, wi) =>
-          week.map((d, di) => {
-            const ymd = toYMD(d);
-            const recs = scheduleMap[ymd] || [];
-            const isTripDay = recs.some((r) => r.type === "TRIP");
-            const isLeaveDay = recs.some((r) => r.type === "LEAVE");
-
-            const isCurrentMonth =
-              d.getMonth() === monthIdx && d.getFullYear() === year;
-
-            const isSelected = toYMD(d) === toYMD(selectedDate);
-
-            const cellBase =
-              "relative border border-slate-200 p-2 min-h-[92px] flex flex-col text-left cursor-pointer overflow-hidden";
-
-            // highlight ô đang chọn = màu brand
-            const cellSelected =
-              "ring-2 ring-[#0079BC] border-[#0079BC] bg-[#E6F4FF]";
-
-            const cellOtherMonth = "bg-slate-50 text-slate-400";
-
-            const cellNormal = "bg-white hover:bg-slate-50";
-
-            return (
+        {/* tên thứ */}
+        <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50 text-[11px] font-medium text-slate-600">
+          {weekdays.map((w) => (
               <div
-                key={wi + "-" + di}
-                className={cls(
-                  cellBase,
-                  isSelected
-                    ? cellSelected
-                    : isCurrentMonth
-                    ? cellNormal
-                    : cellOtherMonth
-                )}
-                onClick={() => setSelectedDate(d)}
+                  key={w}
+                  className="px-2 py-2 border-r last:border-r-0 border-slate-200 text-center uppercase tracking-wide"
               >
-                {/* top row: số ngày + pill trạng thái */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="text-[11px] font-medium text-slate-900 tabular-nums leading-none">
-                    {d.getDate()}
-                  </div>
+                {w}
+              </div>
+          ))}
+        </div>
 
-                  {isTripDay ? (
-                    <span className="rounded-md border border-[#0079BC] bg-[#E6F4FF] text-[#0079BC] text-[10px] font-medium px-1.5 py-[2px] leading-none whitespace-nowrap">
+        {/* body calendar */}
+        <div
+            className={cls(
+                "grid text-[11px] text-slate-700",
+                viewMode === "month" ? "grid-rows-6" : "grid-rows-1",
+                "grid-cols-7"
+            )}
+        >
+          {matrix.map((week, wi) =>
+              week.map((d, di) => {
+                const ymd = toYMD(d);
+                const recs = scheduleMap[ymd] || [];
+                const isTripDay = recs.some((r) => r.type === "TRIP");
+                const isLeaveDay = recs.some((r) => r.type === "LEAVE");
+
+                const isCurrentMonth =
+                    d.getMonth() === monthIdx && d.getFullYear() === year;
+
+                const isSelected = toYMD(d) === toYMD(selectedDate);
+
+                const cellBase =
+                    "relative border border-slate-200 p-2 min-h-[92px] flex flex-col text-left cursor-pointer overflow-hidden";
+
+                // highlight ô đang chọn = màu brand
+                const cellSelected =
+                    "ring-2 ring-[#0079BC] border-[#0079BC] bg-[#E6F4FF]";
+
+                const cellOtherMonth = "bg-slate-50 text-slate-400";
+
+                const cellNormal = "bg-white hover:bg-slate-50";
+
+                return (
+                    <div
+                        key={wi + "-" + di}
+                        className={cls(
+                            cellBase,
+                            isSelected
+                                ? cellSelected
+                                : isCurrentMonth
+                                    ? cellNormal
+                                    : cellOtherMonth
+                        )}
+                        onClick={() => setSelectedDate(d)}
+                    >
+                      {/* top row: số ngày + pill trạng thái */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="text-[11px] font-medium text-slate-900 tabular-nums leading-none">
+                          {d.getDate()}
+                        </div>
+
+                        {isTripDay ? (
+                            <span className="rounded-md border border-[#0079BC] bg-[#E6F4FF] text-[#0079BC] text-[10px] font-medium px-1.5 py-[2px] leading-none whitespace-nowrap">
                       Có chuyến
                     </span>
-                  ) : isLeaveDay ? (
-                    <span className="rounded-md border border-slate-300 bg-slate-100 text-slate-600 text-[10px] font-medium px-1.5 py-[2px] leading-none whitespace-nowrap">
+                        ) : isLeaveDay ? (
+                            <span className="rounded-md border border-slate-300 bg-slate-100 text-slate-600 text-[10px] font-medium px-1.5 py-[2px] leading-none whitespace-nowrap">
                       Nghỉ
                     </span>
-                  ) : null}
-                </div>
+                        ) : null}
+                      </div>
 
-                {/* nội dung list rút gọn trong ô */}
-                <div className="mt-2 flex-1 space-y-1 leading-snug">
-                  {recs.slice(0, 2).map((r, idx) => {
-                    if (r.type === "TRIP") {
-                      return (
-                        <div
-                          className="text-[11px] text-slate-700"
-                          key={idx}
-                        >
+                      {/* nội dung list rút gọn trong ô */}
+                      <div className="mt-2 flex-1 space-y-1 leading-snug">
+                        {recs.slice(0, 2).map((r, idx) => {
+                          if (r.type === "TRIP") {
+                            return (
+                                <div
+                                    className="text-[11px] text-slate-700"
+                                    key={idx}
+                                >
                           <span className="tabular-nums font-medium text-slate-900">
                             {fmtTime(r.time)}
                           </span>{" "}
-                          -{" "}
-                          <span className="font-medium text-slate-900">
+                                  -{" "}
+                                  <span className="font-medium text-slate-900">
                             {r.title}
                           </span>
-                        </div>
-                      );
-                    } else {
-                      return (
-                        <div
-                          className="text-[11px] text-slate-600"
-                          key={idx}
-                        >
-                          {r.title || "Nghỉ"}
-                        </div>
-                      );
-                    }
-                  })}
-                  {recs.length > 2 ? (
-                    <div className="text-[10px] text-slate-500">
-                      +{recs.length - 2} mục
+                                </div>
+                            );
+                          } else {
+                            return (
+                                <div
+                                    className="text-[11px] text-slate-600"
+                                    key={idx}
+                                >
+                                  {r.title || "Nghỉ"}
+                                </div>
+                            );
+                          }
+                        })}
+                        {recs.length > 2 ? (
+                            <div className="text-[10px] text-slate-500">
+                              +{recs.length - 2} mục
+                            </div>
+                        ) : null}
+                      </div>
                     </div>
-                  ) : null}
-                </div>
-              </div>
-            );
-          })
-        )}
+                );
+              })
+          )}
+        </div>
       </div>
-    </div>
   );
 }
 
@@ -531,31 +531,31 @@ function DayDetailPanel({ dateObj, scheduleMap }) {
   const recs = scheduleMap[ymd] || [];
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm flex flex-col overflow-hidden">
-      <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 flex flex-col gap-1">
-        <div className="flex items-center gap-2 text-[13px] font-semibold text-slate-900 leading-tight">
-          <CalendarDays className="h-4 w-4 text-[#0079BC]" />
-          <span>{toDMY(dateObj)}</span>
-        </div>
-        <div className="text-[11px] text-slate-500 leading-none">
-          {recs.length} mục trong ngày
-        </div>
-      </div>
-
-      <div className="p-4 flex flex-col gap-3 text-slate-700 text-[13px] overflow-y-auto max-h-[420px]">
-        {recs.length === 0 ? (
-          <div className="text-[13px] text-slate-500 leading-relaxed">
-            Không có chuyến hoặc lịch nghỉ trong ngày này.
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm flex flex-col overflow-hidden">
+        <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 flex flex-col gap-1">
+          <div className="flex items-center gap-2 text-[13px] font-semibold text-slate-900 leading-tight">
+            <CalendarDays className="h-4 w-4 text-[#0079BC]" />
+            <span>{toDMY(dateObj)}</span>
           </div>
-        ) : (
-          recs.map((r, i) => <DayTripCard record={r} key={i} />)
-        )}
-      </div>
+          <div className="text-[11px] text-slate-500 leading-none">
+            {recs.length} mục trong ngày
+          </div>
+        </div>
 
-      <div className="border-t border-slate-200 bg-white px-4 py-2 text-[11px] text-slate-500 leading-relaxed">
-        Dữ liệu hiển thị theo ngày đang chọn.
+        <div className="p-4 flex flex-col gap-3 text-slate-700 text-[13px] overflow-y-auto max-h-[420px]">
+          {recs.length === 0 ? (
+              <div className="text-[13px] text-slate-500 leading-relaxed">
+                Không có chuyến hoặc lịch nghỉ trong ngày này.
+              </div>
+          ) : (
+              recs.map((r, i) => <DayTripCard record={r} key={i} />)
+          )}
+        </div>
+
+        <div className="border-t border-slate-200 bg-white px-4 py-2 text-[11px] text-slate-500 leading-relaxed">
+          Dữ liệu hiển thị theo ngày đang chọn.
+        </div>
       </div>
-    </div>
   );
 }
 
@@ -638,28 +638,28 @@ export default function DriverSchedulePage() {
         // map dữ liệu backend -> format cho calendar
         // Backend hiện trả: tripId, startTime, endTime, startLocation, endLocation, status, ...
         const records =
-          Array.isArray(list) &&
-          list.map((trip) => {
-            const start = trip.startTime || trip.start_time || "";
-            const dateStr = start ? String(start).slice(0, 10) : null;
+            Array.isArray(list) &&
+            list.map((trip) => {
+              const start = trip.startTime || trip.start_time || "";
+              const dateStr = start ? String(start).slice(0, 10) : null;
 
-            return {
-              date: dateStr, // "YYYY-MM-DD"
-              type: "TRIP",
-              title:
-                (trip.startLocation || trip.start_location || "—") +
-                " → " +
-                (trip.endLocation || trip.end_location || "—"),
-              time: start ? String(start).slice(11, 16) : "", // HH:mm nếu ISO-like
-              pickup: trip.startLocation || trip.start_location || "",
-              trip_id: trip.tripId || trip.trip_id,
-            };
-          }).filter((r) => r.date);
+              return {
+                date: dateStr, // "YYYY-MM-DD"
+                type: "TRIP",
+                title:
+                    (trip.startLocation || trip.start_location || "—") +
+                    " → " +
+                    (trip.endLocation || trip.end_location || "—"),
+                time: start ? String(start).slice(11, 16) : "", // HH:mm nếu ISO-like
+                pickup: trip.startLocation || trip.start_location || "",
+                trip_id: trip.tripId || trip.trip_id,
+              };
+            }).filter((r) => r.date);
         setSchedule(records || []);
       } catch (err) {
         if (!cancelled) {
           setError(
-            err?.data?.message ||
+              err?.data?.message ||
               err?.message ||
               "Không tải được lịch làm việc."
           );
@@ -721,65 +721,65 @@ export default function DriverSchedulePage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col gap-3 p-6">
-      {/* trạng thái load / lỗi */}
-      {loading && (
-        <div className="text-[13px] text-slate-500">
-          Đang tải lịch làm việc...
-        </div>
-      )}
-      {error && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-[13px] text-rose-700">
-          {error}
-        </div>
-      )}
+      <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col gap-3 p-6">
+        {/* trạng thái load / lỗi */}
+        {loading && (
+            <div className="text-[13px] text-slate-500">
+              Đang tải lịch làm việc...
+            </div>
+        )}
+        {error && (
+            <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-[13px] text-rose-700">
+              {error}
+            </div>
+        )}
 
-      {/* Header tài xế + KPI */}
-      <DriverHeader
-        driver={driver}
-        currentMonth={currentMonth}
-        currentYear={currentYear}
-        selectedDate={selectedDate}
-        monthlyTripCount={monthlyTripCount}
-        monthlyLeaveDays={monthlyLeaveDays}
-        viewMode={viewMode}
-        setViewMode={setViewMode}
-        schedule={schedule}
-      />
-
-      {/* Lưới: Lịch + Panel bên phải */}
-      <div className="grid xl:grid-cols-[1fr_320px] gap-5">
-        <CalendarGrid
-          year={currentYear}
-          monthIdx={currentMonth}
-          scheduleMap={scheduleMap}
-          selectedDate={selectedDate}
-          setSelectedDate={(d) => {
-            setSelectedDate(d);
-            // bấm sang tháng khác -> sync tháng/năm
-            setCurrentYear(d.getFullYear());
-            setCurrentMonth(d.getMonth());
-          }}
-          viewMode={viewMode}
-          goPrev={goPrev}
-          goNext={goNext}
+        {/* Header tài xế + KPI */}
+        <DriverHeader
+            driver={driver}
+            currentMonth={currentMonth}
+            currentYear={currentYear}
+            selectedDate={selectedDate}
+            monthlyTripCount={monthlyTripCount}
+            monthlyLeaveDays={monthlyLeaveDays}
+            viewMode={viewMode}
+            setViewMode={setViewMode}
+            schedule={schedule}
         />
 
-        <DayDetailPanel dateObj={selectedDate} scheduleMap={scheduleMap} />
-      </div>
+        {/* Lưới: Lịch + Panel bên phải */}
+        <div className="grid xl:grid-cols-[1fr_320px] gap-5">
+          <CalendarGrid
+              year={currentYear}
+              monthIdx={currentMonth}
+              scheduleMap={scheduleMap}
+              selectedDate={selectedDate}
+              setSelectedDate={(d) => {
+                setSelectedDate(d);
+                // bấm sang tháng khác -> sync tháng/năm
+                setCurrentYear(d.getFullYear());
+                setCurrentMonth(d.getMonth());
+              }}
+              viewMode={viewMode}
+              goPrev={goPrev}
+              goNext={goNext}
+          />
 
-      {/* note dev */}
-      <div className="text-[11px] text-slate-500 leading-relaxed">
-        UI calendar đang dùng dữ liệu từ{" "}
-        <span className="font-mono text-[10px] bg-slate-100 px-1 py-[1px] rounded border border-slate-300 text-slate-700">
+          <DayDetailPanel dateObj={selectedDate} scheduleMap={scheduleMap} />
+        </div>
+
+        {/* note dev */}
+        <div className="text-[11px] text-slate-500 leading-relaxed">
+          UI calendar đang dùng dữ liệu từ{" "}
+          <span className="font-mono text-[10px] bg-slate-100 px-1 py-[1px] rounded border border-slate-300 text-slate-700">
           GET /api/drivers/driverId/schedule
         </span>
-        . Khi backend hỗ trợ tham số{" "}
-        <span className="font-mono text-[10px] bg-slate-100 px-1 py-[1px] rounded border border-slate-300 text-slate-700">
+          . Khi backend hỗ trợ tham số{" "}
+          <span className="font-mono text-[10px] bg-slate-100 px-1 py-[1px] rounded border border-slate-300 text-slate-700">
           month, year, dayoff
         </span>{" "}
-        có thể map thêm các bản ghi <b>LEAVE</b> để hiển thị ngày nghỉ.
+          có thể map thêm các bản ghi <b>LEAVE</b> để hiển thị ngày nghỉ.
+        </div>
       </div>
-    </div>
   );
 }

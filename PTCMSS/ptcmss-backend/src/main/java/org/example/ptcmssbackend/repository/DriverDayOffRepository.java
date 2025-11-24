@@ -16,9 +16,12 @@ public interface DriverDayOffRepository extends JpaRepository<DriverDayOff, Inte
 
 
     // Tìm các đơn nghỉ đã APPROVED, trùng khoảng ngày
-    @Query("SELECT d FROM DriverDayOff d WHERE d.driver.id = :driverId AND d.status = :status AND d.startDate <= :date AND d.endDate >= :date")
+    @Query("""
+           SELECT d FROM DriverDayOff d
+           WHERE d.driver.id = :driverId
+             AND d.status = :status
+             AND d.startDate <= :date
+             AND d.endDate >= :date
+           """)
     List<DriverDayOff> findApprovedDayOffOnDate(Integer driverId, DriverDayOffStatus status, LocalDate date);
-
-    // Tìm tất cả đơn nghỉ theo status
-    List<DriverDayOff> findByStatus(DriverDayOffStatus status);
 }

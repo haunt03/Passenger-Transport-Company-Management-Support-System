@@ -82,11 +82,17 @@ export default function DriverLeaveRequestPage() {
     const validDateOrder =
         startDate && endDate ? new Date(startDate) <= new Date(endDate) : false;
 
+    // Kiểm tra ngày bắt đầu không được trong quá khứ
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startDateObj = startDate ? new Date(startDate + "T00:00:00") : null;
+    const isStartDateValid = startDateObj ? startDateObj >= today : false;
+
     const withinAllowance = requestedDays > 0 && requestedDays <= remainingDays;
 
-    const hasReason = reason.trim().length > 0;
+    const hasReason = reason.trim().length >= 10;
 
-    const canSubmit = validDateOrder && withinAllowance && hasReason && !submitting;
+    const canSubmit = validDateOrder && withinAllowance && hasReason && isStartDateValid && !submitting;
 
     async function onSubmit() {
         if (!canSubmit) {
@@ -137,8 +143,8 @@ export default function DriverLeaveRequestPage() {
                         <div className="text-slate-900 font-semibold text-xl leading-tight flex flex-wrap items-center gap-2">
                             Đăng ký nghỉ
                             <span className="rounded-md border border-sky-300 bg-sky-50 text-sky-700 text-[10px] font-medium px-2 py-[2px]">
-                Driver Portal
-              </span>
+                                Driver Portal
+                            </span>
                         </div>
 
                         <div className="text-[12px] text-slate-600 leading-snug mt-1">
@@ -191,6 +197,11 @@ export default function DriverLeaveRequestPage() {
                             value={startDate}
                             onChange={(e) => setStartDate(e.target.value)}
                         />
+                        {startDate && !isStartDateValid ? (
+                            <div className="text-[11px] text-rose-600">
+                                Ngày bắt đầu không được trong quá khứ
+                            </div>
+                        ) : null}
                     </div>
 
                     {/* Ngày kết thúc */}
@@ -222,21 +233,21 @@ export default function DriverLeaveRequestPage() {
                                     : "text-slate-500 bg-slate-50 border-slate-200"
                             )}
                         >
-              <span className="text-slate-900 font-medium text-base tabular-nums">
-                {requestedDays}
-              </span>
+                            <span className="text-slate-900 font-medium text-base tabular-nums">
+                                {requestedDays}
+                            </span>
                             <span className="text-[11px] text-slate-500">ngày</span>
 
                             {requestedDays > remainingDays ? (
                                 <span className="ml-auto flex items-center gap-1 text-[11px] text-rose-600">
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                  Vượt quá số ngày cho phép
-                </span>
+                                    <AlertTriangle className="h-3.5 w-3.5" />
+                                    Vượt quá số ngày cho phép
+                                </span>
                             ) : requestedDays > 0 && requestedDays <= remainingDays && validDateOrder ? (
                                 <span className="ml-auto flex items-center gap-1 text-[11px] text-emerald-700">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  Hợp lệ
-                </span>
+                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                    Hợp lệ
+                                </span>
                             ) : null}
                         </div>
 
@@ -255,11 +266,28 @@ export default function DriverLeaveRequestPage() {
                         </div>
                         <textarea
                             rows={4}
-                            className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 placeholder:text-slate-400 text-sm resize-none shadow-sm focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                            className={cls(
+                                "w-full border rounded-lg px-3 py-2 text-slate-900 placeholder:text-slate-400 text-sm resize-none shadow-sm focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20",
+                                reason.trim().length > 0 && reason.trim().length < 10
+                                    ? "border-rose-400 bg-rose-50"
+                                    : "border-slate-300 bg-white"
+                            )}
                             placeholder="VD: Việc gia đình, khám sức khỏe, ..."
                             value={reason}
                             onChange={(e) => setReason(e.target.value)}
+                            maxLength={500}
                         />
+                        <div className="flex items-center justify-between mt-1">
+                            {reason.trim().length > 0 && reason.trim().length < 10 ? (
+                                <div className="text-xs text-rose-600">
+                                    Lý do phải có ít nhất 10 ký tự
+                                </div>
+                            ) : (
+                                <div className="text-xs text-slate-400">
+                                    {reason.length}/500 ký tự
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* Policy note */}

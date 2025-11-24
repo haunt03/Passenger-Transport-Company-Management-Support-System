@@ -84,11 +84,11 @@ function Toasts({ toasts }) {
           className={cls(
             "rounded-lg px-3 py-2 text-sm border shadow-lg bg-white",
             t.kind === "success" &&
-              "bg-emerald-50 border-emerald-200 text-emerald-700",
+            "bg-emerald-50 border-emerald-200 text-emerald-700",
             t.kind === "error" &&
-              "bg-rose-50 border-rose-200 text-rose-700",
+            "bg-rose-50 border-rose-200 text-rose-700",
             t.kind === "info" &&
-              "bg-sky-50 border-sky-200 text-sky-700"
+            "bg-sky-50 border-sky-200 text-sky-700"
           )}
         >
           {t.msg}
@@ -159,8 +159,8 @@ function ActionButton({ active, color, icon, label, onClick, loading }) {
           ? color === "start"
             ? "border-sky-300 bg-sky-50 text-sky-700 hover:bg-sky-100"
             : color === "picked"
-            ? "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-            : "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
+              ? "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+              : "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
           : "border-slate-200 bg-white text-slate-400 cursor-not-allowed"
       )}
     >
@@ -347,7 +347,7 @@ function TripCard({
       </div>
 
       {/* trip details */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6 text-sm text-slate-700">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-6 text-sm text-slate-700">
         <div className="flex items-start gap-2">
           <MapPin className="h-4 w-4 text-sky-600 shrink-0" />
           <div>
@@ -376,8 +376,20 @@ function TripCard({
             <div className="text-slate-400 text-[11px] mb-1 uppercase tracking-wide">
               Liên hệ
             </div>
-            <div className="text-slate-900 leading-snug">
+            <div className="text-slate-900 leading-snug font-medium">
               {t.customer_phone || "—"}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-2">
+          <MapPin className="h-4 w-4 text-amber-600 shrink-0" />
+          <div>
+            <div className="text-slate-400 text-[11px] mb-1 uppercase tracking-wide">
+              Quãng đường
+            </div>
+            <div className="text-slate-900 leading-snug font-semibold">
+              {t.distance ? `${Number(t.distance).toFixed(1)} km` : "—"}
             </div>
           </div>
         </div>
@@ -443,17 +455,25 @@ export default function DriverDashboard() {
     setError("");
     try {
       const dash = await getDriverDashboard(driverId);
+      console.log("📊 Dashboard API Response:", dash);
+      console.log("📞 Customer Phone:", dash?.customerPhone);
+      console.log("🗺️ Distance:", dash?.distance);
+
       const mapped =
         dash && dash.tripId
           ? {
-              tripId: dash.tripId,
-              pickupAddress: dash.startLocation,
-              dropoffAddress: dash.endLocation ?? dash.EndLocation,
-              pickupTime: dash.startTime,
-              endTime: dash.endTime,
-              status: dash.status || "SCHEDULED",
-            }
+            tripId: dash.tripId,
+            pickupAddress: dash.startLocation,
+            dropoffAddress: dash.endLocation ?? dash.EndLocation,
+            pickupTime: dash.startTime,
+            endTime: dash.endTime,
+            status: dash.status || "SCHEDULED",
+            customerName: dash.customerName,
+            customerPhone: dash.customerPhone,
+            distance: dash.distance,
+          }
           : null;
+      console.log("🔄 Mapped Trip:", mapped);
       setTrip(mapped);
     } catch (err) {
       setTrip(null);
@@ -486,8 +506,8 @@ export default function DriverDashboard() {
         if (!mounted) return;
         setError(
           err?.data?.message ||
-            err?.message ||
-            "Không tải được dữ liệu tài xế."
+          err?.message ||
+          "Không tải được dữ liệu tài xế."
         );
       } finally {
         if (mounted) setPageLoading(false);
@@ -576,14 +596,15 @@ export default function DriverDashboard() {
 
   const activeTrip = trip
     ? {
-        trip_id: trip.tripId,
-        pickup_time: trip.pickupTime,
-        pickup_address: trip.pickupAddress,
-        dropoff_address: trip.dropoffAddress,
-        customer_name: null,
-        customer_phone: null,
-        note: null,
-      }
+      trip_id: trip.tripId,
+      pickup_time: trip.pickupTime,
+      pickup_address: trip.pickupAddress,
+      dropoff_address: trip.dropoffAddress,
+      customer_name: trip.customerName,
+      customer_phone: trip.customerPhone,
+      distance: trip.distance,
+      note: null,
+    }
     : null;
 
   // demo notifications – sau này có thể lấy từ API khác
