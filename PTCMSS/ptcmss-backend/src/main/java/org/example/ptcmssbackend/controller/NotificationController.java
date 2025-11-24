@@ -101,6 +101,24 @@ public class NotificationController {
     }
 
     @Operation(
+            summary = "Lấy danh sách yêu cầu đã xử lý",
+            description = "Lấy các yêu cầu đã được duyệt hoặc từ chối (APPROVED + REJECTED)"
+    )
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','COORDINATOR')")
+    @GetMapping("/approvals/processed")
+    public ResponseData<List<ApprovalItemResponse>> getProcessedApprovals(
+            @RequestParam(required = false) Integer branchId,
+            @RequestParam(required = false, defaultValue = "50") Integer limit) {
+        try {
+            List<ApprovalItemResponse> data = notificationService.getProcessedApprovals(branchId, limit);
+            return new ResponseData<>(HttpStatus.OK.value(), "Success", data);
+        } catch (Exception e) {
+            log.error("[Notification] Failed to load processed approvals", e);
+            return new ResponseError(HttpStatus.BAD_REQUEST.value(), e.getMessage());
+        }
+    }
+
+    @Operation(
             summary = "Phê duyệt yêu cầu",
             description = "Approve một yêu cầu (nghỉ phép, tạm ứng, etc.)"
     )
