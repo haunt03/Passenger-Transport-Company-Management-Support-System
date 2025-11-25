@@ -15,4 +15,3 @@ export function getNumberCookie(name) {
   const n = Number(s);
   return Number.isFinite(n) && n > 0 ? n : null;
 }
-

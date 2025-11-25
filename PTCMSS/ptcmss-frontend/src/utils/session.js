@@ -1,16 +1,17 @@
 const normalizeDiacritics = (text) => {
   if (!text) return "";
   return String(text)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toUpperCase()
-    .trim();
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase()
+      .trim();
 };
 
 export const ROLES = {
   ADMIN: "ADMIN",
   MANAGER: "MANAGER",
   CONSULTANT: "CONSULTANT",
+  COORDINATOR: "COORDINATOR",
   DRIVER: "DRIVER",
   ACCOUNTANT: "ACCOUNTANT",
 };
@@ -25,6 +26,9 @@ const ROLE_ALIAS = {
   CONSULTANT: ROLES.CONSULTANT,
   "DIEU HANH": ROLES.CONSULTANT,
   "TU VAN": ROLES.CONSULTANT,
+  COORDINATOR: ROLES.COORDINATOR,
+  "DIEU PHOI": ROLES.COORDINATOR,
+  "DIEU PHOI VIEN": ROLES.COORDINATOR,
   DRIVER: ROLES.DRIVER,
   "TAI XE": ROLES.DRIVER,
   ACCOUNTANT: ROLES.ACCOUNTANT,
@@ -35,6 +39,7 @@ const ROLE_HOME_PATH = {
   [ROLES.ADMIN]: "/analytics/admin",
   [ROLES.MANAGER]: "/analytics/manager",
   [ROLES.CONSULTANT]: "/orders",
+  [ROLES.COORDINATOR]: "/dispatch",
   [ROLES.DRIVER]: "/driver/dashboard",
   [ROLES.ACCOUNTANT]: "/accounting",
 };
@@ -95,4 +100,3 @@ export function getCurrentRole() {
 export function getHomePathForRole(role) {
   return ROLE_HOME_PATH[role] || ROLE_HOME_PATH[ROLES.ADMIN];
 }
-
