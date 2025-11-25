@@ -8,6 +8,7 @@ import java.time.LocalDate;
 @Data
 public class VehicleCategoryRequest {
     private String categoryName;
+    private Integer seats;
     private String description;
     private BigDecimal baseFare;
     private BigDecimal pricePerKm;
@@ -16,4 +17,3 @@ public class VehicleCategoryRequest {
     private LocalDate effectiveDate;
     private String status; // ACTIVE / INACTIVE
 }
-
