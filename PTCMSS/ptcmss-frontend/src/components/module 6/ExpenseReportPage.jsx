@@ -9,6 +9,10 @@ import {
     RefreshCw,
     Info,
 } from "lucide-react";
+import { getExpenseReport } from "../../api/accounting";
+import { listBranches } from "../../api/branches";
+import { listVehicles } from "../../api/vehicles";
+import { exportExpenseReportToExcel, exportExpenseReportToCsv } from "../../api/exports";
 
 /**
  * ExpenseReportPage (LIGHT THEME giống vibe AdminBranchListPage)
@@ -53,7 +57,7 @@ const CATEGORY_LABELS = {
 /* ================= Toast system (light) ================= */
 function useToasts() {
     const [toasts, setToasts] = React.useState([]);
-    const push = (
+    const push = React.useCallback((
         msg,
         kind = "info",
         ttl = 2600
@@ -76,7 +80,7 @@ function useToasts() {
                 ),
             ttl
         );
-    };
+    }, []);
     return { toasts, push };
 }
 
@@ -396,10 +400,12 @@ function FiltersBar({
                         setFromDate,
                         toDate,
                         setToDate,
-                        branchFilter,
-                        setBranchFilter,
-                        vehicleFilter,
-                        setVehicleFilter,
+                        branchId,
+                        setBranchId,
+                        vehicleId,
+                        setVehicleId,
+                        period,
+                        setPeriod,
                         catFilter,
                         setCatFilter,
                         branchOptions,
@@ -447,45 +453,47 @@ function FiltersBar({
                     </div>
                 </div>
 
+                {/* Period */}
+                <div className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-[13px] text-slate-700 shadow-sm">
+                    <CalendarRange className="h-4 w-4 text-slate-500" />
+                    <select
+                        value={period || ""}
+                        onChange={(e) => {
+                            setPeriod(e.target.value);
+                            if (e.target.value) {
+                                setFromDate("");
+                                setToDate("");
+                            }
+                        }}
+                        className="bg-transparent outline-none text-[13px] text-slate-900"
+                    >
+                        <option value="">Tùy chỉnh</option>
+                        <option value="TODAY">Hôm nay</option>
+                        <option value="7D">7 ngày qua</option>
+                        <option value="30D">30 ngày qua</option>
+                        <option value="MONTH">Tháng này</option>
+                        <option value="QUARTER">Quý này</option>
+                        <option value="YTD">Năm nay (YTD)</option>
+                    </select>
+                </div>
+
                 {/* Branch */}
                 <div className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-[13px] text-slate-700 shadow-sm">
                     <Building2 className="h-4 w-4 text-slate-500" />
                     <select
-                        value={
-                            branchFilter
-                        }
-                        onChange={(e) =>
-                            setBranchFilter(
-                                e
-                                    .target
-                                    .value
-                            )
-                        }
+                        value={branchId || ""}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            setBranchId(val ? Number(val) : null);
+                        }}
                         className="bg-transparent outline-none text-[13px] text-slate-900"
                     >
-                        <option value="">
-                            Tất cả
-                            chi
-                            nhánh
-                        </option>
-                        {branchOptions.map(
-                            (
-                                br
-                            ) => (
-                                <option
-                                    key={
-                                        br
-                                    }
-                                    value={
-                                        br
-                                    }
-                                >
-                                    {
-                                        br
-                                    }
-                                </option>
-                            )
-                        )}
+                        <option value="">Tất cả chi nhánh</option>
+                        {branchOptions.map((br, idx) => (
+                            <option key={br.branchId || `branch-${idx}`} value={br.branchId || br}>
+                                {br.branchName || br}
+                            </option>
+                        ))}
                     </select>
                 </div>
 
@@ -493,40 +501,19 @@ function FiltersBar({
                 <div className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-[13px] text-slate-700 shadow-sm">
                     <Car className="h-4 w-4 text-slate-500" />
                     <select
-                        value={
-                            vehicleFilter
-                        }
-                        onChange={(e) =>
-                            setVehicleFilter(
-                                e
-                                    .target
-                                    .value
-                            )
-                        }
+                        value={vehicleId || ""}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            setVehicleId(val ? Number(val) : null);
+                        }}
                         className="bg-transparent outline-none text-[13px] text-slate-900"
                     >
-                        <option value="">
-                            Tất cả
-                            xe
-                        </option>
-                        {vehicleOptions.map(
-                            (
-                                v
-                            ) => (
-                                <option
-                                    key={
-                                        v
-                                    }
-                                    value={
-                                        v
-                                    }
-                                >
-                                    {
-                                        v
-                                    }
-                                </option>
-                            )
-                        )}
+                        <option value="">Tất cả xe</option>
+                        {vehicleOptions.map((v, idx) => (
+                            <option key={v.vehicleId || `vehicle-${idx}`} value={v.vehicleId || v}>
+                                {v.licensePlate || v}
+                            </option>
+                        ))}
                     </select>
                 </div>
 
@@ -1205,62 +1192,79 @@ const DEMO_EXPENSES = [
 
 /* ================= Main Page: ExpenseReportPage (light) ================= */
 export default function ExpenseReportPage() {
-    const { toasts, push } =
-        useToasts();
+    const { toasts, push } = useToasts();
 
     // Bộ lọc
-    const [fromDate, setFromDate] =
-        React.useState(
-            "2025-10-20"
-        );
-    const [toDate, setToDate] =
-        React.useState(
-            todayISO()
-        );
-    const [
-        branchFilter,
-        setBranchFilter,
-    ] = React.useState("");
-    const [
-        vehicleFilter,
-        setVehicleFilter,
-    ] = React.useState("");
-    const [catFilter, setCatFilter] =
-        React.useState("");
+    const [fromDate, setFromDate] = React.useState("");
+    const [toDate, setToDate] = React.useState("");
+    const [period, setPeriod] = React.useState("THIS_MONTH");
+    const [branchId, setBranchId] = React.useState(null);
+    const [vehicleId, setVehicleId] = React.useState(null);
+    const [catFilter, setCatFilter] = React.useState("");
 
-    const [loading, setLoading] =
-        React.useState(false);
+    const [loading, setLoading] = React.useState(false);
+    const [initialLoading, setInitialLoading] = React.useState(true);
+    const [error, setError] = React.useState(null);
 
-    // options dropdown
-    const branchOptions =
-        React.useMemo(() => {
-            const set =
-                new Set();
-            DEMO_EXPENSES.forEach(
-                (e) =>
-                    set.add(
-                        e.branch
-                    )
-            );
-            return Array.from(
-                set
-            );
-        }, []);
+    // Data from API
+    const [reportData, setReportData] = React.useState({
+        totalExpense: 0,
+        expenseByCategory: {},
+        expenses: [],
+    });
 
-    const vehicleOptions =
-        React.useMemo(() => {
-            const set =
-                new Set();
-            DEMO_EXPENSES.forEach(
-                (e) =>
-                    set.add(
-                        e.vehicle
-                    )
-            );
-            return Array.from(
-                set
-            );
-        }, []);
+    const [branches, setBranches] = React.useState([]);
+    const [vehicles, setVehicles] = React.useState([]);
+
+    // Load branches and vehicles on mount
+    React.useEffect(() => {
+        (async () => {
+            try {
+                const [branchesData, vehiclesData] = await Promise.all([
+                    listBranches({ size: 100 }),
+                    listVehicles({ size: 100 }),
+                ]);
+                setBranches(Array.isArray(branchesData) ? branchesData : []);
+                setVehicles(Array.isArray(vehiclesData) ? vehiclesData : []);
+            } catch (err) {
+                console.error("Error loading options:", err);
+            }
+        })();
+    }, []);
+
+    // Load expense report
+    const loadReport = React.useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const data = await getExpenseReport({
+                branchId: branchId || undefined,
+                vehicleId: vehicleId || undefined,
+                costType: catFilter || undefined,
+                startDate: fromDate || undefined,
+                endDate: toDate || undefined,
+                period: period || undefined,
+            });
+            setReportData(data || {
+                totalExpense: 0,
+                expenseByCategory: {},
+                expenses: [],
+            });
+        } catch (err) {
+            console.error("Error loading expense report:", err);
+            setError(err.message || "Không thể tải báo cáo chi phí");
+            push("Lỗi khi tải báo cáo chi phí", "error");
+        } finally {
+            setLoading(false);
+            setInitialLoading(false);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [branchId, vehicleId, catFilter, fromDate, toDate, period]);
+
+    // Load on mount and when filters change
+    React.useEffect(() => {
+        loadReport();
+    }, [loadReport]);
 
     const categoryOptions =
         React.useMemo(
@@ -1279,207 +1283,63 @@ export default function ExpenseReportPage() {
             []
         );
 
-    // Áp dụng lọc
-    const filteredExpenses =
-        React.useMemo(
-            () => {
-                const fromTs =
-                    fromDate
-                        ? new Date(
-                            fromDate
-                        ).getTime()
-                        : null;
-                const toTs =
-                    toDate
-                        ? new Date(
-                            toDate
-                        ).getTime()
-                        : null;
+    // Transform expenses from API
+    const filteredExpenses = React.useMemo(() => {
+        return (reportData.expenses || []).map((exp) => ({
+            id: exp.invoiceId,
+            date: exp.invoiceDate ? new Date(exp.invoiceDate).toISOString().slice(0, 10) : "",
+            branch: exp.branchName || "—",
+            vehicle: exp.vehicleLicensePlate || "—",
+            category: exp.costType || "OTHER",
+            amount: Number(exp.amount || 0),
+            notes: exp.note || "—",
+        }));
+    }, [reportData.expenses]);
 
-                return DEMO_EXPENSES.filter(
-                    (e) => {
-                        const ts =
-                            new Date(
-                                e.date
-                            ).getTime();
-                        if (
-                            fromTs !==
-                            null &&
-                            ts <
-                            fromTs
-                        )
-                            return false;
-                        if (
-                            toTs !==
-                            null &&
-                            ts >
-                            toTs
-                        )
-                            return false;
-                        if (
-                            branchFilter &&
-                            e.branch !==
-                            branchFilter
-                        )
-                            return false;
-                        if (
-                            vehicleFilter &&
-                            e.vehicle !==
-                            vehicleFilter
-                        )
-                            return false;
-                        if (
-                            catFilter &&
-                            e.category !==
-                            catFilter
-                        )
-                            return false;
-                        return true;
-                    }
-                );
-            },
-            [
-                fromDate,
-                toDate,
-                branchFilter,
-                vehicleFilter,
-                catFilter,
-            ]
-        );
+    // Total expense
+    const totalExpense = Number(reportData.totalExpense || 0);
 
-    // Tổng chi phí hiện tại
-    const totalExpense =
-        React.useMemo(
-            () =>
-                filteredExpenses.reduce(
-                    (s, e) =>
-                        s +
-                        Number(
-                            e.amount ||
-                            0
-                        ),
-                    0
-                ),
-            [filteredExpenses]
-        );
+    // Dữ liệu cho pie / breakdown từ expenseByCategory
+    const pieSlices = React.useMemo(() => {
+        const categoryMap = reportData.expenseByCategory || {};
+        const entries = Object.entries(categoryMap).map(([key, amount]) => ({
+            key,
+            label: CATEGORY_LABELS[key] || key,
+            amount: Number(amount || 0),
+        }));
 
-    // Dữ liệu cho pie / breakdown
-    const pieSlices =
-        React.useMemo(
-            () => {
-                const map =
-                    {};
-                filteredExpenses.forEach(
-                    (e) => {
-                        if (
-                            !map[
-                                e
-                                    .category
-                                ]
-                        )
-                            map[
-                                e
-                                    .category
-                                ] = 0;
-                        map[
-                            e
-                                .category
-                            ] += Number(
-                            e.amount ||
-                            0
-                        );
-                    }
-                );
+        entries.sort((a, b) => b.amount - a.amount);
+        const total = entries.reduce((s, x) => s + x.amount, 0);
 
-                const entries =
-                    Object.entries(
-                        map
-                    ).map(
-                        ([
-                             key,
-                             amount,
-                         ]) => ({
-                            key,
-                            label:
-                                CATEGORY_LABELS[
-                                    key
-                                    ] ||
-                                key,
-                            amount,
-                        })
-                    );
+        return entries.map((e, idx) => ({
+            ...e,
+            pct: total > 0 ? (e.amount / total) * 100 : 0,
+            color: PALETTE[idx % PALETTE.length],
+        }));
+    }, [reportData.expenseByCategory]);
 
-                // sort desc, gán màu
-                entries.sort(
-                    (
-                        a,
-                        b
-                    ) =>
-                        b.amount -
-                        a.amount
-                );
-                const total =
-                    entries.reduce(
-                        (
-                            s,
-                            x
-                        ) =>
-                            s +
-                            x.amount,
-                        0
-                    );
-
-                return entries.map(
-                    (
-                        e,
-                        idx
-                    ) => ({
-                        ...e,
-                        pct:
-                            total >
-                            0
-                                ? (e.amount /
-                                    total) *
-                                100
-                                : 0,
-                        color:
-                            PALETTE[
-                            idx %
-                            PALETTE.length
-                                ],
-                    })
-                );
-            },
-            [filteredExpenses]
-        );
-
-    // Refresh demo
+    // Refresh
     const onRefresh = () => {
-        setLoading(true);
-        setTimeout(
-            () => {
-                setLoading(
-                    false
-                );
-                push(
-                    "Đã làm mới báo cáo (demo)",
-                    "info"
-                );
-                // TODO: gọi GET /api/v1/reports/expense...
-            },
-            500
-        );
+        loadReport();
+        push("Đã làm mới báo cáo", "info");
     };
 
-    // Export excel demo
-    const onExportExcel = () => {
-        exportExcel(
-            filteredExpenses
-        );
-        push(
-            "Đã xuất báo cáo chi phí (.xlsx giả lập)",
-            "info"
-        );
+    // Export excel
+    const onExportExcel = async () => {
+        try {
+            await exportExpenseReportToExcel({
+                branchId: branchId || undefined,
+                vehicleId: vehicleId || undefined,
+                costType: catFilter || undefined,
+                startDate: fromDate || undefined,
+                endDate: toDate || undefined,
+                period: period || undefined,
+            });
+            push("Đã xuất báo cáo chi phí (Excel)", "success");
+        } catch (err) {
+            console.error("Export error:", err);
+            push("Lỗi khi xuất Excel: " + (err.message || "Unknown error"), "error");
+        }
     };
 
     return (
@@ -1513,52 +1373,24 @@ export default function ExpenseReportPage() {
             {/* FILTER BAR CARD */}
             <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-4 mb-5">
                 <FiltersBar
-                    fromDate={
-                        fromDate
-                    }
-                    setFromDate={
-                        setFromDate
-                    }
+                    fromDate={fromDate}
+                    setFromDate={setFromDate}
                     toDate={toDate}
-                    setToDate={
-                        setToDate
-                    }
-                    branchFilter={
-                        branchFilter
-                    }
-                    setBranchFilter={
-                        setBranchFilter
-                    }
-                    vehicleFilter={
-                        vehicleFilter
-                    }
-                    setVehicleFilter={
-                        setVehicleFilter
-                    }
-                    catFilter={
-                        catFilter
-                    }
-                    setCatFilter={
-                        setCatFilter
-                    }
-                    branchOptions={
-                        branchOptions
-                    }
-                    vehicleOptions={
-                        vehicleOptions
-                    }
-                    categoryOptions={
-                        categoryOptions
-                    }
-                    onRefresh={
-                        onRefresh
-                    }
-                    loading={
-                        loading
-                    }
-                    onExportExcel={
-                        onExportExcel
-                    }
+                    setToDate={setToDate}
+                    catFilter={catFilter}
+                    setCatFilter={setCatFilter}
+                    branchOptions={branches}
+                    vehicleOptions={vehicles}
+                    branchId={branchId}
+                    setBranchId={setBranchId}
+                    vehicleId={vehicleId}
+                    setVehicleId={setVehicleId}
+                    period={period}
+                    setPeriod={setPeriod}
+                    categoryOptions={categoryOptions}
+                    onRefresh={onRefresh}
+                    loading={loading}
+                    onExportExcel={onExportExcel}
                 />
             </div>
 
@@ -1615,24 +1447,8 @@ export default function ExpenseReportPage() {
                 />
 
                 <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 text-[11px] text-slate-500 leading-relaxed">
-                    Prototype
-                    only. Triển
-                    khai thật:
-                    gọi
-                    <code className="mx-1 text-[11px] text-slate-700 bg-slate-100 border border-slate-300 rounded px-1 py-0.5">
-                        GET
-                        /api/v1/reports/expense
-                    </code>
-                    với from_date,
-                    to_date,
-                    branch_id,
-                    type,
-                    vehicle_id...
-                    và backend
-                    trả về tổng,
-                    breakdown,
-                    danh sách có
-                    phân trang.
+                    Dữ liệu được tải từ API. Tổng chi phí: {fmtVND(totalExpense)} đ.
+                    {error && <span className="text-rose-600 ml-2">Lỗi: {error}</span>}
                 </div>
             </div>
         </div>

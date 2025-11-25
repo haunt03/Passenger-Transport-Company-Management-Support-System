@@ -17,6 +17,9 @@ import {
     CartesianGrid,
     ResponsiveContainer,
 } from "recharts";
+import { getRevenueReport } from "../../api/accounting";
+import { listBranches } from "../../api/branches";
+import { exportRevenueReportToExcel, exportRevenueReportToCsv } from "../../api/exports";
 
 /**
  * ReportRevenuePage (phiên bản light theme đồng nhất)
@@ -37,58 +40,15 @@ const BRAND_COLOR = "#0079BC";
 // helper join class
 const cls = (...a) => a.filter(Boolean).join(" ");
 
-// mock chi nhánh
-const BRANCHES = [
-    { id: "", name: "Tất cả chi nhánh" },
-    { id: "1", name: "Chi nhánh Hà Nội" },
-    { id: "2", name: "Chi nhánh TP.HCM" },
-];
-
-// mock data doanh thu (theo ngày)
-const MOCK_CHART = [
-    { date: "2025-10-20", revenue: 12_000_000 },
-    { date: "2025-10-21", revenue: 18_000_000 },
-    { date: "2025-10-22", revenue: 9_000_000 },
-    { date: "2025-10-23", revenue: 15_000_000 },
-    { date: "2025-10-24", revenue: 21_000_000 },
-    { date: "2025-10-25", revenue: 17_000_000 },
-    { date: "2025-10-26", revenue: 25_000_000 },
-];
-
-// mock bảng chi tiết khoản thu
-const MOCK_ROWS = [
-    {
-        id: "INV-00123",
-        date: "2025-10-24",
-        branch: "Chi nhánh Hà Nội",
-        customer: "Công ty A",
-        amount: 12_000_000,
-        note: "Thanh toán hợp đồng vận tải tháng 10",
-    },
-    {
-        id: "INV-00124",
-        date: "2025-10-24",
-        branch: "Chi nhánh Hà Nội",
-        customer: "Công ty B",
-        amount: 9_000_000,
-        note: "Cước vận chuyển cao tốc",
-    },
-    {
-        id: "INV-00130",
-        date: "2025-10-25",
-        branch: "Chi nhánh TP.HCM",
-        customer: "Logistics C",
-        amount: 17_000_000,
-        note: "Thanh toán chuyến hàng SG → DN",
-    },
-    {
-        id: "INV-00132",
-        date: "2025-10-26",
-        branch: "Chi nhánh TP.HCM",
-        customer: "Công ty A",
-        amount: 25_000_000,
-        note: "Tạm ứng dịch vụ tháng sau",
-    },
+// Period options
+const PERIOD_OPTIONS = [
+    { value: "", label: "Tùy chỉnh" },
+    { value: "TODAY", label: "Hôm nay" },
+    { value: "7D", label: "7 ngày qua" },
+    { value: "30D", label: "30 ngày qua" },
+    { value: "MONTH", label: "Tháng này" },
+    { value: "QUARTER", label: "Quý này" },
+    { value: "YTD", label: "Năm nay (YTD)" },
 ];
 
 // format VND gọn
@@ -98,89 +58,142 @@ function fmtVND(n) {
 
 export default function ReportRevenuePage() {
     // ====== STATE FILTERS ======
-    const [fromDate, setFromDate] = React.useState("2025-10-20");
-    const [toDate, setToDate] = React.useState("2025-10-26");
-    const [branchId, setBranchId] = React.useState("");
+    const [fromDate, setFromDate] = React.useState("");
+    const [toDate, setToDate] = React.useState("");
+    const [period, setPeriod] = React.useState("THIS_MONTH");
+    const [branchId, setBranchId] = React.useState(null);
+    const [customerId, setCustomerId] = React.useState(null);
     const [customerQuery, setCustomerQuery] = React.useState("");
 
     const [loading, setLoading] = React.useState(false);
+    const [initialLoading, setInitialLoading] = React.useState(true);
+    const [error, setError] = React.useState(null);
+    const [chartMounted, setChartMounted] = React.useState(false);
 
-    // ====== FILTERING MOCK DATA LOCALLY ======
-    const filteredRows = React.useMemo(() => {
-        return MOCK_ROWS.filter((row) => {
-            // theo khoảng ngày
-            if (fromDate && row.date < fromDate) return false;
-            if (toDate && row.date > toDate) return false;
+    // Data from API
+    const [reportData, setReportData] = React.useState({
+        totalRevenue: 0,
+        totalPaid: 0,
+        totalBalance: 0,
+        totalInvoices: 0,
+        revenueByDate: [],
+        comparisonData: [],
+        topCustomers: [],
+        invoices: [],
+    });
 
-            // theo chi nhánh
-            if (
-                branchId &&
-                row.branch !==
-                BRANCHES.find((b) => b.id === branchId)?.name
-            ) {
-                return false;
+    const [branches, setBranches] = React.useState([]);
+
+    // Load branches on mount
+    React.useEffect(() => {
+        (async () => {
+            try {
+                const branchesData = await listBranches({ size: 100 });
+                console.log("[ReportRevenuePage] Branches loaded:", branchesData);
+
+                // Handle paginated response - backend returns {items: [...], pageNo, pageSize, totalElements, totalPages}
+                if (branchesData?.items && Array.isArray(branchesData.items)) {
+                    setBranches(branchesData.items);
+                } else if (branchesData?.content && Array.isArray(branchesData.content)) {
+                    setBranches(branchesData.content);
+                } else if (Array.isArray(branchesData)) {
+                    setBranches(branchesData);
+                } else {
+                    console.warn("[ReportRevenuePage] Unexpected branches format:", branchesData);
+                    setBranches([]);
+                }
+            } catch (err) {
+                console.error("[ReportRevenuePage] Error loading branches:", err);
+                setBranches([]);
             }
+        })();
+    }, []);
 
-            // theo khách hàng
-            if (
-                customerQuery.trim() &&
-                !row.customer
-                    .toLowerCase()
-                    .includes(customerQuery.trim().toLowerCase())
-            ) {
-                return false;
-            }
+    // Load revenue report
+    const loadReport = React.useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const data = await getRevenueReport({
+                branchId: branchId || undefined,
+                customerId: customerId || undefined,
+                startDate: fromDate || undefined,
+                endDate: toDate || undefined,
+                period: period || undefined,
+            });
+            setReportData(data || {
+                totalRevenue: 0,
+                totalPaid: 0,
+                totalBalance: 0,
+                totalInvoices: 0,
+                revenueByDate: [],
+                comparisonData: [],
+                topCustomers: [],
+                invoices: [],
+            });
+        } catch (err) {
+            console.error("Error loading revenue report:", err);
+            setError(err.message || "Không thể tải báo cáo doanh thu");
+        } finally {
+            setLoading(false);
+            setInitialLoading(false);
+        }
+    }, [branchId, customerId, fromDate, toDate, period]);
 
-            return true;
-        });
-    }, [fromDate, toDate, branchId, customerQuery]);
+    // Load on mount and when filters change
+    React.useEffect(() => {
+        loadReport();
+    }, [loadReport]);
 
-    // tổng doanh thu sau filter
-    const totalRevenue = React.useMemo(() => {
-        return filteredRows.reduce((sum, r) => sum + r.amount, 0);
-    }, [filteredRows]);
+    // Delay chart rendering to ensure container has size
+    React.useEffect(() => {
+        const timer = setTimeout(() => {
+            setChartMounted(true);
+        }, 100);
+        return () => clearTimeout(timer);
+    }, []);
 
-    // data biểu đồ sau filter
-    // gom tiền theo ngày và sort theo ngày tăng dần
+    // Transform chart data
     const chartData = React.useMemo(() => {
-        const map = {};
-        filteredRows.forEach((r) => {
-            if (!map[r.date]) map[r.date] = 0;
-            map[r.date] += r.amount;
-        });
+        return (reportData.revenueByDate || []).map((item) => ({
+            date: item.date || "",
+            revenue: Number(item.value || 0),
+        }));
+    }, [reportData.revenueByDate]);
 
-        // fallback: nếu filter không ra data, dùng MOCK_CHART
-        const base =
-            Object.keys(map).length > 0
-                ? map
-                : MOCK_CHART.reduce((acc, d) => {
-                    acc[d.date] = d.revenue;
-                    return acc;
-                }, {});
+    // Transform table rows
+    const filteredRows = React.useMemo(() => {
+        return (reportData.invoices || []).map((inv) => ({
+            id: inv.invoiceNumber || `INV-${inv.invoiceId}`,
+            date: inv.invoiceDate ? new Date(inv.invoiceDate).toISOString().slice(0, 10) : "",
+            branch: inv.branchName || "—",
+            customer: inv.customerName || "—",
+            amount: Number(inv.amount || 0),
+            note: inv.note || "—",
+        }));
+    }, [reportData.invoices]);
 
-        return Object.entries(base)
-            .sort(([d1], [d2]) => (d1 < d2 ? -1 : 1))
-            .map(([date, revenue]) => ({ date, revenue }));
-    }, [filteredRows]);
+    // Total revenue
+    const totalRevenue = Number(reportData.totalRevenue || 0);
 
     // ====== ACTIONS ======
     const handleFetch = () => {
-        // sau này sẽ gọi API thật:
-        // GET /api/reports/revenue?from_date=...&to_date=...&branch_id=...&customer=...
-        setLoading(true);
-        setTimeout(() => {
-            setLoading(false);
-        }, 500);
+        loadReport();
     };
 
-    const handleExportExcel = () => {
-        // TODO: gọi endpoint export, hoặc build file XLSX client-side
-        console.log("Xuất Excel với filter:", {
-            fromDate,
-            toDate,
-            branchId,
-            customerQuery,
-        });
+    const handleExportExcel = async () => {
+        try {
+            await exportRevenueReportToExcel({
+                branchId: branchId || undefined,
+                customerId: customerId || undefined,
+                startDate: fromDate || undefined,
+                endDate: toDate || undefined,
+                period: period || undefined,
+            });
+        } catch (err) {
+            console.error("Export error:", err);
+            alert("Lỗi khi xuất Excel: " + (err.message || "Unknown error"));
+        }
     };
 
     return (
@@ -304,6 +317,33 @@ export default function ReportRevenuePage() {
                         </div>
                     </div>
 
+                    {/* Period */}
+                    <div className="flex flex-col">
+                        <label className="text-[12px] text-gray-600 mb-1 flex items-center gap-1">
+                            <Calendar className="h-3.5 w-3.5 text-gray-400" />
+                            <span>Kỳ báo cáo</span>
+                        </label>
+                        <div className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm">
+                            <select
+                                className="bg-transparent outline-none text-[13px] text-gray-800 w-full"
+                                value={period}
+                                onChange={(e) => {
+                                    setPeriod(e.target.value);
+                                    if (e.target.value) {
+                                        setFromDate("");
+                                        setToDate("");
+                                    }
+                                }}
+                            >
+                                {PERIOD_OPTIONS.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
                     {/* Chi nhánh */}
                     <div className="flex flex-col">
                         <label className="text-[12px] text-gray-600 mb-1 flex items-center gap-1">
@@ -313,19 +353,22 @@ export default function ReportRevenuePage() {
                         <div className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm">
                             <select
                                 className="bg-transparent outline-none text-[13px] text-gray-800 w-full"
-                                value={branchId}
-                                onChange={(e) =>
-                                    setBranchId(e.target.value)
-                                }
+                                value={branchId || ""}
+                                onChange={(e) => {
+                                    console.log('[ReportRevenuePage] Branch selected:', e.target.value);
+                                    setBranchId(e.target.value ? Number(e.target.value) : null);
+                                }}
                             >
-                                {BRANCHES.map((b) => (
-                                    <option
-                                        key={b.id}
-                                        value={b.id}
-                                    >
-                                        {b.name}
-                                    </option>
-                                ))}
+                                <option value="">Tất cả chi nhánh</option>
+                                {branches.length > 0 ? (
+                                    branches.map((b) => (
+                                        <option key={b.branchId || b.id} value={b.branchId || b.id}>
+                                            {b.branchName || b.name || 'Unknown'}
+                                        </option>
+                                    ))
+                                ) : (
+                                    <option disabled>Đang tải...</option>
+                                )}
                             </select>
                         </div>
                     </div>
@@ -410,65 +453,73 @@ export default function ReportRevenuePage() {
                         </div>
                     </div>
 
-                    <div className="w-full h-[220px]">
-                        <ResponsiveContainer
-                            width="100%"
-                            height="100%"
-                        >
-                            <LineChart data={chartData}>
-                                <CartesianGrid
-                                    stroke="#E5E7EB"
-                                    strokeDasharray="3 3"
-                                />
-                                <XAxis
-                                    dataKey="date"
-                                    stroke="#6B7280"
-                                    fontSize={11}
-                                    tickMargin={8}
-                                />
-                                <YAxis
-                                    stroke="#6B7280"
-                                    fontSize={11}
-                                    tickFormatter={(v) =>
-                                        v / 1_000_000 +
-                                        "M"
-                                    }
-                                />
-                                <Tooltip
-                                    formatter={(val) =>
-                                        fmtVND(val) + " đ"
-                                    }
-                                    labelStyle={{
-                                        fontSize:
-                                            "12px",
-                                        color: "#374151",
-                                    }}
-                                    itemStyle={{
-                                        fontSize:
-                                            "12px",
-                                        color: "#111827",
-                                    }}
-                                />
-                                <Line
-                                    type="monotone"
-                                    dataKey="revenue"
-                                    stroke={BRAND_COLOR}
-                                    strokeWidth={2}
-                                    dot={{
-                                        r: 3,
-                                        strokeWidth: 1,
-                                        stroke: BRAND_COLOR,
-                                        fill: "#fff",
-                                    }}
-                                    activeDot={{
-                                        r: 4,
-                                        strokeWidth: 1,
-                                        stroke: BRAND_COLOR,
-                                        fill: "#fff",
-                                    }}
-                                />
-                            </LineChart>
-                        </ResponsiveContainer>
+                    <div className="w-full h-[220px] min-h-[220px] min-w-0" style={{ position: 'relative' }}>
+                        {chartMounted ? (
+                            <ResponsiveContainer
+                                width="100%"
+                                height={220}
+                                minHeight={220}
+                                minWidth={0}
+                            >
+                                <LineChart data={chartData}>
+                                    <CartesianGrid
+                                        stroke="#E5E7EB"
+                                        strokeDasharray="3 3"
+                                    />
+                                    <XAxis
+                                        dataKey="date"
+                                        stroke="#6B7280"
+                                        fontSize={11}
+                                        tickMargin={8}
+                                    />
+                                    <YAxis
+                                        stroke="#6B7280"
+                                        fontSize={11}
+                                        tickFormatter={(v) =>
+                                            v / 1_000_000 +
+                                            "M"
+                                        }
+                                    />
+                                    <Tooltip
+                                        formatter={(val) =>
+                                            fmtVND(val) + " đ"
+                                        }
+                                        labelStyle={{
+                                            fontSize:
+                                                "12px",
+                                            color: "#374151",
+                                        }}
+                                        itemStyle={{
+                                            fontSize:
+                                                "12px",
+                                            color: "#111827",
+                                        }}
+                                    />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="revenue"
+                                        stroke={BRAND_COLOR}
+                                        strokeWidth={2}
+                                        dot={{
+                                            r: 3,
+                                            strokeWidth: 1,
+                                            stroke: BRAND_COLOR,
+                                            fill: "#fff",
+                                        }}
+                                        activeDot={{
+                                            r: 4,
+                                            strokeWidth: 1,
+                                            stroke: BRAND_COLOR,
+                                            fill: "#fff",
+                                        }}
+                                    />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="w-full h-[220px] flex items-center justify-center text-gray-400 text-sm">
+                                Đang tải biểu đồ...
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -571,10 +622,8 @@ export default function ReportRevenuePage() {
 
                 {/* footer hint */}
                 <div className="border-t border-gray-200 bg-white px-4 py-2 text-[11px] leading-relaxed text-gray-500">
-                    API dự kiến:
-                    {" "}
-                    GET
-                    /api/reports/revenue?from_date={"{fromDate}"}&to_date={"{toDate}"}&branch_id={"{branchId}"}&customer={"{customerQuery}"}
+                    Dữ liệu được tải từ API. Tổng: {reportData.totalInvoices || 0} hóa đơn.
+                    {error && <span className="text-rose-600 ml-2">Lỗi: {error}</span>}
                 </div>
             </div>
         </div>

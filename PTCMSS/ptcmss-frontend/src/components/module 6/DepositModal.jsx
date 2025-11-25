@@ -7,6 +7,9 @@ import {
     Info,
     Paperclip,
 } from "lucide-react";
+import { recordPayment } from "../../api/invoices";
+import { createDeposit } from "../../api/deposits";
+import { getCookie } from "../../utils/cookies";
 
 /**
  * DepositModal (LIGHT THEME REWORK, FIXED PRESET CALC)
@@ -27,9 +30,27 @@ const isISODate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
 // Chuẩn hoá tiền tệ về số
 function normalizeMoney(v) {
     if (v == null) return 0;
-    if (typeof v === "number") return v;
-    // ví dụ "12.000.000 đ" -> "12000000"
-    const digits = String(v).replace(/[^0-9]/g, "");
+    if (typeof v === "number") return Math.floor(v); // Chỉ lấy phần nguyên
+
+    const str = String(v);
+
+    // Xử lý format Việt Nam: "12.000.000,50 đ" hoặc "12.000.000 đ"
+    // hoặc format số thập phân: "12000000.50" hoặc "12000000"
+
+    // Loại bỏ chữ "đ" và khoảng trắng
+    let cleaned = str.replace(/[đ\s]/gi, "");
+
+    // Kiểm tra xem có dấu phẩy không (format Việt)
+    if (cleaned.includes(",")) {
+        // Format Việt: "811.646,68" -> loại bỏ dấu chấm (phân cách nghìn) và dấu phẩy (thập phân)
+        cleaned = cleaned.replace(/\./g, "").replace(/,.*$/, "");
+    } else {
+        // Format số thập phân Mỹ: "811646.68" -> loại bỏ phần thập phân
+        cleaned = cleaned.replace(/\..*$/, "");
+    }
+
+    // Chỉ giữ lại số
+    const digits = cleaned.replace(/[^0-9]/g, "");
     const n = Number(digits || "0");
     return isNaN(n) ? 0 : n;
 }
@@ -157,6 +178,14 @@ export default function DepositModal({
         setPreset("CUSTOM");
     };
 
+    // Format hiển thị trong input với dấu phân cách (chỉ số nguyên, không có đ)
+    const displayAmount = amountStr
+        ? new Intl.NumberFormat("vi-VN", {
+            maximumFractionDigits: 0,
+            minimumFractionDigits: 0
+        }).format(Math.floor(Number(amountStr)))
+        : "";
+
     // chọn preset % (30 / 50)
     const applyPresetPercent = (ratio) => {
         // remaining đã normalize thành số chuẩn
@@ -218,25 +247,63 @@ export default function DepositModal({
             attachments: files && files.length ? files : undefined,
         };
 
-        const endpoint =
-            context?.type === "order"
-                ? "/api/v1/orders/" + String(context?.id) + "/payments"
-                : "/api/v1/invoices/" + String(context?.id) + "/payments";
-
         try {
-            // giả lập call API
-            await new Promise((r) => setTimeout(r, 400));
+            // Get user info from cookies
+            const userId = getCookie("userId");
+            const branchId = context?.branchId || getCookie("branchId");
+            const customerId = context?.customerId;
+
+            console.log("[DepositModal] Context:", context);
+            console.log("[DepositModal] userId:", userId, "branchId:", branchId, "customerId:", customerId);
+            console.log("[DepositModal] amount:", amount, "method:", method, "date:", date);
+
+            if (context?.type === "order") {
+                // Create deposit for booking
+                const depositPayload = {
+                    branchId: branchId ? parseInt(branchId) : undefined,
+                    customerId: customerId ? parseInt(customerId) : undefined,
+                    amount,
+                    paymentMethod: method,
+                    paymentDate: date,
+                    kind, // "DEPOSIT" | "PAYMENT"
+                    note: note || undefined,
+                    bankName: method === "BANK_TRANSFER" ? bankName : undefined,
+                    bankAccount: method === "BANK_TRANSFER" ? bankAccount : undefined,
+                    referenceNumber: method === "BANK_TRANSFER" ? bankRef : undefined,
+                    cashierName: method === "CASH" ? undefined : undefined,
+                    receiptNumber: method === "CASH" ? undefined : undefined,
+                    createdBy: userId ? parseInt(userId) : undefined,
+                };
+                console.log("[DepositModal] Deposit payload:", depositPayload);
+                await createDeposit(context.id, depositPayload);
+            } else {
+                // Record payment for invoice
+                const paymentPayload = {
+                    amount,
+                    paymentMethod: method,
+                    bankName: method === "BANK_TRANSFER" ? bankName : undefined,
+                    bankAccount: method === "BANK_TRANSFER" ? bankAccount : undefined,
+                    referenceNumber: method === "BANK_TRANSFER" ? bankRef : undefined,
+                    cashierName: method === "CASH" ? undefined : undefined,
+                    receiptNumber: method === "CASH" ? undefined : undefined,
+                    note: note || undefined,
+                    createdBy: userId ? parseInt(userId) : undefined,
+                };
+                console.log("[DepositModal] Payment payload:", paymentPayload);
+                await recordPayment(context.id, paymentPayload);
+            }
 
             if (typeof onSubmitted === "function") {
-                onSubmitted(payload, {
-                    ...context,
-                    endpoint,
-                });
+                onSubmitted(payload, context);
             }
 
             onClose && onClose();
-        } catch {
-            setError("Không thể ghi nhận thanh toán. Vui lòng thử lại.");
+        } catch (err) {
+            console.error("Error submitting payment:", err);
+            console.error("Error status:", err.status);
+            console.error("Error data:", err.data);
+            const errorMsg = err.data?.message || err.message || "Unknown error";
+            setError("Không thể ghi nhận thanh toán: " + errorMsg);
         } finally {
             setLoading(false);
         }
@@ -290,7 +357,7 @@ export default function DepositModal({
                         <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 grid grid-cols-2 gap-3 text-[13px] leading-relaxed">
                             <div>
                                 <span className="text-slate-500">
-                                    Tổng hoá đơn:
+                                    Giá trị đơn hàng:
                                 </span>{" "}
                                 <span className="tabular-nums font-semibold text-slate-900">
                                     {fmtVND(total)} đ
@@ -298,9 +365,9 @@ export default function DepositModal({
                             </div>
                             <div>
                                 <span className="text-slate-500">
-                                    Đã thanh toán:
+                                    Đã thu:
                                 </span>{" "}
-                                <span className="tabular-nums text-slate-700">
+                                <span className="tabular-nums text-emerald-700 font-medium">
                                     {fmtVND(paid)} đ
                                 </span>
                             </div>
@@ -308,7 +375,7 @@ export default function DepositModal({
                                 <span className="text-slate-500">
                                     Còn lại:
                                 </span>{" "}
-                                <span className="tabular-nums text-slate-700">
+                                <span className="tabular-nums text-amber-700 font-medium">
                                     {fmtVND(remaining)} đ
                                 </span>
                             </div>
@@ -369,11 +436,11 @@ export default function DepositModal({
                         </div>
 
                         <input
-                            value={amountStr}
+                            value={displayAmount}
                             onChange={handleManualAmountChange}
                             inputMode="numeric"
                             className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 tabular-nums text-slate-900 shadow-sm outline-none placeholder-slate-400"
-                            placeholder="0"
+                            placeholder="Nhập số tiền"
                         />
 
                         {/* Preset row */}
@@ -617,16 +684,9 @@ export default function DepositModal({
                 {/* Footer */}
                 <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex flex-wrap items-center gap-3 justify-between">
                     <div className="text-[11px] text-slate-500 leading-relaxed flex-1 min-w-0">
-                        Endpoint dự kiến:{" "}
-                        <code className="text-[11px] text-slate-800 bg-slate-100 border border-slate-300 rounded px-1 py-0.5">
-                            {context?.type === "order"
-                                ? "/api/v1/orders/" +
-                                String(context?.id) +
-                                "/payments"
-                                : "/api/v1/invoices/" +
-                                String(context?.id) +
-                                "/payments"}
-                        </code>
+                        {context?.type === "order"
+                            ? "Tạo deposit cho booking"
+                            : "Ghi nhận thanh toán cho invoice"}
                     </div>
 
                     <div className="flex items-center gap-2">

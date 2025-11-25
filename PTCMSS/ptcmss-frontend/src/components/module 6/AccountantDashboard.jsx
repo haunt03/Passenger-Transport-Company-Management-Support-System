@@ -19,6 +19,8 @@ import {
     Building2,
     Info,
 } from "lucide-react";
+import { getAccountingDashboard } from "../../api/accounting";
+import { listBranches } from "../../api/branches";
 
 /**
  * AccountantDashboard – (LIGHT THEME giống AdminBranchListPage)
@@ -49,37 +51,8 @@ const fmtVND = (n) =>
     );
 const cls = (...a) => a.filter(Boolean).join(" ");
 
-// Demo chuỗi tháng
-const DEMO_MONTHS = [
-    "01",
-    "02",
-    "03",
-    "04",
-    "05",
-    "06",
-    "07",
-    "08",
-    "09",
-    "10",
-    "11",
-    "12",
-];
-
-// Demo chuỗi doanh thu / chi phí / net
-const DEMO_SERIES = DEMO_MONTHS.map((m, i) => ({
-    month: m,
-    revenue: [
-        120, 140, 135, 160, 180, 210, 200, 230, 240, 250,
-        260, 275,
-    ][i],
-    expense: [
-        80, 90, 110, 105, 120, 130, 150, 145, 155, 165,
-        170, 185,
-    ][i],
-}));
-
-// Demo queue yêu cầu chi phí
-const DEMO_QUEUE = [
+// Demo queue yêu cầu chi phí (REMOVED - chỉ dùng data từ API)
+const DEMO_QUEUE_OLD = [
     {
         id: 901,
         creator: "Driver · Văn A",
@@ -179,15 +152,17 @@ const TYPE_LABEL = {
     INSPECTION: "Đăng kiểm",
     PARKING: "Bến bãi",
     OTHER: "Khác",
+    INCOME: "Thu",
+    EXPENSE: "Chi",
 };
 
-// demo filter chi nhánh
-const BRANCHES = [
-    "Tất cả chi nhánh",
-    "Hà Nội",
-    "Hải Phòng",
-    "Đà Nẵng",
-    "TP.HCM",
+// Period options
+const PERIOD_OPTIONS = [
+    { value: "TODAY", label: "Hôm nay" },
+    { value: "THIS_WEEK", label: "Tuần này" },
+    { value: "THIS_MONTH", label: "Tháng này" },
+    { value: "THIS_QUARTER", label: "Quý này" },
+    { value: "YTD", label: "Năm nay (YTD)" },
 ];
 
 /* ===========================
@@ -195,13 +170,13 @@ const BRANCHES = [
 =========================== */
 function useToasts() {
     const [toasts, setToasts] = React.useState([]);
-    const push = (msg, kind = "info", ttl = 2400) => {
+    const push = React.useCallback((msg, kind = "info", ttl = 2400) => {
         const id = Math.random().toString(36).slice(2);
         setToasts((arr) => [...arr, { id, msg, kind }]);
         setTimeout(() => {
             setToasts((arr) => arr.filter((t) => t.id !== id));
         }, ttl);
-    };
+    }, []);
     return { toasts, push };
 }
 
@@ -318,7 +293,7 @@ function ConfirmModal({
    Biểu đồ Doanh thu / Chi phí / Net
    (SVG thuần, light mode)
 =========================== */
-function RevExpChart({ data = DEMO_SERIES }) {
+function RevExpChart({ data = [] }) {
     // layout
     const padding = { t: 20, r: 16, b: 26, l: 36 };
     const W = 820,
@@ -389,73 +364,40 @@ function RevExpChart({ data = DEMO_SERIES }) {
 
             {/* bars (Doanh thu & Chi phí) */}
             {data.map((d, i) => {
-                const x0 =
-                    padding.l +
-                    i * barGroupW +
-                    (barGroupW -
-                        barW * 2 -
-                        6) /
-                    2;
+                const x0 = padding.l + i * barGroupW + (barGroupW - barW * 2 - 6) / 2;
                 const ry = 3;
-                const hRev =
-                    innerH -
-                    (yTo(d.revenue) -
-                        padding.t);
-                const hExp =
-                    innerH -
-                    (yTo(d.expense) -
-                        padding.t);
+
+                const yRev = yTo(d.revenue || 0);
+                const yExp = yTo(d.expense || 0);
+                const hRev = innerH - (yRev - padding.t);
+                const hExp = innerH - (yExp - padding.t);
+
+                // Validate to prevent NaN
+                if (isNaN(yRev) || isNaN(yExp) || isNaN(hRev) || isNaN(hExp)) {
+                    return null;
+                }
 
                 return (
-                    <g key={d.month}>
+                    <g key={d.month || i}>
                         <rect
                             x={x0}
-                            y={yTo(
-                                d.revenue
-                            )}
-                            width={
-                                barW
-                            }
-                            height={
-                                hRev
-                            }
-                            rx={
-                                ry
-                            }
+                            y={yRev}
+                            width={barW}
+                            height={Math.max(0, hRev)}
+                            rx={ry}
                             className="fill-emerald-500/80"
                         />
                         <rect
-                            x={
-                                x0 +
-                                barW +
-                                6
-                            }
-                            y={yTo(
-                                d.expense
-                            )}
-                            width={
-                                barW
-                            }
-                            height={
-                                hExp
-                            }
-                            rx={
-                                ry
-                            }
+                            x={x0 + barW + 6}
+                            y={yExp}
+                            width={barW}
+                            height={Math.max(0, hExp)}
+                            rx={ry}
                             className="fill-rose-500/80"
                         />
                         <text
-                            x={
-                                padding.l +
-                                i *
-                                barGroupW +
-                                barGroupW /
-                                2
-                            }
-                            y={
-                                H -
-                                6
-                            }
+                            x={padding.l + i * barGroupW + barGroupW / 2}
+                            y={H - 6}
                             textAnchor="middle"
                             className="fill-slate-500 text-[10px] font-medium"
                         >
@@ -466,21 +408,26 @@ function RevExpChart({ data = DEMO_SERIES }) {
             })}
 
             {/* net line */}
-            <path
-                d={netPath.trim()}
-                className="stroke-sky-500"
-                strokeWidth="2"
-                fill="none"
-            />
-            {netPoints.map((p, i) => (
-                <circle
-                    key={i}
-                    cx={p.x}
-                    cy={p.y}
-                    r={2.5}
-                    className="fill-sky-500"
+            {netPath.trim() && !netPath.includes('NaN') && (
+                <path
+                    d={netPath.trim()}
+                    className="stroke-sky-500"
+                    strokeWidth="2"
+                    fill="none"
                 />
-            ))}
+            )}
+            {netPoints.map((p, i) => {
+                if (isNaN(p.x) || isNaN(p.y)) return null;
+                return (
+                    <circle
+                        key={i}
+                        cx={p.x}
+                        cy={p.y}
+                        r={2.5}
+                        className="fill-sky-500"
+                    />
+                );
+            })}
 
             {/* legend (SVG group) */}
             <g
@@ -1301,122 +1248,160 @@ function QueueTable({
    Trang chính AccountantDashboard (light)
 =========================== */
 export default function AccountantDashboard() {
-    const [loading, setLoading] =
-        React.useState(false);
+    const [loading, setLoading] = React.useState(false);
+    const [initialLoading, setInitialLoading] = React.useState(true);
+    const [error, setError] = React.useState(null);
 
-    const [query, setQuery] =
-        React.useState("");
-    const [typeFilter, setTypeFilter] =
-        React.useState("");
+    const [query, setQuery] = React.useState("");
+    const [typeFilter, setTypeFilter] = React.useState("");
 
-    const [branch, setBranch] =
-        React.useState(
-            "Tất cả chi nhánh"
-        );
-    const [year, setYear] =
-        React.useState(2025);
+    const [branchId, setBranchId] = React.useState(null);
+    const [branches, setBranches] = React.useState([]);
+    const [period, setPeriod] = React.useState("THIS_MONTH");
 
-    const { toasts, push } =
-        useToasts();
+    const { toasts, push } = useToasts();
 
-    // dữ liệu KPI demo
-    const kpiAR = 125000000;
-    const kpiAP = 48500000;
-    const kpiNET = 76500000;
+    // Dashboard data from API
+    const [dashboardData, setDashboardData] = React.useState({
+        totalRevenue: 0,
+        totalExpense: 0,
+        netProfit: 0,
+        arBalance: 0,
+        apBalance: 0,
+        invoicesDueIn7Days: 0,
+        overdueInvoices: 0,
+        collectionRate: 0,
+        expenseToRevenueRatio: 0,
+        revenueChart: [],
+        expenseChart: [],
+        expenseByCategory: {},
+        pendingApprovals: [],
+        topCustomers: [],
+    });
 
-    // filter queue theo search / type
-    const filteredQueue =
-        React.useMemo(() => {
-            const q =
-                query
-                    .trim()
-                    .toLowerCase();
-            return DEMO_QUEUE.filter(
-                (it) =>
-                    (!typeFilter ||
-                        it.type ===
-                        typeFilter) &&
-                    (!q ||
-                        (
-                            it.creator +
-                            " " +
-                            (TYPE_LABEL[
-                                    it.type
-                                    ] ||
-                                it.type) +
-                            " " +
-                            (it.trip ||
-                                "")
-                        )
-                            .toLowerCase()
-                            .includes(
-                                q
-                            ))
-            );
-        }, [query, typeFilter]);
-
-    // trạng thái queue trên UI (remove item sau duyệt / từ chối)
-    const [queue, setQueue] =
-        React.useState(
-            filteredQueue
-        );
+    // Load branches on mount
     React.useEffect(() => {
-        setQueue(
-            filteredQueue
-        );
-    }, [filteredQueue]);
+        (async () => {
+            try {
+                const branchesData = await listBranches({ size: 100 });
+                setBranches(Array.isArray(branchesData) ? branchesData : []);
+            } catch (err) {
+                console.error("Error loading branches:", err);
+            }
+        })();
+    }, []);
 
-    // giả lập gọi API duyệt / từ chối
-    const approveOne = (id) => {
+    // Load dashboard data
+    const loadDashboard = React.useCallback(async () => {
         setLoading(true);
-        setTimeout(() => {
-            setQueue((list) =>
-                list.filter(
-                    (x) =>
-                        x.id !==
-                        id
-                )
-            );
+        setError(null);
+        try {
+            const data = await getAccountingDashboard({
+                branchId: branchId || undefined,
+                period,
+            });
+            setDashboardData(data || {
+                totalRevenue: 0,
+                totalExpense: 0,
+                netProfit: 0,
+                arBalance: 0,
+                apBalance: 0,
+                invoicesDueIn7Days: 0,
+                overdueInvoices: 0,
+                collectionRate: 0,
+                expenseToRevenueRatio: 0,
+                revenueChart: [],
+                expenseChart: [],
+                expenseByCategory: {},
+                pendingApprovals: [],
+                topCustomers: [],
+            });
+        } catch (err) {
+            console.error("Error loading dashboard:", err);
+            setError(err.message || "Không thể tải dữ liệu dashboard");
+            push("Lỗi khi tải dữ liệu dashboard", "error");
+        } finally {
             setLoading(false);
-            push(
-                "Đã duyệt yêu cầu #" +
-                String(id),
-                "success"
-            );
-            // TODO: POST /api/v1/accountant/expenses/{id}/approve
-        }, 400);
+            setInitialLoading(false);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [branchId, period]);
+
+    // Load dashboard on mount and when filters change
+    React.useEffect(() => {
+        loadDashboard();
+    }, [loadDashboard]);
+
+    // Filter pending approvals
+    const filteredQueue = React.useMemo(() => {
+        const q = query.trim().toLowerCase();
+        const approvals = dashboardData.pendingApprovals || [];
+        return approvals.filter((it) => {
+            const typeMatch = !typeFilter || it.type === typeFilter;
+            const searchMatch = !q || (
+                (it.customerName || "") +
+                " " +
+                (TYPE_LABEL[it.type] || it.type || "") +
+                " " +
+                (it.invoiceNumber || "")
+            ).toLowerCase().includes(q);
+            return typeMatch && searchMatch;
+        });
+    }, [dashboardData.pendingApprovals, query, typeFilter]);
+
+    // Approve/reject - Note: These are pending invoices, not expense requests
+    // For now, we'll just remove from list (actual approval would be via invoice approval flow)
+    const approveOne = (invoiceId) => {
+        setDashboardData((prev) => ({
+            ...prev,
+            pendingApprovals: (prev.pendingApprovals || []).filter(
+                (x) => x.invoiceId !== invoiceId
+            ),
+        }));
+        push(`Đã xử lý hóa đơn #${invoiceId}`, "success");
     };
 
-    const rejectOne = (id, reason) => {
-        setLoading(true);
-        setTimeout(() => {
-            setQueue((list) =>
-                list.filter(
-                    (x) =>
-                        x.id !==
-                        id
-                )
-            );
-            setLoading(false);
-            push(
-                "Đã từ chối #" +
-                String(id) +
-                (reason
-                    ? " · " +
-                    reason
-                    : ""),
-                "info"
-            );
-            // TODO: POST /api/v1/accountant/expenses/{id}/reject { reason }
-        }, 400);
+    const rejectOne = (invoiceId, reason) => {
+        setDashboardData((prev) => ({
+            ...prev,
+            pendingApprovals: (prev.pendingApprovals || []).filter(
+                (x) => x.invoiceId !== invoiceId
+            ),
+        }));
+        push(`Đã từ chối hóa đơn #${invoiceId}${reason ? " · " + reason : ""}`, "info");
     };
 
-    // dữ liệu biểu đồ: có thể thay đổi theo year/branch trong tương lai
-    const chartData =
-        React.useMemo(
-            () => DEMO_SERIES,
-            [year, branch]
-        );
+    // Transform chart data from API
+    const chartData = React.useMemo(() => {
+        const revenueChart = dashboardData.revenueChart || [];
+        const expenseChart = dashboardData.expenseChart || [];
+
+        // Combine revenue and expense by date
+        const dateMap = {};
+        revenueChart.forEach((item) => {
+            const month = item.date ? item.date.substring(5, 7) : "01";
+            if (!dateMap[month]) {
+                dateMap[month] = { month, revenue: 0, expense: 0 };
+            }
+            dateMap[month].revenue = Number(item.value || 0) / 1000000; // Convert to millions
+        });
+        expenseChart.forEach((item) => {
+            const month = item.date ? item.date.substring(5, 7) : "01";
+            if (!dateMap[month]) {
+                dateMap[month] = { month, revenue: 0, expense: 0 };
+            }
+            dateMap[month].expense = Number(item.value || 0) / 1000000; // Convert to millions
+        });
+
+        // Generate months from data or use current year
+        const months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
+        const result = months.map((m) => {
+            if (dateMap[m]) return dateMap[m];
+            return { month: m, revenue: 0, expense: 0 };
+        });
+
+        return result;
+    }, [dashboardData.revenueChart, dashboardData.expenseChart]);
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 p-5">
@@ -1450,31 +1435,19 @@ export default function AccountantDashboard() {
 
                 {/* Right block: filters + refresh */}
                 <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 ml-auto">
-                    {/* Năm */}
+                    {/* Period */}
                     <div className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-[13px] text-slate-700 shadow-sm">
                         <CalendarRange className="h-4 w-4 text-slate-500" />
                         <select
-                            value={year}
-                            onChange={(e) =>
-                                setYear(
-                                    Number(
-                                        e
-                                            .target
-                                            .value
-                                    )
-                                )
-                            }
+                            value={period}
+                            onChange={(e) => setPeriod(e.target.value)}
                             className="bg-transparent outline-none text-[13px] text-slate-900"
                         >
-                            <option value={2025}>
-                                2025
-                            </option>
-                            <option value={2024}>
-                                2024
-                            </option>
-                            <option value={2023}>
-                                2023
-                            </option>
+                            {PERIOD_OPTIONS.map((opt) => (
+                                <option key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                </option>
+                            ))}
                         </select>
                     </div>
 
@@ -1482,62 +1455,35 @@ export default function AccountantDashboard() {
                     <div className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-[13px] text-slate-700 shadow-sm">
                         <Building2 className="h-4 w-4 text-slate-500" />
                         <select
-                            value={branch}
-                            onChange={(e) =>
-                                setBranch(
-                                    e
-                                        .target
-                                        .value
-                                )
-                            }
+                            value={branchId || ""}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                setBranchId(val ? Number(val) : null);
+                            }}
                             className="bg-transparent outline-none text-[13px] text-slate-900"
                         >
-                            {BRANCHES.map(
-                                (b) => (
-                                    <option
-                                        key={
-                                            b
-                                        }
-                                        value={
-                                            b
-                                        }
-                                    >
-                                        {
-                                            b
-                                        }
-                                    </option>
-                                )
-                            )}
+                            <option value="">Tất cả chi nhánh</option>
+                            {branches.map((b) => (
+                                <option key={b.branchId} value={b.branchId}>
+                                    {b.branchName}
+                                </option>
+                            ))}
                         </select>
                     </div>
 
                     {/* Refresh */}
                     <button
-                        onClick={() => {
-                            setLoading(
-                                true
-                            );
-                            setTimeout(
-                                () =>
-                                    setLoading(
-                                        false
-                                    ),
-                                600
-                            );
-                        }}
-                        className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50 shadow-sm transition-colors"
+                        onClick={loadDashboard}
+                        disabled={loading}
+                        className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50 shadow-sm transition-colors disabled:opacity-50"
                     >
                         <RefreshCw
                             className={cls(
                                 "h-4 w-4 text-slate-500",
-                                loading
-                                    ? "animate-spin"
-                                    : ""
+                                loading ? "animate-spin" : ""
                             )}
                         />
-                        <span>
-                            Làm mới
-                        </span>
+                        <span>Làm mới</span>
                     </button>
                 </div>
             </div>
@@ -1566,21 +1512,21 @@ export default function AccountantDashboard() {
                 <div className="grid grid-rows-3 gap-5">
                     <KpiCard
                         title="Công nợ phải thu (A/R)"
-                        value={kpiAR}
-                        delta={6.2}
+                        value={Number(dashboardData.arBalance || 0)}
+                        delta={dashboardData.collectionRate ? Number(dashboardData.collectionRate) : 0}
                         up={true}
                     />
                     <KpiCard
                         title="Công nợ phải trả (A/P)"
-                        value={kpiAP}
-                        delta={-3.1}
+                        value={Number(dashboardData.apBalance || 0)}
+                        delta={0}
                         up={false}
                     />
                     <KpiCard
-                        title="Net (Rev - Exp) YTD"
-                        value={kpiNET}
-                        delta={4.0}
-                        up={true}
+                        title="Net (Rev - Exp)"
+                        value={Number(dashboardData.netProfit || 0)}
+                        delta={dashboardData.expenseToRevenueRatio ? Number(dashboardData.expenseToRevenueRatio) : 0}
+                        up={Number(dashboardData.netProfit || 0) >= 0}
                     />
                 </div>
             </div>
@@ -1596,7 +1542,7 @@ export default function AccountantDashboard() {
                             chờ duyệt
                         </div>
                         <div className="text-[11px] text-slate-500">
-                            {queue.length}{" "}
+                            {filteredQueue.length}{" "}
                             mục
                         </div>
                     </div>
@@ -1645,54 +1591,72 @@ export default function AccountantDashboard() {
                                     Tất cả
                                     loại
                                 </option>
+                                <option value="INCOME">Thu</option>
+                                <option value="EXPENSE">Chi</option>
                                 {Object.entries(
                                     TYPE_LABEL
-                                ).map(
-                                    ([
-                                         v,
-                                         l,
-                                     ]) => (
-                                        <option
-                                            key={
-                                                v
-                                            }
-                                            value={
-                                                v
-                                            }
-                                        >
-                                            {
-                                                l
-                                            }
-                                        </option>
-                                    )
-                                )}
+                                )
+                                    .filter(([k]) => k !== "INCOME" && k !== "EXPENSE")
+                                    .map(
+                                        ([
+                                             v,
+                                             l,
+                                         ]) => (
+                                            <option
+                                                key={
+                                                    v
+                                                }
+                                                value={
+                                                    v
+                                                }
+                                            >
+                                                {
+                                                    l
+                                                }
+                                            </option>
+                                        )
+                                    )}
                             </select>
                         </div>
                     </div>
                 </div>
 
                 {/* bảng queue */}
-                <QueueTable
-                    items={queue}
-                    onApprove={
-                        approveOne
-                    }
-                    onReject={
-                        rejectOne
-                    }
-                />
+                {initialLoading ? (
+                    <div className="px-4 py-8 text-center text-slate-500 text-sm">
+                        Đang tải dữ liệu...
+                    </div>
+                ) : error ? (
+                    <div className="px-4 py-8 text-center text-rose-600 text-sm">
+                        {error}
+                        <button
+                            onClick={loadDashboard}
+                            className="ml-2 text-sky-600 hover:underline"
+                        >
+                            Thử lại
+                        </button>
+                    </div>
+                ) : (
+                    <QueueTable
+                        items={filteredQueue.map((item) => ({
+                            id: item.invoiceId,
+                            creator: item.createdByName || "—",
+                            type: item.type || "EXPENSE",
+                            amount: Number(item.amount || 0),
+                            trip: item.invoiceNumber || "—",
+                            created_at: item.createdAt || "",
+                            attachments: [],
+                        }))}
+                        onApprove={approveOne}
+                        onReject={rejectOne}
+                    />
+                )}
 
                 {/* footer note */}
                 <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 text-[11px] text-slate-500 leading-relaxed">
-                    Design-only.
-                    Các thao tác
-                    đang mô phỏng.
-                    Khi chốt
-                    contract API
-                    sẽ nối thật &
-                    đồng bộ số
-                    liệu KPI /
-                    biểu đồ.
+                    Dữ liệu được tải từ API. Hóa đơn chờ duyệt: {dashboardData.pendingApprovals?.length || 0} mục.
+                    HĐ đến hạn 7 ngày: {dashboardData.invoicesDueIn7Days || 0}.
+                    HĐ quá hạn: {dashboardData.overdueInvoices || 0}.
                 </div>
             </div>
         </div>
