@@ -13,6 +13,7 @@ import java.util.Optional;
 public interface UsersRepository extends JpaRepository<Users, Integer> {
     Optional<Users> findByUsername(String username);
     Optional<Users> findByEmail(String email);
+    Optional<Users> findByPhone(String phone);
     boolean existsByUsername(String username);
     //    boolean existsByEmail(String email);
     boolean existsByPhone(String phone);
@@ -25,28 +26,10 @@ public interface UsersRepository extends JpaRepository<Users, Integer> {
 
 
 
-    @Query("""
-        SELECT u 
-        FROM Users u 
-        JOIN Employees e ON e.user.id = u.id
-        WHERE e.branch.id = :branchId
-    """)
+    @Query("SELECT u FROM Users u JOIN Employees e ON e.user.id = u.id WHERE e.branch.id = :branchId")
     List<Users> findUsersByBranchId(Integer branchId);
 
-    @Query("""
-        SELECT u FROM Users u
-        JOIN Employees e ON e.user.id = u.id
-        WHERE
-            (:keyword IS NULL 
-                OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                OR LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                OR LOWER(u.phone) LIKE LOWER(CONCAT('%', :keyword, '%'))
-            )
-            AND (:roleId IS NULL OR e.role.id = :roleId)
-            AND (:branchId IS NULL OR e.branch.id = :branchId)
-            AND (:status IS NULL OR u.status = :status)
-        ORDER BY u.fullName ASC
-    """)
+    @Query("SELECT u FROM Users u JOIN Employees e ON e.user.id = u.id WHERE (:keyword IS NULL OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(u.phone) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND (:roleId IS NULL OR e.role.id = :roleId) AND (:branchId IS NULL OR e.branch.id = :branchId) AND (:status IS NULL OR u.status = :status) ORDER BY u.fullName ASC")
     List<Users> searchUsers(
             String keyword,
             Integer roleId,
