@@ -52,6 +52,7 @@ public class BookingServiceImpl implements BookingService {
     private final InvoiceRepository invoiceRepository;
     private final DriverRepository driverRepository;
     private final VehicleRepository vehicleRepository;
+    private final org.example.ptcmssbackend.service.WebSocketNotificationService webSocketNotificationService;
 
     @Override
     @Transactional
@@ -117,6 +118,29 @@ public class BookingServiceImpl implements BookingService {
         booking = bookingRepository.save(booking);
         log.info("[BookingService] Created booking: {}", booking.getId());
 
+        // Send WebSocket notification for new booking
+        try {
+            String customerName = customer.getFullName() != null ? customer.getFullName() : "Khách hàng";
+            String bookingCode = "ORD-" + booking.getId();
+
+            webSocketNotificationService.sendGlobalNotification(
+                    "Đơn hàng mới",
+                    String.format("Đơn %s - %s (%.0f km)",
+                            bookingCode,
+                            customerName,
+                            request.getDistance() != null ? request.getDistance() : 0),
+                    "INFO"
+            );
+
+            webSocketNotificationService.sendBookingUpdate(
+                    booking.getId(),
+                    "CREATED",
+                    String.format("Đơn hàng %s đã được tạo thành công", bookingCode)
+            );
+        } catch (Exception e) {
+            log.warn("Failed to send WebSocket notification for new booking", e);
+        }
+
         // 6. Tạo trips
         if (request.getTrips() != null && !request.getTrips().isEmpty()) {
             for (TripRequest tripReq : request.getTrips()) {
@@ -168,6 +192,8 @@ public class BookingServiceImpl implements BookingService {
         if (booking.getStatus() != BookingStatus.PENDING && booking.getStatus() != BookingStatus.CONFIRMED) {
             throw new RuntimeException("Cannot update booking with status: " + booking.getStatus());
         }
+
+        BookingStatus oldStatus = booking.getStatus();
 
         // Update customer nếu có
         if (request.getCustomer() != null) {
@@ -238,6 +264,41 @@ public class BookingServiceImpl implements BookingService {
         }
 
         booking = bookingRepository.save(booking);
+
+        // Send WebSocket notification for booking update
+        try {
+            String customerName = booking.getCustomer() != null ? booking.getCustomer().getFullName() : "Khách hàng";
+            String bookingCode = "ORD-" + bookingId;
+            BookingStatus newStatus = booking.getStatus();
+
+            if (oldStatus != newStatus) {
+                // Status changed
+                webSocketNotificationService.sendGlobalNotification(
+                        "Cập nhật trạng thái đơn hàng",
+                        String.format("Đơn %s - %s: %s → %s",
+                                bookingCode,
+                                customerName,
+                                oldStatus.name(),
+                                newStatus.name()),
+                        "INFO"
+                );
+
+                webSocketNotificationService.sendBookingUpdate(
+                        bookingId,
+                        newStatus.name(),
+                        String.format("Trạng thái đơn hàng đã được cập nhật thành %s", newStatus.name())
+                );
+            } else {
+                // General update
+                webSocketNotificationService.sendBookingUpdate(
+                        bookingId,
+                        "UPDATED",
+                        String.format("Đơn hàng %s đã được cập nhật", bookingCode)
+                );
+            }
+        } catch (Exception e) {
+            log.warn("Failed to send WebSocket notification for booking update", e);
+        }
 
         // Update trips (xóa cũ, tạo mới)
         if (request.getTrips() != null) {
@@ -367,6 +428,26 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
         booking.setStatus(BookingStatus.CANCELLED);
         bookingRepository.save(booking);
+
+        // Send WebSocket notification for cancellation
+        try {
+            String customerName = booking.getCustomer() != null ? booking.getCustomer().getFullName() : "Khách hàng";
+            String bookingCode = "ORD-" + bookingId;
+
+            webSocketNotificationService.sendGlobalNotification(
+                    "Đơn hàng bị hủy",
+                    String.format("Đơn %s - %s đã bị hủy", bookingCode, customerName),
+                    "WARNING"
+            );
+
+            webSocketNotificationService.sendBookingUpdate(
+                    bookingId,
+                    "CANCELLED",
+                    "Đơn hàng đã bị hủy"
+            );
+        } catch (Exception e) {
+            log.warn("Failed to send WebSocket notification for booking cancellation", e);
+        }
     }
 
     @Override

@@ -30,7 +30,7 @@ public class RatingServiceImpl implements RatingService {
     private final DriverRepository driversRepository;
     private final UsersRepository usersRepository;
     private final CustomerRepository customersRepository;
-    private final TripDriversRepository tripDriversRepository;
+    private final TripDriverRepository tripDriversRepository;
     private final BookingRepository bookingRepository;
 
     @Override

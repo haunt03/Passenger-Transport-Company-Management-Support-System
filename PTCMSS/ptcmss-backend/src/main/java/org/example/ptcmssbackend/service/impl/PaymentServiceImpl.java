@@ -35,6 +35,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final InvoiceRepository invoiceRepository;
     private final EmployeeRepository employeeRepository;
     private final QrPaymentProperties qrPaymentProperties;
+    private final org.example.ptcmssbackend.service.WebSocketNotificationService webSocketNotificationService;
 
     @Override
     public PaymentResponse generateQRCode(Integer bookingId, BigDecimal amount, String note, Boolean deposit, Integer employeeId) {
@@ -61,6 +62,21 @@ public class PaymentServiceImpl implements PaymentService {
         String qrImageUrl = buildQrImageUrl(amount, description);
         Instant expiresAt = Instant.now().plus(qrPaymentProperties.getExpiresInMinutes(), ChronoUnit.MINUTES);
 
+        // Send WebSocket notification for QR code generation
+        try {
+            String customerName = booking.getCustomer() != null ? booking.getCustomer().getFullName() : "Khách hàng";
+            webSocketNotificationService.sendGlobalNotification(
+                    "QR thanh toán mới",
+                    String.format("Đã tạo mã QR thanh toán %s cho đơn #%d - %s",
+                            deposit ? "cọc" : "",
+                            bookingId,
+                            customerName),
+                    "INFO"
+            );
+        } catch (Exception e) {
+            log.warn("Failed to send WebSocket notification for QR generation", e);
+        }
+
         return mapInvoice(saved).toBuilder()
                 .qrText(qrText)
                 .qrImageUrl(qrImageUrl)
@@ -85,7 +101,48 @@ public class PaymentServiceImpl implements PaymentService {
             invoice.setCreatedBy(employee);
         }
         Invoices saved = invoiceRepository.save(invoice);
+
+        // Send WebSocket notifications for payment
+        try {
+            String customerName = booking.getCustomer() != null ? booking.getCustomer().getFullName() : "Khách hàng";
+            String bookingCode = "ORD-" + bookingId;
+            String paymentType = Boolean.TRUE.equals(request.getDeposit()) ? "Cọc" : "Thanh toán";
+
+            // Global notification
+            webSocketNotificationService.sendGlobalNotification(
+                    paymentType + " thành công",
+                    String.format("%s %s cho đơn %s - %s",
+                            paymentType,
+                            formatAmount(request.getAmount()),
+                            bookingCode,
+                            customerName),
+                    "SUCCESS"
+            );
+
+            // Payment update notification
+            webSocketNotificationService.sendPaymentUpdate(
+                    saved.getId(),
+                    bookingId,
+                    "PAID",
+                    String.format("%s đã được ghi nhận", paymentType)
+            );
+
+            // Booking update notification
+            webSocketNotificationService.sendBookingUpdate(
+                    bookingId,
+                    "PAYMENT_RECEIVED",
+                    String.format("Đã nhận %s %s", paymentType.toLowerCase(), formatAmount(request.getAmount()))
+            );
+        } catch (Exception e) {
+            log.warn("Failed to send WebSocket notification for payment", e);
+        }
+
         return mapInvoice(saved);
+    }
+
+    private String formatAmount(BigDecimal amount) {
+        if (amount == null) return "0đ";
+        return String.format("%,dđ", amount.longValue());
     }
 
     @Override
@@ -96,11 +153,14 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     private String buildQrText(BigDecimal amount, String description) {
-        return String.format("BANK:%s|ACC:%s|AMT:%s|INFO:%s",
-                valueOrEmpty(qrPaymentProperties.getBankCode()),
-                valueOrEmpty(qrPaymentProperties.getAccountNumber()),
-                amount.stripTrailingZeros().toPlainString(),
-                description);
+        // VietQR format: bank_code|account_number|amount|description
+        // This will be used by VietQR API to generate proper EMVCo QR code
+        String bank = valueOrEmpty(qrPaymentProperties.getBankCode());
+        String account = valueOrEmpty(qrPaymentProperties.getAccountNumber());
+        String amountStr = amount.stripTrailingZeros().toPlainString();
+
+        // Return simple format that VietQR image URL will handle
+        return String.format("%s|%s|%s|%s", bank, account, amountStr, description);
     }
 
     private String buildQrImageUrl(BigDecimal amount, String description) {
@@ -113,16 +173,22 @@ public class PaymentServiceImpl implements PaymentService {
 
         String bank = valueOrEmpty(qrPaymentProperties.getBankCode());
         String account = valueOrEmpty(qrPaymentProperties.getAccountNumber());
+        String accountName = valueOrEmpty(qrPaymentProperties.getAccountName());
 
+        // URL encode parameters
         String encodedInfo = URLEncoder.encode(description, StandardCharsets.UTF_8);
-        String encodedName = URLEncoder.encode(valueOrEmpty(qrPaymentProperties.getAccountName()), StandardCharsets.UTF_8);
+        String encodedName = URLEncoder.encode(accountName, StandardCharsets.UTF_8);
 
-        return String.format("%s/%s-%s-%s.png?amount=%s&addInfo=%s&accountName=%s",
+        // VietQR requires amount as integer (no decimal)
+        long amountInt = amount.longValue();
+
+        // VietQR URL format: https://img.vietqr.io/image/{bank_id}-{account_no}-{template}.jpg?amount={amount}&addInfo={info}&accountName={name}
+        return String.format("%s/%s-%s-%s.jpg?amount=%d&addInfo=%s&accountName=%s",
                 provider,
                 bank,
                 account,
                 template,
-                amount.stripTrailingZeros().toPlainString(),
+                amountInt,
                 encodedInfo,
                 encodedName);
     }

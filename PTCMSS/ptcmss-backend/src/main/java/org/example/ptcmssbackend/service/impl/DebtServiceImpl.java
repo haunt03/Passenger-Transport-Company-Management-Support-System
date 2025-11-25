@@ -9,6 +9,8 @@ import org.example.ptcmssbackend.dto.response.Debt.DebtReminderHistoryResponse;
 import org.example.ptcmssbackend.dto.response.Debt.DebtSummaryResponse;
 import org.example.ptcmssbackend.entity.DebtReminderHistory;
 import org.example.ptcmssbackend.entity.Invoices;
+import org.example.ptcmssbackend.enums.InvoiceStatus;
+import org.example.ptcmssbackend.enums.InvoiceType;
 import org.example.ptcmssbackend.enums.PaymentStatus;
 import org.example.ptcmssbackend.repository.DebtReminderHistoryRepository;
 import org.example.ptcmssbackend.repository.InvoiceRepository;
