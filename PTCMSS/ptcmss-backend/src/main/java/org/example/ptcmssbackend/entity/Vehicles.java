@@ -12,6 +12,7 @@ import java.time.LocalDate;
 @Getter
 @Setter
 @Entity
+@Table(name = "vehicles")
 public class Vehicles {
     @Id
     @Column(name = "vehicleId", nullable = false)

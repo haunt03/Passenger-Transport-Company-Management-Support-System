@@ -10,6 +10,7 @@ import org.example.ptcmssbackend.enums.UserStatus;
 @Getter
 @Setter
 @Entity
+@Table(name = "roles")
 public class Roles {
     @Id
     @Column(name = "roleId", nullable = false)

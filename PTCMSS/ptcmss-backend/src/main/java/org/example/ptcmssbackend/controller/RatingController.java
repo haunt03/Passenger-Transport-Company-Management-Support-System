@@ -2,12 +2,11 @@ package org.example.ptcmssbackend.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-
-import org.example.ptcmssbackend.dto.response.DriverPerformanceResponse;
-import org.example.ptcmssbackend.dto.response.RatingRequest;
-import org.example.ptcmssbackend.dto.response.TripForRatingResponse;
+import org.example.ptcmssbackend.dto.DriverPerformanceResponse;
+import org.example.ptcmssbackend.dto.RatingRequest;
+import org.example.ptcmssbackend.dto.RatingResponse;
+import org.example.ptcmssbackend.dto.TripForRatingResponse;
 import org.example.ptcmssbackend.dto.response.common.ResponseData;
-import org.example.ptcmssbackend.dto.response.rating.RatingResponse;
 import org.example.ptcmssbackend.service.RatingService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -35,7 +34,7 @@ public class RatingController {
         } catch (Exception e) {
             log.error("Error creating rating", e);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new ResponseData<>(400, e.getMessage()));
+                    .body(new ResponseData<>(400, e.getMessage()));
         }
     }
 
@@ -50,7 +49,7 @@ public class RatingController {
         } catch (Exception e) {
             log.error("Error getting rating for trip {}", tripId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ResponseData<>(500, e.getMessage()));
+                    .body(new ResponseData<>(500, e.getMessage()));
         }
     }
 
@@ -64,7 +63,7 @@ public class RatingController {
         } catch (Exception e) {
             log.error("Error getting ratings for driver {}", driverId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ResponseData<>(500, e.getMessage()));
+                    .body(new ResponseData<>(500, e.getMessage()));
         }
     }
 
@@ -78,7 +77,7 @@ public class RatingController {
         } catch (Exception e) {
             log.error("Error getting performance for driver {}", driverId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ResponseData<>(500, e.getMessage()));
+                    .body(new ResponseData<>(500, e.getMessage()));
         }
     }
 
@@ -90,7 +89,7 @@ public class RatingController {
         } catch (Exception e) {
             log.error("Error getting completed trips", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ResponseData<>(500, e.getMessage()));
+                    .body(new ResponseData<>(500, e.getMessage()));
         }
     }
 

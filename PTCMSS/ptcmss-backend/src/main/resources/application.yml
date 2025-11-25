@@ -1,17 +1,16 @@
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3307/ptcmss_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    url: jdbc:mysql://127.0.0.1:3307/ptcmss_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
     username: root
     password: root
 
   jpa:
-    show-sql: true
     hibernate:
       ddl-auto: update
-      naming:
-        # Dùng đúng tên bạn khai báo/annotate, KHÔNG tự convert sang snake_case
-        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
-        implicit-strategy: org.hibernate.boot.model.naming.ImplicitNamingStrategyLegacyJpaImpl
+    show-sql: true
+    properties:
+      hibernate:
+        physical_naming_strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
 
   mail:
     host: smtp.gmail.com
@@ -25,16 +24,6 @@ spring:
           starttls:
             enable: true
 
-  profiles:
-    active: dev
-
-openapi:
-  service:
-    api-docs: Computer_sell
-    server: http://localhost:8080
-    title: Transport Application
-    version: 1.0.0
-
 server:
   port: 8080
 
@@ -44,7 +33,13 @@ management:
       exposure:
         include: health,info
 
-# Payment Configuration
+openapi:
+  service:
+    api-docs: Computer_sell
+    server: http://localhost:8080
+    title: Transport Application
+    version: 1.0.0
+
 payment:
   bank:
     code: ${PAYMENT_BANK_CODE:970423}  # Mã ngân hàng (TP bank)
@@ -52,16 +47,23 @@ payment:
       number: ${PAYMENT_BANK_ACCOUNT_NUMBER:00005505543}  # Số tài khoản nhận tiền
       name: ${PAYMENT_BANK_ACCOUNT_NAME:NGUYEN THUY HAU}  # Tên chủ tài khoản
 
-# VietQR API Configuration
 vietqr:
   client-id: ${VIETQR_CLIENT_ID:2c533c20-80aa-41dc-b346-cde4bd3fb8de}  # Lấy từ https://my.vietqr.io/profile
   api-key: ${VIETQR_API_KEY:9db359c9-a744-4479-83b0-b8861178b081}      # Lấy từ https://my.vietqr.io/profile
 
-# ===== JWT (bổ sung) =====
+# ===== JWT =====
 jwt:
-  # NÊN dùng Base64 cho secret (độ dài >= 256-bit). Hai chuỗi dưới đây chỉ là ví dụ.
   accessKey: "bXktc3VwZXItc2VjcmV0LWFjY2Vzcy1rZXktMzItYnl0ZXMtb3ItbW9yZQ=="
   refreshKey: "bXktc3VwZXItc2VjcmV0LXJlZnJlc2gta2V5LTMyLWJ5dGVzLW9yLW1vcmU="
   secretsAreBase64: true
-  expireMinutes: 15           # Access Token sống 15 phút
-  refreshExpireMinutes: 43200 # Refresh Token sống 30 ngày (43200 phút)
+  expriMinutes: 15
+  refreshExpriMinutes: 43200
+  expireMinutes: 15
+  refreshExpireMinutes: 43200
+
+serpapi:
+  key: ${SERPAPI_KEY:dummy-serp-api-key}
+
+graphhopper:
+  api-key: ${GRAPHHOPPER_API_KEY:dummy-graphhopper-api-key}
+  # base-url: https://graphhopper.com/api/1

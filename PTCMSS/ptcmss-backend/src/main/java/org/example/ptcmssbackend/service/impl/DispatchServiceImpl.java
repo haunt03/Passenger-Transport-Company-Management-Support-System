@@ -45,7 +45,7 @@ public class DispatchServiceImpl implements DispatchService {
                     BookingStatus.PENDING,
                     BookingStatus.QUOTATION_SENT,
                     BookingStatus.CONFIRMED,
-                    BookingStatus.IN_PROGRESS,
+                    BookingStatus.INPROGRESS,
                     BookingStatus.COMPLETED
             );
 
@@ -58,6 +58,7 @@ public class DispatchServiceImpl implements DispatchService {
     private final DriverDayOffRepository driverDayOffRepository;
     private final BookingService bookingService; // để tái dùng hàm assign của BookingService
     private final TripAssignmentHistoryRepository tripAssignmentHistoryRepository;
+    private final org.example.ptcmssbackend.service.WebSocketNotificationService webSocketNotificationService;
 
     // =========================================================
     // 1) PENDING TRIPS (QUEUE)
@@ -581,11 +582,79 @@ public class DispatchServiceImpl implements DispatchService {
                     .build());
         }
 
-        return AssignRespone.builder()
+        AssignRespone response = AssignRespone.builder()
                 .bookingId(booking.getId())
                 .bookingStatus(bookingResponse.getStatus())
                 .trips(tripInfos)
                 .build();
+
+        // Send WebSocket notifications for trip assignment
+        try {
+            String customerName = booking.getCustomer() != null ? booking.getCustomer().getFullName() : "Khách hàng";
+            String bookingCode = "ORD-" + booking.getId();
+
+            // Get driver and vehicle info
+            String driverInfo = "";
+            String vehicleInfo = "";
+
+            if (!tripInfos.isEmpty()) {
+                AssignRespone.AssignedTripInfo firstTrip = tripInfos.get(0);
+                if (firstTrip.getDriverName() != null) {
+                    driverInfo = " - TX: " + firstTrip.getDriverName();
+                }
+                if (firstTrip.getVehicleLicensePlate() != null) {
+                    vehicleInfo = " - Xe: " + firstTrip.getVehicleLicensePlate();
+                }
+            }
+
+            // Global notification
+            webSocketNotificationService.sendGlobalNotification(
+                    "Đã gán chuyến",
+                    String.format("Đơn %s - %s%s%s",
+                            bookingCode,
+                            customerName,
+                            driverInfo,
+                            vehicleInfo),
+                    "SUCCESS"
+            );
+
+            // Dispatch update notification
+            webSocketNotificationService.sendDispatchUpdate(
+                    booking.getId(),
+                    "ASSIGNED",
+                    String.format("Đã gán %d chuyến%s%s",
+                            tripInfos.size(),
+                            driverInfo,
+                            vehicleInfo)
+            );
+
+            // Booking update notification
+            webSocketNotificationService.sendBookingUpdate(
+                    booking.getId(),
+                    "ASSIGNED",
+                    String.format("Đã gán tài xế và xe cho %d chuyến", tripInfos.size())
+            );
+
+            // Send notification to specific driver if available
+            if (driverId != null) {
+                Drivers driver = driverRepository.findById(driverId).orElse(null);
+                if (driver != null && driver.getEmployee() != null && driver.getEmployee().getUser() != null) {
+                    Integer userId = driver.getEmployee().getUser().getId();
+                    webSocketNotificationService.sendUserNotification(
+                            userId,
+                            "Chuyến mới được gán",
+                            String.format("Bạn được gán %d chuyến cho đơn %s",
+                                    tripInfos.size(),
+                                    bookingCode),
+                            "INFO"
+                    );
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to send WebSocket notification for trip assignment", e);
+        }
+
+        return response;
     }
 
     // =========================================================
@@ -601,6 +670,30 @@ public class DispatchServiceImpl implements DispatchService {
         List<TripDrivers> tds = tripDriverRepository.findByTripId(tripId);
         if (!tds.isEmpty()) {
             tripDriverRepository.deleteAll(tds);
+        }
+
+        // Send WebSocket notification for unassignment
+        try {
+            Bookings booking = trip.getBooking();
+            String customerName = booking.getCustomer() != null ? booking.getCustomer().getFullName() : "Khách hàng";
+            String bookingCode = "ORD-" + booking.getId();
+
+            webSocketNotificationService.sendGlobalNotification(
+                    "Đã hủy gán chuyến",
+                    String.format("Chuyến #%d (Đơn %s - %s) đã được hủy gán",
+                            tripId,
+                            bookingCode,
+                            customerName),
+                    "WARNING"
+            );
+
+            webSocketNotificationService.sendDispatchUpdate(
+                    booking.getId(),
+                    "UNASSIGNED",
+                    String.format("Đã hủy gán chuyến #%d", tripId)
+            );
+        } catch (Exception e) {
+            log.warn("Failed to send WebSocket notification for trip unassignment", e);
         }
 
         // Xoá vehicle mapping
@@ -928,8 +1021,8 @@ public class DispatchServiceImpl implements DispatchService {
         }
 
         // Chọn driver có score thấp nhất (ít chuyến nhất trong ngày)
-        scored.sort(Comparator.comparingInt(CandidateScore::score));
-        Drivers best = scored.get(0).candidate();
+        scored.sort(Comparator.comparingInt(CandidateScore::getScore));
+        Drivers best = scored.get(0).getCandidate();
         log.info("[Dispatch] Auto-picked driver {} for trip {}", best.getId(), trip.getId());
         return best.getId();
     }
@@ -970,14 +1063,24 @@ public class DispatchServiceImpl implements DispatchService {
             return null;
         }
 
-        scored.sort(Comparator.comparingInt(CandidateScore::score));
-        Vehicles best = scored.get(0).candidate();
+        scored.sort(Comparator.comparingInt(CandidateScore::getScore));
+        Vehicles best = scored.get(0).getCandidate();
         log.info("[Dispatch] Auto-picked vehicle {} for trip {}", best.getId(), trip.getId());
         return best.getId();
     }
 
 
     // Helper generic
-    private record CandidateScore<T>(T candidate, int score) {}
-}
+    private static class CandidateScore<T> {
+        private final T candidate;
+        private final int score;
 
+        public CandidateScore(T candidate, int score) {
+            this.candidate = candidate;
+            this.score = score;
+        }
+
+        public T getCandidate() { return candidate; }
+        public int getScore() { return score; }
+    }
+}

@@ -16,6 +16,7 @@ import java.time.Instant;
 @Getter
 @Setter
 @Entity
+@Table(name = "bookings")
 public class Bookings {
     @Id
     @Column(name = "bookingId", nullable = false)

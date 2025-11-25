@@ -6,6 +6,7 @@ import org.example.ptcmssbackend.dto.response.Vehicle.VehicleCategoryResponse;
 import org.example.ptcmssbackend.entity.VehicleCategoryPricing;
 import org.example.ptcmssbackend.enums.VehicleCategoryStatus;
 import org.example.ptcmssbackend.repository.VehicleCategoryPricingRepository;
+import org.example.ptcmssbackend.repository.VehicleRepository;
 import org.example.ptcmssbackend.service.VehicleCategoryService;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +18,7 @@ import java.util.stream.Collectors;
 public class VehicleCategoryServiceImpl implements VehicleCategoryService {
 
     private final VehicleCategoryPricingRepository categoryRepository;
+    private final VehicleRepository vehicleRepository;
 
     @Override
     public List<VehicleCategoryResponse> listAll() {
@@ -52,6 +54,7 @@ public class VehicleCategoryServiceImpl implements VehicleCategoryService {
 
     private void apply(VehicleCategoryPricing c, VehicleCategoryRequest req) {
         c.setCategoryName(req.getCategoryName());
+        c.setSeats(req.getSeats());
         c.setDescription(req.getDescription());
         c.setBaseFare(req.getBaseFare());
         c.setPricePerKm(req.getPricePerKm());
@@ -64,9 +67,13 @@ public class VehicleCategoryServiceImpl implements VehicleCategoryService {
     }
 
     private VehicleCategoryResponse toResponse(VehicleCategoryPricing c) {
+        long vehiclesCount = vehicleRepository.countByCategoryId(c.getId());
+
         return VehicleCategoryResponse.builder()
                 .id(c.getId())
                 .categoryName(c.getCategoryName())
+                .seats(c.getSeats())
+                .vehiclesCount((int) vehiclesCount)
                 .description(c.getDescription())
                 .baseFare(c.getBaseFare())
                 .pricePerKm(c.getPricePerKm())
@@ -77,4 +84,3 @@ public class VehicleCategoryServiceImpl implements VehicleCategoryService {
                 .build();
     }
 }
-

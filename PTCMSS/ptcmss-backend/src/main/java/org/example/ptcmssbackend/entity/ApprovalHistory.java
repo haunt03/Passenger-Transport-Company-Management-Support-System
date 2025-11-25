@@ -25,7 +25,7 @@ import java.time.Instant;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "Approval_history")
+@Table(name = "approval_history")
 public class ApprovalHistory {
 
     @Id

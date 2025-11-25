@@ -16,6 +16,7 @@ import java.time.LocalDate;
 @Getter
 @Setter
 @Entity
+@Table(name = "vehicle_category_pricing")
 public class VehicleCategoryPricing {
     @Id
     @Column(name = "categoryId", nullable = false)
@@ -26,6 +27,9 @@ public class VehicleCategoryPricing {
     @NotNull
     @Column(name = "categoryName", nullable = false, length = 100)
     private String categoryName;
+
+    @Column(name = "seats")
+    private Integer seats;
 
     @Size(max = 255)
     @Column(name = "description")

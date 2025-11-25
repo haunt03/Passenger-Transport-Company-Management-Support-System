@@ -16,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -309,6 +311,42 @@ public class NotificationServiceImpl implements NotificationService {
         log.info("[Notification] Mapped {} approval responses", result.size());
         
         return result;
+    }
+
+    @Override
+    public List<ApprovalItemResponse> getProcessedApprovals(Integer branchId, Integer limit) {
+        log.info("[Notification] Get processed approvals for branch {} (limit: {})", branchId, limit);
+
+        List<ApprovalHistory> approved = branchId == null
+                ? approvalHistoryRepository.findByStatusOrderByRequestedAtDesc(ApprovalStatus.APPROVED)
+                : approvalHistoryRepository.findByBranch_IdAndStatusOrderByRequestedAtDesc(branchId, ApprovalStatus.APPROVED);
+
+        List<ApprovalHistory> rejected = branchId == null
+                ? approvalHistoryRepository.findByStatusOrderByRequestedAtDesc(ApprovalStatus.REJECTED)
+                : approvalHistoryRepository.findByBranch_IdAndStatusOrderByRequestedAtDesc(branchId, ApprovalStatus.REJECTED);
+
+        // Gộp và sắp xếp theo processedAt (mới nhất trước)
+        List<ApprovalHistory> allProcessed = new ArrayList<>();
+        allProcessed.addAll(approved);
+        allProcessed.addAll(rejected);
+
+        // Sắp xếp theo processedAt DESC (nếu có) hoặc requestedAt DESC
+        allProcessed.sort((a, b) -> {
+            Instant aTime = a.getProcessedAt() != null ? a.getProcessedAt() : a.getRequestedAt();
+            Instant bTime = b.getProcessedAt() != null ? b.getProcessedAt() : b.getRequestedAt();
+            return bTime.compareTo(aTime); // DESC
+        });
+
+        // Giới hạn số lượng
+        if (limit != null && limit > 0) {
+            allProcessed = allProcessed.stream().limit(limit).collect(Collectors.toList());
+        }
+
+        log.info("[Notification] Found {} processed approvals", allProcessed.size());
+
+        return allProcessed.stream()
+                .map(this::mapToApprovalItemResponse)
+                .collect(Collectors.toList());
     }
     
     @Override

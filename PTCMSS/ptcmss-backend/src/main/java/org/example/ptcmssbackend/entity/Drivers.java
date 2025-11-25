@@ -16,6 +16,7 @@ import java.time.LocalDate;
 @Getter
 @Setter
 @Entity
+@Table(name = "drivers")
 public class Drivers {
     @Id
     @Column(name = "driverId", nullable = false)

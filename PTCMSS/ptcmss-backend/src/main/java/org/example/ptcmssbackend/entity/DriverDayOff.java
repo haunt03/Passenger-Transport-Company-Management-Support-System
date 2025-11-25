@@ -14,6 +14,7 @@ import java.time.LocalDate;
 @Getter
 @Setter
 @Entity
+@Table(name = "driver_day_off")
 public class DriverDayOff {
     @Id
     @Column(name = "dayOffId", nullable = false)

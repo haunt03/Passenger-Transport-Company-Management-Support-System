@@ -5,6 +5,7 @@ import org.example.ptcmssbackend.enums.SettingStatus;
 import org.example.ptcmssbackend.enums.ValueType;
 
 import java.time.Instant;
+import java.time.LocalDate;
 
 @Getter
 @Setter
@@ -15,6 +16,8 @@ public class SystemSettingResponse {
     private Integer id;
     private String settingKey;
     private String settingValue;
+    private LocalDate effectiveStartDate;
+    private LocalDate effectiveEndDate;
     private ValueType valueType;
     private String category;
     private String description;

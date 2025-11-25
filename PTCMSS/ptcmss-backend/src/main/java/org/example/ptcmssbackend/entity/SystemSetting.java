@@ -17,7 +17,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "SystemSettings")  // Match với tên bảng trong DB (camelCase)
+@Table(name = "system_settings")
 public class SystemSetting {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -42,8 +42,8 @@ public class SystemSetting {
     private LocalDate effectiveEndDate;
 
     @NotNull
-    @Enumerated(EnumType.STRING)
     @Column(name = "valueType", nullable = false)
+    @Convert(converter = org.example.ptcmssbackend.converter.ValueTypeConverter.class)
     @Builder.Default
     private ValueType valueType = ValueType.STRING;
 

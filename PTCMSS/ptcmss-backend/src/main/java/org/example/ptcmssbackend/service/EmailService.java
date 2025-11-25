@@ -50,31 +50,6 @@ public class EmailService {
         mailSender.send(message);
     }
 
-    public void sendCredentialsEmail(String toEmail, String fullName, String username, String password, String baseUrl)
-            throws MessagingException, UnsupportedEncodingException {
-
-        String subject = "🔐 Thông tin đăng nhập TranspoManager - Tài khoản của bạn";
-
-        Map<String, Object> variables = new HashMap<>();
-        variables.put("fullName", fullName);
-        variables.put("username", username);
-        variables.put("password", password);
-        variables.put("loginUrl", baseUrl + "/login");
-
-        Context context = new Context();
-        context.setVariables(variables);
-        String htmlContent = templateEngine.process("credentials-email", context);
-
-        MimeMessage message = mailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(message, "UTF-8");
-        helper.setFrom(fromEmail, "TranspoManager - Hệ thống quản lý vận tải");
-        helper.setTo(toEmail);
-        helper.setSubject(subject);
-        helper.setText(htmlContent, true);
-
-        mailSender.send(message);
-    }
-
     public void sendPasswordResetEmail(String toEmail, String fullName, String token, String baseUrl)
             throws MessagingException, UnsupportedEncodingException {
 
@@ -182,6 +157,21 @@ public class EmailService {
         // TODO: Integrate with SMS gateway (Twilio, AWS SNS, etc.)
         log.info("[EmailService] SMS reminder would be sent to {} for invoice {} amount {}",
                 phoneNumber, invoiceNumber, amount);
+    }
+
+    /**
+     * Gửi email đơn giản (HTML)
+     */
+    public void sendSimpleEmail(String toEmail, String subject, String htmlContent)
+            throws MessagingException, UnsupportedEncodingException {
+        MimeMessage message = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, "UTF-8");
+        helper.setFrom(fromEmail, "TranspoManager - Hệ thống quản lý vận tải");
+        helper.setTo(toEmail);
+        helper.setSubject(subject);
+        helper.setText(htmlContent, true);
+
+        mailSender.send(message);
     }
 
     // Helper methods for fallback HTML

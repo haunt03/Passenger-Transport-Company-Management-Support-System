@@ -1,5 +1,6 @@
 package org.example.ptcmssbackend.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
@@ -14,6 +15,7 @@ import java.time.Instant;
 @Getter
 @Setter
 @Entity
+@Table(name = "branches")
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Branches {
     @Id
@@ -30,8 +32,10 @@ public class Branches {
     @Column(name = "location")
     private String location;
 
+    // FIX: tránh vòng lặp JSON và validation
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "managerId")
+    @JsonIgnore
     private Employees manager;
 
     @Enumerated(EnumType.STRING)
