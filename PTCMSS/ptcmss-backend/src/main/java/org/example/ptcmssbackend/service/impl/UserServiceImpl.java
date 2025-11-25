@@ -5,14 +5,20 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.ptcmssbackend.dto.request.User.CreateUserRequest;
 import org.example.ptcmssbackend.dto.request.User.UpdateUserRequest;
 import org.example.ptcmssbackend.dto.response.User.UserResponse;
+import org.example.ptcmssbackend.entity.Branches;
+import org.example.ptcmssbackend.entity.Employees;
 import org.example.ptcmssbackend.entity.Roles;
 import org.example.ptcmssbackend.entity.Users;
+import org.example.ptcmssbackend.enums.EmployeeStatus;
 import org.example.ptcmssbackend.enums.UserStatus;
+import org.example.ptcmssbackend.repository.BranchesRepository;
+import org.example.ptcmssbackend.repository.EmployeeRepository;
 import org.example.ptcmssbackend.repository.RolesRepository;
 import org.example.ptcmssbackend.repository.UsersRepository;
 import org.example.ptcmssbackend.service.EmailService;
 import org.example.ptcmssbackend.service.LocalImageService;
 import org.example.ptcmssbackend.service.UserService;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -33,15 +39,23 @@ public class UserServiceImpl implements UserService {
 
     private final UsersRepository usersRepository;
     private final RolesRepository rolesRepository;
+    private final BranchesRepository branchesRepository;
+    private final EmployeeRepository employeeRepository;
     private final EmailService emailService;
     private final LocalImageService localImageService; //
 
     @Override
+    @Transactional
     public Integer createUser(CreateUserRequest request) {
+        // Validate role
         Roles role = rolesRepository.findById(request.getRoleId())
                 .orElseThrow(() -> new RuntimeException("Role not found"));
 
+        // Validate branch
+        Branches branch = branchesRepository.findById(request.getBranchId())
+                .orElseThrow(() -> new RuntimeException("Branch not found"));
 
+        // Validate unique fields
         String email = Optional.ofNullable(request.getEmail()).map(String::trim).orElse(null);
         if (StringUtils.hasText(email) && usersRepository.existsByEmailIgnoreCase(email)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email already exists");
@@ -68,7 +82,30 @@ public class UserServiceImpl implements UserService {
         user.setEmailVerified(false);
         user.setVerificationToken(UUID.randomUUID().toString());
 
-        usersRepository.save(user);
+        Users savedUser = usersRepository.save(user);
+        log.info("User created successfully with ID: {}", savedUser.getId());
+
+        // Tự động tạo Employee và gắn branch
+        try {
+            // Kiểm tra xem user đã là employee chưa (tránh duplicate)
+            if (!employeeRepository.existsByUser_Id(savedUser.getId())) {
+                Employees employee = new Employees();
+                employee.setUser(savedUser);
+                employee.setBranch(branch);
+                employee.setRole(role);
+                employee.setStatus(EmployeeStatus.ACTIVE); // Mặc định ACTIVE
+
+                Employees savedEmployee = employeeRepository.save(employee);
+                log.info("Employee created automatically with ID: {} for user ID: {} in branch ID: {}",
+                        savedEmployee.getEmployeeId(), savedUser.getId(), branch.getId());
+            } else {
+                log.warn("User {} is already an employee, skipping employee creation", savedUser.getId());
+            }
+        } catch (Exception e) {
+            log.error("Failed to create employee for user {}: {}", savedUser.getId(), e.getMessage(), e);
+            // Không throw exception để không rollback user creation
+            // Có thể tạo employee sau bằng cách thủ công
+        }
 
         // Tạo đường dẫn xác thực (URL base theo domain)
         String baseUrl = ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString();
@@ -80,14 +117,15 @@ public class UserServiceImpl implements UserService {
                     user.getVerificationToken(),
                     baseUrl
             );
-            log.info("gửi email thành công");
+            log.info("Verification email sent successfully");
         } catch (MessagingException | UnsupportedEncodingException e) {
-            throw new RuntimeException("Gửi email xác thực thất bại!", e);
+            log.error("Failed to send verification email: {}", e.getMessage(), e);
+            // Không throw exception để không rollback user creation
         }
 
-        log.info("create user thành công");
+        log.info("User and Employee created successfully for user ID: {}", savedUser.getId());
 
-        return user.getId();
+        return savedUser.getId();
     }
 
     @Override
@@ -159,6 +197,8 @@ public class UserServiceImpl implements UserService {
         String imageUrl = localImageService.saveImage(file);
         user.setAvatar(imageUrl);
         usersRepository.save(user);
+
+        log.info("update avatar thành công");
 
         return imageUrl;
     }

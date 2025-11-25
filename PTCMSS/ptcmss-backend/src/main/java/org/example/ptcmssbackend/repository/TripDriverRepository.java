@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface TripDriverRepository extends JpaRepository<TripDrivers, TripDriverId> {
@@ -32,13 +33,18 @@ public interface TripDriverRepository extends JpaRepository<TripDrivers, TripDri
     // Xóa mapping theo tripId (dọn sạch gán tài xế trước khi xóa Trips)
     void deleteByTrip_Id(Integer tripId);
 
-    @Query("""
-        SELECT td FROM TripDrivers td
-        WHERE td.driver.id = :driverId
-    """)
+    @Query("SELECT td FROM TripDrivers td WHERE td.driver.id = :driverId")
     List<TripDrivers> findByDriver(Integer driverId);
 
 
     // Kiểm tra driver có được gán vào trip cụ thể không
     boolean existsByTrip_IdAndDriver_Id(Integer tripId, Integer driverId);
+
+    /**
+     * Lấy danh sách TripDrivers theo tripId
+     */
+    List<TripDrivers> findByTrip_Id(Integer tripId);
+
+    @Query("SELECT td FROM TripDrivers td WHERE td.trip.id = :tripId AND td.driverRole = 'Main Driver'")
+    Optional<TripDrivers> findMainDriverByTripId(@Param("tripId") Integer tripId);
 }

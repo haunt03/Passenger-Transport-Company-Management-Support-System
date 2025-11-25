@@ -27,4 +27,7 @@ public class CreateUserRequest {
 
     @NotNull(message = "Role id is required")
     private Integer roleId;
+
+    @NotNull(message = "Branch id is required")
+    private Integer branchId;
 }

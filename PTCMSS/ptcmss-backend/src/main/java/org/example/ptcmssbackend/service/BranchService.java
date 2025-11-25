@@ -3,6 +3,7 @@ package org.example.ptcmssbackend.service;
 import org.example.ptcmssbackend.dto.request.Branch.CreateBranchRequest;
 import org.example.ptcmssbackend.dto.request.Branch.UpdateBranchRequest;
 import org.example.ptcmssbackend.dto.response.Branch.BranchResponse;
+import org.example.ptcmssbackend.dto.response.Branch.ManagerDashboardStatsResponse;
 import org.example.ptcmssbackend.dto.response.common.PageResponse;
 
 public interface BranchService {
@@ -13,4 +14,6 @@ public interface BranchService {
     Integer deleteBranch(Integer id);
 
     BranchResponse getBranchByUserId(Integer userId);
+
+    ManagerDashboardStatsResponse getManagerDashboardStats(Integer branchId, String period);
 }

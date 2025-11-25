@@ -12,6 +12,8 @@ import java.time.LocalDate;
 public class VehicleCategoryResponse {
     private Integer id;
     private String categoryName;
+    private Integer seats;
+    private Integer vehiclesCount;
     private String description;
     private BigDecimal baseFare;
     private BigDecimal pricePerKm;
@@ -20,4 +22,3 @@ public class VehicleCategoryResponse {
     private LocalDate effectiveDate;
     private VehicleCategoryStatus status;
 }
-

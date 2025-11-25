@@ -53,6 +53,9 @@ public class SystemSettingServiceImpl implements SystemSettingService {
         SystemSetting setting = SystemSetting.builder()
                 .settingKey(request.getSettingKey())
                 .settingValue(request.getSettingValue())
+                .effectiveStartDate(request.getEffectiveStartDate() != null ?
+                        request.getEffectiveStartDate() : java.time.LocalDate.now())
+                .effectiveEndDate(request.getEffectiveEndDate())
                 .valueType(request.getValueType())
                 .category(request.getCategory())
                 .description(request.getDescription())
@@ -77,6 +80,10 @@ public class SystemSettingServiceImpl implements SystemSettingService {
 
         setting.setSettingKey(request.getSettingKey());
         setting.setSettingValue(request.getSettingValue());
+        if (request.getEffectiveStartDate() != null) {
+            setting.setEffectiveStartDate(request.getEffectiveStartDate());
+        }
+        setting.setEffectiveEndDate(request.getEffectiveEndDate());
         setting.setValueType(request.getValueType());
         setting.setCategory(request.getCategory());
         setting.setDescription(request.getDescription());
@@ -96,17 +103,30 @@ public class SystemSettingServiceImpl implements SystemSettingService {
     }
 
     private SystemSettingResponse mapToResponse(SystemSetting entity) {
+        String updatedByName = null;
+        try {
+            if (entity.getUpdatedBy() != null) {
+                Employees updater = entity.getUpdatedBy();
+                if (updater.getUser() != null) {
+                    updatedByName = updater.getUser().getFullName();
+                }
+            }
+        } catch (Exception e) {
+            // Ignore lazy loading exceptions
+            updatedByName = null;
+        }
+
         return SystemSettingResponse.builder()
                 .id(entity.getId())
                 .settingKey(entity.getSettingKey())
                 .settingValue(entity.getSettingValue())
+                .effectiveStartDate(entity.getEffectiveStartDate())
+                .effectiveEndDate(entity.getEffectiveEndDate())
                 .valueType(entity.getValueType())
                 .category(entity.getCategory())
                 .description(entity.getDescription())
                 .status(entity.getStatus())
-                .updatedByName(entity.getUpdatedBy() != null && entity.getUpdatedBy().getUser() != null
-                        ? entity.getUpdatedBy().getUser().getFullName()
-                        : null)
+                .updatedByName(updatedByName)
                 .updatedAt(entity.getUpdatedAt())
                 .build();
     }

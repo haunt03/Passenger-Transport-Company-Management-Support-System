@@ -14,6 +14,8 @@ public class EmployeeMapper {
                 .id(employee.getEmployeeId())
                 .userId(employee.getUser() != null ? employee.getUser().getId() : null)
                 .userFullName(employee.getUser() != null ? employee.getUser().getFullName() : null)
+                .userEmail(employee.getUser() != null ? employee.getUser().getEmail() : null)
+                .userPhone(employee.getUser() != null ? employee.getUser().getPhone() : null)
                 .branchId(employee.getBranch() != null ? employee.getBranch().getId() : null)
                 .branchName(employee.getBranch() != null ? employee.getBranch().getBranchName() : null)
                 .roleId(employee.getRole() != null ? employee.getRole().getId() : null)

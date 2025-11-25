@@ -50,20 +50,16 @@ public interface TripVehicleRepository extends JpaRepository<TripVehicles, Integ
     );
 
 
-    @Query("""
-        SELECT tv FROM TripVehicles tv
-        WHERE tv.vehicle.id = :vehicleId
-    """)
+    @Query("SELECT tv FROM TripVehicles tv WHERE tv.vehicle.id = :vehicleId")
     List<TripVehicles> findByVehicle(Integer vehicleId);
 
 
     // Lấy tất cả TripVehicles của 1 vehicle trong 1 khoảng thời gian để check trùng lịch
-    @Query("""
-           SELECT tv FROM TripVehicles tv
-           WHERE tv.vehicle.id = :vehicleId
-             AND tv.trip.startTime < :endTime
-             AND tv.trip.endTime > :startTime
-           """)
+    @Query("SELECT tv FROM TripVehicles tv WHERE tv.vehicle.id = :vehicleId AND tv.trip.startTime < :endTime AND tv.trip.endTime > :startTime")
     List<TripVehicles> findOverlapsForVehicle(Integer vehicleId, Instant startTime, Instant endTime);
-}
 
+    /**
+     * Lấy danh sách TripVehicles theo tripId
+     */
+    List<TripVehicles> findByTrip_Id(Integer tripId);
+}

@@ -28,6 +28,9 @@ public class VehicleCategoryPricing {
     @Column(name = "categoryName", nullable = false, length = 100)
     private String categoryName;
 
+    @Column(name = "seats")
+    private Integer seats;
+
     @Size(max = 255)
     @Column(name = "description")
     private String description;
