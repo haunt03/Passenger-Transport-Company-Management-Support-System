@@ -1,7 +1,14 @@
 // VehicleDetailPage.jsx (LIGHT THEME VERSION)
 import React from "react";
 import { useParams } from "react-router-dom";
-import { getVehicle, updateVehicle, listVehicleCategories } from "../../api/vehicles";
+import {
+    getVehicle,
+    updateVehicle,
+    listVehicleCategories,
+    getVehicleTrips,
+    getVehicleExpenses,
+    getVehicleMaintenance,
+} from "../../api/vehicles";
 import { listBranches } from "../../api/branches";
 import {
     CarFront,
@@ -740,70 +747,122 @@ export default function VehicleDetailPage() {
         })();
     }, [vehicleId]);
 
-    // mock trip history
-    const tripsData = React.useMemo(
-        () => [
-            {
-                id: 901,
-                code: "TRIP-2025-045",
-                customer_name: "Nguyễn Văn A",
-                customer_phone: "0901234567",
-                pickup: "Sân bay Nội Bài - T1, cột 5",
-                pickup_time: "2025-10-26 08:30",
-                status: "AVAILABLE",
-            },
-            {
-                id: 902,
-                code: "TRIP-2025-046",
-                customer_name: "Công ty ABC",
-                customer_phone: "0243 888 999",
-                pickup: "VP Công ty ABC, 123 Láng Hạ",
-                pickup_time: "2025-10-25 14:00",
-                status: "MAINTENANCE",
-            },
-            {
-                id: 903,
-                code: "TRIP-2025-047",
-                customer_name: "Mr. Lee",
-                customer_phone: "N/A",
-                pickup: "Khách sạn Westlake Pearl",
-                pickup_time: "2025-10-24 09:15",
-                status: "AVAILABLE",
-            },
-        ],
-        []
-    );
+    // State for tabs data
+    const [tripsData, setTripsData] = React.useState([]);
+    const [expensesData, setExpensesData] = React.useState([]);
+    const [maintenanceData, setMaintenanceData] = React.useState([]);
+    const [loadingTrips, setLoadingTrips] = React.useState(false);
+    const [loadingExpenses, setLoadingExpenses] = React.useState(false);
+    const [loadingMaintenance, setLoadingMaintenance] = React.useState(false);
 
-    // mock chi phí/bảo trì
-    const expensesData = React.useMemo(
-        () => [
-            {
-                id: 501,
-                date: "2025-10-26",
-                type: "FUEL",
-                type_label: "Xăng dầu",
-                note: "Đổ xăng trước chuyến HN->HP",
-                amount: 650000,
-            },
-            {
-                id: 502,
-                date: "2025-10-24",
-                type: "REPAIR",
-                type_label: "Bảo trì nhẹ",
-                note: "Thay dầu máy, kiểm tra phanh",
-                amount: 1200000,
-            },
-            {
-                id: 503,
-                date: "2025-10-20",
-                type: "FUEL",
-                type_label: "Xăng dầu",
-                note: "Đổ full bình tại Petrolimex",
-                amount: 700000,
-            },
-        ],
-        []
-    );
+    // Load trips data
+    const loadTrips = React.useCallback(async () => {
+        if (!vehicleId || loadingTrips) return;
+        setLoadingTrips(true);
+        try {
+            const data = await getVehicleTrips(vehicleId);
+            const trips = Array.isArray(data) ? data : (data?.data || []);
+            // Map backend data to frontend format
+            const mappedTrips = trips.map((t) => ({
+                id: t.tripId || t.id,
+                code: t.tripCode || t.code || `TRIP-${t.tripId || t.id}`,
+                customer_name: t.customerName || t.customer_name || "—",
+                customer_phone: t.customerPhone || t.customer_phone || "—",
+                pickup: t.pickupLocation || t.pickup || "—",
+                pickup_time: t.startTime || t.pickup_time || t.pickupTime,
+                status: t.status || "AVAILABLE",
+            }));
+            setTripsData(mappedTrips);
+        } catch (err) {
+            console.error("Failed to load vehicle trips:", err);
+            push("Không thể tải lịch sử chuyến đi: " + (err.message || "Lỗi không xác định"), "error");
+            setTripsData([]);
+        } finally {
+            setLoadingTrips(false);
+        }
+    }, [vehicleId, loadingTrips, push]);
+
+    // Load expenses data
+    const loadExpenses = React.useCallback(async () => {
+        if (!vehicleId || loadingExpenses) return;
+        setLoadingExpenses(true);
+        try {
+            const data = await getVehicleExpenses(vehicleId);
+            const expenses = Array.isArray(data) ? data : (data?.data || []);
+            // Map backend data to frontend format
+            const mappedExpenses = expenses.map((e) => ({
+                id: e.expenseId || e.id,
+                date: e.expenseDate || e.date || e.expense_date,
+                type: e.costType || e.type,
+                type_label: e.costType === "FUEL" ? "Xăng dầu" :
+                    e.costType === "TOLL" ? "Cầu đường" :
+                        e.costType === "REPAIR" ? "Sửa chữa" :
+                            e.costType === "MAINTENANCE" ? "Bảo trì" :
+                                e.type_label || e.costType || "Khác",
+                note: e.description || e.note || "—",
+                amount: e.amount || 0,
+            }));
+            setExpensesData(mappedExpenses);
+        } catch (err) {
+            console.error("Failed to load vehicle expenses:", err);
+            push("Không thể tải lịch sử chi phí: " + (err.message || "Lỗi không xác định"), "error");
+            setExpensesData([]);
+        } finally {
+            setLoadingExpenses(false);
+        }
+    }, [vehicleId, loadingExpenses, push]);
+
+    // Load maintenance data
+    const loadMaintenance = React.useCallback(async () => {
+        if (!vehicleId || loadingMaintenance) return;
+        setLoadingMaintenance(true);
+        try {
+            const data = await getVehicleMaintenance(vehicleId);
+            const maintenance = Array.isArray(data) ? data : (data?.data || []);
+            // Map backend data to frontend format
+            const mappedMaintenance = maintenance.map((m) => ({
+                id: m.maintenanceId || m.id,
+                date: m.maintenanceDate || m.date || m.maintenance_date,
+                type: m.maintenanceType || m.type || "MAINTENANCE",
+                type_label: m.maintenanceType === "INSPECTION" ? "Đăng kiểm" :
+                    m.maintenanceType === "REPAIR" ? "Sửa chữa" :
+                        m.maintenanceType === "MAINTENANCE" ? "Bảo trì" :
+                            m.type_label || "Bảo trì",
+                note: m.description || m.note || "—",
+                amount: m.cost || m.amount || 0,
+            }));
+            setMaintenanceData(mappedMaintenance);
+        } catch (err) {
+            console.error("Failed to load vehicle maintenance:", err);
+            push("Không thể tải lịch sử bảo trì: " + (err.message || "Lỗi không xác định"), "error");
+            setMaintenanceData([]);
+        } finally {
+            setLoadingMaintenance(false);
+        }
+    }, [vehicleId, loadingMaintenance, push]);
+
+    // Load data when switching tabs
+    React.useEffect(() => {
+        if (activeTab === "TRIPS" && vehicleId && tripsData.length === 0 && !loadingTrips) {
+            loadTrips();
+        } else if (activeTab === "COSTS" && vehicleId) {
+            if (expensesData.length === 0 && !loadingExpenses) {
+                loadExpenses();
+            }
+            if (maintenanceData.length === 0 && !loadingMaintenance) {
+                loadMaintenance();
+            }
+        }
+    }, [activeTab, vehicleId, tripsData.length, expensesData.length, maintenanceData.length, loadingTrips, loadingExpenses, loadingMaintenance, loadTrips, loadExpenses, loadMaintenance]);
+
+    // Combine expenses and maintenance for COSTS tab
+    const combinedExpensesData = React.useMemo(() => {
+        return [...expensesData, ...maintenanceData].sort((a, b) => {
+            const dateA = new Date(a.date || 0);
+            const dateB = new Date(b.date || 0);
+            return dateB - dateA; // Newest first
+        });
+    }, [expensesData, maintenanceData]);
 
     // tab state
     const [activeTab, setActiveTab] = React.useState("PROFILE");
@@ -890,15 +949,27 @@ export default function VehicleDetailPage() {
             ) : null}
 
             {activeTab === "TRIPS" ? (
-                <TripHistoryTab trips={tripsData} />
+                loadingTrips ? (
+                    <div className="text-center py-8 text-slate-500 text-sm">
+                        Đang tải lịch sử chuyến đi...
+                    </div>
+                ) : (
+                    <TripHistoryTab trips={tripsData} />
+                )
             ) : null}
 
             {activeTab === "COSTS" ? (
-                <ExpenseHistoryTab expenses={expensesData} />
+                (loadingExpenses || loadingMaintenance) ? (
+                    <div className="text-center py-8 text-slate-500 text-sm">
+                        Đang tải lịch sử chi phí & bảo trì...
+                    </div>
+                ) : (
+                    <ExpenseHistoryTab expenses={combinedExpensesData} />
+                )
             ) : null}
 
             {/* footer note */}
-            <div className="text-[11px] text-slate-500 text-center mt-6 leading-relaxed">
+            {/* <div className="text-[11px] text-slate-500 text-center mt-6 leading-relaxed">
                 Đây là bản prototype UI. Kết nối API thật sẽ:
                 <br />
                 - load dữ liệu bằng vehicleId (param route)
@@ -906,7 +977,7 @@ export default function VehicleDetailPage() {
                 - gọi PUT khi Lưu thay đổi tab Hồ sơ xe
                 <br />
                 - tab Lịch sử chuyến & Chi phí sẽ phân trang từ backend
-            </div>
+            </div> */}
         </div>
     );
 }

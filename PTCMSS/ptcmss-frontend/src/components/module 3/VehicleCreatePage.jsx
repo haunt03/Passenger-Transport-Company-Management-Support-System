@@ -3,12 +3,17 @@ import {
     CarFront,
     PlusCircle,
     X,
-    Hash,
     Check,
     FolderKanban,
-    Users,
     GaugeCircle,
+    DollarSign,
+    Calendar,
+    FileText,
 } from "lucide-react";
+import {
+    listVehicleCategories,
+    createVehicleCategory,
+} from "../../api/vehicles";
 
 /* -------------------------------------------------
    Tiny helpers
@@ -85,23 +90,31 @@ function StatusPill({ status }) {
 }
 
 /* -------------------------------------------------
-   Modal tạo danh mục xe (light)
-   POST /api/admin/vehicle-categories
+   Modal tạo danh mục xe - REAL API
+   POST /api/vehicle-categories
 ------------------------------------------------- */
-function VehicleCategoryCreateModal({
-                                        open,
-                                        onClose,
-                                        onCreated,
-                                    }) {
-    const [name, setName] = React.useState("");
-    const [seats, setSeats] = React.useState("");
+function VehicleCategoryCreateModal({ open, onClose, onCreated }) {
+    const [categoryName, setCategoryName] = React.useState("");
+    const [description, setDescription] = React.useState("");
+    const [baseFare, setBaseFare] = React.useState("");
+    const [pricePerKm, setPricePerKm] = React.useState("");
+    const [highwayFee, setHighwayFee] = React.useState("");
+    const [fixedCosts, setFixedCosts] = React.useState("");
+    const [effectiveDate, setEffectiveDate] = React.useState("");
+    const [status, setStatus] = React.useState("ACTIVE");
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState("");
 
     React.useEffect(() => {
         if (open) {
-            setName("");
-            setSeats("");
+            setCategoryName("");
+            setDescription("");
+            setBaseFare("");
+            setPricePerKm("");
+            setHighwayFee("");
+            setFixedCosts("");
+            setEffectiveDate(new Date().toISOString().split("T")[0]);
+            setStatus("ACTIVE");
             setLoading(false);
             setError("");
         }
@@ -109,37 +122,34 @@ function VehicleCategoryCreateModal({
 
     if (!open) return null;
 
-    const cleanDigits = (s) => s.replace(/[^0-9]/g, "");
-    const seatsNum = Number(cleanDigits(seats || ""));
-    const valid = name.trim().length > 0 && seatsNum > 0;
+    const valid = categoryName.trim().length > 0;
 
     async function handleSave() {
         if (!valid) {
-            setError("Vui lòng nhập tên danh mục và số ghế hợp lệ (>0).");
+            setError("Vui lòng nhập tên danh mục.");
             return;
         }
         setLoading(true);
         setError("");
 
         const payload = {
-            name: name.trim(),
-            seats: seatsNum,
+            categoryName: categoryName.trim(),
+            description: description.trim() || null,
+            baseFare: baseFare ? parseFloat(baseFare) : null,
+            pricePerKm: pricePerKm ? parseFloat(pricePerKm) : null,
+            highwayFee: highwayFee ? parseFloat(highwayFee) : null,
+            fixedCosts: fixedCosts ? parseFloat(fixedCosts) : null,
+            effectiveDate: effectiveDate || null,
+            status: status,
         };
 
         try {
-            await new Promise((r) => setTimeout(r, 400)); // mock
-
-            const fakeCreated = {
-                id: Date.now(),
-                ...payload,
-                status: "ACTIVE",
-                vehicles_count: 0,
-            };
-
-            onCreated && onCreated(fakeCreated);
+            const created = await createVehicleCategory(payload);
+            onCreated && onCreated(created);
             onClose && onClose();
-        } catch {
-            setError("Không thể tạo danh mục xe. Vui lòng thử lại.");
+        } catch (err) {
+            console.error("Create category error:", err);
+            setError(err.message || "Không thể tạo danh mục xe. Vui lòng thử lại.");
         } finally {
             setLoading(false);
         }
@@ -179,7 +189,7 @@ function VehicleCategoryCreateModal({
                 </div>
 
                 {/* BODY */}
-                <div className="px-5 py-4 space-y-5 text-[13px]">
+                <div className="px-5 py-4 space-y-5 text-[13px] max-h-[70vh] overflow-y-auto">
                     {/* Tên danh mục */}
                     <div>
                         <div className="text-[12px] text-slate-600 mb-1 flex items-center justify-between">
@@ -190,8 +200,8 @@ function VehicleCategoryCreateModal({
                         </div>
 
                         <input
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
+                            value={categoryName}
+                            onChange={(e) => setCategoryName(e.target.value)}
                             className={cls(
                                 "w-full rounded-md border px-3 py-2 text-[13px] text-slate-900 placeholder:text-slate-400 outline-none",
                                 "border-slate-300 bg-white shadow-sm",
@@ -199,46 +209,137 @@ function VehicleCategoryCreateModal({
                             )}
                             placeholder='VD: "Xe 7 chỗ", "Xe VIP 4 chỗ"'
                         />
+                    </div>
 
-                        <div className="text-[11px] text-slate-500 mt-1 leading-snug">
-                            Hiển thị cho điều phối / CSKH khi chọn loại xe giao
-                            chuyến.
+                    {/* Mô tả */}
+                    <div>
+                        <div className="text-[12px] text-slate-600 mb-1">
+                            Mô tả
+                        </div>
+                        <textarea
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            rows={2}
+                            className={cls(
+                                "w-full rounded-md border px-3 py-2 text-[13px] text-slate-900 placeholder:text-slate-400 outline-none resize-none",
+                                "border-slate-300 bg-white shadow-sm",
+                                "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                            )}
+                            placeholder="Mô tả loại xe..."
+                        />
+                    </div>
+
+                    {/* Pricing Grid */}
+                    <div className="grid grid-cols-2 gap-4">
+                        {/* Base Fare */}
+                        <div>
+                            <div className="text-[12px] text-slate-600 mb-1 flex items-center gap-1">
+                                <DollarSign className="h-3.5 w-3.5" />
+                                <span>Giá cơ bản</span>
+                            </div>
+                            <input
+                                type="number"
+                                value={baseFare}
+                                onChange={(e) => setBaseFare(e.target.value)}
+                                className={cls(
+                                    "w-full rounded-md border px-3 py-2 text-[13px] text-slate-900 placeholder:text-slate-400 outline-none",
+                                    "border-slate-300 bg-white shadow-sm",
+                                    "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                                )}
+                                placeholder="0"
+                            />
+                        </div>
+
+                        {/* Price per KM */}
+                        <div>
+                            <div className="text-[12px] text-slate-600 mb-1">
+                                Giá / km
+                            </div>
+                            <input
+                                type="number"
+                                value={pricePerKm}
+                                onChange={(e) => setPricePerKm(e.target.value)}
+                                className={cls(
+                                    "w-full rounded-md border px-3 py-2 text-[13px] text-slate-900 placeholder:text-slate-400 outline-none",
+                                    "border-slate-300 bg-white shadow-sm",
+                                    "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                                )}
+                                placeholder="0"
+                            />
+                        </div>
+
+                        {/* Highway Fee */}
+                        <div>
+                            <div className="text-[12px] text-slate-600 mb-1">
+                                Phí cao tốc
+                            </div>
+                            <input
+                                type="number"
+                                value={highwayFee}
+                                onChange={(e) => setHighwayFee(e.target.value)}
+                                className={cls(
+                                    "w-full rounded-md border px-3 py-2 text-[13px] text-slate-900 placeholder:text-slate-400 outline-none",
+                                    "border-slate-300 bg-white shadow-sm",
+                                    "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                                )}
+                                placeholder="0"
+                            />
+                        </div>
+
+                        {/* Fixed Costs */}
+                        <div>
+                            <div className="text-[12px] text-slate-600 mb-1">
+                                Chi phí cố định
+                            </div>
+                            <input
+                                type="number"
+                                value={fixedCosts}
+                                onChange={(e) => setFixedCosts(e.target.value)}
+                                className={cls(
+                                    "w-full rounded-md border px-3 py-2 text-[13px] text-slate-900 placeholder:text-slate-400 outline-none",
+                                    "border-slate-300 bg-white shadow-sm",
+                                    "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                                )}
+                                placeholder="0"
+                            />
                         </div>
                     </div>
 
-                    {/* Số ghế */}
-                    <div>
-                        <div className="text-[12px] text-slate-600 mb-1 flex items-center justify-between">
-                            <span>
-                                Số ghế{" "}
-                                <span className="text-red-500">*</span>
-                            </span>
-                            <span className="text-[11px] text-slate-400">
-                                Thường: 4 / 7 / 16 ...
-                            </span>
+                    {/* Effective Date & Status */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <div className="text-[12px] text-slate-600 mb-1 flex items-center gap-1">
+                                <Calendar className="h-3.5 w-3.5" />
+                                <span>Ngày hiệu lực</span>
+                            </div>
+                            <input
+                                type="date"
+                                value={effectiveDate}
+                                onChange={(e) => setEffectiveDate(e.target.value)}
+                                className={cls(
+                                    "w-full rounded-md border px-3 py-2 text-[13px] text-slate-900 outline-none",
+                                    "border-slate-300 bg-white shadow-sm",
+                                    "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                                )}
+                            />
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <div className="flex-1">
-                                <input
-                                    value={seats}
-                                    onChange={(e) =>
-                                        setSeats(cleanDigits(e.target.value))
-                                    }
-                                    inputMode="numeric"
-                                    className={cls(
-                                        "w-full rounded-md border px-3 py-2 text-[13px] text-slate-900 placeholder:text-slate-400 outline-none tabular-nums",
-                                        "border-slate-300 bg-white shadow-sm",
-                                        "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
-                                    )}
-                                    placeholder="7"
-                                />
+                        <div>
+                            <div className="text-[12px] text-slate-600 mb-1">
+                                Trạng thái
                             </div>
-
-                            <div className="text-[11px] px-2 py-1 rounded-md border border-slate-200 bg-slate-50 text-slate-600 flex items-center gap-1">
-                                <Hash className="h-3.5 w-3.5 text-slate-400" />
-                                ghế
-                            </div>
+                            <select
+                                value={status}
+                                onChange={(e) => setStatus(e.target.value)}
+                                className={cls(
+                                    "w-full rounded-md border px-3 py-2 text-[13px] text-slate-900 outline-none",
+                                    "border-slate-300 bg-white shadow-sm",
+                                    "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                                )}
+                            >
+                                <option value="ACTIVE">ACTIVE</option>
+                                <option value="INACTIVE">INACTIVE</option>
+                            </select>
                         </div>
                     </div>
 
@@ -338,52 +439,55 @@ function StatCard({ icon, label, value, hint, color = "sky" }) {
 }
 
 /* -------------------------------------------------
-   MAIN PAGE (light version)
+   Format currency VND
+------------------------------------------------- */
+function formatVND(amount) {
+    if (!amount && amount !== 0) return "-";
+    return new Intl.NumberFormat("vi-VN", {
+        style: "currency",
+        currency: "VND",
+    }).format(amount);
+}
+
+/* -------------------------------------------------
+   MAIN PAGE - REAL API VERSION
 ------------------------------------------------- */
 export default function VehicleCategoryPage() {
     const { toasts, pushToast } = useToasts();
 
-    // mock data
-    const [categories, setCategories] = React.useState([
-        {
-            id: 1,
-            name: "Xe 4 chỗ",
-            seats: 4,
-            status: "ACTIVE",
-            vehicles_count: 12,
-        },
-        {
-            id: 2,
-            name: "Xe 7 chỗ",
-            seats: 7,
-            status: "ACTIVE",
-            vehicles_count: 8,
-        },
-        {
-            id: 3,
-            name: "Xe 16 chỗ (School Bus)",
-            seats: 16,
-            status: "INACTIVE",
-            vehicles_count: 2,
-        },
-    ]);
-
+    const [categories, setCategories] = React.useState([]);
+    const [loading, setLoading] = React.useState(true);
     const [createOpen, setCreateOpen] = React.useState(false);
+
+    // Load categories from API
+    React.useEffect(() => {
+        loadCategories();
+    }, []);
+
+    async function loadCategories() {
+        setLoading(true);
+        try {
+            const data = await listVehicleCategories();
+            setCategories(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error("Failed to load categories:", err);
+            pushToast("Không thể tải danh sách danh mục xe", "error");
+            setCategories([]);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    function handleCreated(newCat) {
+        loadCategories(); // Reload list
+        pushToast("Đã tạo danh mục xe: " + newCat.categoryName, "success");
+    }
 
     // KPIs
     const totalTypes = categories.length;
-    const totalCars = categories.reduce(
-        (sum, c) => sum + Number(c.vehicles_count || 0),
-        0
-    );
     const activeTypes = categories.filter(
         (c) => c.status === "ACTIVE"
     ).length;
-
-    function handleCreated(newCat) {
-        setCategories((arr) => [newCat, ...arr]);
-        pushToast("Đã tạo danh mục xe: " + newCat.name, "success");
-    }
 
     return (
         <div className="relative min-h-screen bg-slate-50 text-slate-900 p-6">
@@ -444,19 +548,19 @@ export default function VehicleCategoryPage() {
                 />
 
                 <StatCard
-                    icon={<Users className="h-5 w-5" />}
-                    label="Số xe đang quản lý"
-                    value={totalCars}
-                    hint="Gộp tất cả danh mục"
-                    color="green"
-                />
-
-                <StatCard
                     icon={<GaugeCircle className="h-5 w-5" />}
                     label="Danh mục đang active"
                     value={activeTypes + " / " + totalTypes}
                     hint="Khả dụng để phân công chuyến"
                     color="amber"
+                />
+
+                <StatCard
+                    icon={<FileText className="h-5 w-5" />}
+                    label="Bảng giá"
+                    value={totalTypes}
+                    hint="Các loại xe có bảng giá"
+                    color="green"
                 />
             </div>
 
@@ -467,86 +571,100 @@ export default function VehicleCategoryPage() {
                     Danh sách danh mục xe
                 </div>
 
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left text-[13px] text-slate-700">
-                        <thead className="bg-slate-100/60 border-b border-slate-200 text-[11px] uppercase tracking-wide text-slate-500">
-                        <tr className="text-left">
-                            <th className="px-4 py-2 font-medium">
-                                Tên danh mục
-                            </th>
-                            <th className="px-4 py-2 font-medium whitespace-nowrap">
-                                <div className="flex items-center gap-1">
-                                    <Hash className="h-3.5 w-3.5 text-slate-400" />
-                                    <span>Số ghế</span>
-                                </div>
-                            </th>
-                            <th className="px-4 py-2 font-medium">
-                                Trạng thái
-                            </th>
-                            <th className="px-4 py-2 font-medium whitespace-nowrap">
-                                Số xe đang gán
-                            </th>
-                        </tr>
-                        </thead>
-
-                        <tbody className="divide-y divide-slate-200">
-                        {categories.map((cat) => (
-                            <tr
-                                key={cat.id}
-                                className="hover:bg-slate-50"
-                            >
-                                {/* name + id */}
-                                <td className="px-4 py-3 align-top">
-                                    <div className="flex flex-col leading-tight">
-                                        <div className="text-slate-900 font-medium">
-                                            {cat.name}
-                                        </div>
-                                        <div className="text-[11px] text-slate-500">
-                                            ID: {cat.id}
-                                        </div>
-                                    </div>
-                                </td>
-
-                                {/* seats */}
-                                <td className="px-4 py-3 align-top">
-                                    <div className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-[12px] text-slate-700 tabular-nums shadow-sm">
-                                        <Hash className="h-3.5 w-3.5 text-slate-400" />
-                                        {cat.seats} ghế
-                                    </div>
-                                </td>
-
-                                {/* status */}
-                                <td className="px-4 py-3 align-top text-[12px]">
-                                    <StatusPill status={cat.status} />
-                                </td>
-
-                                {/* vehicles_count */}
-                                <td className="px-4 py-3 align-top text-[13px] text-slate-900 tabular-nums">
-                                    {cat.vehicles_count}
-                                </td>
+                {loading ? (
+                    <div className="px-4 py-10 text-center text-slate-400 text-[13px]">
+                        Đang tải...
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-[13px] text-slate-700">
+                            <thead className="bg-slate-100/60 border-b border-slate-200 text-[11px] uppercase tracking-wide text-slate-500">
+                            <tr className="text-left">
+                                <th className="px-4 py-2 font-medium">
+                                    Tên danh mục
+                                </th>
+                                <th className="px-4 py-2 font-medium">
+                                    Giá cơ bản
+                                </th>
+                                <th className="px-4 py-2 font-medium">
+                                    Giá/km
+                                </th>
+                                <th className="px-4 py-2 font-medium">
+                                    Phí cao tốc
+                                </th>
+                                <th className="px-4 py-2 font-medium">
+                                    Ngày hiệu lực
+                                </th>
+                                <th className="px-4 py-2 font-medium">
+                                    Trạng thái
+                                </th>
                             </tr>
-                        ))}
+                            </thead>
 
-                        {categories.length === 0 ? (
-                            <tr>
-                                <td
-                                    colSpan={4}
-                                    className="px-4 py-10 text-center text-slate-400 text-[13px]"
+                            <tbody className="divide-y divide-slate-200">
+                            {categories.map((cat) => (
+                                <tr
+                                    key={cat.id}
+                                    className="hover:bg-slate-50"
                                 >
-                                    Chưa có danh mục nào.
-                                </td>
-                            </tr>
-                        ) : null}
-                        </tbody>
-                    </table>
-                </div>
+                                    {/* name + description */}
+                                    <td className="px-4 py-3 align-top">
+                                        <div className="flex flex-col leading-tight">
+                                            <div className="text-slate-900 font-medium">
+                                                {cat.categoryName}
+                                            </div>
+                                            {cat.description ? (
+                                                <div className="text-[11px] text-slate-500">
+                                                    {cat.description}
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                    </td>
+
+                                    {/* baseFare */}
+                                    <td className="px-4 py-3 align-top text-[13px] text-slate-900 tabular-nums">
+                                        {formatVND(cat.baseFare)}
+                                    </td>
+
+                                    {/* pricePerKm */}
+                                    <td className="px-4 py-3 align-top text-[13px] text-slate-900 tabular-nums">
+                                        {formatVND(cat.pricePerKm)}
+                                    </td>
+
+                                    {/* highwayFee */}
+                                    <td className="px-4 py-3 align-top text-[13px] text-slate-900 tabular-nums">
+                                        {formatVND(cat.highwayFee)}
+                                    </td>
+
+                                    {/* effectiveDate */}
+                                    <td className="px-4 py-3 align-top text-[12px] text-slate-700">
+                                        {cat.effectiveDate || "-"}
+                                    </td>
+
+                                    {/* status */}
+                                    <td className="px-4 py-3 align-top text-[12px]">
+                                        <StatusPill status={cat.status} />
+                                    </td>
+                                </tr>
+                            ))}
+
+                            {categories.length === 0 && !loading ? (
+                                <tr>
+                                    <td
+                                        colSpan={6}
+                                        className="px-4 py-10 text-center text-slate-400 text-[13px]"
+                                    >
+                                        Chưa có danh mục nào.
+                                    </td>
+                                </tr>
+                            ) : null}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
 
                 <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 text-[11px] text-slate-500 leading-relaxed">
-                    Prototype frontend. Sau này:
-                    <br />
-                    - GET /api/admin/vehicle-categories
-                    <br />
-                    - POST tạo danh mục mới ở modal
+                    API: GET /api/vehicle-categories | POST /api/vehicle-categories
                 </div>
             </div>
 
