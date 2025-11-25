@@ -78,7 +78,7 @@ public interface InvoiceRepository extends JpaRepository<Invoices, Integer> {
      * Tính tổng amount theo branchId, type và khoảng thời gian
      */
     @Query("SELECT COALESCE(SUM(i.amount), 0) FROM Invoices i " +
-            "WHERE i.branch.id = :branchId " +
+            "WHERE (:branchId IS NULL OR i.branch.id = :branchId) " +
             "AND i.type = :type " +
             "AND i.invoiceDate >= :startDate " +
             "AND i.invoiceDate <= :endDate")
@@ -105,9 +105,9 @@ public interface InvoiceRepository extends JpaRepository<Invoices, Integer> {
     List<Invoices> findByBranch_IdAndTypeAndStatusOrderByInvoiceDateDesc(
             Integer branchId, InvoiceType type, InvoiceStatus status);
 
-    @Query("SELECT i FROM Invoices i WHERE i.branch.id = :branchId " +
-            "AND i.type = :type " +
-            "AND i.status = :status " +
+    @Query("SELECT i FROM Invoices i WHERE (:branchId IS NULL OR i.branch.id = :branchId) " +
+            "AND (:type IS NULL OR i.type = :type) " +
+            "AND (:status IS NULL OR i.status = :status) " +
             "AND (:startDate IS NULL OR i.invoiceDate >= :startDate) " +
             "AND (:endDate IS NULL OR i.invoiceDate <= :endDate) " +
             "AND (:customerId IS NULL OR i.customer.id = :customerId) " +

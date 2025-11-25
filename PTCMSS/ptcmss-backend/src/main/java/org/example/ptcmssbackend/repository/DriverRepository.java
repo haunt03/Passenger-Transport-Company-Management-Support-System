@@ -16,11 +16,7 @@ public interface DriverRepository extends JpaRepository<Drivers, Integer> {
     boolean existsByLicenseNumber(String licenseNumber);
 
 
-    @Query("""
-        SELECT d FROM Drivers d
-        WHERE d.employee.branch.id = :branchId
-          AND d.status = 'ACTIVE'
-    """)
+    @Query("SELECT d FROM Drivers d WHERE d.employee.branch.id = :branchId AND d.status = 'ACTIVE'")
     List<Drivers> findAvailableDrivers(Integer branchId);
 
 
@@ -28,11 +24,7 @@ public interface DriverRepository extends JpaRepository<Drivers, Integer> {
     @Query("SELECT d FROM Drivers d WHERE d.branch.id = :branchId")
     List<Drivers> findByBranchId(Integer branchId);
 
-    @Query("""
-    SELECT new org.example.ptcmssbackend.dto.response.Driver.DriverResponse(d)
-    FROM Drivers d
-    WHERE d.branch.id = :branchId
-""")
+    @Query("SELECT new org.example.ptcmssbackend.dto.response.Driver.DriverResponse(d) FROM Drivers d WHERE d.branch.id = :branchId")
     List<DriverResponse> findAllByBranchId(Integer branchId);
 
     // Lấy tất cả driver của 1 chi nhánh
