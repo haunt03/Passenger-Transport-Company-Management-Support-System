@@ -385,92 +385,98 @@ function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr })
                 Thanh toán / Cọc
             </div>
 
-            <div className="grid sm:grid-cols-[1fr_auto] gap-4 text-sm">
-                <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex flex-col gap-1">
-                        <div className="text-[11px] uppercase tracking-wide font-medium text-slate-500">Đã thu</div>
-                        <div className="text-base font-semibold tabular-nums text-emerald-600 flex items-center gap-1">
-                            <DollarSign className="h-4 w-4 text-emerald-600" />
-                            <span>{fmtVND(paid)}</span>
-                        </div>
-                    </div>
-
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex flex-col gap-1">
-                        <div className="text-[11px] uppercase tracking-wide font-medium text-slate-500">Còn lại</div>
-                        <div className="text-base font-semibold tabular-nums text-amber-600 flex items-center gap-1">
-                            <DollarSign className="h-4 w-4 text-amber-600" />
-                            <span>{fmtVND(remain)}</span>
-                        </div>
-
-                        {remain <= 0 ? (
-                            <div className="text-[11px] text-emerald-600 flex items-center gap-1">
-                                <CheckCircle2 className="h-3.5 w-3.5" />
-                                <span>Đã thanh toán đủ</span>
-                            </div>
-                        ) : (
-                            <div className="text-[11px] text-slate-500 leading-relaxed">
-                                Khách sẽ thanh toán phần còn lại sau chuyến hoặc khi xuất hóa đơn.
-                            </div>
-                        )}
+            {/* Số liệu tóm tắt */}
+            <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 flex flex-col gap-1">
+                    <div className="text-[11px] uppercase tracking-wide font-medium text-emerald-700">Đã thu</div>
+                    <div className="text-lg font-bold tabular-nums text-emerald-700 flex items-center gap-1">
+                        <DollarSign className="h-4 w-4" />
+                        <span>{fmtVND(paid)}</span>
                     </div>
                 </div>
 
-                <div className="shrink-0 flex flex-col gap-2">
-                    <button
-                        className="rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-[13px] px-4 py-2 shadow-sm flex items-center justify-center gap-2"
-                        onClick={onOpenDeposit}
-                    >
-                        <BadgeDollarSign className="h-4 w-4" />
-                        <span>Ghi nhận thanh toán</span>
-                    </button>
-
-                    <button
-                        type="button"
-                        className="rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium text-[13px] px-4 py-2 shadow-sm flex items-center justify-center gap-2"
-                        onClick={onGenerateQr}
-                    >
-                        <QrCode className="h-4 w-4 text-sky-600" />
-                        <span>Tạo QR thanh toán</span>
-                    </button>
-
-                    <div className="text-[11px] text-slate-500 text-center leading-relaxed">
-                        Ghi nhận tiền mặt/chuyển khoản hoặc gửi mã QR để khách tự thanh toán.
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 flex flex-col gap-1">
+                    <div className="text-[11px] uppercase tracking-wide font-medium text-amber-700">Còn lại</div>
+                    <div className="text-lg font-bold tabular-nums text-amber-700 flex items-center gap-1">
+                        <DollarSign className="h-4 w-4" />
+                        <span>{fmtVND(remain)}</span>
                     </div>
                 </div>
             </div>
 
-            <div className="border-t border-slate-200 pt-4">
-                <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-2">Lịch sử thanh toán</div>
+            {/* Trạng thái & ghi chú */}
+            {remain <= 0 ? (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-700 flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span className="font-medium">Đã thanh toán đủ</span>
+                </div>
+            ) : (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-600 leading-relaxed">
+                    Khách sẽ thanh toán phần còn lại sau chuyến hoặc khi xuất hóa đơn.
+                </div>
+            )}
+
+            {/* Nút hành động */}
+            <div className="grid grid-cols-2 gap-3">
+                <button
+                    className="rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-[13px] px-4 py-2.5 shadow-sm flex items-center justify-center gap-2 transition-colors"
+                    onClick={onOpenDeposit}
+                >
+                    <BadgeDollarSign className="h-4 w-4" />
+                    <span>Ghi nhận thanh toán</span>
+                </button>
+
+                <button
+                    type="button"
+                    className="rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium text-[13px] px-4 py-2.5 shadow-sm flex items-center justify-center gap-2 transition-colors"
+                    onClick={onGenerateQr}
+                >
+                    <QrCode className="h-4 w-4 text-sky-600" />
+                    <span>Tạo QR</span>
+                </button>
+            </div>
+
+            <div className="text-[11px] text-slate-500 text-center leading-relaxed px-2">
+                Ghi nhận tiền mặt/chuyển khoản hoặc gửi mã QR để khách tự thanh toán.
+            </div>
+
+            {/* Lịch sử thanh toán */}
+            <div className="border-t border-slate-200 pt-4 space-y-3">
+                <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Lịch sử thanh toán</div>
                 {history.length ? (
-                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                         {history.map((item) => (
                             <div
                                 key={item.invoiceId}
-                                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] flex flex-col gap-1"
+                                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-[12px] space-y-1.5"
                             >
-                                <div className="flex justify-between items-center">
-                                    <span className="font-semibold text-slate-900">{fmtVND(item.amount || 0)}</span>
-                                    <span className="text-[11px] text-slate-500">{item.createdAt ? fmtDateTime(item.createdAt) : "--"}</span>
+                                <div className="flex justify-between items-start gap-2">
+                                    <span className="font-bold text-base text-slate-900 tabular-nums">{fmtVND(item.amount || 0)}</span>
+                                    <span className="text-[11px] text-slate-500 whitespace-nowrap">{item.createdAt ? fmtDateTime(item.createdAt) : "--"}</span>
                                 </div>
-                                <div className="flex justify-between text-[11px] text-slate-500">
-                                    <span>{item.paymentMethod || "N/A"}</span>
+                                <div className="flex justify-between items-center text-[11px]">
+                                    <span className="text-slate-600">{item.paymentMethod || "N/A"}</span>
                                     <span
                                         className={cls(
-                                            "font-medium",
-                                            item.paymentStatus === "PAID" ? "text-emerald-600" : "text-amber-600"
+                                            "font-semibold px-2 py-0.5 rounded-md",
+                                            item.paymentStatus === "PAID"
+                                                ? "bg-emerald-100 text-emerald-700"
+                                                : "bg-amber-100 text-amber-700"
                                         )}
                                     >
                                         {item.paymentStatus || "UNPAID"}
                                     </span>
                                 </div>
                                 {item.note ? (
-                                    <div className="text-[11px] text-slate-600 break-words">{item.note}</div>
+                                    <div className="text-[11px] text-slate-600 break-words leading-relaxed pt-1 border-t border-slate-200">{item.note}</div>
                                 ) : null}
                             </div>
                         ))}
                     </div>
                 ) : (
-                    <div className="text-[12px] text-slate-500">Chưa có khoản thanh toán nào.</div>
+                    <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-[12px] text-slate-500">
+                        Chưa có khoản thanh toán nào.
+                    </div>
                 )}
             </div>
         </div>
@@ -498,14 +504,20 @@ function QrPaymentModal({
         if (open) {
             const initAmount = Math.max(0, Number(defaultAmount || 0));
             setAmountStr(initAmount > 0 ? String(initAmount) : "");
-            setNote("");
+
+            // Auto-generate note based on booking info
+            const autoNote = deposit
+                ? `Cọc đơn ${bookingCode || 'ORD'} - ${customerName || 'Khách hàng'}`
+                : `Thanh toán ${bookingCode || 'ORD'} - ${customerName || 'Khách hàng'}`;
+            setNote(autoNote);
+
             setDeposit(true);
             setResult(null);
             setError("");
             setCopied(false);
             setUseFallbackImage(false);
         }
-    }, [open, defaultAmount]);
+    }, [open, defaultAmount, bookingCode, customerName, deposit]);
 
     if (!open) return null;
 
@@ -541,16 +553,17 @@ function QrPaymentModal({
     };
 
     return (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
             <div
                 className="absolute inset-0 bg-slate-900/40"
                 onClick={onClose}
             />
             <div
-                className="relative z-[1001] w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-5"
+                className="relative z-[1001] w-full max-w-xl max-h-[90vh] rounded-2xl border border-slate-200 bg-white shadow-2xl flex flex-col overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="flex items-start justify-between gap-4">
+                {/* Header - fixed */}
+                <div className="flex items-start justify-between gap-4 p-6 pb-4 border-b border-slate-200 shrink-0">
                     <div>
                         <div className="text-[11px] uppercase tracking-wide font-medium text-slate-500 flex items-center gap-2">
                             <QrCode className="h-4 w-4 text-sky-600" />
@@ -574,7 +587,8 @@ function QrPaymentModal({
                     </button>
                 </div>
 
-                <div className="space-y-4">
+                {/* Content - scrollable */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-4">
                     <div className="flex flex-col gap-1">
                         <label className="text-[12px] font-medium text-slate-600">
                             Số tiền (VND)
@@ -605,13 +619,24 @@ function QrPaymentModal({
                             value={note}
                             onChange={(e) => setNote(e.target.value)}
                         />
+                        <div className="text-[11px] text-slate-500">
+                            Tự động tạo dựa trên thông tin đơn hàng. Bạn có thể chỉnh sửa nếu cần.
+                        </div>
                     </div>
 
                     <label className="inline-flex items-center gap-2 text-[12px] text-slate-600">
                         <input
                             type="checkbox"
                             checked={deposit}
-                            onChange={(e) => setDeposit(e.target.checked)}
+                            onChange={(e) => {
+                                const isDeposit = e.target.checked;
+                                setDeposit(isDeposit);
+                                // Auto-update note when deposit status changes
+                                const autoNote = isDeposit
+                                    ? `Cọc đơn ${bookingCode || 'ORD'} - ${customerName || 'Khách hàng'}`
+                                    : `Thanh toán ${bookingCode || 'ORD'} - ${customerName || 'Khách hàng'}`;
+                                setNote(autoNote);
+                            }}
                             className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                         />
                         Đánh dấu là khoản đặt cọc
@@ -623,7 +648,7 @@ function QrPaymentModal({
                         </div>
                     ) : null}
 
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex items-center justify-end gap-2 pt-2">
                         <button
                             type="button"
                             className="text-[13px] font-medium text-slate-500 hover:text-slate-700"
@@ -640,102 +665,102 @@ function QrPaymentModal({
                             {loading ? "Đang tạo..." : "Tạo QR"}
                         </button>
                     </div>
-                </div>
 
-                {result ? (
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-                        <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                            Mã QR đã tạo
-                        </div>
+                    {result ? (
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3 mt-4">
+                            <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                                Mã QR đã tạo
+                            </div>
 
-                        {(() => {
-                            const fallbackImageUrl = result?.qrText
-                                ? `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(
-                                    result.qrText
-                                )}`
-                                : null;
-                            const qrImgSrc =
-                                useFallbackImage || !result?.qrImageUrl
-                                    ? fallbackImageUrl
-                                    : result?.qrImageUrl;
-                            if (qrImgSrc) {
+                            {(() => {
+                                const fallbackImageUrl = result?.qrText
+                                    ? `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(
+                                        result.qrText
+                                    )}`
+                                    : null;
+                                const qrImgSrc =
+                                    useFallbackImage || !result?.qrImageUrl
+                                        ? fallbackImageUrl
+                                        : result?.qrImageUrl;
+                                if (qrImgSrc) {
+                                    return (
+                                        <div className="flex flex-col items-center gap-2">
+                                            <img
+                                                src={qrImgSrc}
+                                                alt="QR thanh toán"
+                                                className="w-full max-h-[280px] object-contain rounded-lg border border-white shadow-sm bg-white"
+                                                onError={() => {
+                                                    if (!useFallbackImage) {
+                                                        setUseFallbackImage(true);
+                                                    }
+                                                }}
+                                            />
+                                            {useFallbackImage && (
+                                                <span className="text-[11px] text-slate-500">
+                                                    Đang sử dụng ảnh QR dự phòng.
+                                                </span>
+                                            )}
+                                        </div>
+                                    );
+                                }
                                 return (
-                                    <div className="flex flex-col items-center gap-2">
-                                        <img
-                                            src={qrImgSrc}
-                                            alt="QR thanh toán"
-                                            className="w-full max-h-[280px] object-contain rounded-lg border border-white shadow-sm bg-white"
-                                            onError={() => {
-                                                if (!useFallbackImage) {
-                                                    setUseFallbackImage(true);
-                                                }
-                                            }}
-                                        />
-                                        {useFallbackImage && (
-                                            <span className="text-[11px] text-slate-500">
-                                                Đang sử dụng ảnh QR dự phòng.
-                                            </span>
-                                        )}
+                                    <div className="rounded-lg border border-dashed border-slate-300 bg-white px-3 py-5 text-center text-[12px] text-slate-500">
+                                        Không có hình ảnh QR, dùng chuỗi bên dưới để thanh toán.
                                     </div>
                                 );
-                            }
-                            return (
-                                <div className="rounded-lg border border-dashed border-slate-300 bg-white px-3 py-5 text-center text-[12px] text-slate-500">
-                                    Không có hình ảnh QR, dùng chuỗi bên dưới để thanh toán.
-                                </div>
-                            );
-                        })()}
+                            })()}
 
-                        <div className="grid sm:grid-cols-2 gap-3 text-[12px] text-slate-600">
-                            <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                                <div className="text-[11px] uppercase tracking-wide text-slate-400">
-                                    Số tiền
+                            <div className="grid sm:grid-cols-2 gap-3 text-[12px] text-slate-600">
+                                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                                    <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                                        Số tiền
+                                    </div>
+                                    <div className="text-base font-semibold text-slate-900">
+                                        {fmtVND(result.amount || 0)}
+                                    </div>
                                 </div>
-                                <div className="text-base font-semibold text-slate-900">
-                                    {fmtVND(result.amount || 0)}
+                                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                                    <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                                        Hiệu lực đến
+                                    </div>
+                                    <div className="text-sm font-medium text-slate-900">
+                                        {result.expiresAt ? fmtDateTime(result.expiresAt) : "Không giới hạn"}
+                                    </div>
                                 </div>
                             </div>
-                            <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                                <div className="text-[11px] uppercase tracking-wide text-slate-400">
-                                    Hiệu lực đến
+
+                            {result.note ? (
+                                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-600">
+                                    <div className="text-[11px] uppercase tracking-wide text-slate-400 mb-1">
+                                        Ghi chú
+                                    </div>
+                                    <div className="break-words">
+                                        {result.note}
+                                    </div>
                                 </div>
-                                <div className="text-sm font-medium text-slate-900">
-                                    {result.expiresAt ? fmtDateTime(result.expiresAt) : "Không giới hạn"}
+                            ) : null}
+
+                            {result.qrText ? (
+                                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-600 flex flex-col gap-2">
+                                    <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                                        Chuỗi QR
+                                    </div>
+                                    <div className="break-all text-slate-800">
+                                        {result.qrText}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="self-start inline-flex items-center gap-1 rounded-md border border-slate-200 px-3 py-1 text-[12px] font-medium text-slate-600 hover:bg-slate-100"
+                                        onClick={copyQrText}
+                                    >
+                                        <Copy className="h-3.5 w-3.5" />
+                                        {copied ? "Đã sao chép" : "Sao chép"}
+                                    </button>
                                 </div>
-                            </div>
+                            ) : null}
                         </div>
-
-                        {result.note ? (
-                            <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-600">
-                                <div className="text-[11px] uppercase tracking-wide text-slate-400 mb-1">
-                                    Ghi chú
-                                </div>
-                                <div className="break-words">
-                                    {result.note}
-                                </div>
-                            </div>
-                        ) : null}
-
-                        {result.qrText ? (
-                            <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-600 flex flex-col gap-2">
-                                <div className="text-[11px] uppercase tracking-wide text-slate-400">
-                                    Chuỗi QR
-                                </div>
-                                <div className="break-all text-slate-800">
-                                    {result.qrText}
-                                </div>
-                                <button
-                                    type="button"
-                                    className="self-start inline-flex items-center gap-1 rounded-md border border-slate-200 px-3 py-1 text-[12px] font-medium text-slate-600 hover:bg-slate-100"
-                                    onClick={copyQrText}
-                                >
-                                    <Copy className="h-3.5 w-3.5" />
-                                    {copied ? "Đã sao chép" : "Sao chép"}
-                                </button>
-                            </div>
-                        ) : null}
-                    </div>
-                ) : null}
+                    ) : null}
+                </div>
             </div>
         </div>
     );
@@ -867,6 +892,8 @@ export default function OrderDetailPage() {
             id: b.id,
             code: `ORD-${b.id}`,
             status: b.status === 'CONFIRMED' ? 'ASSIGNED' : (b.status || 'PENDING'),
+            branchId: b.branchId,
+            customerId: b.customer?.id,
             customer: {
                 name: b.customer?.fullName || '',
                 phone: b.customer?.phone || '',
@@ -953,7 +980,7 @@ export default function OrderDetailPage() {
             });
             await fetchOrder();
             await fetchPayments();
-            push(`Đã ghi nhận thanh toán +${Number(payload.amount||0).toLocaleString('vi-VN')}đ cho đơn ${order.id}`, 'success');
+            push(`Đã ghi nhận thanh toán +${Number(payload.amount || 0).toLocaleString('vi-VN')}đ cho đơn ${order.id}`, 'success');
         } catch (e) {
             push('Ghi nhận thanh toán thất bại', 'error');
         }
@@ -1061,9 +1088,9 @@ export default function OrderDetailPage() {
                         <div className="flex max-w-fit items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] text-amber-700">
                             <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
                             <span className="leading-relaxed">
-                                Đơn chưa xác nhận. Cần
-                                chốt lại với khách.
-                            </span>
+                                    Đơn chưa xác nhận. Cần
+                                    chốt lại với khách.
+                                </span>
                         </div>
                     )}
                 </div>
@@ -1178,6 +1205,8 @@ export default function OrderDetailPage() {
                 context={{
                     type: "order",
                     id: order.id,
+                    branchId: order.branchId,
+                    customerId: order.customerId,
                     title:
                         order.customer.name +
                         " · " +
