@@ -11,6 +11,7 @@ import {
     Check,
     Loader2,
 } from "lucide-react";
+import { getAssignmentSuggestions, assignTrips, reassignTrips } from "../../api/dispatch";
 
 /**
  * AssignDriverDialog – M5.S3 (Popup/Subscreen) – LIGHT THEME VERSION
@@ -33,12 +34,7 @@ import {
  *  - onAssigned?: (payload) => void
  */
 
-const ENDPOINTS = {
-    SUGGESTIONS: (orderId) =>
-        `/api/v1/coordinator/orders/${orderId}/suggestions`,
-    ASSIGN: (orderId) =>
-        `/api/v1/coordinator/orders/${orderId}/assign`,
-};
+// Endpoints đã được chuyển sang sử dụng API functions từ dispatch.js
 
 export default function AssignDriverDialog({
                                                open,
@@ -49,6 +45,9 @@ export default function AssignDriverDialog({
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState("");
     const [suggestions, setSuggestions] = React.useState([]); // [{driver, vehicle, score, reasons[]}]
+    const [driverCandidates, setDriverCandidates] = React.useState([]);
+    const [vehicleCandidates, setVehicleCandidates] = React.useState([]);
+    const [summary, setSummary] = React.useState(null);
     const [driverId, setDriverId] = React.useState("");
     const [vehicleId, setVehicleId] = React.useState("");
 
@@ -56,45 +55,56 @@ export default function AssignDriverDialog({
     const [autoPosting, setAutoPosting] =
         React.useState(false);
 
-    const orderId = order?.id;
+    const tripId = order?.tripId || order?.id;
+    const bookingId = order?.bookingId;
 
     // Fetch gợi ý khi popup mở
     React.useEffect(() => {
         let cancelled = false;
         async function run() {
-            if (!open || !orderId) return;
+            if (!open || !tripId) return;
             setLoading(true);
             setError("");
             setDriverId("");
             setVehicleId("");
             try {
-                const r = await fetch(
-                    ENDPOINTS.SUGGESTIONS(orderId)
-                );
-                if (!r.ok)
-                    throw new Error(
-                        `HTTP ${r.status}`
-                    );
-                const json = await r.json();
-                const list = Array.isArray(
-                    json?.suggestions
-                )
-                    ? json.suggestions
-                    : json;
-                if (!cancelled)
+                const data = await getAssignmentSuggestions(tripId);
+
+                if (!cancelled) {
+                    setSummary(data?.summary || null);
                     setSuggestions(
-                        Array.isArray(list)
-                            ? list
+                        Array.isArray(data?.suggestions)
+                            ? data.suggestions
                             : []
                     );
-            } catch {
+                    setDriverCandidates(
+                        Array.isArray(data?.drivers)
+                            ? data.drivers
+                            : []
+                    );
+                    setVehicleCandidates(
+                        Array.isArray(data?.vehicles)
+                            ? data.vehicles
+                            : []
+                    );
+
+                    // Auto-select recommended
+                    if (data?.recommendedDriverId) {
+                        setDriverId(String(data.recommendedDriverId));
+                    }
+                    if (data?.recommendedVehicleId) {
+                        setVehicleId(String(data.recommendedVehicleId));
+                    }
+                }
+            } catch (err) {
                 if (cancelled) return;
+                console.error("Failed to load suggestions:", err);
                 setError(
-                    "Không lấy được gợi ý. Hiển thị dữ liệu mẫu."
+                    "Không thể tải gợi ý tài xế/xe: " + (err.message || "Lỗi không xác định")
                 );
-                setSuggestions(
-                    demoSuggestions(order)
-                );
+                setSuggestions([]);
+                setDriverCandidates([]);
+                setVehicleCandidates([]);
             } finally {
                 if (!cancelled)
                     setLoading(false);
@@ -104,41 +114,17 @@ export default function AssignDriverDialog({
         return () => {
             cancelled = true;
         };
-    }, [open, orderId, order]);
+    }, [open, tripId, order]);
 
-    // danh sách tài xế unique
+    // danh sách tài xế (chỉ eligible)
     const driverOptions = React.useMemo(() => {
-        const map = new Map();
-        for (const s of suggestions) {
-            if (
-                s?.driver &&
-                !map.has(String(s.driver.id))
-            ) {
-                map.set(
-                    String(s.driver.id),
-                    s.driver
-                );
-            }
-        }
-        return Array.from(map.values());
-    }, [suggestions]);
+        return driverCandidates.filter(d => d.eligible);
+    }, [driverCandidates]);
 
-    // danh sách xe unique
+    // danh sách xe (chỉ eligible)
     const vehicleOptions = React.useMemo(() => {
-        const map = new Map();
-        for (const s of suggestions) {
-            if (
-                s?.vehicle &&
-                !map.has(String(s.vehicle.id))
-            ) {
-                map.set(
-                    String(s.vehicle.id),
-                    s.vehicle
-                );
-            }
-        }
-        return Array.from(map.values());
-    }, [suggestions]);
+        return vehicleCandidates.filter(v => v.eligible);
+    }, [vehicleCandidates]);
 
     // khi click 1 dòng gợi ý => fill vào dropdown
     const handlePickSuggestion = (s) => {
@@ -156,44 +142,52 @@ export default function AssignDriverDialog({
     // Gán thủ công
     const doAssignManual = async () => {
         if (
-            !orderId ||
+            !bookingId ||
             !driverId ||
             !vehicleId
         )
             return;
         setPosting(true);
         try {
-            const r = await fetch(
-                ENDPOINTS.ASSIGN(orderId),
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type":
-                            "application/json",
-                    },
-                    body: JSON.stringify({
-                        driver_id:
-                            Number(driverId),
-                        vehicle_id:
-                            Number(vehicleId),
-                    }),
-                }
-            );
-            if (!r.ok)
-                throw new Error(
-                    `HTTP ${r.status}`
-                );
-            const ok = await r
-                .json()
-                .catch(() => ({}));
-            onAssigned?.({
-                type: "manual",
-                orderId,
-                driverId: Number(driverId),
-                vehicleId:
-                    Number(vehicleId),
-                response: ok,
-            });
+            // Check if trip already has assignment (reassign) or new assignment
+            const isReassign = order?.driverId || order?.vehicleId;
+
+            if (isReassign && tripId) {
+                // Use reassign API
+                const result = await reassignTrips({
+                    tripId: Number(tripId),
+                    driverId: Number(driverId),
+                    vehicleId: Number(vehicleId),
+                    note: "Reassign từ dialog",
+                });
+
+                onAssigned?.({
+                    type: "reassign",
+                    tripId,
+                    bookingId,
+                    driverId: Number(driverId),
+                    vehicleId: Number(vehicleId),
+                    response: result,
+                });
+            } else {
+                // Use assign API
+                const result = await assignTrips({
+                    bookingId: Number(bookingId),
+                    tripIds: tripId ? [Number(tripId)] : undefined,
+                    driverId: Number(driverId),
+                    vehicleId: Number(vehicleId),
+                    autoAssign: false,
+                });
+
+                onAssigned?.({
+                    type: "manual",
+                    tripId,
+                    bookingId,
+                    driverId: Number(driverId),
+                    vehicleId: Number(vehicleId),
+                    response: result,
+                });
+            }
             onClose?.();
         } catch (e) {
             console.error(e);
@@ -207,33 +201,20 @@ export default function AssignDriverDialog({
 
     // Gán tự động
     const doAssignAuto = async () => {
-        if (!orderId) return;
+        if (!bookingId) return;
         setAutoPosting(true);
         try {
-            const r = await fetch(
-                ENDPOINTS.ASSIGN(orderId),
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type":
-                            "application/json",
-                    },
-                    body: JSON.stringify({
-                        auto: true,
-                    }),
-                }
-            );
-            if (!r.ok)
-                throw new Error(
-                    `HTTP ${r.status}`
-                );
-            const ok = await r
-                .json()
-                .catch(() => ({}));
+            const result = await assignTrips({
+                bookingId: Number(bookingId),
+                tripIds: tripId ? [Number(tripId)] : undefined,
+                autoAssign: true,
+            });
+
             onAssigned?.({
                 type: "auto",
-                orderId,
-                response: ok,
+                tripId,
+                bookingId,
+                response: result,
             });
             onClose?.();
         } catch (e) {
@@ -391,13 +372,13 @@ export default function AssignDriverDialog({
                                                                 ?.driver
                                                                 ?.id && (
                                                                 <span className="text-[11px] text-slate-500 font-normal">
-                                                                    #
+                                                                        #
                                                                     {
                                                                         s
                                                                             .driver
                                                                             .id
                                                                     }
-                                                                </span>
+                                                                    </span>
                                                             )}
                                                         </div>
 
@@ -421,13 +402,13 @@ export default function AssignDriverDialog({
                                                                 ?.vehicle
                                                                 ?.type && (
                                                                 <span className="text-[11px] text-slate-500 font-normal">
-                                                                    ·{" "}
+                                                                        ·{" "}
                                                                     {
                                                                         s
                                                                             .vehicle
                                                                             .type
                                                                     }
-                                                                </span>
+                                                                    </span>
                                                             )}
                                                         </div>
 
@@ -437,11 +418,11 @@ export default function AssignDriverDialog({
                                                                 <div className="ml-auto flex items-center gap-1 text-[11px] text-emerald-600 font-medium">
                                                                     <BadgeCheck className="h-4 w-4 text-emerald-600" />
                                                                     <span>
-                                                                    Score:{" "}
+                                                                        Score:{" "}
                                                                         {
                                                                             s.score
                                                                         }
-                                                                </span>
+                                                                    </span>
                                                                 </div>
                                                             )}
                                                     </div>
@@ -516,8 +497,8 @@ export default function AssignDriverDialog({
                                                 }
                                             >
                                                 {d.name}{" "}
-                                                {d.id
-                                                    ? `(#${d.id})`
+                                                {d.tripsToday != null
+                                                    ? `(${d.tripsToday} chuyến hôm nay)`
                                                     : ""}
                                             </option>
                                         )
@@ -564,11 +545,11 @@ export default function AssignDriverDialog({
                                                 }
                                             >
                                                 {v.plate}{" "}
-                                                {v.type
-                                                    ? `· ${v.type}`
+                                                {v.model
+                                                    ? `· ${v.model}`
                                                     : ""}{" "}
-                                                {v.id
-                                                    ? `(#${v.id})`
+                                                {v.status
+                                                    ? `(${v.status})`
                                                     : ""}
                                             </option>
                                         )
@@ -591,10 +572,9 @@ export default function AssignDriverDialog({
                         }
                         className={`
                             rounded-md px-3 py-2 border text-[13px] font-medium flex items-center gap-1
-                            ${
-                            autoPosting
-                                ? "opacity-60 cursor-not-allowed border-emerald-300 text-emerald-400 bg-white"
-                                : "border-emerald-600 text-emerald-700 bg-white hover:bg-emerald-50"
+                            ${autoPosting
+                            ? "opacity-60 cursor-not-allowed border-emerald-300 text-emerald-400 bg-white"
+                            : "border-emerald-600 text-emerald-700 bg-white hover:bg-emerald-50"
                         }
                         `}
                     >
@@ -619,10 +599,9 @@ export default function AssignDriverDialog({
                         }
                         className={`
                             rounded-md px-3 py-2 border text-[13px] font-medium flex items-center gap-1
-                            ${
-                            canConfirm
-                                ? "border-sky-600 text-sky-700 bg-white hover:bg-sky-50"
-                                : "opacity-60 cursor-not-allowed border-slate-300 text-slate-400 bg-white"
+                            ${canConfirm
+                            ? "border-sky-600 text-sky-700 bg-white hover:bg-sky-50"
+                            : "opacity-60 cursor-not-allowed border-slate-300 text-slate-400 bg-white"
                         }
                         `}
                     >
@@ -661,49 +640,4 @@ function fmtDateTime(iso) {
     const hh = pad2(d.getHours());
     const mm = pad2(d.getMinutes());
     return `${day}/${m}/${y} ${hh}:${mm}`;
-}
-
-// Dữ liệu demo fallback nếu API gợi ý lỗi
-function demoSuggestions(order) {
-    return [
-        {
-            id: 1,
-            driver: {
-                id: 101,
-                name: "Nguyễn Văn A",
-                branch_name:
-                order?.branch_name,
-            },
-            vehicle: {
-                id: 55,
-                plate: "29A-123.45",
-                type: order?.vehicle_type,
-            },
-            score: 92,
-            reasons: [
-                "Rảnh tại thời điểm pickup",
-                "Cùng chi nhánh",
-                "Đúng loại xe",
-            ],
-        },
-        {
-            id: 2,
-            driver: {
-                id: 102,
-                name: "Trần Thị B",
-                branch_name:
-                order?.branch_name,
-            },
-            vehicle: {
-                id: 58,
-                plate: "30G-678.90",
-                type: order?.vehicle_type,
-            },
-            score: 88,
-            reasons: [
-                "Rảnh",
-                "Khoảng cách gần",
-            ],
-        },
-    ];
 }

@@ -1,5 +1,6 @@
 // ConsultantDashboardPage.jsx (LIGHT THEME)
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { getConsultantDashboard } from "../../api/bookings";
 import {
     PlusCircle,
@@ -195,6 +196,7 @@ function PendingQueueCard({ items, onSelect }) {
 
 /* ---------------- MAIN PAGE ---------------- */
 export default function ConsultantDashboardPage() {
+    const navigate = useNavigate();
     const { toasts, push } = useToasts();
 
     // stats từ backend
@@ -266,8 +268,7 @@ export default function ConsultantDashboardPage() {
 
     // CTA
     const handleCreateOrder = () => {
-        push("Đi tới màn Tạo đơn hàng mới (M4.S2) - mock", "info");
-        // navigate("/orders/new")
+        navigate("/orders/new");
     };
 
     // click 1 đơn trong queue
@@ -342,13 +343,13 @@ export default function ConsultantDashboardPage() {
             <PendingQueueCard items={pendingOrders} onSelect={handleSelectPending} />
 
             {/* FOOTNOTE */}
-            <div className="text-[11px] text-slate-500 mt-6 leading-relaxed">
+            {/* <div className="text-[11px] text-slate-500 mt-6 leading-relaxed">
                 Endpoint dự kiến:{" "}
                 <code className="text-slate-700">
                     GET /api/consultant/dashboard
                 </code>
                 . Backend sẽ tự filter theo tài khoản tư vấn viên (branch, user id).
-            </div>
+            </div> */}
         </div>
     );
 }

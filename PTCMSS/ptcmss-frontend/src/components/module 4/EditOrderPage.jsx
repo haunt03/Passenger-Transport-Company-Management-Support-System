@@ -2,6 +2,7 @@
 import React from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { getBooking, updateBooking, calculatePrice, assignBooking } from "../../api/bookings";
+import { calculateDistance } from "../../api/graphhopper";
 import { listVehicleCategories } from "../../api/vehicleCategories";
 import { listBranches } from "../../api/branches";
 import {
@@ -16,6 +17,8 @@ import {
     AlertTriangle,
     Save,
     Send,
+    Loader2,
+    Navigation,
 } from "lucide-react";
 
 /**
@@ -109,18 +112,7 @@ function Toasts({ toasts }) {
     );
 }
 
-/* ---------------- demo dropdowns ---------------- */
-const MOCK_CATEGORIES = [
-    { id: "SEDAN4", label: "Sedan 4 chỗ" },
-    { id: "SUV7", label: "SUV 7 chỗ" },
-    { id: "MINI16", label: "Minibus 16 chỗ" },
-];
-
-const MOCK_BRANCHES = [
-    { id: "HN", label: "Hà Nội" },
-    { id: "HCM", label: "TP.HCM" },
-    { id: "DN", label: "Đà Nẵng" },
-];
+// Removed MOCK_CATEGORIES and MOCK_BRANCHES - chỉ dùng data từ API, báo lỗi nếu không fetch được
 
 /* ---------------- giả lập data GET /api/orders/{orderId} ---------------- */
 const MOCK_ORDER = {
@@ -170,6 +162,9 @@ export default function EditOrderPage() {
     const [dropoff, setDropoff] = React.useState("");
     const [startTime, setStartTime] = React.useState("");
     const [endTime, setEndTime] = React.useState("");
+    const [distanceKm, setDistanceKm] = React.useState("");
+    const [calculatingDistance, setCalculatingDistance] = React.useState(false);
+    const [distanceError, setDistanceError] = React.useState("");
 
     /* --- thông số xe --- */
     const [pax, setPax] = React.useState("0");
@@ -235,13 +230,27 @@ export default function EditOrderPage() {
         (async () => {
             try {
                 const cats = await listVehicleCategories();
-                if (Array.isArray(cats) && cats.length > 0) setCategories(cats);
-            } catch {}
+                if (Array.isArray(cats) && cats.length > 0) {
+                    setCategories(cats);
+                } else {
+                    pushToast("Không thể tải danh mục xe: Dữ liệu trống", "error");
+                }
+            } catch (err) {
+                console.error("Failed to load categories:", err);
+                pushToast("Không thể tải danh mục xe: " + (err.message || "Lỗi không xác định"), "error");
+            }
             try {
                 const br = await listBranches({ page: 0 });
                 const items = Array.isArray(br?.items) ? br.items : (Array.isArray(br) ? br : []);
-                if (items.length > 0) setBranches(items);
-            } catch {}
+                if (items.length > 0) {
+                    setBranches(items);
+                } else {
+                    pushToast("Không thể tải chi nhánh: Dữ liệu trống", "error");
+                }
+            } catch (err) {
+                console.error("Failed to load branches:", err);
+                pushToast("Không thể tải chi nhánh: " + (err.message || "Lỗi không xác định"), "error");
+            }
             try {
                 if (!orderId) return;
                 const b = await getBooking(orderId);
@@ -255,6 +264,7 @@ export default function EditOrderPage() {
                 setDropoff(t.endLocation || "");
                 setStartTime((t.startTime || "").toString().replace("Z", ""));
                 setEndTime((t.endTime || "").toString().replace("Z", ""));
+                setDistanceKm(String(t.distance || ""));
                 const qty = Array.isArray(b.vehicles) ? b.vehicles.reduce((s,v)=>s+(v.quantity||0),0) : 1;
                 const catId = Array.isArray(b.vehicles) && b.vehicles.length ? String(b.vehicles[0].vehicleCategoryId) : "";
                 setVehiclesNeeded(String(qty));
@@ -265,6 +275,38 @@ export default function EditOrderPage() {
             } catch {}
         })();
     }, [orderId]);
+
+    // Auto-calculate distance when both pickup and dropoff are entered
+    React.useEffect(() => {
+        const timeoutId = setTimeout(async () => {
+            if (!pickup || !dropoff) {
+                setDistanceError("");
+                return;
+            }
+
+            // Only calculate if both fields have reasonable length and in edit mode
+            if (pickup.trim().length < 5 || dropoff.trim().length < 5 || !canEdit) {
+                return;
+            }
+
+            setCalculatingDistance(true);
+            setDistanceError("");
+
+            try {
+                const result = await calculateDistance(pickup, dropoff);
+                setDistanceKm(String(result.distance));
+                pushToast(`Distance: ${result.formattedDistance} (~${result.formattedDuration})`, "success");
+            } catch (error) {
+                console.error("Distance calculation error:", error);
+                setDistanceError("Unable to calculate distance automatically.");
+                pushToast("Unable to calculate distance automatically", "error");
+            } finally {
+                setCalculatingDistance(false);
+            }
+        }, 1500); // Debounce 1.5 seconds
+
+        return () => clearTimeout(timeoutId);
+    }, [pickup, dropoff, canEdit]);
 
     /* --- tự tính finalPrice khi thay đổi discount/systemPrice --- */
     React.useEffect(() => {
@@ -313,7 +355,7 @@ export default function EditOrderPage() {
             const price = await calculatePrice({
                 vehicleCategoryIds: [Number(categoryId || 0)],
                 quantities: [Number(vehiclesNeeded || 1)],
-                distance: 0,
+                distance: Number(distanceKm || 0),
                 useHighway: false,
             });
             const base = Number(price || 0);
@@ -961,11 +1003,15 @@ export default function EditOrderPage() {
                                 }
                                 {...disableInputProps}
                             >
-                                {(categories.length ? categories : MOCK_CATEGORIES).map((c) => (
-                                    <option key={c.id} value={String(c.id)}>
-                                        {c.categoryName || c.label}
-                                    </option>
-                                ))}
+                                {categories.length > 0 ? (
+                                    categories.map((c) => (
+                                        <option key={c.id} value={String(c.id)}>
+                                            {c.categoryName || c.label}
+                                        </option>
+                                    ))
+                                ) : (
+                                    <option value="">Không có danh mục (lỗi tải dữ liệu)</option>
+                                )}
                             </select>
                         </div>
 
@@ -987,11 +1033,15 @@ export default function EditOrderPage() {
                                 }
                                 {...disableInputProps}
                             >
-                                {(branches.length ? branches : MOCK_BRANCHES).map((b) => (
-                                    <option key={b.id} value={String(b.id)}>
-                                        {b.branchName || b.label}
-                                    </option>
-                                ))}
+                                {branches.length > 0 ? (
+                                    branches.map((b) => (
+                                        <option key={b.id} value={String(b.id)}>
+                                            {b.branchName || b.label}
+                                        </option>
+                                    ))
+                                ) : (
+                                    <option value="">Không có chi nhánh (lỗi tải dữ liệu)</option>
+                                )}
                             </select>
                         </div>
 

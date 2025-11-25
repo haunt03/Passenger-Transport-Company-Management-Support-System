@@ -1591,7 +1591,8 @@ export default function ConsultantOrdersPage() {
     const [searchText, setSearchText] = React.useState("");
 
     // list data
-    const [orders, setOrders] = React.useState(MOCK_ORDERS);
+    const [orders, setOrders] = React.useState([]);
+    const [loadError, setLoadError] = React.useState(null);
 
     // default branch to use when creating from quick modal
     const [defaultBranchId, setDefaultBranchId] = React.useState(null);
@@ -1610,35 +1611,71 @@ export default function ConsultantOrdersPage() {
         let mounted = true;
         const load = async () => {
             try {
-                const list = await listBookings({});
-                if (!mounted || !Array.isArray(list)) return;
-                const mapped = list.map(b => ({
-                    id: b.id,
-                    code: `ORD-${b.id}`,
-                    status: b.status || "PENDING",
-                    customer_name: b.customerName,
-                    customer_phone: b.customerPhone,
-                    pickup: (b.routeSummary || "").split(" → ")[0] || "",
-                    dropoff: (b.routeSummary || "").split(" → ")[1] || "",
-                    pickup_time: b.startDate,
-                    dropoff_eta: b.startDate,
-                    vehicle_category: "",
-                    vehicle_category_id: "",
-                    vehicle_count: 1,
-                    pax_count: 0,
-                    quoted_price: b.totalCost,
-                    discount_amount: 0,
-                    notes: "",
-                }));
+                const response = await listBookings({});
+                if (!mounted) return;
+
+                // Handle different response formats
+                let list = [];
+                if (Array.isArray(response)) {
+                    list = response;
+                } else if (Array.isArray(response?.content)) {
+                    list = response.content;
+                } else if (Array.isArray(response?.data)) {
+                    list = response.data;
+                } else if (Array.isArray(response?.data?.content)) {
+                    list = response.data.content;
+                } else if (Array.isArray(response?.items)) {
+                    list = response.items;
+                }
+
+                console.log("Loaded bookings:", list);
+
+                const mapped = list.map(b => {
+                    // Extract branchId from multiple sources
+                    const branchId = b.branchId
+                        || (b.branch && (b.branch.id || b.branch.branchId))
+                        || null;
+
+                    // Extract customerId from multiple sources
+                    const customerId = b.customerId
+                        || (b.customer && (b.customer.id || b.customer.customerId))
+                        || null;
+
+                    return {
+                        id: b.id || b.bookingId,
+                        code: b.bookingCode || b.code || (b.id ? `ORD-${b.id}` : `ORD-${b.bookingId || "?"}`),
+                        status: b.status || "PENDING",
+                        customer_name: b.customerName || (b.customer && (b.customer.fullName || b.customer.name)) || "—",
+                        customer_phone: b.customerPhone || (b.customer && b.customer.phone) || "—",
+                        customer_email: b.customerEmail || (b.customer && b.customer.email) || "",
+                        pickup: (b.routeSummary || b.pickupLocation || "").split(" → ")[0] || (b.startLocation || ""),
+                        dropoff: (b.routeSummary || b.dropoffLocation || "").split(" → ")[1] || (b.endLocation || ""),
+                        pickup_time: b.startDate || b.pickupTime || b.startTime,
+                        dropoff_eta: b.endDate || b.dropoffTime || b.endTime || b.startDate,
+                        vehicle_category: b.vehicleCategory || "",
+                        vehicle_category_id: b.vehicleCategoryId || "",
+                        vehicle_count: b.vehicleCount || b.quantity || 1,
+                        pax_count: b.passengerCount || b.paxCount || 0,
+                        quoted_price: b.totalCost || b.totalPrice || b.total || 0,
+                        discount_amount: b.discountAmount || b.discount || 0,
+                        notes: b.notes || b.note || "",
+                        branchId: branchId,
+                        customerId: customerId,
+                    };
+                });
                 setOrders(mapped);
+                setLoadError(null);
             } catch (e) {
-                // keep mock if fails
-                push("Không tải được danh sách đơn hàng", "error");
+                console.error("Failed to load orders:", e);
+                const errorMsg = e?.data?.message || e?.response?.data?.message || e?.message || "Lỗi không xác định";
+                setLoadError("Không thể tải danh sách đơn hàng: " + errorMsg);
+                push("Không thể tải danh sách đơn hàng: " + errorMsg, "error");
+                setOrders([]);
             }
         };
         load();
         return () => { mounted = false; };
-    }, []);
+    }, [push]);
 
     // if navigated back with refresh flag, reload list then clear state
     React.useEffect(() => {
@@ -1646,38 +1683,67 @@ export default function ConsultantOrdersPage() {
         if (st && st.refresh) {
             (async () => {
                 try {
-                    const list = await listBookings({});
-                    const mapped = (list || []).map(b => ({
-                        id: b.id,
-                        code: `ORD-${b.id}`,
-                        status: b.status || "PENDING",
-                        customer_name: b.customerName,
-                        customer_phone: b.customerPhone,
-                        pickup: (b.routeSummary || "").split(" → ")[0] || "",
-                        dropoff: (b.routeSummary || "").split(" → ")[1] || "",
-                        pickup_time: b.startDate,
-                        dropoff_eta: b.startDate,
-                        vehicle_category: "",
-                        vehicle_category_id: "",
-                        vehicle_count: 1,
-                        pax_count: 0,
-                        quoted_price: b.totalCost,
-                        discount_amount: 0,
-                        notes: "",
-                    }));
+                    const response = await listBookings({});
+
+                    // Handle different response formats
+                    let list = [];
+                    if (Array.isArray(response)) {
+                        list = response;
+                    } else if (Array.isArray(response?.content)) {
+                        list = response.content;
+                    } else if (Array.isArray(response?.data)) {
+                        list = response.data;
+                    } else if (Array.isArray(response?.data?.content)) {
+                        list = response.data.content;
+                    } else if (Array.isArray(response?.items)) {
+                        list = response.items;
+                    }
+
+                    const mapped = list.map(b => {
+                        const branchId = b.branchId
+                            || (b.branch && (b.branch.id || b.branch.branchId))
+                            || null;
+                        const customerId = b.customerId
+                            || (b.customer && (b.customer.id || b.customer.customerId))
+                            || null;
+
+                        return {
+                            id: b.id || b.bookingId,
+                            code: b.bookingCode || b.code || (b.id ? `ORD-${b.id}` : `ORD-${b.bookingId || "?"}`),
+                            status: b.status || "PENDING",
+                            customer_name: b.customerName || (b.customer && (b.customer.fullName || b.customer.name)) || "—",
+                            customer_phone: b.customerPhone || (b.customer && b.customer.phone) || "—",
+                            customer_email: b.customerEmail || (b.customer && b.customer.email) || "",
+                            pickup: (b.routeSummary || b.pickupLocation || "").split(" → ")[0] || (b.startLocation || ""),
+                            dropoff: (b.routeSummary || b.dropoffLocation || "").split(" → ")[1] || (b.endLocation || ""),
+                            pickup_time: b.startDate || b.pickupTime || b.startTime,
+                            dropoff_eta: b.endDate || b.dropoffTime || b.endTime || b.startDate,
+                            vehicle_category: b.vehicleCategory || "",
+                            vehicle_category_id: b.vehicleCategoryId || "",
+                            vehicle_count: b.vehicleCount || b.quantity || 1,
+                            pax_count: b.passengerCount || b.paxCount || 0,
+                            quoted_price: b.totalCost || b.totalPrice || b.total || 0,
+                            discount_amount: b.discountAmount || b.discount || 0,
+                            notes: b.notes || b.note || "",
+                            branchId: branchId,
+                            customerId: customerId,
+                        };
+                    });
                     setOrders(mapped);
                     if (st.toast) push(st.toast, "success");
-                } catch {}
+                } catch (err) {
+                    console.error("Failed to refresh orders:", err);
+                }
                 // clear navigation state
                 navigate(location.pathname, { replace: true, state: {} });
             })();
         }
-    }, [location]);
+    }, [location, navigate, push]);
 
     // paging / sort
     const [sortKey, setSortKey] =
-        React.useState("pickup_time");
-    const [sortDir, setSortDir] = React.useState("asc");
+        React.useState("created_at");
+    const [sortDir, setSortDir] = React.useState("desc");
     const [page, setPage] = React.useState(1);
     const [pageSize, setPageSize] = React.useState(10);
 

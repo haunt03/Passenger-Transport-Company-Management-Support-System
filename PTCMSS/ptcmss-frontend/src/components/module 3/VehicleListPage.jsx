@@ -29,7 +29,7 @@ import {
  * Mock logic giữ nguyên như bản dark, chỉ đổi UI sang style light:
  *  - bg-slate-50
  *  - card trắng border-slate-200
- *  - nút chính sky-600
+ *  - nét chính sky-600
  */
 
 const cls = (...a) => a.filter(Boolean).join(" ");
@@ -74,7 +74,7 @@ function Toasts({ toasts }) {
 }
 
 /* -------------------------------- */
-/* Status badge cho trạng thái xe   */
+/* Status badge cho trß║íng th├íi xe   */
 /* -------------------------------- */
 const VEHICLE_STATUS = {
     AVAILABLE: "AVAILABLE",
@@ -127,7 +127,7 @@ function VehicleStatusBadge({ status }) {
 }
 
 /* -------------------------------- */
-/* Modal: Tạo xe mới (light)        */
+/* Modal: Thêm xe mới (light)        */
 /* -------------------------------- */
 function CreateVehicleModal({
                                 open,
@@ -168,8 +168,23 @@ function CreateVehicleModal({
 
     const numericOnly = (s) => s.replace(/[^0-9]/g, "");
 
+    // Validation biển số xe theo chuẩn Việt Nam
+    const isPlateValid = (plate) => {
+        const cleanPlate = plate.trim().toUpperCase();
+        // Xe ô tô: 29A-12345, 29A-123.45, 29AB-12345
+        const carPlateRegex = /^\d{2}[A-Z]{1,2}[-\s]?\d{3,5}(\.\d{2})?$/;
+        // Xe ngoại giao: NG-001, NN-123
+        const diplomaticPlateRegex = /^(NG|NN)[-\s]?\d{3,4}$/;
+        // Xe quân đội: QĐ-12345
+        const militaryPlateRegex = /^Q[ĐD][-\s]?\d{4,5}$/;
+
+        return carPlateRegex.test(cleanPlate) ||
+            diplomaticPlateRegex.test(cleanPlate) ||
+            militaryPlateRegex.test(cleanPlate);
+    };
+
     const valid =
-        licensePlate.trim() !== "" &&
+        isPlateValid(licensePlate) &&
         categoryId !== "" &&
         branchId !== "" &&
         year.trim() !== "" &&
@@ -217,14 +232,13 @@ function CreateVehicleModal({
                             Thêm xe mới
                         </div>
                         <div className="text-[11px] text-slate-500">
-                            Khai báo thông tin xe, trạng thái và chi nhánh sở
-                            hữu.
+                            Khai báo thông tin xe, trạng thái và chi nhánh sở hữu.
                         </div>
                     </div>
                     <button
                         onClick={onClose}
                         className="ml-auto rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                        title="Đóng"
+                        title="─É├│ng"
                     >
                         <X className="h-4 w-4" />
                     </button>
@@ -233,7 +247,7 @@ function CreateVehicleModal({
                 {/* body */}
                 <div className="p-5 space-y-4 text-[13px]">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Biển số */}
+                        {/* Biển số xe */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1">
                                 Biển số xe{" "}
@@ -249,16 +263,22 @@ function CreateVehicleModal({
                                 className={cls(
                                     "w-full rounded-md border px-3 py-2 text-[13px] text-slate-900 placeholder:text-slate-400 outline-none",
                                     "border-slate-300 bg-white shadow-sm",
-                                    "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                                    "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20",
+                                    !isPlateValid(licensePlate) && licensePlate.trim() !== "" && "border-red-300"
                                 )}
-                                placeholder="29A-123.45"
+                                placeholder="29A-12345 hoặc 51H-123.45"
                             />
+                            {!isPlateValid(licensePlate) && licensePlate.trim() !== "" && (
+                                <div className="text-[11px] text-red-600 mt-1">
+                                    Biển số không đúng định dạng VN
+                                </div>
+                            )}
                         </div>
 
                         {/* Hãng SX */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1">
-                                Hãng sản xuất
+                                Hãng sản xuất xe
                             </div>
                             <input
                                 value={brand}
@@ -289,7 +309,7 @@ function CreateVehicleModal({
                             />
                         </div>
 
-                        {/* Năm SX */}
+                        {/* N─âm SX */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1">
                                 Năm SX{" "}
@@ -377,7 +397,7 @@ function CreateVehicleModal({
                             </select>
                         </div>
 
-                        {/* Chi nhánh */}
+                        {/* Chi nh├ính */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1">
                                 Chi nhánh quản lý{" "}
@@ -403,11 +423,11 @@ function CreateVehicleModal({
                             </select>
                         </div>
 
-                        {/* Ngày đăng kiểm tới hạn */}
+                        {/* Ngày Đăng kiểm tiếp theo */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1 flex items-center gap-2">
                                 <Calendar className="h-4 w-4 text-slate-400" />
-                                <span>Ngày đăng kiểm tiếp theo</span>
+                                <span>Ngày Đăng kiểm tiếp theo</span>
                             </div>
                             <input
                                 type="date"
@@ -423,11 +443,11 @@ function CreateVehicleModal({
                             />
                         </div>
 
-                        {/* Ngày hết hạn bảo hiểm */}
+                        {/* Ngày hết hạn bảo hiểm TNDS */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1 flex items-center gap-2">
                                 <Calendar className="h-4 w-4 text-slate-400" />
-                                <span>Hết hạn bảo hiểm TNDS</span>
+                                <span>Hạn hết hạn bảo hiểm TNDS</span>
                             </div>
                             <input
                                 type="date"
@@ -457,7 +477,7 @@ function CreateVehicleModal({
                         onClick={onClose}
                         className="rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-700 hover:bg-slate-100 shadow-sm"
                     >
-                        Huỷ
+                        Đóng
                     </button>
                     <button
                         onClick={handleSubmit}
@@ -476,7 +496,7 @@ function CreateVehicleModal({
 }
 
 /* -------------------------------- */
-/* Modal: Sửa xe (light)            */
+/* Modal: Sß╗¡a xe (light)            */
 /* -------------------------------- */
 function EditVehicleModal({
                               open,
@@ -553,7 +573,7 @@ function EditVehicleModal({
                     </div>
                     <div className="flex flex-col leading-tight min-w-0">
                         <div className="font-semibold text-slate-900 text-[14px]">
-                            Chi tiết / Sửa xe · {vehicle.license_plate}
+                            Chi tiết / Sửa xe  {vehicle.license_plate}
                         </div>
                         <div className="text-[11px] text-slate-500">
                             Cập nhật trạng thái, phân chi nhánh, hạn đăng kiểm.
@@ -571,7 +591,7 @@ function EditVehicleModal({
                 {/* body */}
                 <div className="p-5 space-y-4 text-[13px]">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* biển số readonly */}
+                        {/* biß╗ân sß╗æ readonly */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1">
                                 Biển số xe
@@ -583,7 +603,7 @@ function EditVehicleModal({
 
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1">
-                                Trạng thái{" "}
+                                Trạng thái xe mới{" "}
                                 <span className="text-red-500">*</span>
                             </div>
                             <select
@@ -623,7 +643,7 @@ function EditVehicleModal({
                         {/* year */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1">
-                                Năm SX{" "}
+                                Ngày sản xuất{" "}
                                 <span className="text-red-500">*</span>
                             </div>
                             <input
@@ -660,7 +680,7 @@ function EditVehicleModal({
                             >
                                 {categories.map((c) => (
                                     <option key={c.id} value={c.id}>
-                                        {c.name} ({c.seats} chỗ)
+                                        {c.name} ({c.seats} chß╗ù)
                                     </option>
                                 ))}
                             </select>
@@ -715,7 +735,7 @@ function EditVehicleModal({
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1 flex items-center gap-2">
                                 <Calendar className="h-4 w-4 text-slate-400" />
-                                <span>Hết hạn bảo hiểm TNDS</span>
+                                <span>Hết hạn bảo hiểm xe TNDS</span>
                             </div>
                             <input
                                 type="date"
@@ -738,14 +758,14 @@ function EditVehicleModal({
                         </div>
                     ) : null}
 
-                    <div className="text-[11px] text-slate-500 leading-relaxed rounded-md border border-slate-200 bg-slate-50 p-3">
+                    {/* <div className="text-[11px] text-slate-500 leading-relaxed rounded-md border border-slate-200 bg-slate-50 p-3">
                         Sau khi lưu, trạng thái xe sẽ cập nhật ngay trong danh
                         sách. API thật sẽ gọi{" "}
                         <code className="text-slate-700">
                             PUT /api/vehicles/{vehicle.id}
                         </code>
                         .
-                    </div>
+                    </div> */}
                 </div>
 
                 {/* footer */}
@@ -764,7 +784,7 @@ function EditVehicleModal({
                         )}
                     >
                         <Wrench className="h-4 w-4" />
-                        Lưu thay đổi
+                        Lưu Thay Đổi
                     </button>
                 </div>
             </div>
@@ -792,7 +812,7 @@ function FilterBar({
                    }) {
     return (
         <div className="flex flex-col lg:flex-row lg:flex-wrap gap-3 text-[13px] text-slate-700">
-            {/* Nút thêm xe */}
+            {/* N├║t th├¬m xe */}
             <div className="flex items-center gap-2">
                 <button
                     className={cls(
@@ -802,11 +822,11 @@ function FilterBar({
                     onClick={onClickCreate}
                 >
                     <PlusCircle className="h-4 w-4" />
-                    <span>Thêm xe mới</span>
+                    <span>Thêm Xe mới</span>
                 </button>
             </div>
 
-            {/* đẩy filter sang phải trên màn lớn */}
+            {/* Bộ lọc sang phải trên màn lớn */}
             <div className="flex-1" />
 
             {/* filter controls */}
@@ -828,7 +848,7 @@ function FilterBar({
                     </select>
                 </div>
 
-                {/* Danh mục xe */}
+                {/* Danh mß╗Ñc xe */}
                 <div className="flex items-center gap-2 rounded-md border border-slate-300 bg-white shadow-sm px-3 py-2 min-w-[160px]">
                     <Filter className="h-4 w-4 text-slate-400" />
                     <select
@@ -845,7 +865,7 @@ function FilterBar({
                     </select>
                 </div>
 
-                {/* Trạng thái */}
+                {/* Trß║íng th├íi */}
                 <div className="flex items-center gap-2 rounded-md border border-slate-300 bg-white shadow-sm px-3 py-2 min-w-[150px]">
                     <Wrench className="h-4 w-4 text-slate-400" />
                     <select
@@ -860,7 +880,7 @@ function FilterBar({
                     </select>
                 </div>
 
-                {/* Search biển số */}
+                {/* Search biß╗ân sß╗æ */}
                 <div className="flex items-center gap-2 rounded-md border border-slate-300 bg-white shadow-sm px-3 py-2 min-w-[200px]">
                     <Search className="h-4 w-4 text-slate-400" />
                     <input
@@ -892,7 +912,7 @@ function FilterBar({
 /* helper định dạng ngày            */
 /* -------------------------------- */
 const fmtDate = (iso) => {
-    if (!iso) return "—";
+    if (!iso) return "ΓÇö";
     const [y, m, d] = String(iso).split("-");
     if (!y || !m || !d) return iso;
     return `${d}/${m}/${y}`;
@@ -951,7 +971,7 @@ function VehicleTable({
                     {headerCell("category_name", "Loại xe")}
                     {headerCell("branch_name", "Chi nhánh")}
                     {headerCell("status", "Trạng thái")}
-                    {headerCell("reg_due_date", "Đăng kiểm đến hạn")}
+                    {headerCell("reg_due_date", "Hạn đăng kiểm")}
                     <th className="px-3 py-2 font-medium text-slate-500">
                         Hành động
                     </th>
@@ -964,16 +984,16 @@ function VehicleTable({
                         key={v.id}
                         className="hover:bg-slate-50"
                     >
-                        {/* Biển số */}
+                        {/* Biß╗ân sß╗æ */}
                         <td className="px-3 py-2 font-medium text-slate-900 whitespace-nowrap">
                             {v.license_plate}
                         </td>
 
-                        {/* Loại xe */}
+                        {/* Loß║íi xe */}
                         <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
                             {v.category_name}
                             <div className="text-[11px] text-slate-500">
-                                {v.model} · {v.year}
+                                {v.model} - {v.year}
                             </div>
                         </td>
 
@@ -982,12 +1002,12 @@ function VehicleTable({
                             {v.branch_name}
                         </td>
 
-                        {/* Trạng thái */}
+                        {/* Trß║íng th├íi */}
                         <td className="px-3 py-2 whitespace-nowrap">
                             <VehicleStatusBadge status={v.status} />
                         </td>
 
-                        {/* Hạn đăng kiểm */}
+                        {/* Hß║ín ─æ─âng kiß╗âm */}
                         <td className="px-3 py-2 text-slate-500 whitespace-nowrap text-[12px]">
                             {fmtDate(v.reg_due_date)}
                         </td>
@@ -1017,14 +1037,14 @@ function VehicleTable({
                             colSpan={6}
                             className="px-3 py-6 text-center text-slate-400 text-[13px]"
                         >
-                            Không có xe nào phù hợp.
+                            không có dữ liệu.
                         </td>
                     </tr>
                 )}
                 </tbody>
             </table>
 
-            {/* Footer phân trang */}
+            {/* Footer ph├ón trang */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-3 py-3 border-t border-slate-200 bg-slate-50 text-[13px] text-slate-700">
                 <div className="flex items-center gap-2 flex-wrap">
                     <button
@@ -1076,7 +1096,7 @@ function VehicleTable({
                 </div>
 
                 <div className="text-[11px] text-slate-500">
-                    Tổng xe hiển thị: {items.length}
+                    Tổng xe hiện tại: {items.length}
                 </div>
             </div>
         </div>
@@ -1226,7 +1246,7 @@ export default function VehicleListPage() {
                 setBranches(brs.map(b => ({ id: b.id, name: b.branchName || b.name || b.branch_name })));
                 setCategories((catData || []).map(c => ({ id: c.id, name: c.categoryName || c.name })));
                 setVehicles((vehData || []).map(mapVehicle));
-            } catch {}
+            } catch { }
         })();
     }, [mapVehicle]);
 
@@ -1301,40 +1321,40 @@ export default function VehicleListPage() {
 
     /* ---------- handlers ---------- */
 
-    // mở modal "Thêm xe mới"
+    // "Thêm xe mới"
     const handleCreateNew = () => {
         setCreateOpen(true);
     };
 
-    // tạo xe mới
+    // "Thêm xe mới"
     const handleCreateSubmit = async (payload) => {
         try {
             const created = await createVehicle(payload);
             setVehicles((prev) => [mapVehicle(created), ...prev]);
-            push("Đã thêm xe mới " + (payload.license_plate || payload.licensePlate), "success");
+            push("Thêm xe mới thành công:   " + (payload.license_plate || payload.licensePlate), "success");
         } catch (e) {
-            push("Tạo xe thất bại", "error");
+            push("Thêm xe mới thất bại", "error");
         }
     };
 
-    // mở modal edit
+    // "Chi tiết xe"
     const handleClickDetail = (vehicle) => {
         setEditingVehicle(vehicle);
         setEditOpen(true);
     };
 
-    // lưu thay đổi từ edit modal
+    // "Lưu thay đổi" từ edit modal
     const handleEditSave = async (id, payload) => {
         try {
             const updated = await updateVehicle(id, payload);
             setVehicles((prev) => prev.map(v => v.id === id ? mapVehicle(updated) : v));
-            push("Đã lưu thay đổi cho xe " + id, "success");
+            push("Lưu thay đổi cho xe " + id, "success");
         } catch (e) {
             push("Cập nhật xe thất bại", "error");
         }
     };
 
-    // Làm mới danh sách
+    // L├ám mß╗¢i danh s├ích
     const handleRefresh = async () => {
         setLoadingRefresh(true);
         try {
@@ -1345,9 +1365,9 @@ export default function VehicleListPage() {
                 status: statusFilter || undefined,
             });
             setVehicles((vehData || []).map(mapVehicle));
-            push("Đã làm mới danh sách xe", "info");
+            push("─É├ú l├ám mß╗¢i danh s├ích xe", "info");
         } catch (e) {
-            push("Làm mới danh sách thất bại", "error");
+            push("L├ám mß╗¢i danh s├ích thß║Ñt bß║íi", "error");
         } finally {
             setLoadingRefresh(false);
         }
@@ -1371,7 +1391,7 @@ export default function VehicleListPage() {
                                     Quản lý phương tiện
                                 </div>
                                 <div className="text-[12px] text-slate-500 leading-snug max-w-xl">
-                                    Theo dõi tình trạng xe, hạn đăng kiểm, và
+                                    Theo dõi tình trạng xe, hiện đang kiểm, và
                                     phân bổ theo chi nhánh.
                                 </div>
                             </div>
@@ -1430,10 +1450,10 @@ export default function VehicleListPage() {
                     onClickDetail={handleClickDetail}
                 />
 
-                <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 text-[11px] text-slate-500 leading-relaxed">
+                {/* <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 text-[11px] text-slate-500 leading-relaxed">
                     Design-only: Dữ liệu đang là mock. Khi nối API thật,
                     Manager sẽ chỉ thấy xe thuộc chi nhánh của họ.
-                </div>
+                </div> */}
             </div>
 
             {/* MODALS */}

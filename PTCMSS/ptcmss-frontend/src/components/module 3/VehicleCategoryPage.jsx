@@ -470,90 +470,114 @@ export default function VehicleCategoryPage() {
             {/* TABLE CARD */}
             <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                 {/* head bar */}
-                <div className="px-4 py-3 border-b border-slate-200 text-[13px] text-slate-600 flex items-center gap-2 bg-slate-50">
-                    Danh sách danh mục xe
+                <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+                    <div className="flex items-center gap-2">
+                        <div className="h-8 w-8 rounded-md bg-sky-100 text-sky-600 border border-sky-200 flex items-center justify-center">
+                            <CarFront className="h-4 w-4" />
+                        </div>
+                        <div className="flex flex-col leading-tight">
+                            <div className="text-[13px] font-medium text-slate-700">
+                                Danh sách danh mục xe
+                            </div>
+                            <div className="text-[11px] text-slate-500">
+                                {categories.length} danh mục
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left text-[13px] text-slate-700">
-                        <thead className="bg-slate-100/60 border-b border-slate-200 text-[11px] uppercase tracking-wide text-slate-500">
-                        <tr className="text-left">
-                            <th className="px-4 py-2 font-medium">
-                                Tên danh mục
-                            </th>
-                            <th className="px-4 py-2 font-medium whitespace-nowrap">
-                                <div className="flex items-center gap-1">
-                                    <Hash className="h-3.5 w-3.5 text-slate-400" />
-                                    <span>Số ghế</span>
-                                </div>
-                            </th>
-                            <th className="px-4 py-2 font-medium">
-                                Trạng thái
-                            </th>
-                            <th className="px-4 py-2 font-medium whitespace-nowrap">
-                                Số xe đang gán
-                            </th>
-                        </tr>
-                        </thead>
-
-                        <tbody className="divide-y divide-slate-200">
-                        {categories.map((cat) => (
-                            <tr
-                                key={cat.id}
-                                className="hover:bg-slate-50"
-                            >
-                                {/* name + id */}
-                                <td className="px-4 py-3 align-top">
-                                    <div className="flex flex-col leading-tight">
-                                        <div className="text-slate-900 font-medium">
-                                            {cat.name}
-                                        </div>
-                                        <div className="text-[11px] text-slate-500">
-                                            ID: {cat.id}
-                                        </div>
-                                    </div>
-                                </td>
-
-                                {/* seats */}
-                                <td className="px-4 py-3 align-top">
-                                    <div className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-[12px] text-slate-700 tabular-nums shadow-sm">
-                                        <Hash className="h-3.5 w-3.5 text-slate-400" />
-                                        {cat.seats ?? "—"} ghế
-                                    </div>
-                                </td>
-
-                                {/* status */}
-                                <td className="px-4 py-3 align-top text-[12px]">
-                                    <StatusPill status={cat.status} />
-                                </td>
-
-                                {/* vehicles_count */}
-                                <td className="px-4 py-3 align-top text-[13px] text-slate-900 tabular-nums">
-                                    {cat.vehicles_count}
-                                </td>
-                            </tr>
-                        ))}
-
-                        {categories.length === 0 ? (
+                {categories.length === 0 ? (
+                    <div className="px-4 py-16 text-center">
+                        <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-400 mb-4">
+                            <CarFront className="h-8 w-8" />
+                        </div>
+                        <div className="text-[14px] font-medium text-slate-700 mb-1">
+                            Chưa có danh mục xe nào
+                        </div>
+                        <div className="text-[12px] text-slate-500 mb-4 max-w-sm mx-auto">
+                            Tạo danh mục xe đầu tiên để bắt đầu phân loại và quản lý đội xe của bạn
+                        </div>
+                        <button
+                            onClick={() => setCreateOpen(true)}
+                            className="inline-flex items-center gap-2 rounded-md text-[13px] font-medium px-4 py-2 text-white bg-sky-600 hover:bg-sky-500 shadow-sm"
+                        >
+                            <PlusCircle className="h-4 w-4" />
+                            <span>Tạo danh mục đầu tiên</span>
+                        </button>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-[13px] text-slate-700">
+                            <thead className="bg-slate-50 border-b border-slate-200 text-[11px] uppercase tracking-wide text-slate-600">
                             <tr>
-                                <td
-                                    colSpan={4}
-                                    className="px-4 py-10 text-center text-slate-400 text-[13px]"
-                                >
-                                    Chưa có danh mục nào.
-                                </td>
+                                <th className="px-5 py-3 font-semibold text-left">
+                                    Tên danh mục
+                                </th>
+                                <th className="px-5 py-3 font-semibold text-center whitespace-nowrap">
+                                    Số ghế
+                                </th>
+                                <th className="px-5 py-3 font-semibold text-center">
+                                    Trạng thái
+                                </th>
+                                <th className="px-5 py-3 font-semibold text-center whitespace-nowrap">
+                                    Số xe
+                                </th>
                             </tr>
-                        ) : null}
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
 
-                <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 text-[11px] text-slate-500 leading-relaxed">
-                    Prototype frontend. Sau này:
-                    <br />
-                    - GET /api/admin/vehicle-categories
-                    <br />
-                    - POST tạo danh mục mới ở modal
+                            <tbody className="divide-y divide-slate-100">
+                            {categories.map((cat) => (
+                                <tr
+                                    key={cat.id}
+                                    className="hover:bg-slate-50/70 transition-colors"
+                                >
+                                    {/* name + id */}
+                                    <td className="px-5 py-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-sky-50 to-sky-100 border border-sky-200 flex items-center justify-center text-sky-600 font-semibold text-[13px] shadow-sm">
+                                                {cat.seats || "?"}
+                                            </div>
+                                            <div className="flex flex-col leading-tight">
+                                                <div className="text-slate-900 font-medium text-[14px]">
+                                                    {cat.name}
+                                                </div>
+                                                <div className="text-[11px] text-slate-500">
+                                                    ID: {cat.id}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    {/* seats */}
+                                    <td className="px-5 py-4 text-center">
+                                            <span className="inline-flex items-center gap-1 text-[13px] text-slate-700 tabular-nums font-medium">
+                                                {cat.seats ?? "—"} ghế
+                                            </span>
+                                    </td>
+
+                                    {/* status */}
+                                    <td className="px-5 py-4 text-center">
+                                        <StatusPill status={cat.status} />
+                                    </td>
+
+                                    {/* vehicles_count */}
+                                    <td className="px-5 py-4 text-center">
+                                            <span className="text-[14px] font-semibold text-slate-900 tabular-nums">
+                                                {cat.vehicles_count} xe
+                                            </span>
+                                    </td>
+                                </tr>
+                            ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
+                <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 text-[11px] text-slate-500 leading-relaxed">
+                    <div className="flex items-center gap-2">
+                        <div className="h-1.5 w-1.5 rounded-full bg-sky-500"></div>
+                        <span>Dữ liệu từ API: <code className="text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">GET /api/vehicle-categories</code></span>
+                    </div>
                 </div>
             </div>
 

@@ -2,6 +2,8 @@
 import React from "react";
 import { listVehicleCategories } from "../../api/vehicleCategories";
 import { calculatePrice, createBooking } from "../../api/bookings";
+import { calculateDistance } from "../../api/graphhopper";
+import PlaceAutocomplete from "../common/PlaceAutocomplete";
 import {
     Phone,
     User,
@@ -18,6 +20,7 @@ import {
     Send,
     Loader2,
     Building2,
+    Navigation,
 } from "lucide-react";
 
 /**
@@ -67,12 +70,7 @@ function toIsoZ(s) {
     return d.toISOString();
 }
 
-/* mock categories */
-const MOCK_CATEGORIES = [
-    { id: "SEDAN4", name: "Sedan 4 chỗ", seats: 4 },
-    { id: "SUV7", name: "SUV 7 chỗ", seats: 7 },
-    { id: "BUS16", name: "Minibus 16 chỗ", seats: 16 },
-];
+// Removed MOCK_CATEGORIES - chỉ dùng data từ API, báo lỗi nếu không fetch được
 
 /* mini toast (light style) */
 function useToasts() {
@@ -202,6 +200,8 @@ export default function CreateOrderPage() {
         React.useState(false);
 
     const [distanceKm, setDistanceKm] = React.useState("");
+    const [calculatingDistance, setCalculatingDistance] = React.useState(false);
+    const [distanceError, setDistanceError] = React.useState("");
 
     // load categories from backend
     React.useEffect(() => {
@@ -211,10 +211,47 @@ export default function CreateOrderPage() {
                 if (Array.isArray(list) && list.length > 0) {
                     setCategories(list.map(c => ({ id: String(c.id), name: c.categoryName })));
                     setCategoryId(String(list[0].id));
+                } else {
+                    push("Không thể tải danh mục xe: Dữ liệu trống", "error");
                 }
-            } catch {}
+            } catch (err) {
+                console.error("Failed to load categories:", err);
+                push("Không thể tải danh mục xe: " + (err.message || "Lỗi không xác định"), "error");
+            }
         })();
     }, []);
+
+    // Auto-calculate distance when both pickup and dropoff are entered
+    React.useEffect(() => {
+        const timeoutId = setTimeout(async () => {
+            if (!pickup || !dropoff) {
+                setDistanceError("");
+                return;
+            }
+
+            // Only calculate if both fields have reasonable length
+            if (pickup.trim().length < 5 || dropoff.trim().length < 5) {
+                return;
+            }
+
+            setCalculatingDistance(true);
+            setDistanceError("");
+
+            try {
+                const result = await calculateDistance(pickup, dropoff);
+                setDistanceKm(String(result.distance));
+                push(`Khoảng cách: ${result.formattedDistance} (~${result.formattedDuration})`, "success");
+            } catch (error) {
+                console.error("Distance calculation error:", error);
+                setDistanceError("Không tính được khoảng cách. Vui lòng nhập thủ công.");
+                push("Không tính được khoảng cách tự động", "error");
+            } finally {
+                setCalculatingDistance(false);
+            }
+        }, 1500); // Debounce 1.5 seconds
+
+        return () => clearTimeout(timeoutId);
+    }, [pickup, dropoff]);
 
     // calculate via backend when possible
     React.useEffect(() => {
@@ -585,6 +622,9 @@ export default function CreateOrderPage() {
                                 <div className={labelCls}>
                                     <MapPin className="h-3.5 w-3.5 text-slate-400" />
                                     <span>Quãng đường (km)</span>
+                                    {calculatingDistance && (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500 ml-1" />
+                                    )}
                                 </div>
                                 <input
                                     type="number"
@@ -592,8 +632,21 @@ export default function CreateOrderPage() {
                                     value={distanceKm}
                                     onChange={(e) => setDistanceKm(e.target.value)}
                                     className={cls(inputCls, "tabular-nums")}
-                                    placeholder="Ví dụ: 50"
+                                    placeholder={calculatingDistance ? "Đang tính..." : "Tự động tính hoặc nhập thủ công"}
+                                    disabled={calculatingDistance}
                                 />
+                                {distanceError && (
+                                    <div className="text-[11px] text-amber-600 mt-1 flex items-center gap-1">
+                                        <AlertTriangle className="h-3 w-3" />
+                                        {distanceError}
+                                    </div>
+                                )}
+                                {!calculatingDistance && !distanceError && distanceKm && (
+                                    <div className="text-[11px] text-emerald-600 mt-1 flex items-center gap-1">
+                                        <Navigation className="h-3 w-3" />
+                                        Đã tự động lựa chọn tuyến đường tốt nhất !
+                                    </div>
+                                )}
                             </div>
 
                             {/* Giảm giá */}
@@ -686,17 +739,16 @@ export default function CreateOrderPage() {
                                     <MapPin className="h-3.5 w-3.5 text-emerald-600" />
                                     <span>Điểm đi *</span>
                                 </div>
-                                <input
+                                <PlaceAutocomplete
                                     value={pickup}
-                                    onChange={(e) =>
-                                        setPickup(
-                                            e.target
-                                                .value
-                                        )
-                                    }
+                                    onChange={setPickup}
+                                    placeholder="VD: Hồ Hoàn Kiếm, Sân bay Nội Bài..."
                                     className={inputCls}
-                                    placeholder="VD: Sân bay Nội Bài T1 cột 5"
                                 />
+                                {/* <div className="text-[11px] text-green-600 mt-1 flex items-center gap-1">
+                                    <span>✅</span>
+                                    <span>Gõ tiếng Việt được! Chọn từ gợi ý để tự động tính khoảng cách</span>
+                                </div> */}
                             </div>
 
                             {/* Điểm đến */}
@@ -707,17 +759,16 @@ export default function CreateOrderPage() {
                                         Điểm đến *
                                     </span>
                                 </div>
-                                <input
+                                <PlaceAutocomplete
                                     value={dropoff}
-                                    onChange={(e) =>
-                                        setDropoff(
-                                            e.target
-                                                .value
-                                        )
-                                    }
+                                    onChange={setDropoff}
+                                    placeholder="VD: Trung tâm Hà Nội, Phố cổ..."
                                     className={inputCls}
-                                    placeholder="VD: Khách sạn Pearl Westlake"
                                 />
+                                {/* <div className="text-[11px] text-green-600 mt-1 flex items-center gap-1">
+                                    <span>✅</span>
+                                    <span>Chọn địa chỉ từ dropdown để đảm bảo chính xác</span>
+                                </div> */}
                             </div>
 
                             {/* Thời gian đón */}
@@ -783,24 +834,18 @@ export default function CreateOrderPage() {
                                     }
                                     className={inputCls}
                                 >
-                                    {(categories.length ? categories : MOCK_CATEGORIES).map(
-                                        (c) => (
+                                    {categories.length > 0 ? (
+                                        categories.map((c) => (
                                             <option
-                                                key={
-                                                    c.id
-                                                }
-                                                value={
-                                                    c.id
-                                                }
+                                                key={c.id}
+                                                value={c.id}
                                             >
                                                 {c.name}{" "}
-                                                (
-                                                {
-                                                    c.seats
-                                                }{" "}
-                                                chỗ)
+                                                ({c.seats}{" "}chỗ)
                                             </option>
-                                        )
+                                        ))
+                                    ) : (
+                                        <option value="">Không có danh mục (lỗi tải dữ liệu)</option>
                                     )}
                                 </select>
 
@@ -926,7 +971,7 @@ export default function CreateOrderPage() {
             </div>
 
             {/* FOOTER NOTE */}
-            <div className="text-[11px] text-slate-500 mt-8 leading-relaxed">
+            {/* <div className="text-[11px] text-slate-500 mt-8 leading-relaxed">
                 <div className="opacity-80">
                     API khi submit:
                 </div>
@@ -943,7 +988,7 @@ export default function CreateOrderPage() {
                         2
                     )}
                 </div>
-            </div>
+            </div> */}
         </div>
     );
 }
