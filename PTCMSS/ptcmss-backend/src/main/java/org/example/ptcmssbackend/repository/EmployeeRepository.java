@@ -11,12 +11,31 @@ import java.util.Optional;
 @Repository
 public interface EmployeeRepository extends JpaRepository<Employees, Integer> {
 
+    // Override findAll để load eager tất cả relationships
+    @Query("SELECT e FROM Employees e " +
+            "LEFT JOIN FETCH e.user " +
+            "LEFT JOIN FETCH e.branch " +
+            "LEFT JOIN FETCH e.role")
+    List<Employees> findAll();
+
     //  Tìm nhân viên theo user_id (khi có mối quan hệ 1-1 với bảng users)
     @Query("SELECT e FROM Employees e WHERE e.user.id = :userId")
     Optional<Employees> findByUserId(Integer userId);
 
-    //  Tìm danh sách nhân viên theo branch_id
-    @Query("SELECT e FROM Employees e WHERE e.branch.id = :branchId")
+    //  Tìm nhân viên theo user_id với JOIN FETCH
+    @Query("SELECT e FROM Employees e " +
+            "LEFT JOIN FETCH e.user " +
+            "LEFT JOIN FETCH e.branch " +
+            "LEFT JOIN FETCH e.role " +
+            "WHERE e.user.id = :userId")
+    Optional<Employees> findByUser_Id(Integer userId);
+
+    //  Tìm danh sách nhân viên theo branch_id với JOIN FETCH để load eager
+    @Query("SELECT e FROM Employees e " +
+            "LEFT JOIN FETCH e.user " +
+            "LEFT JOIN FETCH e.branch " +
+            "LEFT JOIN FETCH e.role " +
+            "WHERE e.branch.id = :branchId")
     List<Employees> findByBranchId(Integer branchId);
 
     //  Tìm danh sách nhân viên theo role_id
@@ -29,7 +48,19 @@ public interface EmployeeRepository extends JpaRepository<Employees, Integer> {
     //  Tìm tất cả nhân viên đang hoạt động
     List<Employees> findByStatus(String status);
 
-    // lọc theo vai trò
-    @Query("SELECT e FROM Employees e WHERE e.role.roleName = :roleName")
+    // lọc theo vai trò với JOIN FETCH
+    @Query("SELECT e FROM Employees e " +
+            "LEFT JOIN FETCH e.user " +
+            "LEFT JOIN FETCH e.branch " +
+            "LEFT JOIN FETCH e.role " +
+            "WHERE e.role.roleName = :roleName")
     List<Employees> findByRoleName(String roleName);
+
+    // Tìm employee theo ID với JOIN FETCH để load eager
+    @Query("SELECT e FROM Employees e " +
+            "LEFT JOIN FETCH e.user " +
+            "LEFT JOIN FETCH e.branch " +
+            "LEFT JOIN FETCH e.role " +
+            "WHERE e.employeeId = :id")
+    Optional<Employees> findByIdWithDetails(Integer id);
 }
