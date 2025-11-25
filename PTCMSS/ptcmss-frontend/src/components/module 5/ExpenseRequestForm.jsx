@@ -10,40 +10,73 @@ import {
     AlertCircle,
     ShieldCheck,
 } from "lucide-react";
-
-/**
- * ExpenseRequestForm – light theme (giống AdminBranchListPage)
- * - EXPENSE_TYPES & VEHICLES cứng
- * - Submit POST /api/v1/expenses (multipart nếu có files)
- * - Toàn bộ màu sắc, button, card theo hệ sáng sky-600 / slate-200
- */
+import { createExpenseRequest } from "../../api/expenses";
+import { listVehiclesByBranch } from "../../api/vehicles";
+import { listBranches, getBranchByUserId } from "../../api/branches";
+import { getCurrentRole, getStoredUserId, ROLES } from "../../utils/session";
 
 const EXPENSE_TYPES = [
     { value: "MAINTENANCE", label: "Bảo dưỡng" },
     { value: "INSURANCE", label: "Bảo hiểm" },
     { value: "INSPECTION", label: "Đăng kiểm" },
     { value: "PARKING", label: "Chi phí bến bãi" },
+    { value: "FUEL", label: "Nhiên liệu" },
     { value: "OTHER", label: "Khác" },
 ];
 
-const VEHICLES = [
-    { id: 55, plate: "29A-123.45" },
-    { id: 58, plate: "30G-678.90" },
-    { id: 60, plate: "88C-000.11" },
-];
+const BRANCH_SCOPED_ROLES = new Set([
+    ROLES.MANAGER,
+    ROLES.CONSULTANT,
+    ROLES.COORDINATOR,
+    ROLES.DRIVER,
+]);
+
+const mapBranchRecord = (raw) => {
+    if (!raw) return null;
+    const id = raw.branchId ?? raw.id ?? null;
+    if (!id) return null;
+    return {
+        id: String(id),
+        name: raw.branchName || raw.name || `Chi nhánh #${id}`,
+    };
+};
+
+const extractBranchItems = (payload) => {
+    if (!payload) return [];
+    if (Array.isArray(payload.items)) return payload.items;
+    if (Array.isArray(payload.data)) return payload.data;
+    if (Array.isArray(payload.content)) return payload.content;
+    if (Array.isArray(payload)) return payload;
+    return [];
+};
 
 export default function ExpenseRequestForm() {
+    const role = React.useMemo(() => getCurrentRole(), []);
+    const userId = React.useMemo(() => getStoredUserId(), []);
+    const branchScoped = React.useMemo(
+        () => BRANCH_SCOPED_ROLES.has(role),
+        [role]
+    );
+
     const [type, setType] = React.useState("");
     const [vehicleId, setVehicleId] = React.useState("");
+    const [vehicleOptions, setVehicleOptions] = React.useState([]);
+    const [vehicleLoading, setVehicleLoading] = React.useState(false);
+    const [vehicleError, setVehicleError] = React.useState("");
+
     const [amountInput, setAmountInput] = React.useState("");
     const [notes, setNotes] = React.useState("");
     const [files, setFiles] = React.useState([]);
+
+    const [branchId, setBranchId] = React.useState("");
+    const [branchName, setBranchName] = React.useState("");
+    const [branchLoading, setBranchLoading] = React.useState(true);
+    const [branchError, setBranchError] = React.useState("");
 
     const [submitting, setSubmitting] = React.useState(false);
     const [error, setError] = React.useState("");
     const [success, setSuccess] = React.useState("");
 
-    // ===== Helpers =====
     const parseAmount = (raw) => {
         const digits = (raw || "").replace(/[^0-9]/g, "");
         return digits ? Number(digits) : 0;
@@ -57,6 +90,96 @@ export default function ExpenseRequestForm() {
         }
     };
 
+    React.useEffect(() => {
+        let cancelled = false;
+        async function loadBranch() {
+            setBranchLoading(true);
+            setBranchError("");
+            try {
+                if (branchScoped) {
+                    if (!userId) {
+                        throw new Error("Không xác định người dùng.");
+                    }
+                    const detail = await getBranchByUserId(Number(userId));
+                    if (cancelled) return;
+                    const mapped = mapBranchRecord(detail);
+                    if (!mapped) {
+                        throw new Error("Không tìm thấy chi nhánh phụ trách.");
+                    }
+                    setBranchId(mapped.id);
+                    setBranchName(mapped.name);
+                } else {
+                    const res = await listBranches({ page: 0, size: 100 });
+                    if (cancelled) return;
+                    const options = extractBranchItems(res)
+                        .map(mapBranchRecord)
+                        .filter(Boolean);
+                    const first = options[0] || null;
+                    setBranchId(first?.id || "");
+                    setBranchName(first?.name || "");
+                    if (!first) {
+                        throw new Error("Chưa có chi nhánh khả dụng.");
+                    }
+                }
+            } catch (err) {
+                if (cancelled) return;
+                setBranchId("");
+                setBranchName("");
+                setBranchError(
+                    err?.data?.message ||
+                    err?.message ||
+                    "Không tải được chi nhánh."
+                );
+            } finally {
+                if (!cancelled) setBranchLoading(false);
+            }
+        }
+        loadBranch();
+        return () => {
+            cancelled = true;
+        };
+    }, [branchScoped, userId]);
+
+    React.useEffect(() => {
+        if (!branchId) {
+            setVehicleOptions([]);
+            setVehicleId("");
+            return;
+        }
+        let cancelled = false;
+        async function loadVehicles() {
+            setVehicleError("");
+            setVehicleLoading(true);
+            try {
+                const list = await listVehiclesByBranch(Number(branchId));
+                if (cancelled) return;
+                const mapped = (Array.isArray(list) ? list : []).map((v) => ({
+                    id: String(v.id ?? v.vehicleId ?? ""),
+                    plate:
+                        v.licensePlate ||
+                        v.plate ||
+                        v.license_plate ||
+                        `VEH-${v.id ?? ""}`,
+                }));
+                setVehicleOptions(mapped);
+            } catch (err) {
+                if (cancelled) return;
+                setVehicleOptions([]);
+                setVehicleError(
+                    err?.data?.message ||
+                    err?.message ||
+                    "Không tải được danh sách xe."
+                );
+            } finally {
+                if (!cancelled) setVehicleLoading(false);
+            }
+        }
+        loadVehicles();
+        return () => {
+            cancelled = true;
+        };
+    }, [branchId]);
+
     const onAmountChange = (e) => {
         setError("");
         setSuccess("");
@@ -66,21 +189,17 @@ export default function ExpenseRequestForm() {
     const onPickFiles = (e) => {
         const selected = Array.from(e.target.files || []);
         const maxFiles = 5;
-        const maxSize = 10 * 1024 * 1024; // 10MB
-
+        const maxSize = 10 * 1024 * 1024;
         const valid = [];
         let rejected = 0;
-
-        for (const f of selected) {
-            if (f.size <= maxSize && valid.length < maxFiles) {
-                valid.push(f);
+        for (const file of selected) {
+            if (file.size <= maxSize && valid.length < maxFiles) {
+                valid.push(file);
             } else {
                 rejected++;
             }
         }
-
         setFiles(valid);
-
         if (rejected > 0) {
             setError(
                 `${rejected} file bị bỏ qua (quá 10MB hoặc vượt quá ${maxFiles} file).`
@@ -96,17 +215,23 @@ export default function ExpenseRequestForm() {
         setNotes("");
         setFiles([]);
         setError("");
-        // giữ success để user vẫn thấy "đã gửi"
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError("");
         setSuccess("");
-
+        if (branchLoading) {
+            setError("Đang xác định chi nhánh. Vui lòng chờ.");
+            return;
+        }
+        if (!branchId) {
+            setError(branchError || "Chưa xác định chi nhánh gửi yêu cầu.");
+            return;
+        }
         const amount = parseAmount(amountInput);
         if (!type) {
-            setError("Vui lòng chọn Loại chi phí.");
+            setError("Vui lòng chọn loại chi phí.");
             return;
         }
         if (!amount || amount <= 0) {
@@ -116,55 +241,28 @@ export default function ExpenseRequestForm() {
 
         setSubmitting(true);
         try {
-            const notesClean = notes.trim();
+            const form = new FormData();
+            form.append("type", type);
+            form.append("amount", String(amount));
+            form.append("branchId", String(branchId));
+            if (vehicleId) form.append("vehicleId", vehicleId);
+            const noteClean = notes.trim();
+            if (noteClean) form.append("note", noteClean);
+            if (userId) form.append("requesterUserId", String(userId));
+            files.forEach((file) => form.append("files", file));
 
-            if (files.length > 0) {
-                // multipart/form-data
-                const form = new FormData();
-                form.append("type", type);
-                if (vehicleId)
-                    form.append("vehicle_id", String(vehicleId));
-                form.append("amount", String(amount));
-                if (notesClean) form.append("notes", notesClean);
-                files.forEach((f) =>
-                    form.append("attachments[]", f)
-                );
-
-                const r = await fetch("/api/v1/expenses", {
-                    method: "POST",
-                    body: form,
-                });
-                if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            } else {
-                // JSON
-                const payload = {
-                    type,
-                    amount,
-                };
-                if (vehicleId)
-                    payload.vehicle_id = Number(vehicleId);
-                if (notesClean) payload.notes = notesClean;
-
-                const r = await fetch("/api/v1/expenses", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify(payload),
-                });
-                if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            }
-
+            await createExpenseRequest(form);
             setSuccess(
-                `Đã gửi yêu cầu chi phí tới Kế toán duyệt (${new Date().toLocaleString(
+                `Đã gửi yêu cầu chi phí lúc ${new Date().toLocaleString(
                     "vi-VN"
-                )}).`
+                )}. Kế toán sẽ duyệt sớm.`
             );
             resetForm();
         } catch (err) {
-            console.error(err);
             setError(
-                "Gửi yêu cầu thất bại. Vui lòng thử lại hoặc kiểm tra kết nối."
+                err?.data?.message ||
+                err?.message ||
+                "Không gửi được yêu cầu. Vui lòng thử lại."
             );
         } finally {
             setSubmitting(false);
@@ -172,13 +270,11 @@ export default function ExpenseRequestForm() {
     };
 
     return (
-        <div className="max-w-2xl mx-auto rounded-xl border border-slate-200 bg-white text-slate-900 shadow-sm overflow-hidden">
-            {/* HEADER giống branch list header */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/40 max-w-3xl mx-auto">
             <div className="flex items-start gap-3 px-4 py-4 border-b border-slate-200 bg-slate-50">
                 <div className="h-10 w-10 rounded-md bg-sky-600 text-white flex items-center justify-center shadow-[0_10px_30px_rgba(2,132,199,.35)]">
                     <ReceiptText className="h-5 w-5" />
                 </div>
-
                 <div className="flex flex-col">
                     <div className="text-[11px] text-slate-500 leading-none mb-1">
                         Gửi đề nghị chi tiêu nội bộ
@@ -186,18 +282,19 @@ export default function ExpenseRequestForm() {
                     <div className="text-slate-900 font-semibold leading-tight">
                         Tạo yêu cầu chi phí
                     </div>
+                    <div className="text-[11px] text-slate-500 mt-1">
+                        Chi nhánh:{" "}
+                        {branchLoading
+                            ? "Đang tải..."
+                            : branchName || branchError || "Chưa xác định"}
+                    </div>
                 </div>
             </div>
 
-            <form
-                onSubmit={handleSubmit}
-                className="p-4 space-y-4 text-sm"
-            >
-                {/* Loại chi phí */}
+            <form onSubmit={handleSubmit} className="p-4 space-y-4 text-sm">
                 <div>
                     <div className="text-xs text-slate-600 mb-1">
-                        Loại chi phí{" "}
-                        <span className="text-rose-500">*</span>
+                        Loại chi phí <span className="text-rose-500">*</span>
                     </div>
                     <div className="relative">
                         <ClipboardList className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -210,22 +307,16 @@ export default function ExpenseRequestForm() {
                             }}
                             className="w-full bg-white border border-slate-300 rounded-md pl-9 pr-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500"
                         >
-                            <option value="">
-                                -- Chọn loại chi phí --
-                            </option>
-                            {EXPENSE_TYPES.map((t) => (
-                                <option
-                                    key={t.value}
-                                    value={t.value}
-                                >
-                                    {t.label}
+                            <option value="">-- Chọn loại chi phí --</option>
+                            {EXPENSE_TYPES.map((item) => (
+                                <option key={item.value} value={item.value}>
+                                    {item.label}
                                 </option>
                             ))}
                         </select>
                     </div>
                 </div>
 
-                {/* Xe (optional) */}
                 <div>
                     <div className="text-xs text-slate-600 mb-1">
                         Áp dụng cho xe (tùy chọn)
@@ -237,37 +328,34 @@ export default function ExpenseRequestForm() {
                             onChange={(e) => {
                                 setError("");
                                 setSuccess("");
-                                setVehicleId(
-                                    e.target.value
-                                );
+                                setVehicleId(e.target.value);
                             }}
-                            className="w-full bg-white border border-slate-300 rounded-md pl-9 pr-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500"
+                            disabled={vehicleLoading || branchLoading}
+                            className="w-full bg-white border border-slate-300 rounded-md pl-9 pr-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 disabled:opacity-60"
                         >
-                            <option value="">
-                                -- Không chọn --
-                            </option>
-                            {VEHICLES.map((v) => (
-                                <option
-                                    key={v.id}
-                                    value={v.id}
-                                >
-                                    {v.plate} (#{v.id})
+                            <option value="">-- Không chọn --</option>
+                            {vehicleOptions.map((v) => (
+                                <option key={v.id} value={v.id}>
+                                    {v.plate}
                                 </option>
                             ))}
                         </select>
                     </div>
                     <div className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                        Nếu chi phí không gắn cho xe cụ thể
-                        (ví dụ chi phí bến bãi chung), có thể bỏ
-                        trống.
+                        {vehicleLoading
+                            ? "Đang tải danh sách xe..."
+                            : "Nếu chi phí không gắn cho xe cụ thể (ví dụ chi phí bến bãi chung), có thể bỏ trống."}
                     </div>
+                    {vehicleError && (
+                        <div className="text-[11px] text-rose-500 mt-1">
+                            {vehicleError}
+                        </div>
+                    )}
                 </div>
 
-                {/* Số tiền */}
                 <div>
                     <div className="text-xs text-slate-600 mb-1">
-                        Số tiền (VND){" "}
-                        <span className="text-rose-500">*</span>
+                        Số tiền (VND) <span className="text-rose-500">*</span>
                     </div>
                     <input
                         type="text"
@@ -280,93 +368,68 @@ export default function ExpenseRequestForm() {
                     <div className="text-[11px] text-slate-500 mt-1">
                         Giá trị sẽ gửi:{" "}
                         <span className="text-slate-900 font-mono tabular-nums">
-                            {formatVND(
-                                parseAmount(amountInput)
-                            )}
+                            {formatVND(parseAmount(amountInput))}
                         </span>{" "}
                         VND
                     </div>
                 </div>
 
-                {/* Ghi chú */}
                 <div>
-                    <div className="text-xs text-slate-600 mb-1">
-                        Ghi chú
-                    </div>
+                    <div className="text-xs text-slate-600 mb-1">Ghi chú</div>
                     <textarea
-                        rows={3}
                         value={notes}
                         onChange={(e) => {
                             setError("");
                             setSuccess("");
                             setNotes(e.target.value);
                         }}
-                        placeholder="Nội dung chi tiết, ví dụ: Bảo dưỡng 5 vạn km"
-                        className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm text-slate-900 shadow-sm resize-y focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500"
+                        rows={3}
+                        placeholder="Nội dung chi tiết, ví dụ: bảo dưỡng 5 vạn km"
+                        className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500"
                     />
                 </div>
 
-                {/* Upload chứng từ */}
                 <div>
                     <div className="text-xs text-slate-600 mb-1">
-                        Upload chứng từ (tối đa 5 file, mỗi file ≤
-                        10MB)
+                        Upload chứng từ (tối đa 5 file, mỗi file ≤10MB)
                     </div>
-
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <label className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 shadow-sm cursor-pointer transition-colors">
-                            <Upload className="h-4 w-4 text-slate-500" />
+                    <label className="flex items-center justify-between gap-3 rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-600 cursor-pointer hover:border-slate-400">
+                        <div className="flex items-center gap-2">
+                            <Upload className="h-4 w-4 text-sky-600" />
                             <span>Chọn file</span>
-                            <input
-                                type="file"
-                                multiple
-                                accept="application/pdf,image/*"
-                                className="hidden"
-                                onChange={onPickFiles}
-                            />
-                        </label>
-
-                        {files.length > 0 && (
-                            <div className="text-[11px] text-slate-500">
-                                Đã chọn {files.length} file
-                            </div>
-                        )}
-                    </div>
-
+                        </div>
+                        <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            multiple
+                            className="hidden"
+                            onChange={onPickFiles}
+                        />
+                        <span className="text-xs text-slate-500">
+                            {files.length > 0
+                                ? `${files.length} file đã chọn`
+                                : "Chưa có file"}
+                        </span>
+                    </label>
                     {files.length > 0 && (
                         <ul className="mt-2 text-[12px] leading-4 text-slate-700 space-y-1">
-                            {files.map((f, i) => (
+                            {files.map((file, index) => (
                                 <li
-                                    key={`${f.name}-${i}`}
+                                    key={`${file.name}-${index}`}
                                     className="flex items-center justify-between gap-2"
                                 >
-                                    <span className="truncate">
-                                        {f.name} ·{" "}
-                                        {(f.size / 1024).toFixed(
-                                            0
-                                        )}{" "}
-                                        KB
-                                    </span>
-
+                                    <span className="truncate">{file.name}</span>
                                     <button
                                         type="button"
                                         onClick={() =>
-                                            setFiles(
-                                                (arr) =>
-                                                    arr.filter(
-                                                        (
-                                                            _,
-                                                            idx
-                                                        ) =>
-                                                            idx !==
-                                                            i
-                                                    )
+                                            setFiles((prev) =>
+                                                prev.filter((_, i) => i !== index)
                                             )
                                         }
-                                        className="text-slate-400 hover:text-slate-600 text-[11px]"
+                                        className="text-slate-400 hover:text-slate-600"
                                         title="Bỏ file này"
                                     >
-                                        <X className="inline-block h-3.5 w-3.5" />
+                                        <X className="h-3.5 w-3.5" />
                                     </button>
                                 </li>
                             ))}
@@ -374,7 +437,6 @@ export default function ExpenseRequestForm() {
                     )}
                 </div>
 
-                {/* Alerts */}
                 {error && (
                     <div className="flex items-start gap-2 text-rose-700 bg-rose-50 border border-rose-200/80 rounded-md px-3 py-2 text-sm shadow-sm">
                         <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
@@ -393,31 +455,23 @@ export default function ExpenseRequestForm() {
                     </div>
                 )}
 
-                {/* Actions */}
                 <div className="flex flex-wrap items-center justify-end gap-2 pt-2">
-                    {/* Reset form */}
                     <button
                         type="button"
                         onClick={resetForm}
                         disabled={submitting}
                         className={`inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 shadow-sm transition-colors ${
-                            submitting
-                                ? "opacity-50 cursor-not-allowed"
-                                : ""
+                            submitting ? "opacity-50 cursor-not-allowed" : ""
                         }`}
                     >
                         <X className="h-4 w-4 text-slate-500" />
                         <span>Xoá form</span>
                     </button>
-
-                    {/* Submit */}
                     <button
                         type="submit"
                         disabled={submitting}
                         className={`inline-flex items-center gap-1 rounded-md bg-sky-600 hover:bg-sky-500 text-white px-3 py-2 text-sm font-medium shadow-sm transition-colors ${
-                            submitting
-                                ? "opacity-50 cursor-not-allowed"
-                                : ""
+                            submitting ? "opacity-50 cursor-not-allowed" : ""
                         }`}
                     >
                         {submitting ? (
@@ -429,28 +483,22 @@ export default function ExpenseRequestForm() {
                     </button>
                 </div>
 
-                {/* Debug preview (QA) */}
-                <div className="text-[11px] text-slate-500 font-mono leading-relaxed break-all bg-slate-50 border border-slate-200 rounded-md p-3 shadow-inner">
-                    POST /api/v1/expenses{"\n"}
+                {/* <div className="text-[11px] text-slate-500 font-mono leading-relaxed break-all bg-slate-50 border border-slate-200 rounded-md p-3 shadow-inner">
+                    POST /api/expense-requests{"\n"}
                     {JSON.stringify(
                         {
                             type,
-                            vehicle_id:
-                                vehicleId || undefined,
-                            amount: parseAmount(
-                                amountInput
-                            ),
-                            notes:
-                                notes.trim() ||
-                                undefined,
-                            attachments: files.map(
-                                (f) => f.name
-                            ),
+                            vehicleId: vehicleId || undefined,
+                            amount: parseAmount(amountInput),
+                            note: notes.trim() || undefined,
+                            branchId: branchId || undefined,
+                            requesterUserId: userId || undefined,
+                            attachments: files.map((file) => file.name),
                         },
                         null,
                         2
                     )}
-                </div>
+                </div> */}
             </form>
         </div>
     );
