@@ -24,13 +24,13 @@ export default function VerificationSuccessPage() {
     }, [navigate]);
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50 flex items-center justify-center p-4">
+        <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-blue-50 flex items-center justify-center p-4">
             <div className="max-w-md w-full">
                 <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
                     {/* Success Icon */}
                     <div className="mb-6 flex justify-center">
                         <div className="relative">
-                            <div className="absolute inset-0 bg-emerald-400 rounded-full blur-xl opacity-50 animate-pulse"></div>
+                            <div className="absolute inset-0 bg-amber-400 rounded-full blur-xl opacity-50 animate-pulse"></div>
                             <div className="relative bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full p-4">
                                 <CheckCircle className="h-16 w-16 text-white" strokeWidth={2.5} />
                             </div>
@@ -78,14 +78,14 @@ export default function VerificationSuccessPage() {
                     {/* Auto redirect notice */}
                     <div className="text-sm text-gray-500 mb-6">
                         Tự động chuyển đến trang đăng nhập sau{' '}
-                        <span className="font-bold text-emerald-600">{countdown}</span> giây
+                        <span className="font-bold text-amber-600">{countdown}</span> giây
                     </div>
 
                     {/* Action Buttons */}
                     <div className="space-y-3">
                         <button
                             onClick={() => navigate('/login')}
-                            className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30"
+                            className="w-full bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-[#EDC531] hover:to-emerald-700 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30"
                         >
                             <span>Đăng nhập ngay</span>
                             <ArrowRight className="h-4 w-4" />
