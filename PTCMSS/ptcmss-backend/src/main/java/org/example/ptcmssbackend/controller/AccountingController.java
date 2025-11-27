@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
+import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -39,9 +39,9 @@ public class AccountingController {
     public ResponseEntity<ApiResponse<AccountingDashboardResponse>> getDashboard(
             @Parameter(description = "ID chi nhánh") @RequestParam(required = false) Integer branchId,
             @Parameter(description = "Kỳ báo cáo: TODAY, THIS_WEEK, THIS_MONTH, THIS_QUARTER, YTD") @RequestParam(required = false, defaultValue = "THIS_MONTH") String period) {
-        
+
         log.info("[AccountingController] Getting dashboard - branch: {}, period: {}", branchId, period);
-        
+
         try {
             AccountingDashboardResponse response = accountingService.getDashboard(branchId, period);
             return ResponseEntity.ok(ApiResponse.<AccountingDashboardResponse>builder()
@@ -67,9 +67,9 @@ public class AccountingController {
             @Parameter(description = "Ngày bắt đầu") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @Parameter(description = "Ngày kết thúc") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @Parameter(description = "Kỳ báo cáo: TODAY, 7D, 30D, MONTH, QUARTER, YTD") @RequestParam(required = false) String period) {
-        
+
         log.info("[AccountingController] Getting revenue report - branch: {}, period: {}", branchId, period);
-        
+
         try {
             RevenueReportRequest request = new RevenueReportRequest();
             request.setBranchId(branchId);
@@ -77,7 +77,7 @@ public class AccountingController {
             request.setStartDate(startDate);
             request.setEndDate(endDate);
             request.setPeriod(period);
-            
+
             RevenueReportResponse response = accountingService.getRevenueReport(request);
             return ResponseEntity.ok(ApiResponse.<RevenueReportResponse>builder()
                     .success(true)
@@ -103,9 +103,9 @@ public class AccountingController {
             @Parameter(description = "Loại chi phí: fuel, toll, maintenance, salary, etc.") @RequestParam(required = false) String expenseType,
             @Parameter(description = "Ngày bắt đầu") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @Parameter(description = "Ngày kết thúc") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-        
+
         log.info("[AccountingController] Getting expense report - branch: {}", branchId);
-        
+
         try {
             ExpenseReportRequest request = new ExpenseReportRequest();
             request.setBranchId(branchId);
@@ -114,7 +114,7 @@ public class AccountingController {
             request.setExpenseType(expenseType);
             request.setStartDate(startDate);
             request.setEndDate(endDate);
-            
+
             ExpenseReportResponse response = accountingService.getExpenseReport(request);
             return ResponseEntity.ok(ApiResponse.<ExpenseReportResponse>builder()
                     .success(true)
@@ -137,7 +137,7 @@ public class AccountingController {
             @Parameter(description = "ID chi nhánh") @RequestParam(required = false) Integer branchId,
             @Parameter(description = "Ngày bắt đầu", required = true) @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @Parameter(description = "Ngày kết thúc", required = true) @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-        
+
         try {
             BigDecimal revenue = accountingService.getTotalRevenue(branchId, startDate, endDate);
             return ResponseEntity.ok(ApiResponse.<BigDecimal>builder()
@@ -161,7 +161,7 @@ public class AccountingController {
             @Parameter(description = "ID chi nhánh") @RequestParam(required = false) Integer branchId,
             @Parameter(description = "Ngày bắt đầu", required = true) @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @Parameter(description = "Ngày kết thúc", required = true) @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-        
+
         try {
             BigDecimal expense = accountingService.getTotalExpense(branchId, startDate, endDate);
             return ResponseEntity.ok(ApiResponse.<BigDecimal>builder()
@@ -183,7 +183,7 @@ public class AccountingController {
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT')")
     public ResponseEntity<ApiResponse<BigDecimal>> getARBalance(
             @Parameter(description = "ID chi nhánh") @RequestParam(required = false) Integer branchId) {
-        
+
         try {
             BigDecimal arBalance = accountingService.getARBalance(branchId);
             return ResponseEntity.ok(ApiResponse.<BigDecimal>builder()
@@ -205,7 +205,7 @@ public class AccountingController {
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT')")
     public ResponseEntity<ApiResponse<Integer>> getInvoicesDueIn7Days(
             @Parameter(description = "ID chi nhánh") @RequestParam(required = false) Integer branchId) {
-        
+
         try {
             int count = accountingService.getInvoicesDueIn7Days(branchId);
             return ResponseEntity.ok(ApiResponse.<Integer>builder()
@@ -227,7 +227,7 @@ public class AccountingController {
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT')")
     public ResponseEntity<ApiResponse<Integer>> getOverdueInvoices(
             @Parameter(description = "ID chi nhánh") @RequestParam(required = false) Integer branchId) {
-        
+
         try {
             int count = accountingService.getOverdueInvoices(branchId);
             return ResponseEntity.ok(ApiResponse.<Integer>builder()

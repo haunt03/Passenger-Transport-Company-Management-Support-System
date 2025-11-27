@@ -7,7 +7,6 @@ import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.SignatureException;
 import lombok.extern.slf4j.Slf4j;
-
 import org.example.ptcmssbackend.enums.TokenType;
 import org.example.ptcmssbackend.service.JwtService;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,23 +25,17 @@ import static org.example.ptcmssbackend.enums.TokenType.REFRESH_TOKEN;
 @Slf4j(topic = "JWT_SERVICE")
 public class JwtServiceImpl implements JwtService {
 
-    // ================== CONFIG FROM application.yml ===================
+    @Value("${jwt.expriMinutes}")
+    private long expriMinutes;
 
-    // Access token sống bao nhiêu phút (mapping với: jwt.expireMinutes)
-    @Value("${jwt.expireMinutes}")
-    private long accessTokenExpireMinutes;
+    @Value("${jwt.expireDate}")
+    private long expriDate;
 
-    // Refresh token sống bao nhiêu phút (mapping với: jwt.refreshExpireMinutes)
-    @Value("${jwt.refreshExpireMinutes}")
-    private long refreshTokenExpireMinutes;
+    @Value("${jwt.accesskey}")
+    private String accesskey;
 
-    // Secret cho access token (mapping với: jwt.accessKey)
-    @Value("${jwt.accessKey}")
-    private String accessKey;
-
-    // Secret cho refresh token (mapping với: jwt.refreshKey)
-    @Value("${jwt.refreshKey}")
-    private String refreshKey;
+    @Value("${jwt.refreshkey}")
+    private String refreshkey;
 
     /**
      * Tạo Access Token (thời hạn ngắn)
@@ -56,13 +49,11 @@ public class JwtServiceImpl implements JwtService {
         claims.put("username", username);
         claims.put("roles", authorities.stream().map(GrantedAuthority::getAuthority).toList());
 
-        long now = System.currentTimeMillis();
-
         return Jwts.builder()
                 .setClaims(claims)
                 .setSubject(username)
-                .setIssuedAt(new Date(now))
-                .setExpiration(new Date(now + accessTokenExpireMinutes * 60 * 1000)) // phút -> ms
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + expriMinutes * 60 * 1000))
                 .signWith(getSecretKey(ACCESS_TOKEN), SignatureAlgorithm.HS256)
                 .compact();
     }
@@ -79,19 +70,14 @@ public class JwtServiceImpl implements JwtService {
         claims.put("username", username);
         claims.put("roles", authorities.stream().map(GrantedAuthority::getAuthority).toList());
 
-        long now = System.currentTimeMillis();
-
         return Jwts.builder()
                 .setClaims(claims)
                 .setSubject(username)
-                .setIssuedAt(new Date(now))
-                // dùng phút cấu hình trong jwt.refreshExpireMinutes
-                .setExpiration(new Date(now + refreshTokenExpireMinutes * 60 * 1000))
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + 24 * 60 * 60 * 1000 * expriDate))
                 .signWith(getSecretKey(REFRESH_TOKEN), SignatureAlgorithm.HS256)
                 .compact();
     }
-
-
 
     /**
      * Trích xuất username từ token
@@ -104,7 +90,6 @@ public class JwtServiceImpl implements JwtService {
 
     /**
      * Tạo token cho reset mật khẩu
-     * (dùng chung thời gian sống với access token cho đơn giản)
      */
     @Override
     public String generatePasswordResetToken(String username) {
@@ -113,13 +98,11 @@ public class JwtServiceImpl implements JwtService {
         Map<String, Object> claims = new HashMap<>();
         claims.put("username", username);
 
-        long now = System.currentTimeMillis();
-
         return Jwts.builder()
                 .setClaims(claims)
                 .setSubject(username)
-                .setIssuedAt(new Date(now))
-                .setExpiration(new Date(now + accessTokenExpireMinutes * 60 * 1000))
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + expriMinutes * 60 * 1000))
                 .signWith(getSecretKey(ACCESS_TOKEN), SignatureAlgorithm.HS256)
                 .compact();
     }
@@ -150,11 +133,16 @@ public class JwtServiceImpl implements JwtService {
         }
     }
 
+
     private Key getSecretKey(TokenType type) {
-        return switch (type) {
-            case ACCESS_TOKEN -> Keys.hmacShaKeyFor(accessKey.getBytes());
-            case REFRESH_TOKEN -> Keys.hmacShaKeyFor(refreshKey.getBytes());
-            default -> throw new IllegalArgumentException("Invalid token type: " + type);
-        };
+        if (type == TokenType.ACCESS_TOKEN) {
+            return Keys.hmacShaKeyFor(accesskey.getBytes());
+        } else if (type == TokenType.REFRESH_TOKEN) {
+            return Keys.hmacShaKeyFor(refreshkey.getBytes());
+        } else {
+            throw new IllegalArgumentException("Invalid token type: " + type);
+        }
     }
 }
+
+

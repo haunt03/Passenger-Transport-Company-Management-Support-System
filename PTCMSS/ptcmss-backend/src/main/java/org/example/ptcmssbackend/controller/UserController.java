@@ -49,15 +49,29 @@ public class UserController {
         }
     }
 
-    @Operation(summary = "Cập nhật người dùng", description = "Cập nhật thông tin người dùng (dành cho Admin hoặc chính người đó).")
+    @Operation(summary = "Cập nhật người dùng", description = "Cập nhật thông tin người dùng (chỉ dành cho Admin).")
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or #id == authentication.principal.id") //  Cho phép admin hoặc chính user đó
+    @PreAuthorize("hasRole('ADMIN')") //  Chỉ Admin mới được cập nhật thông tin user
     public ResponseData<?> updateUser(
             @Parameter(description = "ID người dùng") @PathVariable Integer id,
             @Valid @RequestBody UpdateUserRequest request) {
         try{
             log.info("updateUser: {}", request);
             return new ResponseData<>(HttpStatus.OK.value(), "Update user successfully", userService.updateUser(id, request));
+        } catch (Exception e) {
+            return new ResponseError(HttpStatus.BAD_REQUEST.value(), e.getMessage());
+        }
+    }
+
+    @Operation(summary = "Cập nhật thông tin cá nhân", description = "Người dùng tự cập nhật số điện thoại và địa chỉ của mình.")
+    @PatchMapping("/{id}/profile")
+    @PreAuthorize("#id == authentication.principal.id") //  Chỉ cho phép user tự cập nhật profile của mình
+    public ResponseData<?> updateProfile(
+            @Parameter(description = "ID người dùng") @PathVariable Integer id,
+            @Valid @RequestBody org.example.ptcmssbackend.dto.request.User.UpdateProfileRequest request) {
+        try{
+            log.info("updateProfile: {}", request);
+            return new ResponseData<>(HttpStatus.OK.value(), "Update profile successfully", userService.updateProfile(id, request));
         } catch (Exception e) {
             return new ResponseError(HttpStatus.BAD_REQUEST.value(), e.getMessage());
         }
