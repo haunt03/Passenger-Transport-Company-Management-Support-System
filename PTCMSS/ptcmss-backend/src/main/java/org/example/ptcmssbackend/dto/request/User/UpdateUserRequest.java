@@ -29,4 +29,6 @@ public class UpdateUserRequest {
 
     @NotNull(message = "Status is required")
     private UserStatus status;
+
+    private Integer branchId; // Chi nhánh (optional - chỉ cập nhật nếu có)
 }
