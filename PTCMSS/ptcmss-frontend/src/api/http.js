@@ -54,6 +54,13 @@ export async function apiFetch(path, { method = "GET", headers = {}, body, auth 
         const err = new Error("API_ERROR");
         err.status = resp.status;
         err.data = data;
+        err.message = data?.message || data?.error || `HTTP ${resp.status}: ${resp.statusText}`;
+
+        // Silently ignore 404/500 errors for branch/user endpoint (user may not have branch)
+        if (path.includes('/branches/user/') && (resp.status === 404 || resp.status === 500)) {
+            // Don't log, just throw
+        }
+
         throw err;
     }
 
@@ -63,6 +70,11 @@ export async function apiFetch(path, { method = "GET", headers = {}, body, auth 
     // - Variant C: { success, message, data }
     // Note: Only treat as wrapper if status/code is a number (HTTP status code)
     // Business entities may have "status" field (string) which should not be treated as HTTP status
+    // Check if data is an object before using 'in' operator
+    if (!data || typeof data !== "object") {
+        return data; // Return string or primitive as-is
+    }
+
     const hasDataField = "data" in data;
     const hasSuccessField = "success" in data && typeof data.success === "boolean";
     const hasCodeField = "code" in data && typeof data.code === "number";

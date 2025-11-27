@@ -84,7 +84,8 @@ export function recordPayment(invoiceId, body) {
     // Transform frontend format to backend RecordPaymentRequest
     const payload = {
         amount: body.amount,
-        paymentMethod: body.paymentMethod,
+        paymentMethod: body.paymentMethod || "CASH",
+        confirmationStatus: body.confirmationStatus || "PENDING", // Mặc định PENDING, kế toán sẽ xác nhận
         // Bank transfer info
         bankName: body.bankName,
         bankAccount: body.bankAccount,
@@ -99,26 +100,32 @@ export function recordPayment(invoiceId, body) {
     return apiFetch(`/api/invoices/${invoiceId}/payments`, {
         method: "POST",
         body: payload,
-    }).then(res => res.data); // Backend returns ApiResponse wrapper
+    }); // apiFetch already unwraps ApiResponse
+}
+
+// Confirm payment (kế toán xác nhận)
+export function confirmPayment(paymentId, status) {
+    // status: "CONFIRMED" hoặc "REJECTED"
+    return apiFetch(`/api/invoices/payments/${paymentId}/confirm?status=${encodeURIComponent(status)}`, {
+        method: "PATCH",
+    }).then(res => res.data);
 }
 
 // Get payment history for invoice
 export function getPaymentHistory(invoiceId) {
-    return apiFetch(`/api/invoices/${invoiceId}/payments`)
-        .then(res => res.data);
+    return apiFetch(`/api/invoices/${invoiceId}/payments`);
 }
 
 // Get invoice balance
 export function getInvoiceBalance(invoiceId) {
-    return apiFetch(`/api/invoices/${invoiceId}/balance`)
-        .then(res => res.data);
+    return apiFetch(`/api/invoices/${invoiceId}/balance`);
 }
 
 // Mark invoice as paid
 export function markInvoiceAsPaid(invoiceId) {
     return apiFetch(`/api/invoices/${invoiceId}/mark-paid`, {
         method: "POST",
-    }).then(res => res.data);
+    });
 }
 
 // Generate invoice number
@@ -128,3 +135,4 @@ export function generateInvoiceNumber(branchId) {
     const qs = params.toString();
     return apiFetch(`/api/invoices/generate-number${qs ? `?${qs}` : ""}`);
 }
+

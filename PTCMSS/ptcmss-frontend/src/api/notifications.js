@@ -25,10 +25,8 @@ export function getDriverNotifications({ userId, page = 1, limit = 20 } = {}) {
     params.append("page", String(page));
     params.append("limit", String(limit));
 
-    // Use general notifications endpoint with userId filter if available
-    // Otherwise, return empty array and let component handle it
     return apiFetch(`/api/notifications/user/${userId}?${params.toString()}`).catch(() => {
-        // If endpoint doesn't exist, return empty array
+        // If endpoint fails, return empty array
         return { data: [], total: 0, page, limit };
     });
 }
@@ -94,3 +92,4 @@ export function getPendingApprovals(branchId) {
     if (branchId) params.append("branchId", String(branchId));
     return apiFetch(`/api/notifications/approvals/pending${params.toString() ? `?${params.toString()}` : ""}`);
 }
+

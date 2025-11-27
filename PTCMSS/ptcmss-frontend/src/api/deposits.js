@@ -24,11 +24,11 @@ export function createDeposit(bookingId, body) {
         bookingId: bookingId,
         customerId: body.customerId,
         type: "INCOME",
-        isDeposit: true,
+        isDeposit: body.isDeposit !== undefined ? body.isDeposit : true,
         amount: body.amount,
         paymentMethod: body.paymentMethod,
-        paymentTerms: "NET_7",
-        dueDate: body.paymentDate,
+        paymentTerms: body.paymentTerms || "NET_7",
+        dueDate: body.dueDate,
         // Bank transfer info
         bankName: body.bankName,
         bankAccount: body.bankAccount,
@@ -45,25 +45,22 @@ export function createDeposit(bookingId, body) {
     return apiFetch(`/api/deposits/bookings/${bookingId}`, {
         method: "POST",
         body: payload,
-    }).then(res => res.data); // Backend returns ApiResponse wrapper
+    }); // apiFetch already unwraps ApiResponse
 }
 
 // Get deposits by booking
 export function getDepositsByBooking(bookingId) {
-    return apiFetch(`/api/deposits/bookings/${bookingId}`)
-        .then(res => res.data);
+    return apiFetch(`/api/deposits/bookings/${bookingId}`);
 }
 
 // Get total deposit paid for booking
 export function getTotalDepositPaid(bookingId) {
-    return apiFetch(`/api/deposits/bookings/${bookingId}/total-paid`)
-        .then(res => res.data);
+    return apiFetch(`/api/deposits/bookings/${bookingId}/total-paid`);
 }
 
 // Get remaining amount for booking
 export function getRemainingAmount(bookingId) {
-    return apiFetch(`/api/deposits/bookings/${bookingId}/remaining`)
-        .then(res => res.data);
+    return apiFetch(`/api/deposits/bookings/${bookingId}/remaining`);
 }
 
 // Cancel deposit
@@ -72,13 +69,13 @@ export function cancelDeposit(depositId, reason) {
     params.append("reason", reason);
     return apiFetch(`/api/deposits/${depositId}/cancel?${params.toString()}`, {
         method: "POST",
-    }).then(res => res.data);
+    });
 }
 
 // Generate receipt number
 export function generateReceiptNumber(branchId) {
     const params = new URLSearchParams();
     if (branchId != null) params.append("branchId", String(branchId));
-    return apiFetch(`/api/deposits/generate-receipt-number?${params.toString()}`)
-        .then(res => res.data);
+    return apiFetch(`/api/deposits/generate-receipt-number?${params.toString()}`);
 }
+

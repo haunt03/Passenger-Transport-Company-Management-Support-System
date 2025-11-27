@@ -80,3 +80,4 @@ export function setDebtLabel(invoiceId, body) {
         body,
     });
 }
+

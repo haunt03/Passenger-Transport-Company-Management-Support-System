@@ -56,3 +56,4 @@ export function deleteSystemSetting(id) {
         method: "DELETE",
     });
 }
+
