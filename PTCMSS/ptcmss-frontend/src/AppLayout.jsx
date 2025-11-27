@@ -24,9 +24,11 @@ import {
     getHomePathForRole,
     getStoredUsername,
     getStoredRoleLabel,
+    hasActiveSession,
 } from "./utils/session";
-import { WebSocketProvider } from "./contexts/WebSocketContext";
+import { WebSocketProvider, useWebSocket } from "./contexts/WebSocketContext";
 import NotificationToast from "./components/common/NotificationToast";
+import { useNotifications } from "./hooks/useNotifications";
 
 const SIDEBAR_SECTIONS = [
     {
@@ -50,7 +52,6 @@ const SIDEBAR_SECTIONS = [
             // { label: "Tạo chi nhánh", to: "/admin/branches/new", roles: [ROLES.ADMIN] },
             { label: "Quản lý chi nhánh", to: "/admin/managers", roles: [ROLES.ADMIN] },
             { label: "Quản lý tài khoản", to: "/admin/users", roles: [ROLES.ADMIN, ROLES.MANAGER] },
-            { label: "Quản lý nhân viên", to: "/admin/employees", roles: [ROLES.ADMIN, ROLES.MANAGER] },
             { label: "Hồ sơ cá nhân", to: "/me/profile", roles: ALL_ROLES },
         ],
     },
@@ -61,11 +62,11 @@ const SIDEBAR_SECTIONS = [
         roles: [ROLES.DRIVER], // Only actual drivers can access driver dashboard
         items: [
             { label: "Bảng điều khiển tài xế", to: "/driver/dashboard" },
-            { label: "Thông báo", to: "/driver/notifications" },
             { label: "Lịch làm việc", to: "/driver/schedule" },
+            { label: "Danh sách chuyến", to: "/driver/trips-list" },
             { label: "Xin nghỉ phép", to: "/driver/leave-request" },
+            { label: "Danh sách yêu cầu", to: "/driver/requests" },
             { label: "Hồ sơ tài xế", to: "/driver/profile" },
-            { label: "Chi tiết chuyến", to: "/driver/trips" },
         ],
     },
     {
@@ -104,12 +105,13 @@ const SIDEBAR_SECTIONS = [
         roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.COORDINATOR],
         items: [
             { label: "Bảng điều phối", to: "/dispatch" },
-            { label: "Đơn chưa gán chuyến", to: "/dispatch/pending" },
+            { label: "Danh sách đơn", to: "/coordinator/orders", roles: [ROLES.COORDINATOR] },
+            { label: "Đơn chưa gán chuyến", to: "/dispatch/pending", roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.COORDINATOR] },
+            { label: "Danh sách tài xế", to: "/coordinator/drivers", roles: [ROLES.COORDINATOR] },
+            { label: "Danh sách xe", to: "/coordinator/vehicles", roles: [ROLES.COORDINATOR] },
             { label: "Cảnh báo & Chờ duyệt", to: "/dispatch/notifications-dashboard" },
-            { label: "Phiếu tạm ứng tài xế", to: "/dispatch/expense-request" },
-            // { label: "Gán tài xế (demo)", to: "/dispatch/AssignDriverDialog" },
-            // { label: "Thông báo điều phối", to: "/dispatch/notifications" }, // Đã xóa - trùng với "Cảnh báo & Chờ duyệt"
-            { label: "Đánh giá tài xế", to: "/dispatch/ratings", roles: [ROLES.ADMIN, ROLES.MANAGER] },
+            { label: "Tạo yêu cầu thanh toán", to: "/dispatch/expense-request" },
+            { label: "Đánh giá tài xế", to: "/dispatch/ratings", roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.COORDINATOR] },
         ],
     },
     {
@@ -152,25 +154,23 @@ import CreateBranchPage from "./components/module 1/CreateBranchPage.jsx";
 import AdminBranchesPage from "./components/module 1/AdminBranchesPage.jsx";
 import AdminBranchDetailPage from "./components/module 1/AdminBranchDetailPage.jsx";
 import AdminUsersPage from "./components/module 1/AdminUsersPage.jsx";
+import CreateUserPage from "./components/module 1/CreateUserPage.jsx";
 import AdminManagersPage from "./components/module 1/AdminManagersPage.jsx";
 import UserDetailPage from "./components/module 1/UserDetailPage.jsx";
 import UpdateProfilePage from "./components/module 1/UpdateProfilePage.jsx";
 import LoginPage from "./components/module 1/LoginPage.jsx";
-import EmployeeManagementPage from "./components/module 1/EmployeeManagementPage.jsx";
-import CreateEmployeePage from "./components/module 1/CreateEmployeePage.jsx";
-import CreateEmployeeWithUserPage from "./components/module 1/CreateEmployeeWithUserPage.jsx";
-import EditEmployeePage from "./components/module 1/EditEmployeePage.jsx";
 import VerificationSuccessPage from "./components/module 1/VerificationSuccessPage.jsx";
 import VerificationErrorPage from "./components/module 1/VerificationErrorPage.jsx";
 
 /* Module 2 – Tài xế */
 import DriverDashboard from "./components/module 2/DriverDashboard.jsx";
-import DriverNotificationsPage from "./components/module 2/DriverNotificationsPage.jsx";
 import DriverProfilePage from "./components/module 2/DriverProfilePage.jsx";
 import DriverSchedulePage from "./components/module 2/DriverSchedulePage.jsx";
 import DriverLeaveRequestPage from "./components/module 2/DriverLeaveRequestPage.jsx";
 import DriverReportIncidentPage from "./components/module 2/DriverReportIncidentPage.jsx";
 import DriverTripDetailPage from "./components/module 2/DriverTripDetailPage.jsx";
+import DriverTripsListPage from "./components/module 2/DriverTripsListPage.jsx";
+import DriverRequestsPage from "./components/module 2/DriverRequestsPage.jsx";
 
 /* Module 3 – Phương tiện */
 import VehicleCategoryPage from "./components/module 3/VehicleCategoryPage.jsx";
@@ -194,6 +194,9 @@ import PendingTripsPage from "./components/module 5/PendingTripsPage.jsx";
 import NotificationsDashboard from "./components/module 5/NotificationsDashboard.jsx";
 import RatingManagementPage from "./components/module 5/RatingManagementPage.jsx";
 import DriverRatingsPage from "./components/module 5/DriverRatingsPage.jsx";
+import CoordinatorOrderListPage from "./components/module 5/CoordinatorOrderListPage.jsx";
+import CoordinatorDriverListPage from "./components/module 5/CoordinatorDriverListPage.jsx";
+import CoordinatorVehicleListPage from "./components/module 5/CoordinatorVehicleListPage.jsx";
 
 /* DemoAssign – mở AssignDriverDialog */
 import DemoAssign from "./DemoAssign.jsx";
@@ -250,32 +253,28 @@ function SidebarSection({
             <button
                 type="button"
                 onClick={handleToggle}
-                className={`group w-full flex items-center justify-between rounded-lg px-3 py-2.5 text-slate-700 transition-all duration-200 ease-in-out cursor-pointer active:scale-[0.98] ${
-                    isCurrentSection
-                        ? "bg-gradient-to-r from-sky-50 to-blue-50 shadow-sm shadow-sky-100/50"
-                        : "hover:bg-gradient-to-r hover:from-sky-50 hover:to-blue-50 hover:shadow-sm hover:shadow-sky-100/50"
+                className={`group w-full flex items-center justify-between rounded-lg px-3 py-2.5 text-slate-700 transition-all duration-200 ease-in-out cursor-pointer active:scale-[0.98] ${isCurrentSection
+                    ? "bg-gradient-to-r from-sky-50 to-blue-50 shadow-sm shadow-sky-100/50"
+                    : "hover:bg-gradient-to-r hover:from-sky-50 hover:to-blue-50 hover:shadow-sm hover:shadow-sky-100/50"
                 }`}
             >
         <span className="flex items-center gap-2.5">
           {React.createElement(icon, {
-              className: `h-4 w-4 transition-all duration-200 ${
-                  open
-                      ? "text-[#0079BC] scale-110"
-                      : "text-sky-600 group-hover:text-[#0079BC] group-hover:scale-110"
+              className: `h-4 w-4 transition-all duration-200 ${open
+                  ? "text-[#0079BC] scale-110"
+                  : "text-sky-600 group-hover:text-[#0079BC] group-hover:scale-110"
               }`
           })}
-            <span className={`font-medium leading-none transition-colors duration-200 ${
-                open
-                    ? "text-slate-900"
-                    : "text-slate-800 group-hover:text-slate-900"
+            <span className={`font-medium leading-none transition-colors duration-200 ${open
+                ? "text-slate-900"
+                : "text-slate-800 group-hover:text-slate-900"
             }`}>
             {label}
           </span>
         </span>
                 <div className="transition-transform duration-200 ease-in-out">
                     {open ? (
-                        <ChevronDown className={`h-4 w-4 transition-all duration-200 ${
-                            isCurrentSection ? "text-[#0079BC] rotate-0" : "text-slate-400"
+                        <ChevronDown className={`h-4 w-4 transition-all duration-200 ${isCurrentSection ? "text-[#0079BC] rotate-0" : "text-slate-400"
                         }`} />
                     ) : (
                         <ChevronRight className={`h-4 w-4 transition-all duration-200 text-slate-400 group-hover:text-[#0079BC] group-hover:translate-x-0.5`} />
@@ -309,8 +308,7 @@ function SidebarSection({
                                 }}
                             >
                                 <span className="truncate">{item.label}</span>
-                                <ChevronRight className={`h-3.5 w-3.5 transition-all duration-200 ${
-                                    "opacity-0 group-hover/item:opacity-100 group-hover/item:translate-x-0.5 group-hover/item:text-[#0079BC]"
+                                <ChevronRight className={`h-3.5 w-3.5 transition-all duration-200 ${"opacity-0 group-hover/item:opacity-100 group-hover/item:translate-x-0.5 group-hover/item:text-[#0079BC]"
                                 }`} />
                             </NavLink>
                         </li>
@@ -520,6 +518,7 @@ function SidebarNav() {
 --------------------------------------------------- */
 function Topbar() {
     const navigate = useNavigate();
+    const { pushNotification } = useNotifications();
     const username = getStoredUsername() || "John Doe";
     const roleName = getStoredRoleLabel() || "Quản trị viên";
     const initials =
@@ -531,14 +530,20 @@ function Topbar() {
             .slice(0, 2)
             .join("")
             .toUpperCase() || "JD";
-    const onLogout = () => {
+    const onLogout = React.useCallback(async () => {
         try {
-            apiLogout();
-        } catch {
-            // do nothing
+            await apiLogout();
+        } catch (error) {
+            console.warn("Logout endpoint unavailable, ignoring:", error?.message);
+        } finally {
+            pushNotification({
+                title: "Đăng xuất thành công",
+                message: "Hẹn gặp lại bạn lần sau.",
+                type: "SUCCESS",
+            });
+            navigate("/login", { replace: true });
         }
-        window.location.href = "/login";
-    };
+    }, [navigate, pushNotification]);
 
     const handleProfileClick = () => {
         navigate("/me/profile");
@@ -595,11 +600,11 @@ function ShellLayout() {
         return <Navigate to="/login" replace />;
     }
     return (
-        <div className="flex min-h-screen bg-slate-50 text-slate-900">
+        <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden">
             <SidebarNav />
             <div className="flex-1 flex flex-col min-w-0 ml-64">
                 <Topbar />
-                <main className="flex-1 overflow-y-auto p-5">
+                <main className="flex-1 overflow-y-auto min-h-0 p-5">
                     {/* Ghi chú: Một số màn con vẫn theme dark. Có thể refactor sau. */}
                     <Outlet />
                 </main>
@@ -608,9 +613,40 @@ function ShellLayout() {
     );
 }
 
+function RedirectWithToast({ to, state, toast }) {
+    const { pushNotification } = useWebSocket();
+    React.useEffect(() => {
+        if (toast) {
+            pushNotification({
+                id: Date.now(),
+                title: toast.title || "Thông báo",
+                message: toast.message || "",
+                type: toast.type || "ERROR",
+            });
+        }
+    }, [pushNotification, toast]);
+    return <Navigate to={to} replace state={state} />;
+}
+
 function ProtectedRoute({ roles = ALL_ROLES, children }) {
     const role = useRole();
     const allowed = roles && roles.length ? roles : ALL_ROLES;
+    const location = useLocation();
+
+    if (!hasActiveSession()) {
+        return (
+            <RedirectWithToast
+                to="/login"
+                state={{ from: `${location.pathname}${location.search}` }}
+                toast={{
+                    title: "Phiên đăng nhập đã hết hạn",
+                    message: "Bạn không có quyền truy cập, vui lòng đăng nhập lại.",
+                    type: "ERROR",
+                }}
+            />
+        );
+    }
+
     if (allowed.includes(role)) {
         return children;
     }
@@ -619,7 +655,39 @@ function ProtectedRoute({ roles = ALL_ROLES, children }) {
 
 function RoleRedirect() {
     const role = useRole();
+    const location = useLocation();
+    if (!hasActiveSession()) {
+        return (
+            <RedirectWithToast
+                to="/login"
+                state={{ from: `${location.pathname}${location.search}` }}
+                toast={{
+                    title: "Vui lòng đăng nhập",
+                    message: "Bạn cần đăng nhập để tiếp tục sử dụng hệ thống.",
+                    type: "WARNING",
+                }}
+            />
+        );
+    }
     return <Navigate to={getHomePathForRole(role)} replace />;
+}
+
+function RequireAuth({ children }) {
+    const location = useLocation();
+    if (!hasActiveSession()) {
+        return (
+            <RedirectWithToast
+                to="/login"
+                state={{ from: `${location.pathname}${location.search}` }}
+                toast={{
+                    title: "Phiên đăng nhập không hợp lệ",
+                    message: "Bạn cần đăng nhập để truy cập trang này.",
+                    type: "ERROR",
+                }}
+            />
+        );
+    }
+    return children;
 }
 
 /* ---------------------------------------------------
@@ -637,7 +705,7 @@ export default function AppLayout() {
                 <Route path="/" element={<RoleRedirect />} />
 
                 {/* Các route cần shell layout */}
-                <Route element={<ShellLayout />}>
+                <Route element={<RequireAuth><ShellLayout /></RequireAuth>}>
                     <Route index element={<RoleRedirect />} />
 
                     {/* Báo cáo & Phân tích */}
@@ -708,6 +776,14 @@ export default function AppLayout() {
                         }
                     />
                     <Route
+                        path="/admin/users/new"
+                        element={
+                            <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
+                                <CreateUserPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
                         path="/admin/users/:userId"
                         element={
                             <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
@@ -723,38 +799,7 @@ export default function AppLayout() {
                             </ProtectedRoute>
                         }
                     />
-                    <Route
-                        path="/admin/employees"
-                        element={
-                            <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
-                                <EmployeeManagementPage />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/admin/employees/create"
-                        element={
-                            <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
-                                <CreateEmployeePage />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/admin/employees/create-with-user"
-                        element={
-                            <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
-                                <CreateEmployeeWithUserPage />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/admin/employees/edit/:id"
-                        element={
-                            <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
-                                <EditEmployeePage />
-                            </ProtectedRoute>
-                        }
-                    />
+
 
                     {/* Tài xế - Only for actual drivers */}
                     <Route
@@ -762,14 +807,6 @@ export default function AppLayout() {
                         element={
                             <ProtectedRoute roles={[ROLES.DRIVER]}>
                                 <DriverDashboard />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/driver/notifications"
-                        element={
-                            <ProtectedRoute roles={[ROLES.DRIVER]}>
-                                <DriverNotificationsPage />
                             </ProtectedRoute>
                         }
                     />
@@ -790,6 +827,14 @@ export default function AppLayout() {
                         }
                     />
                     <Route
+                        path="/driver/trips-list"
+                        element={
+                            <ProtectedRoute roles={[ROLES.DRIVER]}>
+                                <DriverTripsListPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
                         path="/driver/leave-request"
                         element={
                             <ProtectedRoute roles={[ROLES.DRIVER]}>
@@ -798,18 +843,18 @@ export default function AppLayout() {
                         }
                     />
                     <Route
-                        path="/driver/report-incident"
+                        path="/driver/requests"
                         element={
                             <ProtectedRoute roles={[ROLES.DRIVER]}>
-                                <DriverReportIncidentPage />
+                                <DriverRequestsPage />
                             </ProtectedRoute>
                         }
                     />
                     <Route
-                        path="/driver/trips"
+                        path="/driver/report-incident"
                         element={
                             <ProtectedRoute roles={[ROLES.DRIVER]}>
-                                <DriverTripDetailPage />
+                                <DriverReportIncidentPage />
                             </ProtectedRoute>
                         }
                     />
@@ -944,27 +989,9 @@ export default function AppLayout() {
                         }
                     />
                     <Route
-                        path="/dispatch/AssignDriverDialog"
-                        element={
-                            <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.COORDINATOR]}>
-                                <DemoAssign />
-                            </ProtectedRoute>
-                        }
-                    />
-                    {/* Route đã xóa - trùng với /dispatch/notifications-dashboard
-          <Route
-            path="/dispatch/notifications"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.COORDINATOR]}>
-                <NotificationsWidget />
-              </ProtectedRoute>
-            }
-          />
-          */}
-                    <Route
                         path="/dispatch/ratings"
                         element={
-                            <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
+                            <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.COORDINATOR]}>
                                 <RatingManagementPage />
                             </ProtectedRoute>
                         }
@@ -972,8 +999,34 @@ export default function AppLayout() {
                     <Route
                         path="/drivers/:driverId/ratings"
                         element={
-                            <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
+                            <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.COORDINATOR]}>
                                 <DriverRatingsPage />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* Coordinator specific routes */}
+                    <Route
+                        path="/coordinator/orders"
+                        element={
+                            <ProtectedRoute roles={[ROLES.COORDINATOR]}>
+                                <CoordinatorOrderListPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/coordinator/drivers"
+                        element={
+                            <ProtectedRoute roles={[ROLES.COORDINATOR]}>
+                                <CoordinatorDriverListPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/coordinator/vehicles"
+                        element={
+                            <ProtectedRoute roles={[ROLES.COORDINATOR]}>
+                                <CoordinatorVehicleListPage />
                             </ProtectedRoute>
                         }
                     />

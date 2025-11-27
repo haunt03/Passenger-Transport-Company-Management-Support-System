@@ -1,0 +1,285 @@
+import React from "react";
+import {
+    Calendar,
+    DollarSign,
+    Clock,
+    CheckCircle2,
+    XCircle,
+    AlertCircle,
+    FileText,
+} from "lucide-react";
+import { getCookie } from "../../utils/cookies";
+import { getDriverProfileByUser } from "../../api/drivers";
+
+const cls = (...a) => a.filter(Boolean).join(" ");
+
+const fmtDate = (iso) => {
+    if (!iso) return "--/--/----";
+    try {
+        const d = new Date(iso);
+        const dd = String(d.getDate()).padStart(2, "0");
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const yyyy = d.getFullYear();
+        return `${dd}/${mm}/${yyyy}`;
+    } catch {
+        return "--/--/----";
+    }
+};
+
+function RequestCard({ request }) {
+    const typeMap = {
+        LEAVE: {
+            icon: Calendar,
+            label: "Xin nghỉ phép",
+            color: "text-sky-600",
+            bgColor: "bg-sky-50",
+        },
+        PAYMENT: {
+            icon: DollarSign,
+            label: "Yêu cầu thanh toán",
+            color: "text-amber-600",
+            bgColor: "bg-amber-50",
+        },
+    };
+
+    const statusMap = {
+        PENDING: {
+            icon: Clock,
+            label: "Chờ duyệt",
+            color: "bg-amber-100 text-amber-700",
+        },
+        APPROVED: {
+            icon: CheckCircle2,
+            label: "Đã duyệt",
+            color: "bg-emerald-100 text-emerald-700",
+        },
+        REJECTED: {
+            icon: XCircle,
+            label: "Từ chối",
+            color: "bg-rose-100 text-rose-700",
+        },
+    };
+
+    const type = typeMap[request.type] || typeMap.LEAVE;
+    const status = statusMap[request.status] || statusMap.PENDING;
+    const TypeIcon = type.icon;
+    const StatusIcon = status.icon;
+
+    return (
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="flex items-center gap-2">
+                    <div
+                        className={cls(
+                            "h-10 w-10 rounded-lg flex items-center justify-center",
+                            type.bgColor
+                        )}
+                    >
+                        <TypeIcon className={cls("h-5 w-5", type.color)} />
+                    </div>
+                    <div>
+                        <div className="text-sm font-semibold text-slate-900">
+                            {type.label}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                            {fmtDate(request.createdAt)}
+                        </div>
+                    </div>
+                </div>
+
+                <div
+                    className={cls(
+                        "flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium",
+                        status.color
+                    )}
+                >
+                    <StatusIcon className="h-3.5 w-3.5" />
+                    <span>{status.label}</span>
+                </div>
+            </div>
+
+            <div className="space-y-2 text-sm text-slate-700">
+                {request.type === "LEAVE" && (
+                    <>
+                        <div className="flex items-center gap-2">
+                            <span className="text-slate-500">Từ ngày:</span>
+                            <span className="font-medium">{fmtDate(request.startDate)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-slate-500">Đến ngày:</span>
+                            <span className="font-medium">{fmtDate(request.endDate)}</span>
+                        </div>
+                        {request.reason && (
+                            <div className="flex items-start gap-2">
+                                <span className="text-slate-500">Lý do:</span>
+                                <span className="flex-1">{request.reason}</span>
+                            </div>
+                        )}
+                    </>
+                )}
+
+                {request.type === "PAYMENT" && (
+                    <>
+                        <div className="flex items-center gap-2">
+                            <span className="text-slate-500">Số tiền:</span>
+                            <span className="font-semibold text-amber-700">
+                                {Number(request.amount || 0).toLocaleString("vi-VN")}đ
+                            </span>
+                        </div>
+                        {request.tripId && (
+                            <div className="flex items-center gap-2">
+                                <span className="text-slate-500">Chuyến:</span>
+                                <span className="font-medium">#{request.tripId}</span>
+                            </div>
+                        )}
+                        {request.description && (
+                            <div className="flex items-start gap-2">
+                                <span className="text-slate-500">Mô tả:</span>
+                                <span className="flex-1">{request.description}</span>
+                            </div>
+                        )}
+                    </>
+                )}
+
+                {request.status === "REJECTED" && request.rejectionReason && (
+                    <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 p-2 text-xs text-rose-700">
+                        <div className="flex items-start gap-1">
+                            <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                            <div>
+                                <div className="font-medium">Lý do từ chối:</div>
+                                <div>{request.rejectionReason}</div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+export default function DriverRequestsPage() {
+    const [loading, setLoading] = React.useState(true);
+    const [requests, setRequests] = React.useState([]);
+    const [error, setError] = React.useState("");
+
+    React.useEffect(() => {
+        let mounted = true;
+
+        async function load() {
+            try {
+                const uid = getCookie("userId");
+                if (!uid) throw new Error("Không xác định được tài khoản tài xế.");
+
+                const profile = await getDriverProfileByUser(uid);
+                if (!mounted) return;
+
+                // TODO: Gọi API lấy danh sách requests
+                // const list = await getDriverRequests(profile.driverId);
+
+                // Demo data
+                const demoRequests = [
+                    {
+                        id: 1,
+                        type: "LEAVE",
+                        status: "APPROVED",
+                        startDate: "2025-11-28",
+                        endDate: "2025-11-29",
+                        reason: "Việc gia đình",
+                        createdAt: "2025-11-20",
+                    },
+                    {
+                        id: 2,
+                        type: "PAYMENT",
+                        status: "PENDING",
+                        amount: 500000,
+                        tripId: 123,
+                        description: "Chi phí xăng và phí đường",
+                        createdAt: "2025-11-26",
+                    },
+                    {
+                        id: 3,
+                        type: "LEAVE",
+                        status: "REJECTED",
+                        startDate: "2025-12-01",
+                        endDate: "2025-12-02",
+                        reason: "Khám sức khỏe",
+                        rejectionReason: "Đã có chuyến được gán trong khoảng thời gian này",
+                        createdAt: "2025-11-25",
+                    },
+                ];
+
+                setRequests(demoRequests);
+            } catch (err) {
+                if (!mounted) return;
+                setError(
+                    err?.data?.message ||
+                    err?.message ||
+                    "Không tải được danh sách yêu cầu."
+                );
+            } finally {
+                if (mounted) setLoading(false);
+            }
+        }
+
+        load();
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
+    const sortedRequests = React.useMemo(() => {
+        return [...requests].sort((a, b) => {
+            const aTime = new Date(a.createdAt).getTime();
+            const bTime = new Date(b.createdAt).getTime();
+            return bTime - aTime;
+        });
+    }, [requests]);
+
+    return (
+        <div className="min-h-screen bg-slate-50 text-slate-900 p-6">
+            {/* Header */}
+            <div className="mb-6">
+                <div className="flex items-center gap-3 mb-2">
+                    <FileText className="h-6 w-6 text-[#0079BC]" />
+                    <h1 className="text-2xl font-semibold text-slate-900">
+                        Danh sách yêu cầu
+                    </h1>
+                </div>
+                <p className="text-sm text-slate-600">
+                    Theo dõi trạng thái các yêu cầu nghỉ phép và thanh toán của bạn
+                </p>
+            </div>
+
+            {error && (
+                <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700">
+                    {error}
+                </div>
+            )}
+
+            {loading && (
+                <div className="text-sm text-slate-500">
+                    Đang tải danh sách yêu cầu...
+                </div>
+            )}
+
+            {!loading && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {sortedRequests.length === 0 ? (
+                        <div className="col-span-full text-center py-12 text-slate-500">
+                            Bạn chưa có yêu cầu nào
+                        </div>
+                    ) : (
+                        sortedRequests.map((request) => (
+                            <RequestCard key={request.id} request={request} />
+                        ))
+                    )}
+                </div>
+            )}
+
+            <div className="mt-6 text-xs text-slate-500 leading-relaxed">
+                Lưu ý: Các yêu cầu sẽ được xử lý trong vòng 24-48 giờ. Bạn sẽ nhận được
+                thông báo khi có cập nhật.
+            </div>
+        </div>
+    );
+}
