@@ -28,7 +28,7 @@ export default function KpiCard({
                                 }) {
     const colorClasses = {
         blue: "bg-sky-50 text-sky-700 border-sky-200",
-        green: "bg-emerald-50 text-emerald-700 border-emerald-200",
+        green: "bg-amber-50 text-amber-700 border-amber-200",
         red: "bg-rose-50 text-rose-700 border-rose-200",
         yellow: "bg-amber-50 text-amber-700 border-amber-200",
         purple: "bg-purple-50 text-purple-700 border-purple-200",
@@ -71,7 +71,7 @@ export default function KpiCard({
                     <div
                         className={cls(
                             "text-xs flex items-center gap-1 font-medium",
-                            up ? "text-emerald-600" : "text-rose-600"
+                            up ? "text-amber-600" : "text-rose-600"
                         )}
                     >
                         {up ? (
