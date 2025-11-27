@@ -243,7 +243,7 @@ export default function AssignDriverDialog({
             >
                 {/* Header */}
                 <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-200">
-                    <Sparkles className="h-5 w-5 text-emerald-600" />
+                    <Sparkles className="h-5 w-5 text-amber-600" />
                     <div className="font-semibold text-slate-900 text-sm">
                         Gán chuyến (Assign
                         Driver)
@@ -354,7 +354,7 @@ export default function AssignDriverDialog({
                                                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                                                         {/* driver */}
                                                         <div className="flex items-center gap-1.5 text-[13px] text-slate-900 font-medium min-w-0">
-                                                            <UserRound className="h-4 w-4 text-emerald-600" />
+                                                            <UserRound className="h-4 w-4 text-amber-600" />
                                                             <span
                                                                 className="truncate"
                                                                 title={
@@ -415,8 +415,8 @@ export default function AssignDriverDialog({
                                                         {/* score */}
                                                         {typeof s?.score ===
                                                             "number" && (
-                                                                <div className="ml-auto flex items-center gap-1 text-[11px] text-emerald-600 font-medium">
-                                                                    <BadgeCheck className="h-4 w-4 text-emerald-600" />
+                                                                <div className="ml-auto flex items-center gap-1 text-[11px] text-amber-600 font-medium">
+                                                                    <BadgeCheck className="h-4 w-4 text-amber-600" />
                                                                     <span>
                                                                         Score:{" "}
                                                                         {
@@ -573,15 +573,15 @@ export default function AssignDriverDialog({
                         className={`
                             rounded-md px-3 py-2 border text-[13px] font-medium flex items-center gap-1
                             ${autoPosting
-                            ? "opacity-60 cursor-not-allowed border-emerald-300 text-emerald-400 bg-white"
-                            : "border-emerald-600 text-emerald-700 bg-white hover:bg-emerald-50"
+                            ? "opacity-60 cursor-not-allowed border-amber-300 text-amber-400 bg-white"
+                            : "border-[#EDC531] text-amber-700 bg-white hover:bg-amber-50"
                         }
                         `}
                     >
                         {autoPosting ? (
-                            <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />
+                            <Loader2 className="h-4 w-4 animate-spin text-amber-600" />
                         ) : (
-                            <Sparkles className="h-4 w-4 text-emerald-600" />
+                            <Sparkles className="h-4 w-4 text-amber-600" />
                         )}
                         <span>
                             Tự động gán
@@ -641,3 +641,4 @@ function fmtDateTime(iso) {
     const mm = pad2(d.getMinutes());
     return `${day}/${m}/${y} ${hh}:${mm}`;
 }
+

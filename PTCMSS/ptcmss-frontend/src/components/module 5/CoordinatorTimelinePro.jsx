@@ -254,9 +254,13 @@ const mapBranchRecord = (raw) => {
 
 const extractBranchItems = (payload) => {
     if (!payload) return [];
+    // Try data.items first (current backend format)
+    if (payload.data?.items && Array.isArray(payload.data.items)) return payload.data.items;
+    // Then try other formats
     if (Array.isArray(payload.items)) return payload.items;
-    if (Array.isArray(payload.data)) return payload.data;
+    if (payload.data?.content && Array.isArray(payload.data.content)) return payload.data.content;
     if (Array.isArray(payload.content)) return payload.content;
+    if (Array.isArray(payload.data)) return payload.data;
     if (Array.isArray(payload)) return payload;
     return [];
 };
@@ -577,8 +581,7 @@ function TimeHeader({ zoom }) {
                         return (
                             <div
                                 key={idx}
-                                className={`absolute top-0 bottom-0 ${COLORS.GRID} ${
-                                    isHour ? "border-l" : ""
+                                className={`absolute top-0 bottom-0 ${COLORS.GRID} ${isHour ? "border-l" : ""
                                 }`}
                                 style={{ left }}
                             >
@@ -680,8 +683,7 @@ function Row({
                     (_, i) => (
                         <div
                             key={i}
-                            className={`absolute top-0 bottom-0 ${COLORS.GRID} ${
-                                i % 2 === 0 ? "border-l" : ""
+                            className={`absolute top-0 bottom-0 ${COLORS.GRID} ${i % 2 === 0 ? "border-l" : ""
                             }`}
                             style={{
                                 left:
@@ -959,10 +961,9 @@ function AssignDialog({
                                 vehicleId,
                             });
                         }}
-                        className={`rounded-md px-3 py-2 text-[13px] font-medium shadow-sm ${
-                            canConfirm
-                                ? "bg-emerald-600 hover:bg-emerald-500 text-white"
-                                : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                        className={`rounded-md px-3 py-2 text-[13px] font-medium shadow-sm ${canConfirm
+                            ? "bg-emerald-600 hover:bg-emerald-500 text-white"
+                            : "bg-slate-200 text-slate-400 cursor-not-allowed"
                         }`}
                     >
                         {submitting ? "Đang gán..." : "Gán"}
@@ -1059,11 +1060,19 @@ export default function CoordinatorTimelinePro() {
                         }
                     }
                 } else {
+                    console.log("[CoordinatorTimelinePro] Loading all branches for Admin...");
                     const res = await listBranches({ page: 0, size: 100 });
                     if (cancelled) return;
-                    const options = extractBranchItems(res)
+                    console.log("[CoordinatorTimelinePro] Branches API response:", res);
+
+                    const rawItems = extractBranchItems(res);
+                    console.log("[CoordinatorTimelinePro] Extracted raw items:", rawItems);
+
+                    const options = rawItems
                         .map(mapBranchRecord)
                         .filter(Boolean);
+                    console.log("[CoordinatorTimelinePro] Mapped branch options:", options);
+
                     setBranches(options);
                     setBranchId((prev) => prev || (options[0]?.id || ""));
                     if (!options.length) {
@@ -1418,8 +1427,7 @@ export default function CoordinatorTimelinePro() {
                                 </div>
                             ) : branches.length ? (
                                 <select
-                                    className={`bg-transparent outline-none text-[13px] text-slate-900 min-w-[140px] appearance-none pr-6 focus:ring-2 focus:ring-sky-500 rounded ${
-                                        isBranchScoped ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'
+                                    className={`bg-transparent outline-none text-[13px] text-slate-900 min-w-[140px] appearance-none pr-6 focus:ring-2 focus:ring-sky-500 rounded ${isBranchScoped ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'
                                     }`}
                                     value={branchId}
                                     onChange={(e) => {
@@ -1521,6 +1529,24 @@ export default function CoordinatorTimelinePro() {
                         >
                             Now{" "}
                             <MoveRight className="inline h-4 w-4 text-slate-600" />
+                        </button>
+
+                        {/* refresh */}
+                        <button
+                            onClick={() => {
+                                if (branchId) {
+                                    fetchData(branchId, date);
+                                }
+                            }}
+                            disabled={loading}
+                            className="rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 px-3 py-2 text-[13px] text-emerald-700 font-medium flex items-center gap-1 disabled:opacity-50"
+                        >
+                            {loading ? (
+                                <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />
+                            ) : (
+                                <RefreshCw className="h-4 w-4 text-emerald-600" />
+                            )}
+                            Refresh
                         </button>
 
                         {/* export */}
@@ -1821,3 +1847,4 @@ export default function CoordinatorTimelinePro() {
         </div>
     );
 }
+
