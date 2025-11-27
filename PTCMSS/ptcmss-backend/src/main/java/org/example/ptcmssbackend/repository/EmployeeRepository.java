@@ -1,8 +1,10 @@
 package org.example.ptcmssbackend.repository;
 
 import org.example.ptcmssbackend.entity.Employees;
+import org.example.ptcmssbackend.enums.EmployeeStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -63,4 +65,15 @@ public interface EmployeeRepository extends JpaRepository<Employees, Integer> {
             "LEFT JOIN FETCH e.role " +
             "WHERE e.employeeId = :id")
     Optional<Employees> findByIdWithDetails(Integer id);
+
+    @Query("SELECT COUNT(e) FROM Employees e WHERE e.branch.id = :branchId AND (e.status IS NULL OR e.status <> :inactiveStatus)")
+    long countActiveByBranchId(@Param("branchId") Integer branchId,
+                               @Param("inactiveStatus") EmployeeStatus inactiveStatus);
+
+    @Query("SELECT e.branch.id AS branchId, COUNT(e) AS total " +
+            "FROM Employees e " +
+            "WHERE e.branch.id IN :branchIds AND (e.status IS NULL OR e.status <> :inactiveStatus) " +
+            "GROUP BY e.branch.id")
+    List<Object[]> countActiveByBranchIds(@Param("branchIds") List<Integer> branchIds,
+                                          @Param("inactiveStatus") EmployeeStatus inactiveStatus);
 }

@@ -20,6 +20,8 @@ import org.example.ptcmssbackend.service.LocalImageService;
 import org.example.ptcmssbackend.service.UserService;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -129,21 +131,118 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
     public Integer updateUser(Integer id, UpdateUserRequest request) {
         Users user = usersRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Chỉ Admin mới được gọi method này (đã check ở Controller)
+
+        // Validation: Kiểm tra phone trùng với user khác (trừ chính user hiện tại)
+        if (request.getPhone() != null && !request.getPhone().trim().isEmpty()) {
+            String phone = request.getPhone().trim();
+            Optional<Users> existingUserWithPhone = usersRepository.findByPhone(phone);
+            if (existingUserWithPhone.isPresent() && !existingUserWithPhone.get().getId().equals(id)) {
+                throw new RuntimeException("Số điện thoại đã được sử dụng bởi người dùng khác. Vui lòng sử dụng số điện thoại khác.");
+            }
+        }
+
+        // Validation: Kiểm tra email trùng với user khác (trừ chính user hiện tại)
+        if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
+            String email = request.getEmail().trim();
+            Optional<Users> existingUserWithEmail = usersRepository.findByEmail(email);
+            if (existingUserWithEmail.isPresent() && !existingUserWithEmail.get().getId().equals(id)) {
+                throw new RuntimeException("Email đã được sử dụng bởi người dùng khác. Vui lòng sử dụng email khác.");
+            }
+        }
+
+        // Admin có thể cập nhật tất cả thông tin
         user.setFullName(request.getFullName());
-        user.setEmail(request.getEmail());
-        user.setPhone(request.getPhone());
-        user.setAddress(request.getAddress());
+        if (request.getEmail() != null) {
+            user.setEmail(request.getEmail().trim());
+        }
+        if (request.getPhone() != null) {
+            user.setPhone(request.getPhone().trim());
+        }
+        if (request.getAddress() != null) {
+            user.setAddress(request.getAddress().trim());
+        }
+
+        // Cập nhật role
         if (request.getRoleId() != null) {
             Roles role = rolesRepository.findById(request.getRoleId())
                     .orElseThrow(() -> new RuntimeException("Role not found"));
             user.setRole(role);
         }
+
+        // Cập nhật status
         if (request.getStatus() != null)
             user.setStatus(request.getStatus());
-        usersRepository.save(user);
+
+        // Cập nhật branch (nếu có)
+        if (request.getBranchId() != null) {
+            Branches branch = branchesRepository.findById(request.getBranchId())
+                    .orElseThrow(() -> new RuntimeException("Branch not found"));
+
+            // Tìm hoặc tạo employee record
+            Employees employee = employeeRepository.findByUserId(id).orElse(null);
+            if (employee != null) {
+                employee.setBranch(branch);
+                employeeRepository.save(employee);
+            }
+        }
+
+        try {
+            usersRepository.save(user);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            // Catch database constraint violations (unique key violations)
+            String errorMsg = e.getMessage();
+            if (errorMsg != null && (errorMsg.contains("phone") || errorMsg.contains("Phone"))) {
+                throw new RuntimeException("Số điện thoại đã được sử dụng bởi người dùng khác. Vui lòng sử dụng số điện thoại khác.");
+            } else if (errorMsg != null && (errorMsg.contains("email") || errorMsg.contains("Email"))) {
+                throw new RuntimeException("Email đã được sử dụng bởi người dùng khác. Vui lòng sử dụng email khác.");
+            } else {
+                throw new RuntimeException("Dữ liệu không hợp lệ hoặc đã tồn tại trong hệ thống: " + (e.getCause() != null ? e.getCause().getMessage() : e.getMessage()));
+            }
+        }
+
+        return user.getId();
+    }
+
+    @Override
+    @Transactional
+    public Integer updateProfile(Integer id, org.example.ptcmssbackend.dto.request.User.UpdateProfileRequest request) {
+        Users user = usersRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Chỉ cho phép user tự cập nhật profile của mình (đã check ở Controller)
+
+        // Validation: Kiểm tra phone trùng với user khác (trừ chính user hiện tại)
+        if (request.getPhone() != null && !request.getPhone().trim().isEmpty()) {
+            String phone = request.getPhone().trim();
+            Optional<Users> existingUserWithPhone = usersRepository.findByPhone(phone);
+            if (existingUserWithPhone.isPresent() && !existingUserWithPhone.get().getId().equals(id)) {
+                throw new RuntimeException("Số điện thoại đã được sử dụng bởi người dùng khác. Vui lòng sử dụng số điện thoại khác.");
+            }
+            user.setPhone(phone);
+        }
+
+        // Cập nhật address
+        if (request.getAddress() != null) {
+            user.setAddress(request.getAddress().trim());
+        }
+
+        try {
+            usersRepository.save(user);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            String errorMsg = e.getMessage();
+            if (errorMsg != null && (errorMsg.contains("phone") || errorMsg.contains("Phone"))) {
+                throw new RuntimeException("Số điện thoại đã được sử dụng bởi người dùng khác. Vui lòng sử dụng số điện thoại khác.");
+            } else {
+                throw new RuntimeException("Dữ liệu không hợp lệ: " + (e.getCause() != null ? e.getCause().getMessage() : e.getMessage()));
+            }
+        }
+
         return user.getId();
     }
 
@@ -169,6 +268,15 @@ public class UserServiceImpl implements UserService {
     public UserResponse getUserById(Integer id) {
         Users user = usersRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Employees employee = employeeRepository.findByUserId(id).orElse(null);
+        Integer branchId = null;
+        String branchName = null;
+        if (employee != null && employee.getBranch() != null) {
+            branchId = employee.getBranch().getId();
+            branchName = employee.getBranch().getBranchName();
+        }
+
         return UserResponse.builder()
                 .id(user.getId())
                 .fullName(user.getFullName())
@@ -177,7 +285,10 @@ public class UserServiceImpl implements UserService {
                 .address(user.getAddress())
                 .imgUrl(user.getAvatar())
                 .roleName(user.getRole() != null ? user.getRole().getRoleName() : null)
+                .roleId(user.getRole() != null ? user.getRole().getId() : null)
                 .status(user.getStatus() != null ? user.getStatus().name() : null)
+                .branchId(branchId)
+                .branchName(branchName)
                 .build();
     }
 
@@ -185,6 +296,14 @@ public class UserServiceImpl implements UserService {
     public void toggleUserStatus(Integer id) {
         Users user = usersRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Validation: Không cho phép vô hiệu hóa admin
+        if (user.getRole() != null && "ADMIN".equals(user.getRole().getRoleName())) {
+            if (user.getStatus() == UserStatus.ACTIVE) {
+                throw new RuntimeException("Không thể vô hiệu hóa tài khoản Admin. Phải có ít nhất một tài khoản Admin hoạt động trong hệ thống.");
+            }
+        }
+
         user.setStatus(user.getStatus() == UserStatus.ACTIVE ? UserStatus.INACTIVE : UserStatus.ACTIVE);
         usersRepository.save(user);
     }
@@ -246,3 +365,4 @@ public class UserServiceImpl implements UserService {
     }
 
 }
+

@@ -16,4 +16,6 @@ public interface BranchService {
     BranchResponse getBranchByUserId(Integer userId);
 
     ManagerDashboardStatsResponse getManagerDashboardStats(Integer branchId, String period);
+
+    java.util.List<BranchResponse> getAllBranchesForSelection();
 }

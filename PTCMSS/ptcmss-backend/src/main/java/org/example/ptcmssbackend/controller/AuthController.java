@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.servlet.view.RedirectView;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 @Slf4j(topic = "AUTH_CONTROLLER")
 @RestController
@@ -41,7 +42,7 @@ public class AuthController {
             }
     )
     @PostMapping("/login")
-    public ResponseEntity<TokenResponse> login(@Validated @RequestBody LoginRequest request) {
+    public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
         log.info("[LOGIN] Request login for username: {}", request.getUsername());
         TokenResponse response = authService.getAccessToken(request);
         log.info("[LOGIN] Login successful for username: {}", request.getUsername());
@@ -96,9 +97,50 @@ public class AuthController {
             }
     )
     @PostMapping("/forgot-password")
-    public ResponseEntity<String> forgotPassword(@Validated @RequestBody ForgotPasswordRequest request) {
+    public ResponseEntity<org.example.ptcmssbackend.dto.response.common.ApiResponse<String>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         log.info("[FORGOT_PASSWORD] Request received for email: {}", request.getEmail());
-        String message = authService.forgotPassword(request.getEmail());
-        return ResponseEntity.ok(message);
+        try {
+            String message = authService.forgotPassword(request.getEmail());
+            return ResponseEntity.ok(org.example.ptcmssbackend.dto.response.common.ApiResponse.<String>builder()
+                    .success(true)
+                    .message(message)
+                    .data("Email đã được gửi thành công")
+                    .build());
+        } catch (Exception e) {
+            log.error("[FORGOT_PASSWORD] Error: {}", e.getMessage(), e);
+            return ResponseEntity.ok(org.example.ptcmssbackend.dto.response.common.ApiResponse.<String>builder()
+                    .success(false)
+                    .message("Không thể gửi email. Vui lòng thử lại sau.")
+                    .build());
+        }
+    }
+
+    // ---------------- SET PASSWORD ----------------
+    @Operation(
+            summary = "Thiết lập mật khẩu",
+            description = "Người dùng thiết lập mật khẩu sau khi xác thực email hoặc đặt lại mật khẩu.",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Thiết lập mật khẩu thành công"),
+                    @ApiResponse(responseCode = "400", description = "Token không hợp lệ hoặc mật khẩu không khớp")
+            }
+    )
+    @PostMapping("/set-password")
+    public ResponseEntity<org.example.ptcmssbackend.dto.response.common.ApiResponse<String>> setPassword(
+            @Valid @RequestBody org.example.ptcmssbackend.dto.request.Auth.SetPasswordRequest request) {
+        log.info("[SET_PASSWORD] Request received");
+        try {
+            String message = authService.setPassword(request);
+            return ResponseEntity.ok(org.example.ptcmssbackend.dto.response.common.ApiResponse.<String>builder()
+                    .success(true)
+                    .message(message)
+                    .data("Mật khẩu đã được thiết lập thành công")
+                    .build());
+        } catch (Exception e) {
+            log.error("[SET_PASSWORD] Error: {}", e.getMessage(), e);
+            return ResponseEntity.ok(org.example.ptcmssbackend.dto.response.common.ApiResponse.<String>builder()
+                    .success(false)
+                    .message(e.getMessage())
+                    .build());
+        }
     }
 }
