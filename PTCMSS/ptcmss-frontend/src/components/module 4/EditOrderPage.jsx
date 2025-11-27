@@ -55,7 +55,7 @@ const ORDER_STATUS_STYLE_LIGHT = {
         "ring-1 ring-amber-200 bg-amber-50 text-amber-700",
     ASSIGNED: "ring-1 ring-sky-200 bg-sky-50 text-sky-700",
     COMPLETED:
-        "ring-1 ring-emerald-200 bg-emerald-50 text-emerald-700",
+        "ring-1 ring-emerald-200 bg-amber-50 text-amber-700",
     CANCELLED:
         "ring-1 ring-rose-200 bg-rose-50 text-rose-700",
 };
@@ -98,7 +98,7 @@ function Toasts({ toasts }) {
                     className={cls(
                         "rounded-md px-3 py-2 shadow-sm border bg-white text-slate-700",
                         t.kind === "success" &&
-                        "border-emerald-200 bg-emerald-50 text-emerald-700",
+                        "border-amber-200 bg-amber-50 text-amber-700",
                         t.kind === "error" &&
                         "border-rose-200 bg-rose-50 text-rose-700",
                         t.kind === "info" &&
@@ -213,11 +213,11 @@ export default function EditOrderPage() {
         setDropoff(seedOrder.dropoff || "");
         if (seedOrder.pickup_time) {
             const d = new Date(String(seedOrder.pickup_time).replace(" ", "T"));
-            if (!Number.isNaN(d.getTime())) setStartTime(d.toISOString().slice(0,16));
+            if (!Number.isNaN(d.getTime())) setStartTime(d.toISOString().slice(0, 16));
         }
         if (seedOrder.dropoff_eta) {
             const d2 = new Date(String(seedOrder.dropoff_eta).replace(" ", "T"));
-            if (!Number.isNaN(d2.getTime())) setEndTime(d2.toISOString().slice(0,16));
+            if (!Number.isNaN(d2.getTime())) setEndTime(d2.toISOString().slice(0, 16));
         }
         if (seedOrder.vehicle_count != null) setVehiclesNeeded(String(seedOrder.vehicle_count));
         if (seedOrder.quoted_price != null) {
@@ -265,14 +265,14 @@ export default function EditOrderPage() {
                 setStartTime((t.startTime || "").toString().replace("Z", ""));
                 setEndTime((t.endTime || "").toString().replace("Z", ""));
                 setDistanceKm(String(t.distance || ""));
-                const qty = Array.isArray(b.vehicles) ? b.vehicles.reduce((s,v)=>s+(v.quantity||0),0) : 1;
+                const qty = Array.isArray(b.vehicles) ? b.vehicles.reduce((s, v) => s + (v.quantity || 0), 0) : 1;
                 const catId = Array.isArray(b.vehicles) && b.vehicles.length ? String(b.vehicles[0].vehicleCategoryId) : "";
                 setVehiclesNeeded(String(qty));
                 setCategoryId(catId);
                 setSystemPrice(Number(b.estimatedCost || 0));
                 setDiscountAmount(String(b.discountAmount || 0));
                 setFinalPrice(Number(b.totalCost || 0));
-            } catch {}
+            } catch { }
         })();
     }, [orderId]);
 
@@ -368,6 +368,25 @@ export default function EditOrderPage() {
 
     /* --- PUT status=DRAFT --- */
     const onSaveDraft = async () => {
+        // Validate time
+        if (startTime && endTime) {
+            const startDate = new Date(startTime);
+            const endDate = new Date(endTime);
+            const now = new Date();
+
+            // Check if start time is in the past
+            if (startDate < now) {
+                pushToast("Thời gian đón phải lớn hơn hoặc bằng thời gian hiện tại", "error");
+                return;
+            }
+
+            // Check if end time is after start time
+            if (endDate <= startDate) {
+                pushToast("Thời gian kết thúc phải sau thời gian đón", "error");
+                return;
+            }
+        }
+
         setSubmittingDraft(true);
 
         const cleanDiscount = Number(
@@ -427,6 +446,25 @@ export default function EditOrderPage() {
 
     /* --- PUT status=PENDING --- */
     const onSubmitOrder = async () => {
+        // Validate time
+        if (startTime && endTime) {
+            const startDate = new Date(startTime);
+            const endDate = new Date(endTime);
+            const now = new Date();
+
+            // Check if start time is in the past
+            if (startDate < now) {
+                pushToast("Thời gian đón phải lớn hơn hoặc bằng thời gian hiện tại", "error");
+                return;
+            }
+
+            // Check if end time is after start time
+            if (endDate <= startDate) {
+                pushToast("Thời gian kết thúc phải sau thời gian đón", "error");
+                return;
+            }
+        }
+
         setSubmittingUpdate(true);
 
         const cleanDiscount = Number(
@@ -554,7 +592,7 @@ export default function EditOrderPage() {
                         </button>
 
                         <div className="text-[20px] font-semibold text-slate-900 flex items-center gap-2">
-                            <DollarSign className="h-6 w-6 text-emerald-600" />
+                            <DollarSign className="h-6 w-6 text-amber-600" />
                             <span>
                                 Chỉnh sửa đơn ORD-{orderId}
                             </span>
@@ -581,7 +619,7 @@ export default function EditOrderPage() {
                         className={cls(
                             "rounded-md font-medium text-[13px] px-4 py-2 flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed",
                             canEdit
-                                ? "bg-emerald-600 hover:bg-emerald-500 text-white"
+                                ? "bg-[#EDC531] hover:bg-amber-500 text-white"
                                 : "bg-slate-200 text-slate-400 cursor-not-allowed"
                         )}
                     >
@@ -700,7 +738,7 @@ export default function EditOrderPage() {
                     {/* --- Báo giá --- */}
                     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                         <div className="text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center gap-2 mb-4">
-                            <DollarSign className="h-4 w-4 text-emerald-600" />
+                            <DollarSign className="h-4 w-4 text-amber-600" />
                             Báo giá
                         </div>
 
@@ -839,14 +877,14 @@ export default function EditOrderPage() {
                     {/* --- Hành trình & xe --- */}
                     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                         <div className="text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center gap-2 mb-4">
-                            <CarFront className="h-4 w-4 text-emerald-600" />
+                            <CarFront className="h-4 w-4 text-amber-600" />
                             Hành trình & loại xe
                         </div>
 
                         {/* Điểm đón */}
                         <div className="mb-3">
                             <label className={labelCls}>
-                                <MapPin className="h-3.5 w-3.5 text-emerald-600" />
+                                <MapPin className="h-3.5 w-3.5 text-amber-600" />
                                 <span>Điểm đón</span>
                             </label>
                             <input
@@ -1058,7 +1096,7 @@ export default function EditOrderPage() {
                                 disabled={!canEdit}
                                 onClick={checkAvailability}
                             >
-                                <CarFront className="h-4 w-4 text-emerald-600" />
+                                <CarFront className="h-4 w-4 text-amber-600" />
                                 <span>Kiểm tra xe</span>
                             </button>
 
@@ -1084,11 +1122,11 @@ export default function EditOrderPage() {
                         <div className="grid md:grid-cols-2 gap-4 text-[13px]">
                             <div>
                                 <label className="text-[12px] text-slate-600 mb-1 block">Driver ID</label>
-                                <input className={selectEnabledCls} placeholder="Nhập driverId" value={driverId} onChange={(e)=>setDriverId(e.target.value)} />
+                                <input className={selectEnabledCls} placeholder="Nhập driverId" value={driverId} onChange={(e) => setDriverId(e.target.value)} />
                             </div>
                             <div>
                                 <label className="text-[12px] text-slate-600 mb-1 block">Vehicle ID</label>
-                                <input className={selectEnabledCls} placeholder="Nhập vehicleId" value={vehicleId} onChange={(e)=>setVehicleId(e.target.value)} />
+                                <input className={selectEnabledCls} placeholder="Nhập vehicleId" value={vehicleId} onChange={(e) => setVehicleId(e.target.value)} />
                             </div>
                         </div>
 
@@ -1120,7 +1158,7 @@ export default function EditOrderPage() {
                         ASSIGNED
                     </span>{" "}
                     hoặc{" "}
-                    <span className="text-emerald-600 font-semibold">
+                    <span className="text-amber-600 font-semibold">
                         COMPLETED
                     </span>
                     , chỉnh sửa phải thông qua điều

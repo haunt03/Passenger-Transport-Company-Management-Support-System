@@ -91,7 +91,7 @@ const ORDER_STATUS_STYLE_LIGHT = {
     ASSIGNED:
         "ring-1 ring-sky-200 bg-sky-50 text-sky-700",
     COMPLETED:
-        "ring-1 ring-emerald-200 bg-emerald-50 text-emerald-700",
+        "ring-1 ring-emerald-200 bg-amber-50 text-amber-700",
     CANCELLED:
         "ring-1 ring-rose-200 bg-rose-50 text-rose-700",
 };
@@ -132,7 +132,7 @@ function Toasts({ toasts }) {
                     className={cls(
                         "rounded-md px-3 py-2 shadow-sm border bg-white text-slate-700",
                         t.kind === "success" &&
-                        "border-emerald-200 bg-emerald-50 text-emerald-700",
+                        "border-amber-200 bg-amber-50 text-amber-700",
                         t.kind === "error" &&
                         "border-rose-200 bg-rose-50 text-rose-700",
                         t.kind === "info" &&
@@ -206,7 +206,7 @@ function TripInfoCard({ trip }) {
     return (
         <div className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-4 shadow-sm">
             <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                <MapPin className="h-4 w-4 text-emerald-600" />
+                <MapPin className="h-4 w-4 text-amber-600" />
                 Thông tin lịch trình
             </div>
 
@@ -216,7 +216,7 @@ function TripInfoCard({ trip }) {
                     <div className="flex gap-3">
                         {/* timeline dots */}
                         <div className="flex flex-col items-center">
-                            <div className="h-3 w-3 rounded-full bg-emerald-500" />
+                            <div className="h-3 w-3 rounded-full bg-amber-500" />
                             <div className="flex-1 w-px bg-slate-300" />
                             <div className="h-3 w-3 rounded-full bg-rose-500" />
                         </div>
@@ -225,7 +225,7 @@ function TripInfoCard({ trip }) {
                             {/* Pickup */}
                             <div>
                                 <div className="mb-1 flex items-center gap-1 text-[12px] text-slate-500">
-                                    <MapPin className="h-3.5 w-3.5 text-emerald-600" />
+                                    <MapPin className="h-3.5 w-3.5 text-amber-600" />
                                     <span>Điểm đón</span>
                                 </div>
                                 <div className="font-medium text-slate-900 leading-relaxed">
@@ -284,7 +284,7 @@ function TripInfoCard({ trip }) {
                         </div>
 
                         <div className="flex items-center gap-2">
-                            <CarFront className="h-4 w-4 text-emerald-600" />
+                            <CarFront className="h-4 w-4 text-amber-600" />
                             <span className="text-slate-700">
                                 {trip.vehicle_category ||
                                     "—"}{" "}
@@ -321,7 +321,7 @@ function QuoteInfoCard({ quote }) {
     return (
         <div className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-4 shadow-sm">
             <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                <DollarSign className="h-4 w-4 text-emerald-600" />
+                <DollarSign className="h-4 w-4 text-amber-600" />
                 Báo giá
             </div>
 
@@ -359,8 +359,8 @@ function QuoteInfoCard({ quote }) {
                     <div className="text-[11px] uppercase tracking-wide font-medium text-slate-500">
                         Giá cuối báo khách
                     </div>
-                    <div className="text-base font-semibold tabular-nums flex items-center gap-1 text-emerald-600">
-                        <DollarSign className="h-4 w-4 text-emerald-600" />
+                    <div className="text-base font-semibold tabular-nums flex items-center gap-1 text-amber-600">
+                        <DollarSign className="h-4 w-4 text-amber-600" />
                         <span>
                             {fmtVND(
                                 quote.final_price
@@ -381,15 +381,15 @@ function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr })
     return (
         <div className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-4 shadow-sm">
             <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                <BadgeDollarSign className="h-4 w-4 text-emerald-600" />
+                <BadgeDollarSign className="h-4 w-4 text-amber-600" />
                 Thanh toán / Cọc
             </div>
 
             {/* Số liệu tóm tắt */}
             <div className="grid grid-cols-2 gap-4">
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 flex flex-col gap-1">
-                    <div className="text-[11px] uppercase tracking-wide font-medium text-emerald-700">Đã thu</div>
-                    <div className="text-lg font-bold tabular-nums text-emerald-700 flex items-center gap-1">
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 flex flex-col gap-1">
+                    <div className="text-[11px] uppercase tracking-wide font-medium text-amber-700">Đã thu</div>
+                    <div className="text-lg font-bold tabular-nums text-amber-700 flex items-center gap-1">
                         <DollarSign className="h-4 w-4" />
                         <span>{fmtVND(paid)}</span>
                     </div>
@@ -406,7 +406,7 @@ function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr })
 
             {/* Trạng thái & ghi chú */}
             {remain <= 0 ? (
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-700 flex items-center gap-2">
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-700 flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4" />
                     <span className="font-medium">Đã thanh toán đủ</span>
                 </div>
@@ -419,7 +419,7 @@ function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr })
             {/* Nút hành động */}
             <div className="grid grid-cols-2 gap-3">
                 <button
-                    className="rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-[13px] px-4 py-2.5 shadow-sm flex items-center justify-center gap-2 transition-colors"
+                    className="rounded-lg bg-[#EDC531] hover:bg-amber-500 text-white font-medium text-[13px] px-4 py-2.5 shadow-sm flex items-center justify-center gap-2 transition-colors"
                     onClick={onOpenDeposit}
                 >
                     <BadgeDollarSign className="h-4 w-4" />
@@ -460,7 +460,7 @@ function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr })
                                         className={cls(
                                             "font-semibold px-2 py-0.5 rounded-md",
                                             item.paymentStatus === "PAID"
-                                                ? "bg-emerald-100 text-emerald-700"
+                                                ? "bg-amber-100 text-amber-700"
                                                 : "bg-amber-100 text-amber-700"
                                         )}
                                     >
@@ -637,7 +637,7 @@ function QrPaymentModal({
                                     : `Thanh toán ${bookingCode || 'ORD'} - ${customerName || 'Khách hàng'}`;
                                 setNote(autoNote);
                             }}
-                            className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                            className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
                         />
                         Đánh dấu là khoản đặt cọc
                     </label>
@@ -839,7 +839,7 @@ function DispatchInfoCard({ dispatch }) {
                             "—"}
                     </div>
                     <div className="text-[11px] text-slate-500 flex items-center gap-1 leading-relaxed">
-                        <CarFront className="h-3.5 w-3.5 text-emerald-600" />
+                        <CarFront className="h-3.5 w-3.5 text-amber-600" />
                         <span>
                             Xe đã gán cho
                             chuyến
@@ -853,8 +853,8 @@ function DispatchInfoCard({ dispatch }) {
                         Trạng thái điều
                         phối
                     </div>
-                    <div className="text-sm font-medium text-emerald-700 flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    <div className="text-sm font-medium text-amber-700 flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-amber-600" />
                         <span>
                             Đã phân xe
                         </span>
@@ -969,20 +969,16 @@ export default function OrderDetailPage() {
         setQrModalOpen(true);
     };
 
-    // callback khi ghi nhận thanh toán thành công (modal gọi onSubmitted)
+    // callback khi ghi nhận thanh toán thành công (DepositModal đã xử lý API call)
     const handleDepositSubmitted = async (payload, ctx) => {
+        // DepositModal đã gọi createDeposit/recordPayment bên trong
+        // Chỉ cần refresh data và hiển thị thông báo
         try {
-            await addBookingPayment(order.id, {
-                amount: payload.amount,
-                paymentMethod: payload.payment_method,
-                note: payload.note,
-                deposit: payload.kind === 'DEPOSIT' || true,
-            });
             await fetchOrder();
             await fetchPayments();
             push(`Đã ghi nhận thanh toán +${Number(payload.amount || 0).toLocaleString('vi-VN')}đ cho đơn ${order.id}`, 'success');
         } catch (e) {
-            push('Ghi nhận thanh toán thất bại', 'error');
+            push('Không thể tải lại dữ liệu', 'error');
         }
     };
 
@@ -1033,7 +1029,7 @@ export default function OrderDetailPage() {
                     {/* title row */}
                     <div className="flex flex-wrap items-start gap-3">
                         <div className="text-[20px] font-semibold text-slate-900 flex items-center gap-2">
-                            <ClipboardList className="h-6 w-6 text-emerald-600" />
+                            <ClipboardList className="h-6 w-6 text-amber-600" />
                             <span>
                                 Đơn hàng {order.code}
                             </span>
@@ -1045,7 +1041,7 @@ export default function OrderDetailPage() {
                     {/* meta row */}
                     <div className="flex flex-wrap items-center gap-3 text-[12px] text-slate-600 leading-relaxed">
                         <div className="flex items-center gap-1">
-                            <MapPin className="h-3.5 w-3.5 text-emerald-600" />
+                            <MapPin className="h-3.5 w-3.5 text-amber-600" />
                             <span className="text-slate-700">
                                 {order.trip.pickup}{" "}
                                 <ChevronRight className="h-3 w-3 text-slate-400 inline-block" />{" "}
@@ -1074,7 +1070,7 @@ export default function OrderDetailPage() {
                         </div>
 
                         <div className="flex items-center gap-1 text-slate-700">
-                            <CarFront className="h-3.5 w-3.5 text-emerald-600" />
+                            <CarFront className="h-3.5 w-3.5 text-amber-600" />
                             <span>
                                 {order.trip.vehicle_category} ·{" "}
                                 {order.trip.vehicle_count} xe
@@ -1098,7 +1094,7 @@ export default function OrderDetailPage() {
                 {/* thanh toán summary box */}
                 <div className="w-full max-w-[260px] rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-3 text-sm shadow-sm">
                     <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                        <DollarSign className="h-3.5 w-3.5 text-emerald-600" />
+                        <DollarSign className="h-3.5 w-3.5 text-amber-600" />
                         Tình trạng thanh toán
                     </div>
 
@@ -1115,8 +1111,8 @@ export default function OrderDetailPage() {
                         <div className="text-[12px] text-slate-500">
                             Đã thu
                         </div>
-                        <div className="font-semibold text-emerald-600 tabular-nums flex items-center gap-1">
-                            <DollarSign className="h-3.5 w-3.5 text-emerald-600" />
+                        <div className="font-semibold text-amber-600 tabular-nums flex items-center gap-1">
+                            <DollarSign className="h-3.5 w-3.5 text-amber-600" />
                             <span>{fmtVND(paid)}</span>
                         </div>
                     </div>
@@ -1134,7 +1130,7 @@ export default function OrderDetailPage() {
                     </div>
 
                     <button
-                        className="w-full rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-[13px] px-4 py-2 shadow-sm flex items-center justify-center gap-2"
+                        className="w-full rounded-md bg-[#EDC531] hover:bg-amber-500 text-white font-medium text-[13px] px-4 py-2 shadow-sm flex items-center justify-center gap-2"
                         onClick={openDeposit}
                     >
                         <BadgeDollarSign className="h-4 w-4" />

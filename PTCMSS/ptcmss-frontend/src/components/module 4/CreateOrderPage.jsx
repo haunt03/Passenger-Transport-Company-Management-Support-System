@@ -1,8 +1,9 @@
 // CreateOrderPage.jsx (LIGHT THEME)
 import React from "react";
 import { listVehicleCategories } from "../../api/vehicleCategories";
-import { calculatePrice, createBooking } from "../../api/bookings";
+import { calculatePrice, createBooking, getBooking, pageBookings } from "../../api/bookings";
 import { calculateDistance } from "../../api/graphhopper";
+import { getBranchByUserId, listBranches } from "../../api/branches";
 import PlaceAutocomplete from "../common/PlaceAutocomplete";
 import {
     Phone,
@@ -21,7 +22,14 @@ import {
     Loader2,
     Building2,
     Navigation,
+    Plus,
+    Minus,
+    Search,
+    History,
+    Sparkles,
+    ArrowRight,
 } from "lucide-react";
+import AnimatedDialog from "../common/AnimatedDialog";
 
 /**
  * M4.S2 - Create Order (Tạo Đơn Hàng)
@@ -62,6 +70,95 @@ const cls = (...a) => a.filter(Boolean).join(" ");
 const fmtVND = (n) =>
     new Intl.NumberFormat("vi-VN").format(Math.max(0, Number(n || 0)));
 
+function stripAccents(str = "") {
+    try {
+        return str
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase();
+    } catch {
+        return String(str || "").toLowerCase();
+    }
+}
+
+function normalizeNumberValue(value) {
+    if (value == null) return NaN;
+    if (typeof value === "number") {
+        return Number.isFinite(value) ? value : NaN;
+    }
+
+    const raw = String(value).trim();
+    if (!raw) return NaN;
+
+    // Remove all characters except digits, dot, comma, minus
+    const digitsOnly = raw.replace(/[^\d.,-]/g, "");
+    if (!digitsOnly) return NaN;
+
+    // Replace commas with dots to unify decimal separators
+    const dotNormalized = digitsOnly.replace(/,/g, ".");
+
+    // If there are multiple dots, treat the last one as decimal and remove the others (thousand separators)
+    const parts = dotNormalized.split(".");
+    let normalizedNumber = dotNormalized;
+    if (parts.length > 2) {
+        const decimalPart = parts.pop();
+        const integerPart = parts.join("");
+        normalizedNumber = `${integerPart}.${decimalPart}`;
+    }
+
+    const parsed = parseFloat(normalizedNumber);
+    return Number.isNaN(parsed) ? NaN : parsed;
+}
+
+function mapHireTypeNameToCode(name) {
+    const normalized = stripAccents(name);
+    if (!normalized) return "ONE_WAY";
+    if (normalized.includes("hai") || normalized.includes("round") || normalized.includes("khu")) {
+        return "ROUND_TRIP";
+    }
+    if (normalized.includes("ngay") || normalized.includes("daily")) {
+        return "DAILY";
+    }
+    if (normalized.includes("multi")) {
+        return "MULTI_DAY";
+    }
+    if (normalized.includes("co dinh") || normalized.includes("fixed")) {
+        return "FIXED_ROUTE";
+    }
+    return "ONE_WAY";
+}
+
+function toDatetimeLocalValue(isoString) {
+    if (!isoString) return "";
+    const date = new Date(isoString);
+    if (Number.isNaN(date.getTime())) return "";
+    const tzOffsetMinutes = date.getTimezoneOffset();
+    const localDate = new Date(date.getTime() - tzOffsetMinutes * 60 * 1000);
+    return localDate.toISOString().slice(0, 16);
+}
+
+function formatReadableDateTime(isoString) {
+    if (!isoString) return "Chưa rõ";
+    const date = new Date(isoString);
+    if (Number.isNaN(date.getTime())) return "Chưa rõ";
+    return date.toLocaleString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+    });
+}
+
+function extractPageItems(payload) {
+    if (!payload) return [];
+    if (Array.isArray(payload.items)) return payload.items;
+    if (Array.isArray(payload.data?.items)) return payload.data.items;
+    if (Array.isArray(payload.content)) return payload.content;
+    if (Array.isArray(payload.data?.content)) return payload.data.content;
+    return [];
+}
+
 // Convert "YYYY-MM-DDTHH:mm" (datetime-local) to ISO string with Z
 function toIsoZ(s) {
     if (!s) return null;
@@ -75,13 +172,16 @@ function toIsoZ(s) {
 /* mini toast (light style) */
 function useToasts() {
     const [toasts, setToasts] = React.useState([]);
-    const push = (msg, kind = "info", ttl = 2500) => {
-        const id = Math.random().toString(36).slice(2);
-        setToasts((arr) => [...arr, { id, msg, kind }]);
-        setTimeout(() => {
-            setToasts((arr) => arr.filter((t) => t.id !== id));
-        }, ttl);
-    };
+    const push = React.useCallback(
+        (msg, kind = "info", ttl = 2500) => {
+            const id = Math.random().toString(36).slice(2);
+            setToasts((arr) => [...arr, { id, msg, kind }]);
+            setTimeout(() => {
+                setToasts((arr) => arr.filter((t) => t.id !== id));
+            }, ttl);
+        },
+        [setToasts]
+    );
     return { toasts, push };
 }
 function Toasts({ toasts }) {
@@ -140,6 +240,7 @@ export default function CreateOrderPage() {
     /* --- Phần 2: hình thức thuê --- */
     const [hireType, setHireType] =
         React.useState("ONE_WAY"); // ONE_WAY | ROUND_TRIP | DAILY
+    const [hireTypeId, setHireTypeId] = React.useState(""); // ID từ backend
 
     /* --- Phần 3: chuyến đi / yêu cầu xe --- */
     const [pickup, setPickup] = React.useState("");
@@ -148,12 +249,20 @@ export default function CreateOrderPage() {
     const [endTime, setEndTime] = React.useState("");
     const [categoryId, setCategoryId] = React.useState("");
     const [categories, setCategories] = React.useState([]);
+    const [selectedCategory, setSelectedCategory] = React.useState(null); // Lưu thông tin category được chọn (để lấy số ghế)
     const [paxCount, setPaxCount] = React.useState(1);
     const [vehicleCount, setVehicleCount] =
-        React.useState(1);
+        React.useState(1); // Mặc định = 1
+    const [recentBookingSuggestion, setRecentBookingSuggestion] = React.useState(null);
+    const [showPrefillDialog, setShowPrefillDialog] = React.useState(false);
+    const [prefillLoading, setPrefillLoading] = React.useState(false);
 
-    // branch mặc định theo user đăng nhập
-    const [branchId] = React.useState("1");
+    // branch management
+    const [branchId, setBranchId] = React.useState("");
+    const [branchName, setBranchName] = React.useState("");
+    const [availableBranches, setAvailableBranches] = React.useState([]);
+    const [isAdmin, setIsAdmin] = React.useState(false);
+    const [loadingBranch, setLoadingBranch] = React.useState(true);
 
     // availability check
     const [availabilityInfo, setAvailabilityInfo] =
@@ -193,8 +302,8 @@ export default function CreateOrderPage() {
     const [discount, setDiscount] = React.useState(0);
     const [discountReason, setDiscountReason] =
         React.useState("");
-    const [quotedPrice, setQuotedPrice] =
-        React.useState(0);
+    const [quotedPrice, setQuotedPrice] = React.useState(0);
+    const [quotedPriceTouched, setQuotedPriceTouched] = React.useState(false);
 
     const [calculatingPrice, setCalculatingPrice] =
         React.useState(false);
@@ -203,14 +312,196 @@ export default function CreateOrderPage() {
     const [calculatingDistance, setCalculatingDistance] = React.useState(false);
     const [distanceError, setDistanceError] = React.useState("");
 
+    // Các field mới cho logic tính giá
+    const [isHoliday, setIsHoliday] = React.useState(false);
+    const [isWeekend, setIsWeekend] = React.useState(false);
+    const [additionalPickupPoints, setAdditionalPickupPoints] = React.useState(0);
+    const [additionalDropoffPoints, setAdditionalDropoffPoints] = React.useState(0);
+    const loadRecentBookingSuggestion = React.useCallback(async (phoneNumber) => {
+        if (!phoneNumber) return;
+        try {
+            const payload = await pageBookings({
+                keyword: phoneNumber,
+                page: 1,
+                size: 1,
+                sortBy: "id:desc",
+            });
+            const items = extractPageItems(payload);
+            if (items.length > 0) {
+                const latest = items[0];
+                setRecentBookingSuggestion({
+                    id: latest.id,
+                    customerName: latest.customerName,
+                    routeSummary: latest.routeSummary,
+                    startDate: latest.startDate,
+                    totalCost: latest.totalCost,
+                    status: latest.status,
+                });
+                setShowPrefillDialog(true);
+            } else {
+                setRecentBookingSuggestion(null);
+            }
+        } catch (error) {
+            console.error("Failed to load recent booking suggestion:", error);
+        }
+    }, []);
+    const applyBookingToForm = React.useCallback((booking) => {
+        if (!booking) return;
+        setHireTypeId(booking.hireTypeId ? String(booking.hireTypeId) : "");
+        setHireType(mapHireTypeNameToCode(booking.hireTypeName));
+        setCustomerName(booking.customer?.fullName || "");
+        setEmail(booking.customer?.email || "");
+        const primaryTrip = booking.trips?.[0];
+        setPickup(primaryTrip?.startLocation || "");
+        setDropoff(primaryTrip?.endLocation || "");
+        setStartTime(primaryTrip?.startTime ? toDatetimeLocalValue(primaryTrip.startTime) : "");
+        setEndTime(primaryTrip?.endTime ? toDatetimeLocalValue(primaryTrip.endTime) : "");
+        if (Array.isArray(booking.vehicles) && booking.vehicles.length > 0) {
+            const firstVehicle = booking.vehicles[0];
+            if (firstVehicle?.vehicleCategoryId) {
+                setCategoryId(String(firstVehicle.vehicleCategoryId));
+            }
+            const totalVehicles = booking.vehicles.reduce((sum, v) => sum + (v.quantity || 0), 0);
+            if (totalVehicles > 0) {
+                setVehicleCount(totalVehicles);
+            }
+        }
+        if (primaryTrip?.distance != null) {
+            const parsedDistance = normalizeNumberValue(primaryTrip.distance);
+            if (!Number.isNaN(parsedDistance)) {
+                setDistanceKm(parsedDistance.toFixed(2));
+            }
+        }
+        setDiscount(Number(booking.discountAmount || 0));
+        setQuotedPrice(Number(booking.totalCost || 0));
+        setQuotedPriceTouched(false);
+        setEstPriceSys(Number(booking.estimatedCost || 0));
+    }, []);
+    const handleApplyRecentBooking = React.useCallback(async () => {
+        if (!recentBookingSuggestion?.id) return;
+        try {
+            setPrefillLoading(true);
+            const booking = await getBooking(recentBookingSuggestion.id);
+            applyBookingToForm(booking);
+            push(`Đã tự động điền theo đơn #${recentBookingSuggestion.id}`, "success");
+            setShowPrefillDialog(false);
+        } catch (error) {
+            console.error("Prefill booking failed:", error);
+            push("Không thể tải đơn hàng gần nhất để tự động điền", "error");
+        } finally {
+            setPrefillLoading(false);
+        }
+    }, [recentBookingSuggestion, applyBookingToForm, push]);
+    React.useEffect(() => {
+        const cleaned = (phone || "").replace(/[^0-9]/g, "");
+        if (!cleaned || cleaned.length < 10) {
+            setRecentBookingSuggestion(null);
+            setShowPrefillDialog(false);
+        }
+    }, [phone]);
+
+    // Load branch based on user role
+    React.useEffect(() => {
+        (async () => {
+            try {
+                setLoadingBranch(true);
+                const userId = localStorage.getItem("userId");
+                const roleName = (localStorage.getItem("roleName") || "").toUpperCase();
+                const isAdminUser = roleName === "ADMIN";
+
+                console.log("🔍 Branch Loading Debug:", {
+                    userId,
+                    roleName,
+                    isAdminUser
+                });
+
+                setIsAdmin(isAdminUser);
+
+                if (isAdminUser) {
+                    // Admin: Load all branches for selection
+                    console.log("👑 Loading branches for Admin...");
+                    const branchesData = await listBranches({ page: 0, size: 100 });
+                    console.log("📦 Branches API Response:", branchesData);
+
+                    // Try multiple possible response structures
+                    let branches = branchesData?.data?.items ||
+                        branchesData?.items ||
+                        branchesData?.data?.content ||
+                        branchesData?.content ||
+                        (Array.isArray(branchesData?.data) ? branchesData.data : []) ||
+                        (Array.isArray(branchesData) ? branchesData : []);
+
+                    // Filter only ACTIVE branches
+                    branches = branches.filter(b => b && b.id && b.status === 'ACTIVE');
+
+                    // Normalize field names: id -> branchId for consistency
+                    const normalizedBranches = branches.map(b => ({
+                        branchId: b.id || b.branchId,
+                        branchName: b.branchName,
+                        location: b.location,
+                        status: b.status
+                    }));
+
+                    console.log("✅ Extracted branches:", normalizedBranches);
+                    setAvailableBranches(normalizedBranches);
+
+                    if (normalizedBranches.length > 0) {
+                        setBranchId(String(normalizedBranches[0].branchId));
+                        setBranchName(normalizedBranches[0].branchName);
+                        console.log("✅ Set default branch:", normalizedBranches[0]);
+                        push(`Đã tải ${normalizedBranches.length} chi nhánh`, "success");
+                    } else {
+                        console.warn("⚠️ No active branches found for Admin");
+                        push("Không tìm thấy chi nhánh ACTIVE nào trong hệ thống", "error");
+                    }
+                } else {
+                    // Manager/Other roles: Get branch by userId
+                    console.log("👤 Loading branch for Manager/User...");
+                    if (userId) {
+                        const branchData = await getBranchByUserId(Number(userId));
+                        console.log("📦 Branch by User Response:", branchData);
+
+                        if (branchData) {
+                            // Normalize: id -> branchId
+                            const normalizedBranchId = branchData.id || branchData.branchId;
+                            setBranchId(String(normalizedBranchId));
+                            setBranchName(branchData.branchName);
+                            console.log("✅ Set user branch:", { branchId: normalizedBranchId, branchName: branchData.branchName });
+                            push(`Chi nhánh: ${branchData.branchName}`, "success");
+                        } else {
+                            console.warn("⚠️ Branch data is null");
+                            push("Không tìm thấy chi nhánh của bạn", "error");
+                        }
+                    } else {
+                        console.warn("⚠️ No userId found in localStorage");
+                        push("Không tìm thấy thông tin người dùng", "error");
+                    }
+                }
+            } catch (err) {
+                console.error("❌ Failed to load branch:", err);
+                push("Không thể tải thông tin chi nhánh: " + (err.message || "Lỗi không xác định"), "error");
+            } finally {
+                setLoadingBranch(false);
+                console.log("✅ Branch loading completed");
+            }
+        })();
+    }, []);
+
     // load categories from backend
     React.useEffect(() => {
         (async () => {
             try {
                 const list = await listVehicleCategories();
                 if (Array.isArray(list) && list.length > 0) {
-                    setCategories(list.map(c => ({ id: String(c.id), name: c.categoryName })));
-                    setCategoryId(String(list[0].id));
+                    const mapped = list.map(c => ({
+                        id: String(c.id),
+                        name: c.categoryName,
+                        seats: c.seats || 0 // Lưu số ghế
+                    }));
+                    setCategories(mapped);
+                    const firstCategory = mapped[0];
+                    setCategoryId(firstCategory.id);
+                    setSelectedCategory(firstCategory); // Set category đầu tiên
                 } else {
                     push("Không thể tải danh mục xe: Dữ liệu trống", "error");
                 }
@@ -220,6 +511,20 @@ export default function CreateOrderPage() {
             }
         })();
     }, []);
+
+    // Update selectedCategory khi categoryId thay đổi
+    React.useEffect(() => {
+        if (categoryId && categories.length > 0) {
+            const found = categories.find(c => c.id === categoryId);
+            if (found) {
+                setSelectedCategory(found);
+                // Reset số khách nếu vượt quá số ghế
+                if (paxCount >= (found.seats || 0)) {
+                    setPaxCount(Math.max(1, (found.seats || 1) - 1));
+                }
+            }
+        }
+    }, [categoryId, categories]);
 
     // Auto-calculate distance when both pickup and dropoff are entered
     React.useEffect(() => {
@@ -239,7 +544,14 @@ export default function CreateOrderPage() {
 
             try {
                 const result = await calculateDistance(pickup, dropoff);
-                setDistanceKm(String(result.distance));
+                const parsedDistance = normalizeNumberValue(result.distance);
+                if (Number.isNaN(parsedDistance)) {
+                    setDistanceError("Không xác định được quãng đường. Vui lòng nhập thủ công.");
+                    setDistanceKm("");
+                } else {
+                    setDistanceError("");
+                    setDistanceKm(parsedDistance.toFixed(2));
+                }
                 push(`Khoảng cách: ${result.formattedDistance} (~${result.formattedDuration})`, "success");
             } catch (error) {
                 console.error("Distance calculation error:", error);
@@ -253,27 +565,65 @@ export default function CreateOrderPage() {
         return () => clearTimeout(timeoutId);
     }, [pickup, dropoff]);
 
+    // Tự động detect cuối tuần từ startTime
+    React.useEffect(() => {
+        if (startTime) {
+            try {
+                const date = new Date(startTime);
+                const dayOfWeek = date.getDay(); // 0 = Chủ nhật, 6 = Thứ 7
+                setIsWeekend(dayOfWeek === 0 || dayOfWeek === 6);
+            } catch (e) {
+                setIsWeekend(false);
+            }
+        } else {
+            setIsWeekend(false);
+        }
+    }, [startTime]);
+
     // calculate via backend when possible
     React.useEffect(() => {
         const run = async () => {
+            // Cần đủ thông tin cơ bản để tính giá
             if (!categoryId || !distanceKm) return;
+
+            // Nếu thiếu startTime/endTime, không tính giá (tránh lỗi 400)
+            if (!startTime || !endTime) {
+                console.log("⏸️ Skipping price calculation: missing time");
+                return;
+            }
+
             setCalculatingPrice(true);
             try {
+                // Convert datetime-local to ISO string
+                const startISO = toIsoZ(startTime);
+                const endISO = toIsoZ(endTime);
+
+                const totalAdditionalPoints = (additionalPickupPoints || 0) + (additionalDropoffPoints || 0);
+
                 const price = await calculatePrice({
                     vehicleCategoryIds: [Number(categoryId)],
                     quantities: [Number(vehicleCount || 1)],
                     distance: Number(distanceKm || 0),
                     useHighway: false,
+                    hireTypeId: hireTypeId ? Number(hireTypeId) : undefined,
+                    isHoliday: isHoliday,
+                    isWeekend: isWeekend,
+                    additionalPoints: totalAdditionalPoints,
+                    startTime: startISO,
+                    endTime: endISO,
                 });
                 const base = Number(price || 0);
                 setEstPriceSys(base);
-                setQuotedPrice((old) => (old > 0 ? old : base));
-            } catch {} finally {
+                setQuotedPrice((old) => (quotedPriceTouched ? old : base));
+            } catch (err) {
+                console.error("❌ Calculate price error:", err);
+                // Không hiển thị toast error vì có thể là do user đang nhập dở
+            } finally {
                 setCalculatingPrice(false);
             }
         };
         run();
-    }, [categoryId, vehicleCount, distanceKm]);
+    }, [categoryId, vehicleCount, distanceKm, hireTypeId, isHoliday, isWeekend, additionalPickupPoints, additionalDropoffPoints, startTime, endTime, quotedPriceTouched]);
 
     /* --- submit states --- */
     const [loadingDraft, setLoadingDraft] =
@@ -282,12 +632,48 @@ export default function CreateOrderPage() {
         React.useState(false);
 
     /* --- auto fill khách khi nhập SĐT --- */
+    const [searchingCustomer, setSearchingCustomer] = React.useState(false);
     React.useEffect(() => {
-        if (phone && phone.includes("999")) {
-            setCustomerName("Nguyễn Văn Cũ");
-            setEmail("khachcu@example.com");
-        }
-    }, [phone]);
+        const timeoutId = setTimeout(async () => {
+            // Chỉ search nếu phone có ít nhất 10 số
+            const normalizedPhone = phone ? phone.replace(/[^0-9]/g, "") : "";
+            if (!phone || normalizedPhone.length < 10) {
+                return;
+            }
+
+            setSearchingCustomer(true);
+            try {
+                // Gọi API tìm customer by phone
+                const response = await fetch(`${import.meta.env.VITE_API_BASE || "http://localhost:8080"}/api/bookings/customers/phone/${encodeURIComponent(phone)}`, {
+                    headers: {
+                        "Authorization": `Bearer ${localStorage.getItem("access_token") || ""}`,
+                        "Content-Type": "application/json"
+                    }
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    // Parse ApiResponse structure: { success, message, data }
+                    const customer = result?.data || result;
+                    if (customer && customer.fullName) {
+                        setCustomerName(customer.fullName);
+                        if (customer.email) setEmail(customer.email);
+                        push("Đã tìm thấy khách hàng trong hệ thống", "success");
+                        await loadRecentBookingSuggestion(normalizedPhone);
+                    }
+                } else if (response.status === 404) {
+                    // Không tìm thấy - không làm gì, user sẽ nhập thủ công
+                }
+            } catch (err) {
+                console.error("Search customer error:", err);
+                // Không hiển thị lỗi, chỉ log
+            } finally {
+                setSearchingCustomer(false);
+            }
+        }, 1000); // Debounce 1 giây
+
+        return () => clearTimeout(timeoutId);
+    }, [phone, loadRecentBookingSuggestion, push]);
 
     /* --- helpers nhỏ --- */
     const numOnly = (s) => s.replace(/[^0-9]/g, "");
@@ -297,6 +683,32 @@ export default function CreateOrderPage() {
     };
     const onChangeVehicleCount = (v) => {
         setVehicleCount(Number(numOnly(v)) || 0);
+    };
+
+    const decrementPax = () => {
+        setPaxCount((prev) => Math.max(1, prev - 1));
+    };
+
+    const incrementPax = () => {
+        if (selectedCategory && selectedCategory.seats) {
+            const maxPax = Math.max(1, selectedCategory.seats - 1);
+            setPaxCount((prev) => Math.min(maxPax, prev + 1));
+            return;
+        }
+        setPaxCount((prev) => prev + 1);
+    };
+
+    const decrementVehicleCount = () => {
+        setVehicleCount((prev) => Math.max(1, prev - 1));
+    };
+
+    const incrementVehicleCount = () => {
+        if (availabilityInfo && availabilityInfo.count) {
+            const maxVehicles = Math.max(1, availabilityInfo.count);
+            setVehicleCount((prev) => Math.min(maxVehicles, prev + 1));
+            return;
+        }
+        setVehicleCount((prev) => prev + 1);
     };
 
     /* --- payload preview / validation --- */
@@ -326,25 +738,69 @@ export default function CreateOrderPage() {
         startTime &&
         endTime &&
         categoryId &&
+        branchId &&
         quotedPrice > 0;
 
     /* --- handlers --- */
     const saveDraft = async () => {
+        // Check if branch is still loading
+        if (loadingBranch) {
+            push("Đang tải thông tin chi nhánh, vui lòng đợi...", "info");
+            return;
+        }
+
         if (!isValidCore) {
             push(
-                "Thiếu dữ liệu bắt buộc (SĐT / Tên KH / Điểm đi / Điểm đến / Giá báo khách...)",
+                "Thiếu dữ liệu bắt buộc (SĐT / Tên KH / Điểm đi / Điểm đến / Chi nhánh / Giá báo khách...)",
                 "error"
             );
             return;
         }
+
+        if (!branchId || branchId === "" || branchId === "0") {
+            console.error("❌ BranchId is invalid:", branchId);
+            push("Không tìm thấy chi nhánh. Vui lòng tải lại trang hoặc liên hệ quản trị viên.", "error");
+            return;
+        }
+
+        // Validate time
+        if (startTime && endTime) {
+            const startDate = new Date(startTime);
+            const endDate = new Date(endTime);
+            const now = new Date();
+
+            // Check if start time is in the past
+            if (startDate < now) {
+                push("Thời gian đón phải lớn hơn hoặc bằng thời gian hiện tại", "error");
+                return;
+            }
+
+            // Check if end time is after start time
+            if (endDate <= startDate) {
+                push("Thời gian kết thúc phải sau thời gian đón", "error");
+                return;
+            }
+        }
+
         setLoadingDraft(true);
         try {
             const sStart = toIsoZ(startTime);
             const sEnd = toIsoZ(endTime);
+
+            if (!sStart || !sEnd) {
+                push("Thời gian không hợp lệ", "error");
+                return;
+            }
+
             const req = {
                 customer: { fullName: customerName, phone, email },
                 branchId: Number(branchId),
+                hireTypeId: hireTypeId ? Number(hireTypeId) : null,
                 useHighway: false,
+                isHoliday: isHoliday,
+                isWeekend: isWeekend,
+                additionalPickupPoints: additionalPickupPoints || 0,
+                additionalDropoffPoints: additionalDropoffPoints || 0,
                 trips: [
                     { startLocation: pickup, endLocation: dropoff, startTime: sStart, endTime: sEnd },
                 ],
@@ -358,16 +814,25 @@ export default function CreateOrderPage() {
                 status: "PENDING",
                 distance: Number(distanceKm || 0),
             };
+
+            console.log("📤 Creating booking:", req);
             await createBooking(req);
             push("Đã lưu nháp đơn hàng", "success");
-        } catch {
-            push("Lưu nháp thất bại", "error");
+        } catch (err) {
+            console.error("❌ Save draft error:", err);
+            push("Lưu nháp thất bại: " + (err.message || "Lỗi không xác định"), "error");
         } finally {
             setLoadingDraft(false);
         }
     };
 
     const submitOrder = async () => {
+        // Check if branch is still loading
+        if (loadingBranch) {
+            push("Đang tải thông tin chi nhánh, vui lòng đợi...", "info");
+            return;
+        }
+
         if (!isValidCore) {
             push(
                 "Thiếu dữ liệu bắt buộc. Kiểm tra lại thông tin.",
@@ -375,6 +840,32 @@ export default function CreateOrderPage() {
             );
             return;
         }
+
+        if (!branchId || branchId === "" || branchId === "0") {
+            console.error("❌ BranchId is invalid:", branchId);
+            push("Không tìm thấy chi nhánh. Vui lòng tải lại trang hoặc liên hệ quản trị viên.", "error");
+            return;
+        }
+
+        // Validate time
+        if (startTime && endTime) {
+            const startDate = new Date(startTime);
+            const endDate = new Date(endTime);
+            const now = new Date();
+
+            // Check if start time is in the past
+            if (startDate < now) {
+                push("Thời gian đón phải lớn hơn hoặc bằng thời gian hiện tại", "error");
+                return;
+            }
+
+            // Check if end time is after start time
+            if (endDate <= startDate) {
+                push("Thời gian kết thúc phải sau thời gian đón", "error");
+                return;
+            }
+        }
+
         if (availabilityInfo && !availabilityInfo.ok) {
             push(
                 "Cảnh báo: Hệ thống báo hết xe trong khung giờ này.",
@@ -387,10 +878,21 @@ export default function CreateOrderPage() {
         try {
             const sStart = toIsoZ(startTime);
             const sEnd = toIsoZ(endTime);
+
+            if (!sStart || !sEnd) {
+                push("Thời gian không hợp lệ", "error");
+                return;
+            }
+
             const req = {
                 customer: { fullName: customerName, phone, email },
                 branchId: Number(branchId),
+                hireTypeId: hireTypeId ? Number(hireTypeId) : null,
                 useHighway: false,
+                isHoliday: isHoliday,
+                isWeekend: isWeekend,
+                additionalPickupPoints: additionalPickupPoints || 0,
+                additionalDropoffPoints: additionalDropoffPoints || 0,
                 trips: [
                     { startLocation: pickup, endLocation: dropoff, startTime: sStart, endTime: sEnd },
                 ],
@@ -401,13 +903,16 @@ export default function CreateOrderPage() {
                 discountAmount: Number(discount || 0),
                 totalCost: Number(quotedPrice || 0),
                 depositAmount: 0,
-                status: "CONFIRMED",
+                status: "PENDING", // Changed from CONFIRMED to PENDING so Coordinator can assign driver/vehicle
                 distance: Number(distanceKm || 0),
             };
+
+            console.log("📤 Creating booking:", req);
             const created = await createBooking(req);
-            push(`Đã tạo đơn hàng #${created?.id || "?"}`, "success");
-        } catch {
-            push("Tạo đơn hàng thất bại", "error");
+            push(`Đã tạo đơn hàng #${created?.id || "?"}. Đơn đang chờ điều phối gán xe/tài xế.`, "success");
+        } catch (err) {
+            console.error("❌ Submit order error:", err);
+            push("Tạo đơn hàng thất bại: " + (err.message || "Lỗi không xác định"), "error");
         } finally {
             setLoadingSubmit(false);
         }
@@ -424,6 +929,19 @@ export default function CreateOrderPage() {
         <div className="min-h-screen bg-slate-50 text-slate-900 p-5">
             <Toasts toasts={toasts} />
 
+            {/* DEBUG PANEL - Remove this after testing */}
+            {process.env.NODE_ENV === 'development' && (
+                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs">
+                    <div className="font-bold mb-2">🔍 Debug Info:</div>
+                    <div>loadingBranch: {String(loadingBranch)}</div>
+                    <div>isAdmin: {String(isAdmin)}</div>
+                    <div>branchId: {branchId || 'empty'}</div>
+                    <div>branchName: {branchName || 'empty'}</div>
+                    <div>availableBranches: {availableBranches.length} items</div>
+                    <div>roleName: {localStorage.getItem("roleName") || 'not set'}</div>
+                </div>
+            )}
+
             {/* HEADER */}
             <div className="flex flex-col xl:flex-row xl:items-start gap-4 mb-6">
                 <div className="flex-1 flex flex-col gap-2">
@@ -433,13 +951,44 @@ export default function CreateOrderPage() {
                             <span>Tạo đơn hàng mới</span>
                         </div>
 
-                        <span className="rounded-md border border-slate-300 bg-slate-100 text-[11px] px-2 py-[2px] text-slate-600 font-medium flex items-center gap-1">
-                            <Building2 className="h-3.5 w-3.5 text-slate-500" />
-                            Chi nhánh:{" "}
-                            <span className="text-slate-900 font-semibold">
-                                {branchId}
+                        {/* Branch Display/Selection */}
+                        {loadingBranch ? (
+                            <span className="rounded-md border border-slate-300 bg-slate-100 text-[11px] px-2 py-[2px] text-slate-600 font-medium flex items-center gap-1">
+                                <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-500" />
+                                Đang tải chi nhánh...
                             </span>
-                        </span>
+                        ) : isAdmin ? (
+                            <div className="flex items-center gap-2">
+                                <Building2 className="h-4 w-4 text-slate-500" />
+                                <select
+                                    value={branchId}
+                                    onChange={(e) => {
+                                        const selectedBranch = availableBranches.find(
+                                            b => String(b.branchId) === e.target.value
+                                        );
+                                        setBranchId(e.target.value);
+                                        if (selectedBranch) {
+                                            setBranchName(selectedBranch.branchName);
+                                        }
+                                    }}
+                                    className="rounded-md border border-slate-300 bg-white text-[13px] px-3 py-1.5 text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+                                >
+                                    {availableBranches.map((branch) => (
+                                        <option key={branch.branchId} value={String(branch.branchId)}>
+                                            {branch.branchName}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        ) : (
+                            <span className="rounded-md border border-slate-300 bg-slate-100 text-[11px] px-2 py-[2px] text-slate-600 font-medium flex items-center gap-1">
+                                <Building2 className="h-3.5 w-3.5 text-slate-500" />
+                                Chi nhánh:{" "}
+                                <span className="text-slate-900 font-semibold">
+                                    {branchName || branchId}
+                                </span>
+                            </span>
+                        )}
                     </div>
 
                     <div className="text-[12px] text-slate-500 flex flex-wrap items-center gap-2 leading-relaxed">
@@ -452,7 +1001,7 @@ export default function CreateOrderPage() {
                     {/* Lưu nháp */}
                     <button
                         onClick={saveDraft}
-                        disabled={loadingDraft}
+                        disabled={loadingDraft || loadingBranch || !branchId}
                         type="button"
                         className="rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-[13px] text-slate-700 px-4 py-2 flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -467,7 +1016,7 @@ export default function CreateOrderPage() {
                     {/* Đặt đơn */}
                     <button
                         onClick={submitOrder}
-                        disabled={loadingSubmit}
+                        disabled={loadingSubmit || loadingBranch || !branchId}
                         type="button"
                         className="rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-[13px] px-4 py-2 shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -587,6 +1136,79 @@ export default function CreateOrderPage() {
                                 </button>
                             ))}
                         </div>
+
+                        {/* Các tùy chọn phụ phí */}
+                        <div className="mt-4 pt-4 border-t border-slate-200 space-y-3">
+                            <div className="text-[12px] text-slate-600 mb-2 font-medium">
+                                Tùy chọn phụ phí
+                            </div>
+
+                            <div className="flex flex-wrap gap-4">
+                                {/* Ngày lễ */}
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={isHoliday}
+                                        onChange={(e) => setIsHoliday(e.target.checked)}
+                                        className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                                    />
+                                    <span className="text-[13px] text-slate-700">
+                                        Ngày lễ (+25%)
+                                    </span>
+                                </label>
+
+                                {/* Cuối tuần */}
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={isWeekend}
+                                        onChange={(e) => setIsWeekend(e.target.checked)}
+                                        disabled={true}
+                                        className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-50"
+                                    />
+                                    <span className="text-[13px] text-slate-700">
+                                        Cuối tuần (+20%)
+                                        {isWeekend && <span className="text-emerald-600 ml-1">(Tự động)</span>}
+                                    </span>
+                                </label>
+                            </div>
+
+                            {/* Điểm đón/trả thêm */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <div className="text-[12px] text-slate-600 mb-1">
+                                        Điểm đón thêm
+                                    </div>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        value={additionalPickupPoints}
+                                        onChange={(e) => setAdditionalPickupPoints(Number(e.target.value) || 0)}
+                                        className={cls(inputCls, "tabular-nums")}
+                                        placeholder="0"
+                                    />
+                                    <div className="text-[11px] text-slate-500 mt-1">
+                                        Nhập số điểm đón phụ ngoài điểm chính (mỗi điểm = 1 lần ghé thêm).
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="text-[12px] text-slate-600 mb-1">
+                                        Điểm trả thêm
+                                    </div>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        value={additionalDropoffPoints}
+                                        onChange={(e) => setAdditionalDropoffPoints(Number(e.target.value) || 0)}
+                                        className={cls(inputCls, "tabular-nums")}
+                                        placeholder="0"
+                                    />
+                                    <div className="text-[11px] text-slate-500 mt-1">
+                                        Nhập số địa điểm trả khách bổ sung để hệ thống tính phụ phí chính xác.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </section>
 
                     {/* Phần 4: GIÁ BÁO KHÁCH */}
@@ -629,8 +1251,21 @@ export default function CreateOrderPage() {
                                 <input
                                     type="number"
                                     min="0"
+                                    step="0.01"
                                     value={distanceKm}
-                                    onChange={(e) => setDistanceKm(e.target.value)}
+                                    onChange={(e) => {
+                                        const raw = e.target.value;
+                                        if (raw === "" || raw === null) {
+                                            setDistanceKm("");
+                                            return;
+                                        }
+                                        const numberValue = Number(raw);
+                                        if (Number.isNaN(numberValue)) {
+                                            setDistanceKm(raw);
+                                            return;
+                                        }
+                                        setDistanceKm(numberValue.toFixed(2));
+                                    }}
                                     className={cls(inputCls, "tabular-nums")}
                                     placeholder={calculatingDistance ? "Đang tính..." : "Tự động tính hoặc nhập thủ công"}
                                     disabled={calculatingDistance}
@@ -697,7 +1332,8 @@ export default function CreateOrderPage() {
                                 </div>
                                 <input
                                     value={quotedPrice}
-                                    onChange={(e) =>
+                                    onChange={(e) => {
+                                        setQuotedPriceTouched(true);
                                         setQuotedPrice(
                                             Number(
                                                 numOnly(
@@ -706,8 +1342,8 @@ export default function CreateOrderPage() {
                                                         .value
                                                 )
                                             ) || 0
-                                        )
-                                    }
+                                        );
+                                    }}
                                     className={cls(
                                         inputCls,
                                         "tabular-nums font-semibold"
@@ -872,27 +1508,58 @@ export default function CreateOrderPage() {
                                     <div className={labelCls}>
                                         <Users className="h-3.5 w-3.5 text-slate-400" />
                                         <span>
-                                            Số
-                                            khách
+                                            Số khách
                                         </span>
-                                    </div>
-                                    <input
-                                        value={
-                                            paxCount
-                                        }
-                                        onChange={(e) =>
-                                            onChangePax(
-                                                e
-                                                    .target
-                                                    .value
-                                            )
-                                        }
-                                        className={cls(
-                                            inputCls,
-                                            "tabular-nums"
+                                        {selectedCategory && selectedCategory.seats && (
+                                            <span className="text-[11px] text-slate-500 font-normal">
+                                                (Tối đa: {selectedCategory.seats - 1})
+                                            </span>
                                         )}
-                                        placeholder="0"
-                                    />
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            type="button"
+                                            onClick={decrementPax}
+                                            disabled={paxCount <= 1}
+                                            className={cls(
+                                                "px-2 py-2 rounded-l-md border border-slate-300 bg-white hover:bg-slate-50 transition-colors",
+                                                "disabled:opacity-50 disabled:cursor-not-allowed",
+                                                "focus:outline-none focus:ring-2 focus:ring-[#0079BC]/20"
+                                            )}
+                                        >
+                                            <Minus className="h-4 w-4 text-slate-600" />
+                                        </button>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            max={selectedCategory ? (selectedCategory.seats - 1) : undefined}
+                                            value={paxCount}
+                                            onChange={(e) => onChangePax(e.target.value)}
+                                            className={cls(
+                                                inputCls,
+                                                "tabular-nums rounded-none border-x-0 text-center"
+                                            )}
+                                            placeholder="1"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={incrementPax}
+                                            disabled={selectedCategory && selectedCategory.seats && paxCount >= (selectedCategory.seats - 1)}
+                                            className={cls(
+                                                "px-2 py-2 rounded-r-md border border-slate-300 bg-white hover:bg-slate-50 transition-colors",
+                                                "disabled:opacity-50 disabled:cursor-not-allowed",
+                                                "focus:outline-none focus:ring-2 focus:ring-[#0079BC]/20"
+                                            )}
+                                        >
+                                            <Plus className="h-4 w-4 text-slate-600" />
+                                        </button>
+                                    </div>
+                                    {selectedCategory && selectedCategory.seats && paxCount >= selectedCategory.seats && (
+                                        <div className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
+                                            <AlertTriangle className="h-3 w-3" />
+                                            Số khách phải nhỏ hơn số ghế ({selectedCategory.seats} chỗ)
+                                        </div>
+                                    )}
                                 </div>
                                 <div>
                                     <div className={labelCls}>
@@ -900,24 +1567,56 @@ export default function CreateOrderPage() {
                                         <span>
                                             Số xe
                                         </span>
-                                    </div>
-                                    <input
-                                        value={
-                                            vehicleCount
-                                        }
-                                        onChange={(e) =>
-                                            onChangeVehicleCount(
-                                                e
-                                                    .target
-                                                    .value
-                                            )
-                                        }
-                                        className={cls(
-                                            inputCls,
-                                            "tabular-nums"
+                                        {availabilityInfo && availabilityInfo.count && (
+                                            <span className="text-[11px] text-slate-500 font-normal">
+                                                (Khả dụng: {availabilityInfo.count})
+                                            </span>
                                         )}
-                                        placeholder="1"
-                                    />
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            type="button"
+                                            onClick={decrementVehicleCount}
+                                            disabled={vehicleCount <= 1}
+                                            className={cls(
+                                                "px-2 py-2 rounded-l-md border border-slate-300 bg-white hover:bg-slate-50 transition-colors",
+                                                "disabled:opacity-50 disabled:cursor-not-allowed",
+                                                "focus:outline-none focus:ring-2 focus:ring-[#0079BC]/20"
+                                            )}
+                                        >
+                                            <Minus className="h-4 w-4 text-slate-600" />
+                                        </button>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            max={availabilityInfo && availabilityInfo.count ? availabilityInfo.count : undefined}
+                                            value={vehicleCount}
+                                            onChange={(e) => onChangeVehicleCount(e.target.value)}
+                                            className={cls(
+                                                inputCls,
+                                                "tabular-nums rounded-none border-x-0 text-center"
+                                            )}
+                                            placeholder="1"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={incrementVehicleCount}
+                                            disabled={availabilityInfo && availabilityInfo.count && vehicleCount >= availabilityInfo.count}
+                                            className={cls(
+                                                "px-2 py-2 rounded-r-md border border-slate-300 bg-white hover:bg-slate-50 transition-colors",
+                                                "disabled:opacity-50 disabled:cursor-not-allowed",
+                                                "focus:outline-none focus:ring-2 focus:ring-[#0079BC]/20"
+                                            )}
+                                        >
+                                            <Plus className="h-4 w-4 text-slate-600" />
+                                        </button>
+                                    </div>
+                                    {availabilityInfo && availabilityInfo.count && vehicleCount > availabilityInfo.count && (
+                                        <div className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
+                                            <AlertTriangle className="h-3 w-3" />
+                                            Số xe không được vượt quá số xe khả dụng ({availabilityInfo.count})
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -972,23 +1671,85 @@ export default function CreateOrderPage() {
 
             {/* FOOTER NOTE */}
             {/* <div className="text-[11px] text-slate-500 mt-8 leading-relaxed">
-                <div className="opacity-80">
-                    API khi submit:
-                </div>
-                <div className="font-mono text-[11px] text-slate-400 break-all">
-                    POST /api/orders
-                </div>
-                <div className="font-mono text-[11px] text-slate-400 break-all whitespace-pre-wrap">
-                    {JSON.stringify(
-                        {
-                            ...basePayload,
-                            status: "PENDING",
-                        },
-                        null,
-                        2
-                    )}
-                </div>
+                ...
             </div> */}
+
+            {recentBookingSuggestion && showPrefillDialog && (
+                <AnimatedDialog
+                    open={showPrefillDialog}
+                    onClose={() => setShowPrefillDialog(false)}
+                    size="lg"
+                >
+                    <div className="p-6 space-y-5">
+                        <div className="flex items-start gap-3">
+                            <div className="h-12 w-12 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center shadow-inner">
+                                <History className="h-6 w-6" />
+                            </div>
+                            <div className="flex-1">
+                                <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold">
+                                    Khách quen vừa được nhận diện
+                                </p>
+                                <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                                    {recentBookingSuggestion.customerName || "Khách hàng cũ"}
+                                    <Sparkles className="h-4 w-4 text-amber-500" />
+                                </h3>
+                                <p className="text-sm text-slate-600 mt-1">
+                                    Hệ thống tìm thấy đơn gần nhất của khách này. Bạn có muốn tự động điền lại theo lịch sử để tiết kiệm thời gian không?
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 grid sm:grid-cols-3 gap-4 text-sm">
+                            <div>
+                                <p className="text-slate-500 mb-1">Hành trình</p>
+                                <p className="font-semibold text-slate-900">
+                                    {recentBookingSuggestion.routeSummary || "Chưa có mô tả"}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-slate-500 mb-1">Thời gian dự kiến</p>
+                                <p className="font-semibold text-slate-900">
+                                    {formatReadableDateTime(recentBookingSuggestion.startDate)}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-slate-500 mb-1">Giá báo khách</p>
+                                <p className="font-semibold text-emerald-600">
+                                    {fmtVND(recentBookingSuggestion.totalCost)} đ
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-600 bg-white flex items-center gap-2">
+                            <ArrowRight className="h-4 w-4 text-sky-500" />
+                            Bạn có thể chỉnh lại sau khi hệ thống tự động điền thông tin từ đơn #{recentBookingSuggestion.id}.
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setShowPrefillDialog(false)}
+                                className="px-4 py-2.5 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium bg-white hover:bg-slate-50 transition-colors"
+                            >
+                                Để sau
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleApplyRecentBooking}
+                                disabled={prefillLoading}
+                                className="px-4 py-2.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                            >
+                                {prefillLoading ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Sparkles className="h-4 w-4" />
+                                )}
+                                Tự động điền ngay
+                            </button>
+                        </div>
+                    </div>
+                </AnimatedDialog>
+            )}
         </div>
     );
 }
