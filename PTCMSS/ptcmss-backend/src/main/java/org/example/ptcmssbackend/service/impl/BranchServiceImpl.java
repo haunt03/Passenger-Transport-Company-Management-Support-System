@@ -10,10 +10,15 @@ import org.example.ptcmssbackend.dto.response.common.PageResponse;
 import org.example.ptcmssbackend.entity.Branches;
 import org.example.ptcmssbackend.entity.Employees;
 import org.example.ptcmssbackend.enums.BranchStatus;
-import org.example.ptcmssbackend.enums.BookingStatus;
+import org.example.ptcmssbackend.enums.EmployeeStatus;
 import org.example.ptcmssbackend.enums.InvoiceType;
 import org.example.ptcmssbackend.enums.TripStatus;
-import org.example.ptcmssbackend.repository.*;
+import org.example.ptcmssbackend.repository.BranchesRepository;
+import org.example.ptcmssbackend.repository.EmployeeRepository;
+import org.example.ptcmssbackend.repository.InvoiceRepository;
+import org.example.ptcmssbackend.repository.TripDriverRepository;
+import org.example.ptcmssbackend.repository.TripRepository;
+import org.example.ptcmssbackend.repository.TripVehicleRepository;
 import org.example.ptcmssbackend.service.BranchService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -27,9 +32,10 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneId;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -40,7 +46,6 @@ public class BranchServiceImpl implements BranchService {
 
     private final BranchesRepository branchesRepository;
     private final EmployeeRepository employeeRepository;
-    private final BookingRepository bookingRepository;
     private final TripRepository tripRepository;
     private final InvoiceRepository invoiceRepository;
     private final TripDriverRepository tripDriverRepository;
@@ -66,6 +71,7 @@ public class BranchServiceImpl implements BranchService {
                         ? branch.getManager().getUser().getFullName() : null)
                 .location(branch.getLocation())
                 .status(branch.getStatus().name())
+                .employeeCount(0)
                 .build();
     }
 
@@ -113,7 +119,7 @@ public class BranchServiceImpl implements BranchService {
         }else {
             page = branchesRepository.findAll(pageable);
         }
-        return getBranchPageResponse(pageNo, pageSize, page);
+        return buildBranchPageResponse(pageNo, pageSize, page);
     }
 
     @Override
@@ -128,6 +134,7 @@ public class BranchServiceImpl implements BranchService {
                         ? branch.getManager().getUser().getFullName() : null)
                 .location(branch.getLocation())
                 .status(branch.getStatus().name())
+                .employeeCount((int) employeeRepository.countActiveByBranchId(branch.getId(), EmployeeStatus.INACTIVE))
                 .build();
     }
 
@@ -161,10 +168,25 @@ public class BranchServiceImpl implements BranchService {
                         branch.getManager() != null ?
                                 branch.getManager().getEmployeeId() : null
                 )
+                .employeeCount((int) employeeRepository.countActiveByBranchId(branch.getId(), EmployeeStatus.INACTIVE))
                 .build();
     }
 
-    private static PageResponse<List<BranchResponse>> getBranchPageResponse(int pageNo, int pageSize, Page<Branches> branches) {
+    private PageResponse<List<BranchResponse>> buildBranchPageResponse(int pageNo, int pageSize, Page<Branches> branches) {
+        List<Integer> branchIds = branches.getContent().stream()
+                .map(Branches::getId)
+                .toList();
+
+        Map<Integer, Integer> employeeCounts = new HashMap<>();
+        if (!branchIds.isEmpty()) {
+            List<Object[]> counts = employeeRepository.countActiveByBranchIds(branchIds, EmployeeStatus.INACTIVE);
+            for (Object[] row : counts) {
+                Integer branchId = (Integer) row[0];
+                Long total = (Long) row[1];
+                employeeCounts.put(branchId, total != null ? total.intValue() : 0);
+            }
+        }
+
         List<BranchResponse> branchResponse = branches.stream()
                 .map(branch -> BranchResponse.builder()
                         .id(branch.getId())
@@ -174,6 +196,7 @@ public class BranchServiceImpl implements BranchService {
                                 ? branch.getManager().getUser().getFullName() : null)
                         .location(branch.getLocation())
                         .status(branch.getStatus().name())
+                        .employeeCount(employeeCounts.getOrDefault(branch.getId(), 0))
                         .build())
                 .toList();
         return PageResponse.<List<BranchResponse>>builder()
@@ -414,6 +437,23 @@ public class BranchServiceImpl implements BranchService {
         BigDecimal percentage = change.divide(oldValue, 4, RoundingMode.HALF_UP)
                 .multiply(BigDecimal.valueOf(100));
         return percentage.doubleValue();
+    }
+
+    @Override
+    public List<BranchResponse> getAllBranchesForSelection() {
+        log.info("Getting all branches for selection");
+
+        // Lấy tất cả chi nhánh đang ACTIVE
+        List<Branches> branches = branchesRepository.findByStatus(BranchStatus.ACTIVE);
+
+        return branches.stream()
+                .map(branch -> BranchResponse.builder()
+                        .id(branch.getId())
+                        .branchName(branch.getBranchName())
+                        .Address(branch.getLocation())
+                        .status(branch.getStatus().name())
+                        .build())
+                .toList();
     }
 
     // Helper class for vehicle statistics
