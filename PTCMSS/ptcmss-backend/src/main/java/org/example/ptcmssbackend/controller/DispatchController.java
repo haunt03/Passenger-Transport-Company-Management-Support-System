@@ -1,7 +1,5 @@
 package org.example.ptcmssbackend.controller;
 
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.ptcmssbackend.dto.request.Trip.TripSearchRequest;
@@ -15,8 +13,12 @@ import org.example.ptcmssbackend.dto.response.dispatch.DispatchDashboardResponse
 import org.example.ptcmssbackend.dto.response.dispatch.PendingTripResponse;
 import org.example.ptcmssbackend.service.DispatchService;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -35,11 +37,7 @@ public class DispatchController {
     // =====================================================================
     @Operation(
             summary = "Lấy danh sách chuyến *Pending* theo chi nhánh",
-            description = """
-                          Trả về danh sách các chuyến đã xác nhận & đủ điều kiện điều phối.
-                          Chỉ ADMIN hoặc MANAGER có quyền xem.
-                          Nếu branchId = 0 hoặc null và user là ADMIN, trả về tất cả chi nhánh.
-                          """
+            description = "Trả về danh sách các chuyến đã xác nhận & đủ điều kiện điều phối. Chỉ ADMIN hoặc MANAGER có quyền xem. Nếu branchId = 0 hoặc null và user là ADMIN, trả về tất cả chi nhánh."
     )
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT')")
     @GetMapping("/pending/{branchId}")
@@ -53,7 +51,7 @@ public class DispatchController {
             return new ResponseError(HttpStatus.BAD_REQUEST.value(), e.getMessage());
         }
     }
-    
+
     @Operation(
             summary = "Lấy danh sách chuyến *Pending* của tất cả chi nhánh",
             description = "Chỉ ADMIN có quyền xem tất cả chi nhánh"
@@ -90,10 +88,7 @@ public class DispatchController {
 
     @Operation(
             summary = "Tổng quan điều phối trong ngày",
-            description = """
-                    Trả về Queue pending + timeline tài xế / phương tiện trong ngày theo chi nhánh.
-                    Admin/Manager được phép truy cập.
-                    """
+            description = "Trả về Queue pending + timeline tài xế / phương tiện trong ngày theo chi nhánh. Admin/Manager được phép truy cập."
     )
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT')")
     @GetMapping("/dashboard")
@@ -151,10 +146,7 @@ public class DispatchController {
     // =====================================================================
     @Operation(
             summary = "Gán tài xế + xe cho chuyến",
-            description = """
-                          ADMIN hoặc MANAGER mới có quyền điều phối.
-                          Gán 1 hoặc nhiều trip, idempotent (gán lại không lỗi).
-                          """
+            description = "ADMIN hoặc MANAGER mới có quyền điều phối. Gán 1 hoặc nhiều trip, idempotent (gán lại không lỗi)."
     )
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT')")
     @PostMapping("/assign")
