@@ -124,3 +124,4 @@ export default function AnimatedDialog({
  * AnimatedModal - Alias for AnimatedDialog (backward compatibility)
  */
 export const AnimatedModal = AnimatedDialog;
+
