@@ -14,6 +14,7 @@ export const useNotifications = () => {
         clearNotification,
         clearAllNotifications,
         subscribeToUserNotifications,
+        pushNotification,
     } = useWebSocket();
 
     /**
@@ -78,5 +79,6 @@ export const useNotifications = () => {
         subscribeToUser,
         getNotificationsByType,
         getUnreadNotifications,
+        pushNotification,
     };
 };

@@ -10,7 +10,8 @@ export function getMyProfile() {
 export function updateMyProfile(body) {
     const id = getStoredUserId();
     if (!id) throw new Error("NO_USER_ID");
-    return apiFetch(`/api/users/${id}`, { method: "PUT", body });
+    // Sử dụng endpoint mới /profile cho user tự cập nhật
+    return apiFetch(`/api/users/${id}/profile`, { method: "PATCH", body });
 }
 
 export async function uploadAvatar(userId, file) {

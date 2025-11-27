@@ -1,3 +1,4 @@
+
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { createEmployee } from "../../api/employees";
@@ -140,7 +141,7 @@ export default function CreateEmployeePage() {
             {/* SUCCESS TOAST */}
             {showSuccess && (
                 <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 duration-300">
-                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 shadow-xl rounded-xl p-4 flex gap-3 items-center min-w-[320px]">
+                    <div className="bg-gradient-to-r from-green-50 to-amber-50 border border-green-200 shadow-xl rounded-xl p-4 flex gap-3 items-center min-w-[320px]">
                         <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
                             <CheckCircle className="text-green-600" size={20} />
                         </div>

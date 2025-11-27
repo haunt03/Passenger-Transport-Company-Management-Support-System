@@ -81,7 +81,7 @@ export default function AlertsPanel({
     if (!alerts || alerts.length === 0) {
         return (
             <div className="text-center py-8 text-slate-500 text-sm">
-                <CheckCircle className="h-12 w-12 mx-auto mb-2 text-emerald-500" />
+                <CheckCircle className="h-12 w-12 mx-auto mb-2 text-amber-500" />
                 <div>Không có cảnh báo nào</div>
             </div>
         );

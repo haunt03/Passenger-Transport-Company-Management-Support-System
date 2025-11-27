@@ -105,6 +105,14 @@ export default function NotificationsWidget() {
     }, [userId, isAdmin, branchLoaded]);
 
     const fetchAll = React.useCallback(async () => {
+        // Skip for DRIVER role - they don't have access to notifications dashboard
+        if (role === ROLES.DRIVER) {
+            console.log('[NotificationsWidget] Skipping dashboard fetch for DRIVER role');
+            setDashboard(null);
+            setLoading(false);
+            return;
+        }
+
         // Prevent multiple simultaneous calls
         if (loading) {
             console.log('[NotificationsWidget] Already loading, skipping...');
@@ -125,7 +133,7 @@ export default function NotificationsWidget() {
         } finally {
             setLoading(false);
         }
-    }, [branchId, loading]);
+    }, [branchId, loading, role]);
 
     // Fetch when dropdown opens OR when in page mode
     React.useEffect(() => {
@@ -361,7 +369,7 @@ export default function NotificationsWidget() {
                         {approval.details && approval.approvalType === "EXPENSE_REQUEST" && (
                             <div className="mt-1.5 text-[11px] text-slate-500 flex items-center gap-1.5">
                                 <DollarSign className="h-3 w-3" />
-                                {approval.details.requesterName} · <span className="font-semibold text-emerald-600">{approval.details.amount?.toLocaleString()} VNĐ</span>
+                                {approval.details.requesterName} · <span className="font-semibold text-amber-600">{approval.details.amount?.toLocaleString()} VNĐ</span>
                             </div>
                         )}
                     </div>
@@ -373,7 +381,7 @@ export default function NotificationsWidget() {
                             disabled={working}
                             onClick={() => handleApprove(approval.id)}
                             className={cls(
-                                "inline-flex items-center gap-1.5 rounded-lg border-2 border-emerald-600 bg-white text-emerald-700 hover:bg-emerald-50 hover:shadow-md px-3 py-1.5 text-[12px] font-semibold transition-all duration-200",
+                                "inline-flex items-center gap-1.5 rounded-lg border-2 border-[#EDC531] bg-white text-amber-700 hover:bg-amber-50 hover:shadow-md px-3 py-1.5 text-[12px] font-semibold transition-all duration-200",
                                 working ? "opacity-60 cursor-not-allowed" : "hover:scale-105"
                             )}
                             title="Duyệt"
@@ -433,7 +441,7 @@ export default function NotificationsWidget() {
                         </span>
                     )}
                     {connected && (
-                        <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-white shadow-sm"></span>
+                        <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-amber-500 border-2 border-white shadow-sm"></span>
                     )}
                 </button>
             )}
@@ -480,7 +488,7 @@ export default function NotificationsWidget() {
                                     className={cls(
                                         "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-all duration-200",
                                         connected
-                                            ? "bg-gradient-to-r from-emerald-50 to-emerald-100 text-emerald-700 border-2 border-emerald-300 shadow-sm"
+                                            ? "bg-gradient-to-r from-amber-50 to-amber-100 text-amber-700 border-2 border-amber-300 shadow-sm"
                                             : "bg-slate-100 text-slate-500 border-2 border-slate-300"
                                     )}
                                     title={connected ? "WebSocket đã kết nối" : "WebSocket chưa kết nối"}
@@ -583,84 +591,125 @@ export default function NotificationsWidget() {
                         </div>
 
                         {/* Content */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-slate-200 max-h-[calc(85vh-80px)] overflow-hidden">
-                            {/* Cột Cảnh báo */}
+                        {role === ROLES.DRIVER ? (
+                            // Driver view - Only show WebSocket notifications
                             <div className="min-h-[300px] max-h-[calc(85vh-80px)] overflow-y-auto text-sm scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100">
                                 <SectionHeader
-                                    icon={<ShieldAlert className="h-4 w-4" />}
-                                    title="Cảnh báo"
-                                    count={alerts.length}
+                                    icon={<Bell className="h-4 w-4" />}
+                                    title="Thông báo của bạn"
+                                    count={wsNotifications.length}
                                 />
 
-                                {error && (
-                                    <div className="mx-4 mt-3 px-4 py-3 text-[12px] leading-5 text-amber-800 bg-gradient-to-r from-amber-50 to-amber-100 border border-amber-200 rounded-lg flex items-start gap-2 shadow-sm">
-                                        <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                                        <div className="flex-1">
-                                            <div className="font-semibold mb-1">Lỗi tải dữ liệu</div>
-                                            <span>{error}</span>
-                                        </div>
-                                        <button
-                                            onClick={fetchAll}
-                                            className="shrink-0 text-amber-700 hover:text-amber-900 transition-colors"
-                                            title="Thử lại"
-                                        >
-                                            <RefreshCw className="h-4 w-4" />
-                                        </button>
-                                    </div>
-                                )}
-
-                                {alerts.length === 0 && !loading && !error && (
+                                {wsNotifications.length === 0 && (
                                     <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
                                         <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mb-3">
                                             <Inbox className="h-8 w-8 text-slate-400" />
                                         </div>
-                                        <div className="text-sm font-medium text-slate-600 mb-1">Không có cảnh báo</div>
-                                        <div className="text-xs text-slate-500">Tất cả đều ổn!</div>
+                                        <div className="text-sm font-medium text-slate-600 mb-1">Không có thông báo mới</div>
+                                        <div className="text-xs text-slate-500">Bạn sẽ nhận được thông báo khi có cập nhật!</div>
                                     </div>
                                 )}
 
-                                {alerts.map((a) => (
-                                    <AlertItem key={a.id} alert={a} />
-                                ))}
-
-                                {loading && (
-                                    <div className="flex flex-col items-center justify-center px-4 py-12">
-                                        <Loader2 className="h-8 w-8 text-sky-600 animate-spin mb-3" />
-                                        <div className="text-sm text-slate-600 font-medium">Đang tải cảnh báo...</div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Cột Chờ duyệt */}
-                            <div className="min-h-[300px] max-h-[calc(85vh-80px)] overflow-y-auto text-sm scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100">
-                                <SectionHeader
-                                    icon={<CalendarDays className="h-4 w-4" />}
-                                    title="Chờ duyệt"
-                                    count={pending.length}
-                                />
-
-                                {pending.length === 0 && !loading && (
-                                    <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
-                                        <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mb-3">
-                                            <Clock className="h-8 w-8 text-slate-400" />
+                                {wsNotifications.map((notif) => (
+                                    <div key={notif.id} className="flex items-start gap-3 px-4 py-3.5 border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                                        <div className="mt-0.5 p-2 rounded-lg bg-sky-50 shadow-sm">
+                                            <Bell className="h-4 w-4 text-sky-600" />
                                         </div>
-                                        <div className="text-sm font-medium text-slate-600 mb-1">Không có mục chờ duyệt</div>
-                                        <div className="text-xs text-slate-500">Tất cả đã được xử lý!</div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-sm font-semibold text-slate-900 mb-1">
+                                                {notif.title}
+                                            </div>
+                                            <div className="text-xs text-slate-600 leading-relaxed">
+                                                {notif.message}
+                                            </div>
+                                            <div className="text-[10px] text-slate-400 mt-1">
+                                                {new Date(notif.timestamp).toLocaleString('vi-VN')}
+                                            </div>
+                                        </div>
                                     </div>
-                                )}
-
-                                {pending.map((p) => (
-                                    <PendingItem key={p.id} approval={p} />
                                 ))}
-
-                                {loading && (
-                                    <div className="flex flex-col items-center justify-center px-4 py-12">
-                                        <Loader2 className="h-8 w-8 text-sky-600 animate-spin mb-3" />
-                                        <div className="text-sm text-slate-600 font-medium">Đang tải yêu cầu...</div>
-                                    </div>
-                                )}
                             </div>
-                        </div>
+                        ) : (
+                            // Coordinator/Manager/Admin view - Show alerts and pending approvals
+                            <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-slate-200 max-h-[calc(85vh-80px)] overflow-hidden">
+                                {/* Cột Cảnh báo */}
+                                <div className="min-h-[300px] max-h-[calc(85vh-80px)] overflow-y-auto text-sm scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100">
+                                    <SectionHeader
+                                        icon={<ShieldAlert className="h-4 w-4" />}
+                                        title="Cảnh báo"
+                                        count={alerts.length}
+                                    />
+
+                                    {error && (
+                                        <div className="mx-4 mt-3 px-4 py-3 text-[12px] leading-5 text-amber-800 bg-gradient-to-r from-amber-50 to-amber-100 border border-amber-200 rounded-lg flex items-start gap-2 shadow-sm">
+                                            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                                            <div className="flex-1">
+                                                <div className="font-semibold mb-1">Lỗi tải dữ liệu</div>
+                                                <span>{error}</span>
+                                            </div>
+                                            <button
+                                                onClick={fetchAll}
+                                                className="shrink-0 text-amber-700 hover:text-amber-900 transition-colors"
+                                                title="Thử lại"
+                                            >
+                                                <RefreshCw className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {alerts.length === 0 && !loading && !error && (
+                                        <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
+                                            <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mb-3">
+                                                <Inbox className="h-8 w-8 text-slate-400" />
+                                            </div>
+                                            <div className="text-sm font-medium text-slate-600 mb-1">Không có cảnh báo</div>
+                                            <div className="text-xs text-slate-500">Tất cả đều ổn!</div>
+                                        </div>
+                                    )}
+
+                                    {alerts.map((a) => (
+                                        <AlertItem key={a.id} alert={a} />
+                                    ))}
+
+                                    {loading && (
+                                        <div className="flex flex-col items-center justify-center px-4 py-12">
+                                            <Loader2 className="h-8 w-8 text-sky-600 animate-spin mb-3" />
+                                            <div className="text-sm text-slate-600 font-medium">Đang tải cảnh báo...</div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Cột Chờ duyệt */}
+                                <div className="min-h-[300px] max-h-[calc(85vh-80px)] overflow-y-auto text-sm scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100">
+                                    <SectionHeader
+                                        icon={<CalendarDays className="h-4 w-4" />}
+                                        title="Chờ duyệt"
+                                        count={pending.length}
+                                    />
+
+                                    {pending.length === 0 && !loading && (
+                                        <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
+                                            <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mb-3">
+                                                <Clock className="h-8 w-8 text-slate-400" />
+                                            </div>
+                                            <div className="text-sm font-medium text-slate-600 mb-1">Không có mục chờ duyệt</div>
+                                            <div className="text-xs text-slate-500">Tất cả đã được xử lý!</div>
+                                        </div>
+                                    )}
+
+                                    {pending.map((p) => (
+                                        <PendingItem key={p.id} approval={p} />
+                                    ))}
+
+                                    {loading && (
+                                        <div className="flex flex-col items-center justify-center px-4 py-12">
+                                            <Loader2 className="h-8 w-8 text-sky-600 animate-spin mb-3" />
+                                            <div className="text-sm text-slate-600 font-medium">Đang tải yêu cầu...</div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </>
             )}

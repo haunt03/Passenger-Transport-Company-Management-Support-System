@@ -53,12 +53,29 @@ export function pageBookings({ status, branchId, consultantId, startDate, endDat
 }
 
 // Calculate price
-export function calculatePrice({ vehicleCategoryIds = [], quantities = [], distance, useHighway = false }) {
+export function calculatePrice({
+                                   vehicleCategoryIds = [],
+                                   quantities = [],
+                                   distance,
+                                   useHighway = false,
+                                   hireTypeId,
+                                   isHoliday = false,
+                                   isWeekend = false,
+                                   additionalPoints = 0,
+                                   startTime,
+                                   endTime
+                               }) {
     const params = new URLSearchParams();
     for (const id of vehicleCategoryIds) params.append("vehicleCategoryIds", String(id));
     for (const q of quantities) params.append("quantities", String(q));
     if (distance != null) params.append("distance", String(distance));
     params.append("useHighway", String(!!useHighway));
+    if (hireTypeId != null) params.append("hireTypeId", String(hireTypeId));
+    if (isHoliday) params.append("isHoliday", "true");
+    if (isWeekend) params.append("isWeekend", "true");
+    if (additionalPoints > 0) params.append("additionalPoints", String(additionalPoints));
+    if (startTime) params.append("startTime", startTime instanceof Date ? startTime.toISOString() : startTime);
+    if (endTime) params.append("endTime", endTime instanceof Date ? endTime.toISOString() : endTime);
     return apiFetch(`/api/bookings/calculate-price?${params.toString()}`, { method: "POST" });
 }
 

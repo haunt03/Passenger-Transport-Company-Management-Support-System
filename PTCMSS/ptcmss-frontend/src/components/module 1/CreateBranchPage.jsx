@@ -44,7 +44,7 @@ function Toasts({ toasts }) {
                     className={cls(
                         "rounded-md px-3 py-2 text-sm shadow border",
                         t.kind === "success" &&
-                        "bg-emerald-50 border-emerald-300 text-emerald-700",
+                        "bg-amber-50 border-amber-300 text-amber-700",
                         t.kind === "error" &&
                         "bg-rose-50 border-rose-300 text-rose-700",
                         t.kind === "info" &&
@@ -261,12 +261,12 @@ function CreateBranchModal({
 
                 {/* FOOTER */}
                 <div className="px-5 py-3 border-t border-slate-200 bg-slate-50/50 flex flex-wrap items-center gap-3 justify-between">
-                    <div className="text-[11px] leading-snug text-slate-500">
+                    {/* <div className="text-[11px] leading-snug text-slate-500">
                         Endpoint dự kiến:
                         <code className="ml-1 rounded bg-slate-100 px-1 py-0.5 text-[11px] font-mono text-slate-700">
                             POST /api/admin/branches
                         </code>
-                    </div>
+                    </div> */}
 
                     <div className="flex items-center gap-2">
                         <button

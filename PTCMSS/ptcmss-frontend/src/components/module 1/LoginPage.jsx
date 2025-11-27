@@ -12,6 +12,7 @@ import {
     Info,
     CheckCircle2,
 } from "lucide-react";
+import { useNotifications } from "../../hooks/useNotifications";
 
 /**
  * LoginPage – Light Theme version
@@ -29,6 +30,7 @@ const cls = (...a) => a.filter(Boolean).join(" ");
 
 export default function LoginPage() {
     const navigate = useNavigate();
+    const { pushNotification } = useNotifications();
     // form state
     const [email, setEmail] = React.useState("");
     const [password, setPassword] = React.useState("");
@@ -42,14 +44,46 @@ export default function LoginPage() {
     const [forgotEmail, setForgotEmail] = React.useState("");
     const [forgotLoading, setForgotLoading] = React.useState(false);
     const [forgotSuccess, setForgotSuccess] = React.useState(false);
+    const [forgotError, setForgotError] = React.useState("");
 
+    // Validation functions
+    const isValidEmail = (email) => {
+        if (!email) return false;
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+    };
+
+    const validateLogin = () => {
+        if (!email.trim()) {
+            return "Vui lòng nhập email hoặc tên đăng nhập";
+        }
+        if (!password.trim()) {
+            return "Vui lòng nhập mật khẩu";
+        }
+        if (password.trim().length < 3) {
+            return "Mật khẩu phải có ít nhất 3 ký tự";
+        }
+        return null;
+    };
+
+    const trimmedEmail = email.trim();
+    const canUseForgotPassword = isValidEmail(trimmedEmail);
     const canSubmit =
-        email.trim() !== "" &&
+        trimmedEmail !== "" &&
         password.trim() !== "" &&
+        password.trim().length >= 3 &&
         !loading;
 
     async function handleLogin(e) {
         e.preventDefault();
+
+        // Validate
+        const validationError = validateLogin();
+        if (validationError) {
+            setError(validationError);
+            return;
+        }
+
         if (!canSubmit) return;
 
         setLoading(true);
@@ -77,6 +111,12 @@ export default function LoginPage() {
                 }
             }
 
+            pushNotification({
+                title: "Đăng nhập thành công",
+                message: `Chào mừng trở lại, ${data?.fullName || data?.username || creds.username}!`,
+                type: "SUCCESS",
+            });
+
             // Navigate based on role
             const role = data?.roleName || "";
             console.log("User role:", role);
@@ -99,7 +139,17 @@ export default function LoginPage() {
             }
         } catch (err) {
             console.error("Login error:", err);
-            setError(err?.data?.message || "Email hoặc mật khẩu không chính xác.");
+            // Handle validation errors from backend
+            const errorMessage = err?.data?.message
+                || err?.message
+                || err?.data?.error
+                || "Email hoặc mật khẩu không chính xác.";
+            setError(errorMessage);
+            pushNotification({
+                title: "Đăng nhập thất bại",
+                message: errorMessage,
+                type: "ERROR",
+            });
         } finally {
             setLoading(false);
         }
@@ -156,10 +206,19 @@ export default function LoginPage() {
                             <input
                                 type="text"
                                 value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100 transition-all"
+                                onChange={(e) => {
+                                    setEmail(e.target.value);
+                                    if (error) setError(""); // Clear error when user types
+                                }}
+                                className={cls(
+                                    "w-full pl-11 pr-4 py-3 rounded-xl border text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all",
+                                    error && (error.includes("email") || error.includes("đăng nhập"))
+                                        ? "border-red-300 bg-red-50/50 focus:border-red-400 focus:bg-white focus:ring-4 focus:ring-red-100"
+                                        : "border-slate-200 bg-slate-50/50 focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                                )}
                                 placeholder="Nhập email hoặc tên đăng nhập"
                                 autoComplete="username"
+                                required
                             />
                         </div>
                     </div>
@@ -173,8 +232,28 @@ export default function LoginPage() {
 
                             <button
                                 type="button"
-                                className="text-xs text-sky-600 hover:text-sky-700 font-medium hover:underline transition-colors"
-                                onClick={() => setShowForgotPassword(true)}
+                                disabled={!canUseForgotPassword}
+                                className={cls(
+                                    "text-xs font-medium transition-colors",
+                                    canUseForgotPassword
+                                        ? "text-sky-600 hover:text-sky-700 hover:underline cursor-pointer"
+                                        : "text-slate-400 cursor-not-allowed"
+                                )}
+                                title={
+                                    canUseForgotPassword
+                                        ? "Đặt lại mật khẩu qua email"
+                                        : "Vui lòng nhập email hợp lệ để đặt lại mật khẩu"
+                                }
+                                onClick={() => {
+                                    if (!canUseForgotPassword) {
+                                        setError("Vui lòng nhập email hợp lệ trước khi yêu cầu đặt lại mật khẩu.");
+                                        return;
+                                    }
+                                    setForgotEmail(trimmedEmail);
+                                    setForgotSuccess(false);
+                                    setForgotError("");
+                                    setShowForgotPassword(true);
+                                }}
                             >
                                 Quên mật khẩu?
                             </button>
@@ -187,10 +266,20 @@ export default function LoginPage() {
                             <input
                                 type={showPw ? "text" : "password"}
                                 value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="w-full pl-11 pr-12 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100 transition-all"
+                                onChange={(e) => {
+                                    setPassword(e.target.value);
+                                    if (error) setError(""); // Clear error when user types
+                                }}
+                                className={cls(
+                                    "w-full pl-11 pr-12 py-3 rounded-xl border text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all",
+                                    error && error.includes("mật khẩu")
+                                        ? "border-red-300 bg-red-50/50 focus:border-red-400 focus:bg-white focus:ring-4 focus:ring-red-100"
+                                        : "border-slate-200 bg-slate-50/50 focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                                )}
                                 placeholder="Nhập mật khẩu của bạn"
                                 autoComplete="current-password"
+                                required
+                                minLength={3}
                             />
 
                             <button
@@ -281,7 +370,7 @@ export default function LoginPage() {
                                     setShowForgotPassword(false);
                                     setForgotEmail("");
                                     setForgotSuccess(false);
-                                    setError("");
+                                    setForgotError("");
                                 }}
                                 className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 transition-colors"
                             >
@@ -297,10 +386,13 @@ export default function LoginPage() {
                                     <div className="flex items-start gap-3">
                                         <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-emerald-500 mt-0.5" />
                                         <div>
-                                            <p className="font-semibold">Email đã được gửi!</p>
+                                            <p className="font-semibold">Email đã được gửi thành công!</p>
                                             <p className="mt-1.5 text-emerald-600">
                                                 Chúng tôi đã gửi link đặt lại mật khẩu đến email <strong>{forgotEmail}</strong>.
-                                                Vui lòng kiểm tra hộp thư của bạn.
+                                                Vui lòng kiểm tra hộp thư đến và thư mục spam của bạn.
+                                            </p>
+                                            <p className="mt-2 text-emerald-600 text-xs">
+                                                Nếu không nhận được email trong vài phút, vui lòng thử lại hoặc liên hệ quản trị viên.
                                             </p>
                                         </div>
                                     </div>
@@ -311,6 +403,7 @@ export default function LoginPage() {
                                         setShowForgotPassword(false);
                                         setForgotEmail("");
                                         setForgotSuccess(false);
+                                        setForgotError("");
                                     }}
                                     className="w-full rounded-xl bg-gradient-to-r from-sky-500 to-sky-600 px-4 py-3 text-sm font-semibold text-white hover:from-sky-600 hover:to-sky-700 transition-all"
                                 >
@@ -322,42 +415,44 @@ export default function LoginPage() {
                                 onSubmit={async (e) => {
                                     e.preventDefault();
                                     if (!forgotEmail.trim()) {
-                                        setError("Vui lòng nhập email");
+                                        setForgotError("Không tìm thấy email hợp lệ. Vui lòng đóng và nhập lại email ở form đăng nhập.");
                                         return;
                                     }
-
                                     setForgotLoading(true);
-                                    setError("");
+                                    setForgotError("");
 
                                     try {
                                         await apiForgotPassword(forgotEmail.trim());
                                         setForgotSuccess(true);
                                     } catch (err) {
-                                        setError(err.message || "Không thể gửi email. Vui lòng thử lại sau.");
+                                        const errorMessage = err?.data?.message
+                                            || err?.message
+                                            || err?.data?.error
+                                            || "Không thể gửi email đặt lại mật khẩu. Vui lòng thử lại.";
+                                        setForgotError(errorMessage);
                                     } finally {
                                         setForgotLoading(false);
                                     }
                                 }}
                                 className="space-y-4"
                             >
-                                <div className="space-y-2.5">
-                                    <label className="text-sm font-medium text-slate-700">
-                                        Email đăng ký
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-slate-700 flex items-center justify-between">
+                                        <span>Email đăng ký</span>
+                                        <span className="text-xs text-slate-400">(lấy từ form đăng nhập)</span>
                                     </label>
                                     <input
                                         type="email"
                                         value={forgotEmail}
-                                        onChange={(e) => setForgotEmail(e.target.value)}
-                                        className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100 outline-none transition-all"
-                                        placeholder="Nhập email của bạn"
-                                        autoFocus
+                                        readOnly
+                                        className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm bg-slate-50 text-slate-500 cursor-not-allowed"
                                     />
                                 </div>
 
-                                {error && (
+                                {forgotError && (
                                     <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-start gap-3">
                                         <Info className="h-5 w-5 flex-shrink-0 text-red-500" />
-                                        <div className="font-medium">{error}</div>
+                                        <div className="font-medium">{forgotError}</div>
                                     </div>
                                 )}
 
@@ -367,7 +462,7 @@ export default function LoginPage() {
                                         onClick={() => {
                                             setShowForgotPassword(false);
                                             setForgotEmail("");
-                                            setError("");
+                                            setForgotError("");
                                         }}
                                         className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
                                     >
@@ -375,10 +470,10 @@ export default function LoginPage() {
                                     </button>
                                     <button
                                         type="submit"
-                                        disabled={!forgotEmail.trim() || forgotLoading}
+                                        disabled={forgotLoading}
                                         className={cls(
                                             "flex-1 rounded-xl px-4 py-3 text-sm font-semibold transition-all",
-                                            forgotEmail.trim() && !forgotLoading
+                                            !forgotLoading
                                                 ? "bg-gradient-to-r from-sky-500 to-sky-600 text-white hover:from-sky-600 hover:to-sky-700"
                                                 : "bg-slate-200 text-slate-400 cursor-not-allowed"
                                         )}

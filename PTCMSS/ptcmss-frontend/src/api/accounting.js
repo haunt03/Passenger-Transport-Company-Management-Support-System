@@ -107,3 +107,4 @@ export function getOverdueInvoices({ branchId } = {}) {
     const qs = params.toString();
     return apiFetch(`/api/accounting/stats/overdue${qs ? `?${qs}` : ""}`);
 }
+

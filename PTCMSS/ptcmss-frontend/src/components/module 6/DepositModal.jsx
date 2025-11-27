@@ -27,10 +27,10 @@ const cls = (...a) => a.filter(Boolean).join(" ");
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const isISODate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
 
-// Chuẩn hoá tiền tệ về số
+// Chuẩn hoá tiền tệ về số (hỗ trợ số thập phân)
 function normalizeMoney(v) {
     if (v == null) return 0;
-    if (typeof v === "number") return Math.floor(v); // Chỉ lấy phần nguyên
+    if (typeof v === "number") return v; // Giữ nguyên số thập phân
 
     const str = String(v);
 
@@ -42,16 +42,13 @@ function normalizeMoney(v) {
 
     // Kiểm tra xem có dấu phẩy không (format Việt)
     if (cleaned.includes(",")) {
-        // Format Việt: "811.646,68" -> loại bỏ dấu chấm (phân cách nghìn) và dấu phẩy (thập phân)
-        cleaned = cleaned.replace(/\./g, "").replace(/,.*$/, "");
-    } else {
-        // Format số thập phân Mỹ: "811646.68" -> loại bỏ phần thập phân
-        cleaned = cleaned.replace(/\..*$/, "");
+        // Format Việt: "811.646,68" -> loại bỏ dấu chấm (phân cách nghìn), giữ dấu phẩy (thập phân)
+        cleaned = cleaned.replace(/\./g, "").replace(/,/g, ".");
     }
+    // Nếu không có dấu phẩy, giữ nguyên format số thập phân Mỹ: "811646.68"
 
-    // Chỉ giữ lại số
-    const digits = cleaned.replace(/[^0-9]/g, "");
-    const n = Number(digits || "0");
+    // Parse thành số
+    const n = parseFloat(cleaned || "0");
     return isNaN(n) ? 0 : n;
 }
 
@@ -99,9 +96,9 @@ export default function DepositModal({
     const paid = Math.max(0, normalizeMoney(totals.paid));
     const remaining = Math.max(0, total - paid); // số tiền còn lại phải thu
 
-    // amountStr có thể là chuỗi số "300000", mình chuyển về number sạch:
+    // amountStr có thể là chuỗi số "300000" hoặc "300000.55", mình chuyển về number sạch:
     const cleanDigits = (s) =>
-        String(s || "").replace(/[^0-9]/g, "");
+        String(s || "").replace(/[^0-9.]/g, ""); // Cho phép dấu chấm thập phân
     const amount = normalizeMoney(amountStr); // dùng normalizeMoney cho chắc, tương đương cleanDigits -> Number
 
     const newBalance = Math.max(0, total - (paid + (amount || 0)));
@@ -173,17 +170,42 @@ export default function DepositModal({
 
     // ----- HANDLERS -----
     const handleManualAmountChange = (e) => {
-        const v = cleanDigits(e.target.value); // giữ lại chỉ số
+        let input = e.target.value;
+
+        // Xử lý format Việt Nam: "1.760.000,55" -> "1760000.55"
+        // Nếu có cả dấu chấm và dấu phẩy, coi dấu chấm là phân cách nghìn, dấu phẩy là thập phân
+        if (input.includes(".") && input.includes(",")) {
+            input = input.replace(/\./g, "").replace(",", ".");
+        }
+        // Nếu chỉ có dấu phẩy, coi là thập phân
+        else if (input.includes(",")) {
+            input = input.replace(",", ".");
+        }
+            // Nếu chỉ có dấu chấm, kiểm tra xem có phải phân cách nghìn không
+        // (nếu có nhiều dấu chấm hoặc dấu chấm ở vị trí phân cách nghìn)
+        else if (input.includes(".")) {
+            const parts = input.split(".");
+            if (parts.length > 2) {
+                // Nhiều dấu chấm -> coi là phân cách nghìn
+                input = input.replace(/\./g, "");
+            } else if (parts.length === 2 && parts[1].length === 3 && !input.endsWith(".")) {
+                // Dấu chấm ở vị trí phân cách nghìn (VD: "1.760" hoặc "1.760.000")
+                input = input.replace(/\./g, "");
+            }
+            // Ngược lại, giữ dấu chấm như thập phân
+        }
+
+        const v = cleanDigits(input); // giữ lại chỉ số và dấu chấm thập phân
         setAmountStr(v);
         setPreset("CUSTOM");
     };
 
-    // Format hiển thị trong input với dấu phân cách (chỉ số nguyên, không có đ)
+    // Format hiển thị trong input với dấu phân cách (hỗ trợ số thập phân)
     const displayAmount = amountStr
         ? new Intl.NumberFormat("vi-VN", {
-            maximumFractionDigits: 0,
+            maximumFractionDigits: 2,
             minimumFractionDigits: 0
-        }).format(Math.floor(Number(amountStr)))
+        }).format(Number(amountStr))
         : "";
 
     // chọn preset % (30 / 50)
@@ -258,34 +280,27 @@ export default function DepositModal({
             console.log("[DepositModal] amount:", amount, "method:", method, "date:", date);
 
             if (context?.type === "order") {
-                // Create deposit for booking
+                // Create deposit for booking - Backend expects CreateInvoiceRequest
                 const depositPayload = {
                     branchId: branchId ? parseInt(branchId) : undefined,
+                    bookingId: context.id,
                     customerId: customerId ? parseInt(customerId) : undefined,
+                    type: "INCOME",
+                    isDeposit: kind === "DEPOSIT",
                     amount,
                     paymentMethod: method,
-                    paymentDate: date,
-                    kind, // "DEPOSIT" | "PAYMENT"
+                    paymentTerms: "NET_7",
+                    dueDate: date,
                     note: note || undefined,
-                    bankName: method === "BANK_TRANSFER" ? bankName : undefined,
-                    bankAccount: method === "BANK_TRANSFER" ? bankAccount : undefined,
-                    referenceNumber: method === "BANK_TRANSFER" ? bankRef : undefined,
-                    cashierName: method === "CASH" ? undefined : undefined,
-                    receiptNumber: method === "CASH" ? undefined : undefined,
                     createdBy: userId ? parseInt(userId) : undefined,
                 };
                 console.log("[DepositModal] Deposit payload:", depositPayload);
                 await createDeposit(context.id, depositPayload);
             } else {
-                // Record payment for invoice
+                // Record payment for invoice - Backend expects RecordPaymentRequest
                 const paymentPayload = {
                     amount,
                     paymentMethod: method,
-                    bankName: method === "BANK_TRANSFER" ? bankName : undefined,
-                    bankAccount: method === "BANK_TRANSFER" ? bankAccount : undefined,
-                    referenceNumber: method === "BANK_TRANSFER" ? bankRef : undefined,
-                    cashierName: method === "CASH" ? undefined : undefined,
-                    receiptNumber: method === "CASH" ? undefined : undefined,
                     note: note || undefined,
                     createdBy: userId ? parseInt(userId) : undefined,
                 };
@@ -317,11 +332,11 @@ export default function DepositModal({
             onClick={onClose}
         >
             <div
-                className="w-full max-w-lg rounded-2xl bg-white border border-slate-200 text-slate-900 shadow-xl"
+                className="w-full max-w-lg max-h-[90vh] rounded-2xl bg-white border border-slate-200 text-slate-900 shadow-xl flex flex-col"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="px-5 py-4 border-b border-slate-200 flex items-center gap-2">
+                <div className="px-5 py-4 border-b border-slate-200 flex items-center gap-2 flex-shrink-0">
                     <div className="rounded-md bg-emerald-600 text-white p-1.5 shadow-[0_8px_24px_rgba(16,185,129,.4)]">
                         <BadgeDollarSign className="h-4 w-4" />
                     </div>
@@ -342,7 +357,7 @@ export default function DepositModal({
                 </div>
 
                 {/* Body */}
-                <div className="p-4 space-y-4 text-sm text-slate-700 leading-relaxed">
+                <div className="p-4 space-y-4 text-sm text-slate-700 leading-relaxed overflow-y-auto flex-1">
                     {context?.title ? (
                         <div className="text-[13px] text-slate-600">
                             <span className="text-slate-400">Thông tin: </span>
@@ -682,7 +697,7 @@ export default function DepositModal({
                 </div>
 
                 {/* Footer */}
-                <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex flex-wrap items-center gap-3 justify-between">
+                <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex flex-wrap items-center gap-3 justify-between flex-shrink-0">
                     <div className="text-[11px] text-slate-500 leading-relaxed flex-1 min-w-0">
                         {context?.type === "order"
                             ? "Tạo deposit cho booking"

@@ -74,7 +74,7 @@ function StatCard({ icon, label, value, sub, colorClass }) {
                     className={cls(
                         "h-9 w-9 rounded-lg flex items-center justify-center text-[13px] font-semibold",
                         // colorClass tuỳ theo thẻ: dùng nền nhạt + ring mảnh
-                        colorClass || "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+                        colorClass || "bg-amber-50 text-amber-700 ring-1 ring-emerald-200"
                     )}
                 >
                     {icon}
@@ -131,7 +131,7 @@ function QueueRow({ order, onClick }) {
                 {/* Lộ trình */}
                 <div className="flex flex-col">
                     <div className="text-slate-500 text-[11px] uppercase tracking-wide flex items-center gap-1">
-                        <MapPin className="h-3.5 w-3.5 text-emerald-600" />
+                        <MapPin className="h-3.5 w-3.5 text-amber-600" />
                         Lộ trình
                     </div>
                     <div className="text-slate-900 font-medium leading-relaxed">
@@ -328,7 +328,7 @@ export default function ConsultantDashboardPage() {
                     label="Đơn đã xác nhận"
                     value={stats.confirmed_orders}
                     sub="Trong tháng này"
-                    colorClass="bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+                    colorClass="bg-amber-50 text-amber-700 ring-1 ring-emerald-200"
                 />
                 <StatCard
                     icon={<DollarSign className="h-4 w-4" />}

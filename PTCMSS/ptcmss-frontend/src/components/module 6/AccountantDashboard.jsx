@@ -189,7 +189,7 @@ function Toasts({ toasts }) {
                     className={cls(
                         "rounded-md px-3 py-2 text-sm shadow border",
                         t.kind === "success" &&
-                        "bg-emerald-50 border-emerald-300 text-emerald-700",
+                        "bg-amber-50 border-amber-300 text-amber-700",
                         t.kind === "error" &&
                         "bg-rose-50 border-rose-300 text-rose-700",
                         t.kind === "info" &&
@@ -279,7 +279,7 @@ function ConfirmModal({
                                     : undefined
                             )
                         }
-                        className="rounded-md bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 text-sm font-medium shadow-sm transition-colors"
+                        className="rounded-md bg-[#EDC531] hover:bg-amber-500 text-white px-3 py-2 text-sm font-medium shadow-sm transition-colors"
                     >
                         Xác nhận
                     </button>
@@ -525,7 +525,7 @@ function KpiCard({ title, value, delta, up }) {
                     className={cls(
                         "text-xs flex items-center gap-1 font-medium",
                         up
-                            ? "text-emerald-600"
+                            ? "text-amber-600"
                             : "text-rose-600"
                     )}
                 >
@@ -872,7 +872,7 @@ function QueueTable({
                                                 }
                                             )
                                         }
-                                        className="inline-flex items-center gap-1 rounded-md border border-emerald-500 bg-white px-2.5 py-1.5 text-xs font-medium text-emerald-600 hover:bg-emerald-50 shadow-sm transition-colors"
+                                        className="inline-flex items-center gap-1 rounded-md border border-[#EDC531] bg-white px-2.5 py-1.5 text-xs font-medium text-amber-600 hover:bg-amber-50 shadow-sm transition-colors"
                                     >
                                         <Check className="h-3.5 w-3.5" />
                                         <span>
@@ -1134,7 +1134,7 @@ function QueueTable({
                                 .size ===
                             0
                         }
-                        className="inline-flex items-center gap-1 rounded-md border border-emerald-500 bg-white px-2.5 py-1.5 text-xs font-medium text-emerald-600 hover:bg-emerald-50 shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="inline-flex items-center gap-1 rounded-md border border-[#EDC531] bg-white px-2.5 py-1.5 text-xs font-medium text-amber-600 hover:bg-amber-50 shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <Check className="h-3.5 w-3.5" />
                         Duyệt đã chọn
@@ -1493,7 +1493,7 @@ export default function AccountantDashboard() {
                 {/* Biểu đồ Doanh thu vs Chi phí */}
                 <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                     <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 text-sm text-slate-600 flex items-center gap-2">
-                        <BadgeDollarSign className="h-4 w-4 text-emerald-600" />
+                        <BadgeDollarSign className="h-4 w-4 text-amber-600" />
                         <span className="font-medium text-slate-700">
                             Doanh thu vs Chi phí
                             (tháng)
@@ -1536,7 +1536,7 @@ export default function AccountantDashboard() {
                 {/* header của queue */}
                 <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 text-sm text-slate-600 flex flex-wrap items-center gap-3">
                     <div className="flex items-center gap-2">
-                        <ReceiptText className="h-4 w-4 text-emerald-600" />
+                        <ReceiptText className="h-4 w-4 text-amber-600" />
                         <div className="font-medium text-slate-700">
                             Yêu cầu chi phí
                             chờ duyệt

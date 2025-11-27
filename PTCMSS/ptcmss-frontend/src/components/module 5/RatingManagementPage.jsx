@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Star, Search, Filter, Calendar, User, MapPin } from 'lucide-react';
 import RateDriverDialog from './RateDriverDialog';
 import StarRating from '../common/StarRating';
+import Pagination from '../common/Pagination';
 import { getRatingByTrip, getCompletedTripsForRating } from '../../api/ratings';
 
 const RatingManagementPage = () => {
@@ -12,6 +13,9 @@ const RatingManagementPage = () => {
     const [filterStatus, setFilterStatus] = useState('pending'); // 'pending' | 'rated' | 'all'
     const [selectedTrip, setSelectedTrip] = useState(null);
     const [showRatingDialog, setShowRatingDialog] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize] = useState(10);
+    const [totalPages, setTotalPages] = useState(1);
 
     useEffect(() => {
         loadTrips();
@@ -89,6 +93,8 @@ const RatingManagementPage = () => {
         }
 
         setFilteredTrips(filtered);
+        setTotalPages(Math.ceil(filtered.length / pageSize));
+        setCurrentPage(1); // Reset to first page when filtering
     };
 
     const handleRateClick = (trip) => {
@@ -236,79 +242,79 @@ const RatingManagementPage = () => {
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full">
+                        <table className="w-full table-fixed">
                             <thead className="bg-gray-50 border-b">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="w-24 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Chuyến
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="w-40 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Tài xế
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="w-36 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Khách hàng
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="w-56 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Tuyến đường
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="w-32 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Thời gian
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="w-32 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Trạng thái
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="w-32 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Đánh giá
                                 </th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="w-32 px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Thao tác
                                 </th>
                             </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                            {filteredTrips.map((trip) => (
-                                <tr key={trip.tripId} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                            {filteredTrips.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((trip) => (
+                                <tr key={trip.tripId} className="hover:bg-gray-50 align-top">
+                                    <td className="px-4 py-4">
                                         <div className="text-sm font-medium text-gray-900">#{trip.tripId}</div>
                                         <div className="text-sm text-gray-500">Đơn #{trip.bookingId}</div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                                    <td className="px-4 py-4">
                                         <div className="flex items-center">
                                             <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
                                                 <User className="text-blue-600" size={20} />
                                             </div>
                                             <div className="ml-3">
-                                                <div className="text-sm font-medium text-gray-900">{trip.driverName}</div>
+                                                <div className="text-sm font-medium text-gray-900 truncate">{trip.driverName}</div>
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="text-sm text-gray-900">{trip.customerName}</div>
+                                    <td className="px-4 py-4">
+                                        <div className="text-sm text-gray-900 truncate">{trip.customerName}</div>
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td className="px-4 py-4">
                                         <div className="flex items-start gap-2">
                                             <MapPin className="text-gray-400 flex-shrink-0 mt-0.5" size={16} />
-                                            <div className="text-sm">
-                                                <div className="text-gray-900">{trip.startLocation}</div>
-                                                <div className="text-gray-500">→ {trip.endLocation}</div>
+                                            <div className="text-sm min-w-0">
+                                                <div className="text-gray-900 truncate">{trip.startLocation}</div>
+                                                <div className="text-gray-500 truncate">→ {trip.endLocation}</div>
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="text-sm text-gray-900">
+                                    <td className="px-4 py-4">
+                                        <div className="text-sm text-gray-900 whitespace-nowrap">
                                             {new Date(trip.endTime).toLocaleDateString('vi-VN')}
                                         </div>
-                                        <div className="text-sm text-gray-500">
+                                        <div className="text-sm text-gray-500 whitespace-nowrap">
                                             {new Date(trip.endTime).toLocaleTimeString('vi-VN', {
                                                 hour: '2-digit',
                                                 minute: '2-digit'
                                             })}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                                    <td className="px-4 py-4">
                                         {getStatusBadge(trip.hasRating)}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                                    <td className="px-4 py-4">
                                         {trip.hasRating && trip.rating ? (
                                             (() => {
                                                 // Lấy overallRating, nếu không có thì tính từ các rating khác
@@ -341,18 +347,18 @@ const RatingManagementPage = () => {
                                             <span className="text-sm text-gray-400">Chưa có</span>
                                         )}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <td className="px-4 py-4 text-right">
                                         {trip.hasRating ? (
                                             <button
                                                 onClick={() => handleRateClick(trip)}
-                                                className="text-blue-600 hover:text-blue-900"
+                                                className="text-blue-600 hover:text-blue-900 text-sm font-medium whitespace-nowrap"
                                             >
                                                 Xem chi tiết
                                             </button>
                                         ) : (
                                             <button
                                                 onClick={() => handleRateClick(trip)}
-                                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium whitespace-nowrap"
                                             >
                                                 Đánh giá
                                             </button>
@@ -365,6 +371,17 @@ const RatingManagementPage = () => {
                     </div>
                 )}
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <div className="mt-6">
+                    <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={setCurrentPage}
+                    />
+                </div>
+            )}
 
             {/* Rating Dialog */}
             {showRatingDialog && selectedTrip && (

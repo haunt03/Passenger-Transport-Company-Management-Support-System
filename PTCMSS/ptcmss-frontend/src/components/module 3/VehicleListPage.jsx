@@ -544,13 +544,13 @@ function EditVehicleModal({
         }
 
         const payload = {
-            branch_id: branchId,
-            category_id: categoryId,
+            branchId: Number(branchId),
+            categoryId: Number(categoryId),
             status,
-            model: model.trim(),
-            year: Number(year),
-            reg_due_date: regDueDate || null,
-            ins_due_date: insDueDate || null,
+            model: model.trim() || null,
+            productionYear: year ? Number(year) : null,
+            inspectionExpiry: regDueDate || null,
+            insuranceExpiry: insDueDate || null,
         };
 
         onSave(vehicle.id, payload);

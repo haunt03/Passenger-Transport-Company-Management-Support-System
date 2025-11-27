@@ -100,3 +100,15 @@ export function getCurrentRole() {
 export function getHomePathForRole(role) {
   return ROLE_HOME_PATH[role] || ROLE_HOME_PATH[ROLES.ADMIN];
 }
+
+function hasStoredToken(tokenKey) {
+  return Boolean(safeLocalStorageGet(tokenKey) || getCookieValue(tokenKey));
+}
+
+export function hasActiveSession() {
+  const hasAccess = hasStoredToken("access_token");
+  const hasRefresh = hasStoredToken("refresh_token");
+  const hasUser = Boolean(getStoredUserId());
+  const hasRole = Boolean(getStoredRoleLabel());
+  return hasAccess || hasRefresh || (hasUser && hasRole);
+}

@@ -2,14 +2,15 @@
 import { useNavigate } from "react-router-dom";
 import { listUsers, listUsersByBranch, listRoles, toggleUserStatus } from "../../api/users";
 import { listEmployeesByRole } from "../../api/employees";
-import { RefreshCw, PlusCircle, Edit2, ShieldCheck, Users, Search, Filter, Mail, Phone, Shield } from "lucide-react";
+import { RefreshCw, Edit2, ShieldCheck, Users, Search, Filter, Mail, Phone, Shield } from "lucide-react";
 import { getCurrentRole, getStoredUserId, ROLES } from "../../utils/session";
+import Pagination from "../common/Pagination";
 
 const cls = (...a) => a.filter(Boolean).join(" ");
 
 function StatusBadge({ value }) {
   const map = {
-    ACTIVE: "bg-emerald-50 text-emerald-700 border-emerald-300",
+    ACTIVE: "bg-amber-50 text-amber-700 border-amber-300",
     INACTIVE: "bg-slate-100 text-slate-600 border-slate-300",
   };
   const label = value === "ACTIVE" ? "Hoạt động" : "Vô hiệu hóa";
@@ -29,6 +30,8 @@ export default function AdminUsersPage() {
   const [keyword, setKeyword] = React.useState("");
   const [roleId, setRoleId] = React.useState("");
   const [status, setStatus] = React.useState("");
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(10);
   const currentRole = React.useMemo(() => getCurrentRole(), []);
   const currentUserId = React.useMemo(() => getStoredUserId(), []);
   const isManagerView = currentRole === ROLES.MANAGER;
@@ -155,7 +158,14 @@ export default function AdminUsersPage() {
   React.useEffect(() => {
     const filtered = applyFilters(allUsers);
     setUsers(filtered);
+    setCurrentPage(1); // Reset to first page when filters change
   }, [allUsers, applyFilters]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(users.length / pageSize);
+  const startIdx = (currentPage - 1) * pageSize;
+  const endIdx = startIdx + pageSize;
+  const currentUsers = users.slice(startIdx, endIdx);
 
   React.useEffect(() => {
     (async () => {
@@ -207,14 +217,6 @@ export default function AdminUsersPage() {
             </div>
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-              <button
-                  onClick={() => navigate("/admin/users/new")}
-                  className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-lg hover:shadow-xl transition-all active:scale-[0.98]"
-                  style={{ backgroundColor: BRAND_COLOR }}
-              >
-                <PlusCircle className="h-4 w-4" />
-                <span>Tạo mới</span>
-              </button>
               <button
                   onClick={onRefresh}
                   disabled={loading || (isManagerView && (managerBranchLoading || !branchFilterValue))}
@@ -330,7 +332,7 @@ export default function AdminUsersPage() {
                 </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                {users.length === 0 ? (
+                {currentUsers.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-6 py-12 text-center">
                         <div className="flex flex-col items-center gap-3">
@@ -342,7 +344,7 @@ export default function AdminUsersPage() {
                         </div>
                       </td>
                     </tr>
-                ) : users.map(u => (
+                ) : currentUsers.map(u => (
                     <tr key={u.id} className="hover:bg-gradient-to-r hover:from-slate-50 hover:to-white transition-colors group">
                       <td className="px-6 py-4">
                         <div className="font-semibold text-slate-900">{u.fullName}</div>
@@ -382,7 +384,7 @@ export default function AdminUsersPage() {
                               className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium shadow-sm transition-all active:scale-[0.98] ${
                                   u.status === "ACTIVE"
                                       ? "border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
-                                      : "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                      : "border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
                               }`}
                           >
                             {u.status === "ACTIVE" ? "Vô hiệu hóa" : "Kích hoạt"}
@@ -394,11 +396,29 @@ export default function AdminUsersPage() {
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination */}
+            {users.length > 0 && (
+                <div className="px-6 py-4 border-t border-slate-200 bg-slate-50/50">
+                  <Pagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      onPageChange={setCurrentPage}
+                      pageSize={pageSize}
+                      onPageSizeChange={(size) => {
+                        setPageSize(size);
+                        setCurrentPage(1);
+                      }}
+                      totalItems={users.length}
+                  />
+                </div>
+            )}
           </div>
         </div>
       </div>
   );
 }
+
 
 
 

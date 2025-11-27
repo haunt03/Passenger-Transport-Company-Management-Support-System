@@ -4,14 +4,12 @@ import {
     listVehicleCategories,
     createVehicleCategory,
     updateVehicleCategory,
-    deleteVehicleCategory,
 } from "../../api/vehicleCategories";
 import {
     CarFront,
     PlusCircle,
     X,
     Check,
-    Trash2,
     AlertTriangle,
 } from "lucide-react";
 
@@ -62,7 +60,7 @@ function StatusPill({ status }) {
     const map = {
         ACTIVE: {
             label: "Đang hoạt động",
-            cls: "bg-emerald-50 text-emerald-700 border-emerald-200",
+            cls: "bg-amber-50 text-amber-700 border-amber-200",
         },
         INACTIVE: {
             label: "Ngưng",
@@ -249,7 +247,6 @@ function VehicleCategoryEditModal({
                                       data,
                                       onClose,
                                       onSaved,
-                                      onDeleted,
                                   }) {
     const [name, setName] = React.useState("");
     const [seats, setSeats] = React.useState("");
@@ -264,7 +261,6 @@ function VehicleCategoryEditModal({
     const [touchedSeats, setTouchedSeats] = React.useState(false);
 
     const [loadingSave, setLoadingSave] = React.useState(false);
-    const [loadingDelete, setLoadingDelete] = React.useState(false);
 
     React.useEffect(() => {
         if (open && data) {
@@ -316,20 +312,6 @@ function VehicleCategoryEditModal({
         });
 
         setLoadingSave(false);
-        onClose();
-    }
-
-    async function handleDelete() {
-        if (Number(data.vehicles_count || 0) > 0) {
-            setError("Không thể xoá: còn xe thuộc danh mục này.");
-            return;
-        }
-
-        setLoadingDelete(true);
-        await new Promise((r) => setTimeout(r, 300));
-
-        onDeleted({ id: data.id });
-        setLoadingDelete(false);
         onClose();
     }
 
@@ -524,41 +506,26 @@ function VehicleCategoryEditModal({
                 </div>
 
                 {/* footer */}
-                <div className="border-t border-slate-200 bg-slate-50 px-5 py-4 flex gap-3 justify-between">
+                <div className="border-t border-slate-200 bg-slate-50 px-5 py-4 flex gap-3 justify-end">
                     <button
-                        onClick={handleDelete}
-                        disabled={loadingDelete}
-                        className={cls(
-                            "inline-flex items-center gap-2 rounded-md border px-3 py-2 text-[13px] font-medium shadow-sm",
-                            "border-red-200 bg-red-50 text-red-700 hover:bg-red-100",
-                            loadingDelete && "opacity-50"
-                        )}
+                        onClick={onClose}
+                        className="rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] text-slate-700 hover:bg-slate-100"
                     >
-                        <Trash2 className="h-4 w-4" />
-                        {loadingDelete ? "Đang xoá..." : "Xoá danh mục"}
+                        Đóng
                     </button>
 
-                    <div className="flex gap-2 ml-auto">
-                        <button
-                            onClick={onClose}
-                            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] text-slate-700 hover:bg-slate-100"
-                        >
-                            Đóng
-                        </button>
-
-                        <button
-                            onClick={handleSave}
-                            disabled={!valid || loadingSave}
-                            className={cls(
-                                "rounded-md px-3 py-2 text-[13px] font-medium text-white shadow-sm",
-                                valid
-                                    ? "bg-sky-600 hover:bg-sky-500"
-                                    : "bg-slate-400 cursor-not-allowed"
-                            )}
-                        >
-                            {loadingSave ? "Đang lưu..." : "Lưu thay đổi"}
-                        </button>
-                    </div>
+                    <button
+                        onClick={handleSave}
+                        disabled={!valid || loadingSave}
+                        className={cls(
+                            "rounded-md px-3 py-2 text-[13px] font-medium text-white shadow-sm",
+                            valid
+                                ? "bg-sky-600 hover:bg-sky-500"
+                                : "bg-slate-400 cursor-not-allowed"
+                        )}
+                    >
+                        {loadingSave ? "Đang lưu..." : "Lưu thay đổi"}
+                    </button>
                 </div>
             </div>
         </div>
@@ -576,7 +543,7 @@ export default function VehicleCategoryManagePage() {
             name: c.categoryName || c.name,
             status: c.status || "ACTIVE",
             seats: c.seats ?? null,
-            vehicles_count: c.vehicles_count ?? 0,
+            vehicles_count: c.vehiclesCount ?? c.vehicles_count ?? 0,
             description: c.description || "",
             baseFare: c.baseFare ?? null,
             pricePerKm: c.pricePerKm ?? null,
@@ -647,16 +614,7 @@ export default function VehicleCategoryManagePage() {
         }
     }
 
-    async function handleDeleted({ id }) {
-        try {
-            await deleteVehicleCategory(id);
 
-            setCategories((arr) => arr.filter((c) => c.id !== id));
-            pushToast("Xoá danh mục thành công", "success");
-        } catch (e) {
-            pushToast("Xoá danh mục thất bại", "error");
-        }
-    }
 
     return (
         <div className="relative min-h-screen bg-[#F5F7FA] p-6">
@@ -742,7 +700,7 @@ export default function VehicleCategoryManagePage() {
                                         }}
                                         className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-[12px] hover:bg-slate-100 text-slate-700 shadow-sm"
                                     >
-                                        Sửa / Xoá
+                                        Chỉnh sửa
                                     </button>
                                 </td>
                             </tr>
@@ -775,7 +733,6 @@ export default function VehicleCategoryManagePage() {
                 data={editData}
                 onClose={() => setEditOpen(false)}
                 onSaved={handleSaved}
-                onDeleted={handleDeleted}
             />
         </div>
     );

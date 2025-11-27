@@ -447,8 +447,8 @@ export default function ExpenseRequestForm() {
                 )}
 
                 {success && (
-                    <div className="flex items-start gap-2 text-emerald-700 bg-emerald-50 border border-emerald-200/80 rounded-md px-3 py-2 text-sm shadow-sm">
-                        <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <div className="flex items-start gap-2 text-amber-700 bg-amber-50 border border-amber-200/80 rounded-md px-3 py-2 text-sm shadow-sm">
+                        <ShieldCheck className="h-4 w-4 text-amber-600 shrink-0" />
                         <div className="leading-relaxed text-slate-700">
                             {success}
                         </div>

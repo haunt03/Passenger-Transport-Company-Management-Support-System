@@ -149,15 +149,39 @@ export async function getBranchVehicleUtilization(params = {}) {
 }
 
 /**
+ * Get vehicle efficiency (cost per km) for branch
+ * @param {Object} params - { branchId, period }
+ * @returns {Promise}
+ */
+export async function getBranchVehicleEfficiency(params = {}) {
+    try {
+        const response = await axiosInstance.get("/api/v1/manager/analytics/vehicle-efficiency", {
+            params,
+        });
+        return response.data;
+    } catch (error) {
+        // API not implemented yet - return empty data
+        console.warn(`[API] Vehicle efficiency endpoint not implemented for branch ${params.branchId}:`, error.message);
+        return [];
+    }
+}
+
+/**
  * Get expense breakdown by category
  * @param {Object} params - { branchId, startDate, endDate }
  * @returns {Promise}
  */
 export async function getBranchExpenseBreakdown(params = {}) {
-    const response = await axiosInstance.get("/api/v1/manager/analytics/expense-breakdown", {
-        params,
-    });
-    return response.data;
+    try {
+        const response = await axiosInstance.get("/api/v1/manager/analytics/expense-breakdown", {
+            params,
+        });
+        return response.data;
+    } catch (error) {
+        // API not implemented yet - return empty data
+        console.warn(`[API] Expense breakdown endpoint not implemented for branch ${params.branchId}:`, error.message);
+        return [];
+    }
 }
 
 /**

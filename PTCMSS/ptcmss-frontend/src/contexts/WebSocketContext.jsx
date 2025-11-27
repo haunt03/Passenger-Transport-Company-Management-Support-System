@@ -173,6 +173,20 @@ export const WebSocketProvider = ({ children }) => {
         return subscription;
     };
 
+    const pushNotification = (notification) => {
+        if (!notification) return;
+        const payload = {
+            id: Date.now(),
+            title: notification.title || 'Thông báo',
+            message: notification.message || '',
+            type: notification.type || 'INFO',
+            timestamp: notification.timestamp || new Date().toISOString(),
+            read: false,
+            ...notification,
+        };
+        setNotifications((prev) => [payload, ...prev]);
+    };
+
     const value = {
         connected,
         notifications,
@@ -181,6 +195,7 @@ export const WebSocketProvider = ({ children }) => {
         clearNotification,
         clearAllNotifications,
         subscribeToUserNotifications,
+        pushNotification,
     };
 
     return (
