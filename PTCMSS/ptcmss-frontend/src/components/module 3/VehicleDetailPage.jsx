@@ -472,7 +472,7 @@ function TripHistoryTab({ trips }) {
                                 </td>
                                 <td className="px-3 py-2 text-slate-700">
                                     <div className="flex items-start gap-1 text-[12px] leading-relaxed">
-                                        <MapPin className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                                        <MapPin className="h-3.5 w-3.5 text-amber-600 shrink-0" />
                                         <span>{t.pickup}</span>
                                     </div>
                                 </td>
