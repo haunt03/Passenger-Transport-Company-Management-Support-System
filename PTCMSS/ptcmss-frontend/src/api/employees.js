@@ -61,3 +61,9 @@ export function deleteEmployee(id) {
 export function listEmployeesByBranch(branchId) {
     return apiFetch(`/api/employees/branch/${branchId}`);
 }
+
+// POST /api/employees/create-with-user - Tạo nhân viên kèm user
+export function createEmployeeWithUser(req) {
+    // req: { username, password, fullName, email, phone, address, branchId, roleId, status }
+    return apiFetch("/api/employees/create-with-user", { method: "POST", body: req });
+}
