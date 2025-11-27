@@ -210,6 +210,32 @@ public class NotificationController {
         }
     }
 
+    @Operation(
+            summary = "Lấy notifications của user (cho driver/employee)",
+            description = "Lấy danh sách notifications của một user cụ thể với pagination"
+    )
+    @GetMapping("/user/{userId}")
+    public ResponseData<?> getUserNotifications(
+            @PathVariable Integer userId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int limit) {
+        try {
+            // For now, return empty list since we don't have a user_notifications table yet
+            // TODO: Implement proper user notifications storage and retrieval
+            log.info("[Notification] Get notifications for user {} (page={}, limit={})", userId, page, limit);
+
+            return new ResponseData<>(HttpStatus.OK.value(), "Success", Map.of(
+                    "data", List.of(),
+                    "total", 0,
+                    "page", page,
+                    "limit", limit
+            ));
+        } catch (Exception e) {
+            log.error("[Notification] Failed to load user notifications for user {}", userId, e);
+            return new ResponseError(HttpStatus.BAD_REQUEST.value(), e.getMessage());
+        }
+    }
+
     private final org.example.ptcmssbackend.service.impl.ApprovalSyncServiceImpl approvalSyncService;
 
     @Operation(
