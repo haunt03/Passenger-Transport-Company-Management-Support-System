@@ -58,7 +58,7 @@ export default function DriverReportIncidentPage() {
             {driver && (
                 <div className="text-sm text-slate-600">{driver.fullName} {driver.branchName ? `- ${driver.branchName}` : ""}</div>
             )}
-            {message && <div className="mt-2 text-sm text-emerald-600">{message}</div>}
+            {message && <div className="mt-2 text-sm text-amber-600">{message}</div>}
             {error && <div className="mt-2 text-sm text-rose-600">{error}</div>}
 
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">

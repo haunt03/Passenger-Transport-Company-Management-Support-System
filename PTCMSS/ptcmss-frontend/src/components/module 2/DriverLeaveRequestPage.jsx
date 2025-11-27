@@ -40,7 +40,7 @@ function Toasts({ toasts }) {
                     className={cls(
                         "rounded-lg px-3 py-2 text-sm border shadow-lg",
                         t.kind === "success" &&
-                        "bg-emerald-50 border-emerald-200 text-emerald-700",
+                        "bg-amber-50 border-amber-200 text-amber-700",
                         t.kind === "error" &&
                         "bg-rose-50 border-rose-200 text-rose-700",
                         t.kind === "info" && "bg-blue-50 border-blue-200 text-blue-700",
@@ -177,7 +177,7 @@ export default function DriverLeaveRequestPage() {
             {/* FORM CARD */}
             <div className="rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-900/5 max-w-3xl mx-auto">
                 <div className="border-b border-slate-200 px-5 py-4 flex items-center gap-2 text-sm bg-slate-50/70">
-                    <Calendar className="h-4 w-4 text-emerald-600" />
+                    <Calendar className="h-4 w-4 text-amber-600" />
                     <div className="font-medium text-slate-700">Thông tin yêu cầu nghỉ</div>
                     <div className="ml-auto text-[11px] text-slate-500">
                         POST /api/driver/leave-requests
@@ -244,7 +244,7 @@ export default function DriverLeaveRequestPage() {
                                     Vượt quá số ngày cho phép
                                 </span>
                             ) : requestedDays > 0 && requestedDays <= remainingDays && validDateOrder ? (
-                                <span className="ml-auto flex items-center gap-1 text-[11px] text-emerald-700">
+                                <span className="ml-auto flex items-center gap-1 text-[11px] text-amber-700">
                                     <CheckCircle2 className="h-3.5 w-3.5" />
                                     Hợp lệ
                                 </span>
@@ -303,12 +303,12 @@ export default function DriverLeaveRequestPage() {
 
                 {/* FOOTER */}
                 <div className="px-5 py-4 border-t border-slate-200 flex flex-wrap items-center gap-3 justify-between bg-slate-50/60">
-                    <div className="text-[11px] text-slate-600 leading-relaxed">
+                    {/* <div className="text-[11px] text-slate-600 leading-relaxed">
                         Endpoint dự kiến:{" "}
                         <code className="bg-slate-100 text-slate-700 px-1 py-[1px] rounded">
                             /api/driver/leave-requests
                         </code>
-                    </div>
+                    </div> */}
 
                     <button
                         onClick={onSubmit}
@@ -316,7 +316,7 @@ export default function DriverLeaveRequestPage() {
                         className={cls(
                             "rounded-lg px-4 py-2 text-sm font-medium inline-flex items-center gap-2 shadow-sm",
                             canSubmit
-                                ? "bg-emerald-600 hover:bg-emerald-500 text-white"
+                                ? "bg-[#EDC531] hover:bg-amber-500 text-white"
                                 : "bg-slate-200 text-slate-500 cursor-not-allowed"
                         )}
                     >

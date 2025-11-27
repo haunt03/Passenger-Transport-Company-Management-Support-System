@@ -56,7 +56,7 @@ function Toasts({ toasts }) {
                     className={cls(
                         "rounded-lg px-3 py-2 text-sm border shadow-lg",
                         t.kind === "success" &&
-                        "bg-emerald-50 border-emerald-200 text-emerald-700",
+                        "bg-amber-50 border-amber-200 text-amber-700",
                         t.kind === "error" &&
                         "bg-rose-50 border-rose-200 text-rose-700",
                         t.kind === "info" &&
@@ -85,7 +85,7 @@ function NotificationIcon({ type }) {
     }
     if (type === "ASSIGN_TRIP") {
         return (
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 border border-emerald-300 text-emerald-700 shadow-sm">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 border border-amber-300 text-amber-700 shadow-sm">
                 <Bell className="h-4 w-4" />
             </span>
         );
@@ -119,7 +119,7 @@ function NotificationRow({ notif, onMarkRead }) {
             <div className="shrink-0 flex flex-col items-center pt-0.5">
                 <NotificationIcon type={notif.type} />
                 {notif.unread ? (
-                    <span className="mt-2 inline-flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_6px_rgba(16,185,129,.6)]" />
+                    <span className="mt-2 inline-flex h-2 w-2 rounded-full bg-amber-500 animate-pulse shadow-[0_0_6px_rgba(16,185,129,.6)]" />
                 ) : (
                     <span className="mt-2 inline-flex h-2 w-2 rounded-full bg-slate-300" />
                 )}
@@ -142,7 +142,7 @@ function NotificationRow({ notif, onMarkRead }) {
                     <Clock className="h-3.5 w-3.5 text-slate-400" />
                     <span>{fmtDateTime(notif.created_at)}</span>
                     {notif.unread ? (
-                        <span className="text-emerald-600 font-semibold uppercase tracking-wide text-[10px]">
+                        <span className="text-amber-600 font-semibold uppercase tracking-wide text-[10px]">
                             Mới
                         </span>
                     ) : null}
@@ -154,7 +154,7 @@ function NotificationRow({ notif, onMarkRead }) {
                 <div className="shrink-0 flex items-start">
                     <button
                         onClick={() => onMarkRead(notif.id)}
-                        className="rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-[11px] px-2 py-1 flex items-center gap-1 font-medium shadow-sm"
+                        className="rounded-lg border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 text-[11px] px-2 py-1 flex items-center gap-1 font-medium shadow-sm"
                     >
                         <Check className="h-3.5 w-3.5" />
                         Đã đọc
@@ -320,10 +320,11 @@ export default function DriverNotificationsPage() {
         }
     }, [page, pageSize, push]);
 
-    // Load on mount
+    // Load on mount and when page/pageSize changes
     React.useEffect(() => {
         loadNotifications();
-    }, [loadNotifications]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [page, pageSize]);
 
     // refresh
     const onRefresh = () => {
@@ -349,7 +350,7 @@ export default function DriverNotificationsPage() {
                         </div>
                         <div className="text-[11px] text-slate-500 leading-snug">
                             Bạn có{" "}
-                            <span className="text-emerald-600 font-semibold">
+                            <span className="text-amber-600 font-semibold">
                                 {unreadCount}
                             </span>{" "}
                             chưa đọc
@@ -360,7 +361,7 @@ export default function DriverNotificationsPage() {
                 <div className="ml-auto flex flex-wrap items-center gap-2 text-xs">
                     <button
                         onClick={markAllRead}
-                        className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-[12px] font-medium text-emerald-700 shadow-sm hover:bg-emerald-100"
+                        className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] font-medium text-amber-700 shadow-sm hover:bg-amber-100"
                     >
                         <Check className="h-3.5 w-3.5" />
                         Đánh dấu tất cả đã đọc

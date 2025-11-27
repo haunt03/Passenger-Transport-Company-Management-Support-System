@@ -1,5 +1,6 @@
 // src/components/driver/DriverSchedulePage.jsx
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import {
   CarFront,
   CalendarDays,
@@ -103,15 +104,16 @@ const fmtTime = (t) => t || "—";
 ========================================================= */
 
 // Thẻ trong panel bên phải cho từng chuyến / nghỉ
-function DayTripCard({ record }) {
+function DayTripCard({ record, onClick }) {
   const isTrip = record.type === "TRIP";
 
   return (
       <div
+          onClick={isTrip ? onClick : undefined}
           className={cls(
-              "rounded-xl border p-3 text-[13px] shadow-sm flex flex-col gap-2",
+              "rounded-xl border p-3 text-[13px] shadow-sm flex flex-col gap-2 transition-all",
               isTrip
-                  ? "border-[#0079BC] bg-white" // chuyến: viền brand
+                  ? "border-[#0079BC] bg-white cursor-pointer hover:shadow-md hover:border-[#0079BC]/70" // chuyến: viền brand
                   : "border-slate-200 bg-slate-50" // nghỉ: tone xám
           )}
       >
@@ -284,26 +286,6 @@ function DriverHeader({
 
           {/* right side stats */}
           <div className="flex flex-wrap items-start gap-3 ml-auto">
-            {/* Số chuyến tháng */}
-            <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-left shadow-sm min-w-[120px]">
-              <div className="text-[11px] text-slate-500 leading-none mb-1">
-                Số chuyến (tháng)
-              </div>
-              <div className="text-[15px] font-semibold text-slate-900 leading-none">
-                {monthlyTripCount}
-              </div>
-            </div>
-
-            {/* Ngày nghỉ tháng */}
-            <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-left shadow-sm min-w-[120px]">
-              <div className="text-[11px] text-slate-500 leading-none mb-1">
-                Ngày nghỉ
-              </div>
-              <div className="text-[15px] font-semibold text-slate-900 leading-none">
-                {monthlyLeaveDays}
-              </div>
-            </div>
-
             {/* Chế độ xem Tháng / Tuần */}
             <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-left shadow-sm flex flex-col gap-2">
               <div className="text-[11px] text-slate-500 leading-none">
@@ -526,7 +508,7 @@ function CalendarGrid({
 /* =========================================================
    Day Detail Panel
 ========================================================= */
-function DayDetailPanel({ dateObj, scheduleMap }) {
+function DayDetailPanel({ dateObj, scheduleMap, onTripClick }) {
   const ymd = toYMD(dateObj);
   const recs = scheduleMap[ymd] || [];
 
@@ -548,12 +530,18 @@ function DayDetailPanel({ dateObj, scheduleMap }) {
                 Không có chuyến hoặc lịch nghỉ trong ngày này.
               </div>
           ) : (
-              recs.map((r, i) => <DayTripCard record={r} key={i} />)
+              recs.map((r, i) => (
+                  <DayTripCard
+                      record={r}
+                      key={i}
+                      onClick={r.type === "TRIP" && r.trip_id ? () => onTripClick(r.trip_id) : undefined}
+                  />
+              ))
           )}
         </div>
 
         <div className="border-t border-slate-200 bg-white px-4 py-2 text-[11px] text-slate-500 leading-relaxed">
-          Dữ liệu hiển thị theo ngày đang chọn.
+          Dữ liệu hiển thị theo ngày đang chọn. Click vào chuyến để xem chi tiết.
         </div>
       </div>
   );
@@ -563,6 +551,7 @@ function DayDetailPanel({ dateObj, scheduleMap }) {
    MAIN PAGE
 ========================================================= */
 export default function DriverSchedulePage() {
+  const navigate = useNavigate();
   const today = React.useMemo(() => new Date(), []);
   const [currentYear, setCurrentYear] = React.useState(today.getFullYear());
   const [currentMonth, setCurrentMonth] = React.useState(today.getMonth()); // 0-based
@@ -573,6 +562,10 @@ export default function DriverSchedulePage() {
   const [schedule, setSchedule] = React.useState([]); // [{date, type, title, time, pickup, trip_id}]
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
+
+  const handleTripClick = (tripId) => {
+    navigate(`/driver/trips/${tripId}`);
+  };
 
   // gom data theo ngày
   const scheduleMap = React.useMemo(() => {
@@ -740,8 +733,6 @@ export default function DriverSchedulePage() {
             currentMonth={currentMonth}
             currentYear={currentYear}
             selectedDate={selectedDate}
-            monthlyTripCount={monthlyTripCount}
-            monthlyLeaveDays={monthlyLeaveDays}
             viewMode={viewMode}
             setViewMode={setViewMode}
             schedule={schedule}
@@ -765,7 +756,7 @@ export default function DriverSchedulePage() {
               goNext={goNext}
           />
 
-          <DayDetailPanel dateObj={selectedDate} scheduleMap={scheduleMap} />
+          <DayDetailPanel dateObj={selectedDate} scheduleMap={scheduleMap} onTripClick={handleTripClick} />
         </div>
 
         {/* note dev */}
