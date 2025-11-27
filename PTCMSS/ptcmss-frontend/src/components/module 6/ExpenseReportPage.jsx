@@ -94,7 +94,7 @@ function Toasts({ toasts }) {
                         "rounded-md px-3 py-2 text-sm shadow border",
                         t.kind ===
                         "success" &&
-                        "bg-emerald-50 border-emerald-300 text-emerald-700",
+                        "bg-amber-50 border-amber-300 text-amber-700",
                         t.kind ===
                         "error" &&
                         "bg-rose-50 border-rose-300 text-rose-700",
@@ -146,7 +146,7 @@ const PALETTE = [
     {
         slice: "fill-emerald-500/80",
         legend:
-            "bg-emerald-500/80 border-emerald-400/30",
+            "bg-amber-500/80 border-amber-400/30",
     },
     {
         slice: "fill-sky-400/80",

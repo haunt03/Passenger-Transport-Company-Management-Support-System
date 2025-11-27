@@ -53,7 +53,7 @@ function Toasts({ toasts }) {
                     key={t.id}
                     className={cls(
                         "rounded-md px-3 py-2 text-sm shadow border",
-                        t.kind === "success" && "bg-emerald-50 border-emerald-300 text-emerald-700",
+                        t.kind === "success" && "bg-amber-50 border-amber-300 text-amber-700",
                         t.kind === "error" && "bg-rose-50 border-rose-300 text-rose-700",
                         t.kind === "info" && "bg-white border-slate-300 text-slate-700"
                     )}
@@ -415,7 +415,7 @@ export default function DebtManagementPage() {
                                                     setSelectedDebt(debt);
                                                     setShowPromiseModal(true);
                                                 }}
-                                                className="px-2 py-1 rounded text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-100"
+                                                className="px-2 py-1 rounded text-[11px] bg-amber-50 text-amber-700 border border-amber-300 hover:bg-amber-100"
                                                 title="Hẹn thanh toán"
                                             >
                                                 <Calendar className="h-3 w-3 inline" />
@@ -541,7 +541,7 @@ function PromiseModal({ debt, onClose, onSet }) {
                     <div className="flex gap-2">
                         <button
                             onClick={() => onSet(debt.invoiceId, date)}
-                            className="flex-1 bg-emerald-600 text-white px-3 py-2 rounded"
+                            className="flex-1 bg-[#EDC531] text-white px-3 py-2 rounded"
                         >
                             Xác nhận
                         </button>
@@ -590,3 +590,4 @@ function LabelModal({ debt, onClose, onSet }) {
         </div>
     );
 }
+
