@@ -310,4 +310,28 @@ public class InvoiceController {
                             .build());
         }
     }
+
+    @Operation(summary = "Xác nhận thanh toán", description = "Kế toán xác nhận hoặc từ chối một khoản thanh toán (CONFIRMED hoặc REJECTED)")
+    @PatchMapping("/payments/{paymentId}/confirm")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT')")
+    public ResponseEntity<ApiResponse<PaymentHistoryResponse>> confirmPayment(
+            @Parameter(description = "ID của payment") @PathVariable Integer paymentId,
+            @Parameter(description = "Trạng thái xác nhận: CONFIRMED hoặc REJECTED") @RequestParam String status) {
+        log.info("[InvoiceController] Confirming payment: {} with status: {}", paymentId, status);
+        try {
+            PaymentHistoryResponse response = invoiceService.confirmPayment(paymentId, status);
+            return ResponseEntity.ok(ApiResponse.<PaymentHistoryResponse>builder()
+                    .success(true)
+                    .message("Payment confirmation updated successfully")
+                    .data(response)
+                    .build());
+        } catch (Exception e) {
+            log.error("[InvoiceController] Error confirming payment", e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.<PaymentHistoryResponse>builder()
+                            .success(false)
+                            .message(e.getMessage())
+                            .build());
+        }
+    }
 }

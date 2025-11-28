@@ -214,7 +214,7 @@ public class AnalyticsExportController {
         // Driver Performance
         pw.println("=== HIỆU SUẤT TÀI XẾ ===");
         pw.println("Tên Tài Xế,Số Chuyến,KM Đã Chạy");
-        List<Map<String, Object>> drivers = analyticsService.getDriverPerformance(branchId, 10);
+        List<Map<String, Object>> drivers = analyticsService.getDriverPerformance(branchId, 10, "THIS_MONTH");
         for (var driver : drivers) {
             pw.println(driver.get("driverName") + "," +
                     formatNumber(driver.get("trips")) + "," +
