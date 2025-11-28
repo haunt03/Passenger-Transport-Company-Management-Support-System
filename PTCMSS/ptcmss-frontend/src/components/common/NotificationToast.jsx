@@ -11,8 +11,11 @@ export default function NotificationToast() {
     const [visibleNotifications, setVisibleNotifications] = useState([]);
 
     useEffect(() => {
-        // Only show unread notifications
-        const unread = notifications.filter(n => !n.read).slice(0, 3); // Max 3 toasts
+        // Only show unread notifications that should show toast (not from DB load)
+        // showToast === false means loaded from DB (should only appear in bell, not as popup)
+        const unread = notifications
+            .filter(n => !n.read && n.showToast !== false)
+            .slice(0, 3); // Max 3 toasts
         setVisibleNotifications(unread);
     }, [notifications]);
 
