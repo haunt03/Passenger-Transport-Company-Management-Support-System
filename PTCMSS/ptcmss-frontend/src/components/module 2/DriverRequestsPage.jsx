@@ -9,7 +9,7 @@ import {
     FileText,
 } from "lucide-react";
 import { getCookie } from "../../utils/cookies";
-import { getDriverProfileByUser } from "../../api/drivers";
+import { getDriverProfileByUser, getDriverRequests } from "../../api/drivers";
 
 const cls = (...a) => a.filter(Boolean).join(" ");
 
@@ -173,42 +173,55 @@ export default function DriverRequestsPage() {
                 const profile = await getDriverProfileByUser(uid);
                 if (!mounted) return;
 
-                // TODO: Gọi API lấy danh sách requests
-                // const list = await getDriverRequests(profile.driverId);
+                // Get day-off requests (LEAVE type) and expense requests (PAYMENT type)
+                try {
+                    const { getDayOffHistory } = await import("../../api/drivers");
+                    const { getDriverExpenseRequests } = await import("../../api/expenses");
 
-                // Demo data
-                const demoRequests = [
-                    {
-                        id: 1,
-                        type: "LEAVE",
-                        status: "APPROVED",
-                        startDate: "2025-11-28",
-                        endDate: "2025-11-29",
-                        reason: "Việc gia đình",
-                        createdAt: "2025-11-20",
-                    },
-                    {
-                        id: 2,
-                        type: "PAYMENT",
-                        status: "PENDING",
-                        amount: 500000,
-                        tripId: 123,
-                        description: "Chi phí xăng và phí đường",
-                        createdAt: "2025-11-26",
-                    },
-                    {
-                        id: 3,
-                        type: "LEAVE",
-                        status: "REJECTED",
-                        startDate: "2025-12-01",
-                        endDate: "2025-12-02",
-                        reason: "Khám sức khỏe",
-                        rejectionReason: "Đã có chuyến được gán trong khoảng thời gian này",
-                        createdAt: "2025-11-25",
-                    },
-                ];
+                    // Load day-off requests
+                    let leaveRequests = [];
+                    try {
+                        const dayOffList = await getDayOffHistory(profile.driverId);
+                        console.log("📅 Day-off list:", dayOffList);
+                        leaveRequests = (Array.isArray(dayOffList) ? dayOffList : []).map(item => ({
+                            id: `leave-${item.dayOffId || item.id}`,
+                            type: "LEAVE",
+                            status: item.status || "PENDING",
+                            createdAt: item.requestDate || item.createdAt,
+                            startDate: item.startDate,
+                            endDate: item.endDate,
+                            reason: item.reason,
+                            rejectionReason: item.rejectionReason || item.rejectReason,
+                        }));
+                    } catch (leaveErr) {
+                        console.warn("Could not load day-off requests:", leaveErr);
+                    }
 
-                setRequests(demoRequests);
+                    // Load expense requests
+                    let paymentRequests = [];
+                    try {
+                        const expenseList = await getDriverExpenseRequests(profile.driverId);
+                        console.log("💰 Expense list:", expenseList);
+                        const expenses = expenseList?.data || expenseList || [];
+                        paymentRequests = (Array.isArray(expenses) ? expenses : []).map(item => ({
+                            id: `payment-${item.id}`,
+                            type: "PAYMENT",
+                            status: item.status || "PENDING",
+                            createdAt: item.createdAt,
+                            amount: item.amount,
+                            tripId: item.tripId,
+                            description: item.description || item.reason,
+                            rejectionReason: item.rejectionReason || item.rejectReason,
+                        }));
+                    } catch (expenseErr) {
+                        console.warn("Could not load expense requests:", expenseErr);
+                    }
+
+                    setRequests([...leaveRequests, ...paymentRequests]);
+                } catch (requestErr) {
+                    console.warn("Could not load driver requests:", requestErr);
+                    setRequests([]);
+                }
             } catch (err) {
                 if (!mounted) return;
                 setError(

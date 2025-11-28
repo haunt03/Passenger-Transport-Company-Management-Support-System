@@ -14,6 +14,7 @@ import { getCookie } from "../../utils/cookies";
 import {
   getDriverProfileByUser,
   getDriverSchedule,
+  getDayOffHistory,
 } from "../../api/drivers";
 
 /**
@@ -158,7 +159,7 @@ function DayTripCard({ record, onClick }) {
                 </div>
             ) : (
                 <div className="text-[11px] text-slate-500 leading-relaxed mt-1">
-                  Nghỉ được duyệt / không phân công chuyến.
+                  {record.reason ? record.reason : "Nghỉ được duyệt / không phân công chuyến."}
                 </div>
             )}
           </div>
@@ -455,9 +456,20 @@ function CalendarGrid({
                       Có chuyến
                     </span>
                         ) : isLeaveDay ? (
-                            <span className="rounded-md border border-slate-300 bg-slate-100 text-slate-600 text-[10px] font-medium px-1.5 py-[2px] leading-none whitespace-nowrap">
-                      Nghỉ
-                    </span>
+                            (() => {
+                              const leaveRec = recs.find((r) => r.type === "LEAVE");
+                              const isApproved = leaveRec?.status === "APPROVED";
+                              return (
+                                  <span className={cls(
+                                      "rounded-md border text-[10px] font-medium px-1.5 py-[2px] leading-none whitespace-nowrap",
+                                      isApproved
+                                          ? "border-amber-300 bg-amber-50 text-amber-700"
+                                          : "border-slate-300 bg-slate-100 text-slate-600"
+                                  )}>
+                          {isApproved ? "Nghỉ" : "Chờ duyệt"}
+                        </span>
+                              );
+                            })()
                         ) : null}
                       </div>
 
@@ -625,30 +637,62 @@ export default function DriverSchedulePage() {
           branch: profile.branchName,
         });
 
+        // Load trips
         const list = await getDriverSchedule(profile.driverId);
         if (cancelled) return;
 
         // map dữ liệu backend -> format cho calendar
         // Backend hiện trả: tripId, startTime, endTime, startLocation, endLocation, status, ...
-        const records =
-            Array.isArray(list) &&
-            list.map((trip) => {
-              const start = trip.startTime || trip.start_time || "";
-              const dateStr = start ? String(start).slice(0, 10) : null;
+        const tripRecords =
+            Array.isArray(list)
+                ? list.map((trip) => {
+                  const start = trip.startTime || trip.start_time || "";
+                  const dateStr = start ? String(start).slice(0, 10) : null;
 
-              return {
-                date: dateStr, // "YYYY-MM-DD"
-                type: "TRIP",
-                title:
-                    (trip.startLocation || trip.start_location || "—") +
-                    " → " +
-                    (trip.endLocation || trip.end_location || "—"),
-                time: start ? String(start).slice(11, 16) : "", // HH:mm nếu ISO-like
-                pickup: trip.startLocation || trip.start_location || "",
-                trip_id: trip.tripId || trip.trip_id,
-              };
-            }).filter((r) => r.date);
-        setSchedule(records || []);
+                  return {
+                    date: dateStr, // "YYYY-MM-DD"
+                    type: "TRIP",
+                    title:
+                        (trip.startLocation || trip.start_location || "—") +
+                        " → " +
+                        (trip.endLocation || trip.end_location || "—"),
+                    time: start ? String(start).slice(11, 16) : "", // HH:mm nếu ISO-like
+                    pickup: trip.startLocation || trip.start_location || "",
+                    trip_id: trip.tripId || trip.trip_id,
+                  };
+                }).filter((r) => r.date)
+                : [];
+
+        // Load day-off history
+        let leaveRecords = [];
+        try {
+          const dayOffList = await getDayOffHistory(profile.driverId);
+          if (cancelled) return;
+
+          if (Array.isArray(dayOffList)) {
+            leaveRecords = dayOffList
+                .filter((d) => d.status === "APPROVED" || d.status === "PENDING")
+                .map((dayOff) => {
+                  // dayOff có thể có: id, driverId, date/leaveDate, reason, status
+                  const leaveDate = dayOff.date || dayOff.leaveDate || dayOff.startDate || "";
+                  const dateStr = leaveDate ? String(leaveDate).slice(0, 10) : null;
+                  const statusLabel = dayOff.status === "APPROVED" ? "Đã duyệt" : "Chờ duyệt";
+
+                  return {
+                    date: dateStr,
+                    type: "LEAVE",
+                    title: `Nghỉ phép (${statusLabel})`,
+                    reason: dayOff.reason || "",
+                    status: dayOff.status,
+                  };
+                }).filter((r) => r.date);
+          }
+        } catch (err) {
+          console.warn("Could not load day-off history:", err);
+        }
+
+        // Merge trips + leaves
+        setSchedule([...tripRecords, ...leaveRecords]);
       } catch (err) {
         if (!cancelled) {
           setError(
@@ -759,18 +803,7 @@ export default function DriverSchedulePage() {
           <DayDetailPanel dateObj={selectedDate} scheduleMap={scheduleMap} onTripClick={handleTripClick} />
         </div>
 
-        {/* note dev */}
-        <div className="text-[11px] text-slate-500 leading-relaxed">
-          UI calendar đang dùng dữ liệu từ{" "}
-          <span className="font-mono text-[10px] bg-slate-100 px-1 py-[1px] rounded border border-slate-300 text-slate-700">
-          GET /api/drivers/driverId/schedule
-        </span>
-          . Khi backend hỗ trợ tham số{" "}
-          <span className="font-mono text-[10px] bg-slate-100 px-1 py-[1px] rounded border border-slate-300 text-slate-700">
-          month, year, dayoff
-        </span>{" "}
-          có thể map thêm các bản ghi <b>LEAVE</b> để hiển thị ngày nghỉ.
-        </div>
+
       </div>
   );
 }

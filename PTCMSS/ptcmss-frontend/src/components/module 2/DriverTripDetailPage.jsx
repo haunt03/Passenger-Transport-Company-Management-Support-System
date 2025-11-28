@@ -15,6 +15,7 @@ import {
   Loader2,
 } from "lucide-react";
 import TripExpenseModal from "./TripExpenseModal.jsx";
+import TripPaymentRequestModal from "./TripPaymentRequestModal.jsx";
 import { getCookie } from "../../utils/cookies";
 import {
   getDriverProfileByUser,
@@ -25,6 +26,8 @@ import {
 import { getTripDetail } from "../../api/dispatch";
 
 const cls = (...a) => a.filter(Boolean).join(" ");
+const fmtVND = (n) =>
+    new Intl.NumberFormat("vi-VN").format(Math.max(0, Number(n || 0)));
 const fmtDateTime = (isoLike) => {
   if (!isoLike) return "--:--";
   const safe = isoLike.replace(" ", "T");
@@ -56,7 +59,11 @@ function normalizeTripDetail(payload) {
     customer_phone: payload.customerPhone || "",
     vehicle_plate: payload.vehiclePlate || "Chưa gán xe",
     vehicle_type: payload.vehicleModel || "",
-    note: "",
+    booking_note: payload.bookingNote || "",
+    total_cost: payload.totalCost || 0,
+    deposit_amount: payload.depositAmount || 0,
+    remaining_amount: payload.remainingAmount || 0,
+    booking_id: payload.bookingId || null,
   };
 }
 
@@ -187,18 +194,19 @@ function TripMetaCard({ trip }) {
       <div className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-4 shadow-inner">
         <div className="text-[11px] uppercase tracking-wide text-slate-500 flex items-center gap-2 font-medium">
           <StickyNote className="h-3.5 w-3.5 text-amber-500" />
-          Thong tin chung
+          Thông tin chung
         </div>
         <div className="grid gap-3 text-sm text-slate-700">
           <div>
-            <div className="text-xs text-slate-500">Ma chuyen</div>
+            <div className="text-xs text-slate-500">Mã chuyến</div>
             <div className="font-semibold text-slate-900">{trip.code}</div>
           </div>
           <div>
-            <div className="text-xs text-slate-500">Khach hang</div>
+            <div className="text-xs text-slate-500">Khách hàng</div>
             <div className="font-semibold text-slate-900">{trip.customer_name || "—"}</div>
             {trip.customer_phone && (
-                <a href={`tel:${trip.customer_phone}`} className="text-sky-600 text-xs hover:underline">
+                <a href={`tel:${trip.customer_phone}`} className="text-sky-600 text-xs hover:underline flex items-center gap-1">
+                  <Phone className="h-3 w-3" />
                   {trip.customer_phone}
                 </a>
             )}
@@ -209,6 +217,14 @@ function TripMetaCard({ trip }) {
               {trip.vehicle_plate} {trip.vehicle_type ? `· ${trip.vehicle_type}` : ""}
             </div>
           </div>
+          {trip.booking_note && (
+              <div>
+                <div className="text-xs text-slate-500">Ghi chú đơn hàng</div>
+                <div className="text-slate-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-[13px] leading-relaxed">
+                  {trip.booking_note}
+                </div>
+              </div>
+          )}
         </div>
       </div>
   );
@@ -278,6 +294,7 @@ export default function DriverTripDetailPage() {
   const [nextLabel, setNextLabel] = React.useState("");
   const [actionLoading, setActionLoading] = React.useState(false);
   const [expenseOpen, setExpenseOpen] = React.useState(false);
+  const [paymentOpen, setPaymentOpen] = React.useState(false);
   const { toasts, pushToast } = useToasts();
 
   const loadTripDetail = React.useCallback(async (targetTripId, { silent } = {}) => {
@@ -360,7 +377,9 @@ export default function DriverTripDetailPage() {
     return tripDate > today;
   }, [trip?.pickup_time]);
 
-  const canUpdateStatus = isTripToday && !isTripFuture;
+  // Chỉ được cập nhật nếu: chuyến HÔM NAY + chưa hoàn thành
+  const isCompleted = trip?.status === "COMPLETED";
+  const canUpdateStatus = isTripToday && !isTripFuture && !isCompleted;
 
   const requestStatusChange = () => {
     if (!stepInfo || actionLoading || detailLoading || !canUpdateStatus) return;
@@ -443,13 +462,24 @@ export default function DriverTripDetailPage() {
                   </div>
                 </div>
                 <div className="flex flex-col gap-2 w-full max-w-[240px]">
-                  {!canUpdateStatus && isTripFuture && (
+                  {/* Chuyến chưa tới ngày */}
+                  {isTripFuture && (
                       <div className="rounded-xl border border-slate-300 bg-slate-50 text-slate-600 text-xs font-medium px-4 py-2 flex items-center gap-2 justify-center shadow-sm">
                         <AlertTriangle className="h-4 w-4 text-slate-500" />
                         Chuyến chưa tới ngày
                       </div>
                   )}
-                  {stepInfo && canUpdateStatus ? (
+
+                  {/* Đã hoàn thành - chỉ hiển thị badge */}
+                  {isCompleted && (
+                      <div className="rounded-xl border border-amber-300 bg-amber-50 text-amber-700 text-xs font-medium px-4 py-2 flex items-center gap-2 justify-center shadow-sm">
+                        <CheckCircle2 className="h-4 w-4 text-amber-600" />
+                        Đã hoàn thành chuyến
+                      </div>
+                  )}
+
+                  {/* Nút cập nhật trạng thái - chỉ hiển thị khi HÔM NAY + chưa hoàn thành */}
+                  {stepInfo && canUpdateStatus && (
                       <button
                           onClick={requestStatusChange}
                           disabled={actionLoading || detailLoading}
@@ -467,21 +497,20 @@ export default function DriverTripDetailPage() {
                             stepInfo.btnText
                         )}
                       </button>
-                  ) : trip?.status === "COMPLETED" ? (
-                      <>
-                        <div className="rounded-xl border border-amber-300 bg-amber-50 text-amber-700 text-xs font-medium px-4 py-2 flex items-center gap-2 justify-center shadow-sm">
-                          <CheckCircle2 className="h-4 w-4 text-amber-600" />
-                          Đã hoàn thành chuyến
-                        </div>
-                        <button
-                            onClick={() => setExpenseOpen(true)}
-                            className="rounded-xl border border-[#0079BC] bg-[#0079BC] hover:bg-[#0079BC]/90 text-white text-sm font-semibold px-4 py-2 flex items-center justify-center gap-2 shadow-sm"
-                        >
-                          <BadgeDollarSign className="h-4 w-4" />
-                          <span>Yêu cầu thanh toán</span>
-                        </button>
-                      </>
-                  ) : null}
+                  )}
+
+                  {/* Nút Yêu cầu thanh toán - hiển thị khi IN_PROGRESS (trước khi hoàn thành) */}
+                  {canUpdateStatus && trip?.status === "IN_PROGRESS" && (
+                      <button
+                          onClick={() => setPaymentOpen(true)}
+                          className="rounded-xl border border-[#0079BC] bg-[#0079BC] hover:bg-[#0079BC]/90 text-white text-sm font-semibold px-4 py-2 flex items-center justify-center gap-2 shadow-sm"
+                      >
+                        <BadgeDollarSign className="h-4 w-4" />
+                        <span>Yêu cầu thanh toán</span>
+                      </button>
+                  )}
+
+                  {/* Nút Báo cáo chi phí - chỉ khi HÔM NAY + chưa hoàn thành */}
                   {canUpdateStatus && (
                       <button
                           onClick={() => setExpenseOpen(true)}
@@ -504,6 +533,31 @@ export default function DriverTripDetailPage() {
                 <TripMetaCard trip={trip} />
                 <RouteCard pickupLocation={trip.pickup_location} dropoffLocation={trip.dropoff_location} pickupTime={trip.pickup_time} />
               </div>
+
+              {/* Card thông tin thanh toán */}
+              {(trip.total_cost > 0 || trip.deposit_amount > 0) && (
+                  <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-inner">
+                    <div className="text-[11px] uppercase tracking-wide text-slate-500 flex items-center gap-2 font-medium mb-3">
+                      <BadgeDollarSign className="h-3.5 w-3.5 text-sky-500" />
+                      Thông tin thanh toán
+                    </div>
+                    <div className="grid sm:grid-cols-3 gap-4">
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center">
+                        <div className="text-[11px] text-slate-500 mb-1">Tổng tiền</div>
+                        <div className="text-lg font-bold text-slate-900 tabular-nums">{fmtVND(trip.total_cost)} đ</div>
+                      </div>
+                      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-center">
+                        <div className="text-[11px] text-emerald-600 mb-1">Đã cọc</div>
+                        <div className="text-lg font-bold text-emerald-700 tabular-nums">{fmtVND(trip.deposit_amount)} đ</div>
+                      </div>
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-center">
+                        <div className="text-[11px] text-amber-600 mb-1">Còn lại</div>
+                        <div className="text-lg font-bold text-amber-700 tabular-nums">{fmtVND(trip.remaining_amount)} đ</div>
+                      </div>
+                    </div>
+                  </div>
+              )}
+
               <ConfirmModal
                   open={confirmOpen}
                   title="Xác nhận cập nhật trạng thái"
@@ -517,6 +571,19 @@ export default function DriverTripDetailPage() {
                   tripLabel={tripRouteLabel}
                   onClose={() => setExpenseOpen(false)}
                   onSubmitted={handleExpenseSubmitted}
+              />
+              <TripPaymentRequestModal
+                  open={paymentOpen}
+                  tripId={trip?.id}
+                  bookingId={trip?.booking_id}
+                  totalCost={trip?.total_cost}
+                  depositAmount={trip?.deposit_amount}
+                  remainingAmount={trip?.remaining_amount}
+                  customerName={trip?.customer_name}
+                  onClose={() => setPaymentOpen(false)}
+                  onSubmitted={({ amount, paymentMethod }) => {
+                    pushToast(`Đã gửi yêu cầu thanh toán ${fmtVND(amount)}đ (${paymentMethod === "CASH" ? "Tiền mặt" : "Chuyển khoản"})`, "success");
+                  }}
               />
             </>
         ) : (
