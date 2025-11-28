@@ -39,6 +39,17 @@ public class SystemSettingServiceImpl implements SystemSettingService {
     }
 
     @Override
+    public SystemSettingResponse getByKey(String settingKey) {
+        SystemSetting setting = systemSettingRepository
+                .findBySettingKeyAndStatus(settingKey, org.example.ptcmssbackend.enums.SettingStatus.ACTIVE)
+                .orElse(null);
+        if (setting == null) {
+            return null;
+        }
+        return mapToResponse(setting);
+    }
+
+    @Override
     public SystemSettingResponse create(SystemSettingRequest request) {
         if (systemSettingRepository.existsBySettingKey(request.getSettingKey())) {
             throw new RuntimeException("Setting key already exists");

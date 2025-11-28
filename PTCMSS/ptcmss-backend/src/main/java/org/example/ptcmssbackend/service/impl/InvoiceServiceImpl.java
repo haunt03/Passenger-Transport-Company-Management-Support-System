@@ -13,6 +13,7 @@ import org.example.ptcmssbackend.entity.*;
 import org.example.ptcmssbackend.enums.InvoiceStatus;
 import org.example.ptcmssbackend.enums.InvoiceType;
 import org.example.ptcmssbackend.enums.PaymentStatus;
+import org.example.ptcmssbackend.enums.PaymentConfirmationStatus;
 import org.example.ptcmssbackend.exception.ResourceNotFoundException;
 import org.example.ptcmssbackend.repository.*;
 import org.example.ptcmssbackend.service.InvoiceService;
@@ -244,6 +245,16 @@ public class InvoiceServiceImpl implements InvoiceService {
         payment.setPaymentDate(Instant.now());
         payment.setAmount(request.getAmount());
         payment.setPaymentMethod(request.getPaymentMethod());
+        // Set confirmation status: mặc định PENDING, nếu request có thì dùng request
+        if (request.getConfirmationStatus() != null) {
+            try {
+                payment.setConfirmationStatus(PaymentConfirmationStatus.valueOf(request.getConfirmationStatus().toUpperCase()));
+            } catch (IllegalArgumentException e) {
+                payment.setConfirmationStatus(PaymentConfirmationStatus.PENDING);
+            }
+        } else {
+            payment.setConfirmationStatus(PaymentConfirmationStatus.PENDING);
+        }
         payment.setBankName(request.getBankName());
         payment.setBankAccount(request.getBankAccount());
         payment.setReferenceNumber(request.getReferenceNumber());
@@ -282,7 +293,8 @@ public class InvoiceServiceImpl implements InvoiceService {
         Invoices invoice = invoiceRepository.findById(invoiceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice not found: " + invoiceId));
 
-        BigDecimal totalPaid = paymentHistoryRepository.sumByInvoiceId(invoiceId);
+        // Chỉ tính các payment đã được xác nhận (CONFIRMED)
+        BigDecimal totalPaid = paymentHistoryRepository.sumConfirmedByInvoiceId(invoiceId);
         return invoice.getAmount().subtract(totalPaid != null ? totalPaid : BigDecimal.ZERO);
     }
 
@@ -333,8 +345,8 @@ public class InvoiceServiceImpl implements InvoiceService {
             );
             log.info("[InvoiceService] Invoice {} sent to {}", invoice.getInvoiceNumber(), request.getEmail());
         } catch (Exception e) {
-            log.error("[InvoiceService] Failed to send invoice email", e);
-            // Don't throw exception, just log - invoice is already marked as sent
+            log.error("[InvoiceService] Failed to send invoice email: {}", e.getMessage(), e);
+            throw new RuntimeException("Không thể gửi email: " + e.getMessage(), e);
         }
     }
 
@@ -406,7 +418,8 @@ public class InvoiceServiceImpl implements InvoiceService {
         response.setImg(invoice.getImg());
 
         // Calculate balance
-        BigDecimal paidAmount = paymentHistoryRepository.sumByInvoiceId(invoice.getId());
+        // Chỉ tính các payment đã được xác nhận (CONFIRMED)
+        BigDecimal paidAmount = paymentHistoryRepository.sumConfirmedByInvoiceId(invoice.getId());
         response.setPaidAmount(paidAmount != null ? paidAmount : BigDecimal.ZERO);
         response.setBalance(calculateBalance(invoice.getId()));
 
@@ -429,6 +442,7 @@ public class InvoiceServiceImpl implements InvoiceService {
         response.setBranchName(invoice.getBranch().getBranchName());
         response.setCustomerId(invoice.getCustomer() != null ? invoice.getCustomer().getId() : null);
         response.setCustomerName(invoice.getCustomer() != null ? invoice.getCustomer().getFullName() : null);
+        response.setCustomerEmail(invoice.getCustomer() != null ? invoice.getCustomer().getEmail() : null);
         response.setBookingId(invoice.getBooking() != null ? invoice.getBooking().getId() : null);
         response.setType(invoice.getType().toString());
         response.setAmount(invoice.getAmount());
@@ -437,7 +451,8 @@ public class InvoiceServiceImpl implements InvoiceService {
         response.setStatus(invoice.getStatus().toString());
         response.setInvoiceDate(invoice.getInvoiceDate());
 
-        BigDecimal paidAmount = paymentHistoryRepository.sumByInvoiceId(invoice.getId());
+        // Chỉ tính các payment đã được xác nhận (CONFIRMED)
+        BigDecimal paidAmount = paymentHistoryRepository.sumConfirmedByInvoiceId(invoice.getId());
         response.setPaidAmount(paidAmount != null ? paidAmount : BigDecimal.ZERO);
         response.setBalance(calculateBalance(invoice.getId()));
 
@@ -458,6 +473,7 @@ public class InvoiceServiceImpl implements InvoiceService {
         response.setPaymentDate(payment.getPaymentDate());
         response.setAmount(payment.getAmount());
         response.setPaymentMethod(payment.getPaymentMethod());
+        response.setConfirmationStatus(payment.getConfirmationStatus() != null ? payment.getConfirmationStatus().name() : "PENDING");
         response.setBankName(payment.getBankName());
         response.setBankAccount(payment.getBankAccount());
         response.setReferenceNumber(payment.getReferenceNumber());
@@ -481,6 +497,37 @@ public class InvoiceServiceImpl implements InvoiceService {
             if (branchName.contains("Quảng Ninh") || branchName.contains("Quang Ninh")) return "QN";
         }
         return String.format("B%02d", branchId);
+    }
+
+    @Override
+    public PaymentHistoryResponse confirmPayment(Integer paymentId, String status) {
+        PaymentHistory payment = paymentHistoryRepository.findById(paymentId)
+                .orElseThrow(() -> new RuntimeException("Payment not found: " + paymentId));
+
+        try {
+            PaymentConfirmationStatus confirmationStatus = PaymentConfirmationStatus.valueOf(status.toUpperCase());
+            payment.setConfirmationStatus(confirmationStatus);
+            payment = paymentHistoryRepository.save(payment);
+
+            // Update invoice payment status nếu cần
+            Invoices invoice = payment.getInvoice();
+            if (invoice != null) {
+                BigDecimal newBalance = calculateBalance(invoice.getId());
+                if (newBalance.compareTo(BigDecimal.ZERO) <= 0) {
+                    invoice.setPaymentStatus(PaymentStatus.PAID);
+                } else {
+                    // Nếu có payment bị reject, có thể cần update lại status
+                    if (invoice.getPaymentStatus() == PaymentStatus.PAID && newBalance.compareTo(BigDecimal.ZERO) > 0) {
+                        invoice.setPaymentStatus(PaymentStatus.UNPAID);
+                    }
+                }
+                invoiceRepository.save(invoice);
+            }
+
+            return mapToPaymentHistoryResponse(payment);
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("Invalid confirmation status: " + status + ". Must be CONFIRMED or REJECTED");
+        }
     }
 
     private int getDaysFromPaymentTerms(String paymentTerms) {

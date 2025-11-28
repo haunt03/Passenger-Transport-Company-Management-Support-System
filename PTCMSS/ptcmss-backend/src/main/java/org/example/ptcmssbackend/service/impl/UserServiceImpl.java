@@ -20,8 +20,6 @@ import org.example.ptcmssbackend.service.LocalImageService;
 import org.example.ptcmssbackend.service.UserService;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -111,13 +109,13 @@ public class UserServiceImpl implements UserService {
 
         // Tạo đường dẫn xác thực (URL base theo domain)
         String baseUrl = ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString();
+        String verificationUrl = baseUrl + "/api/auth/verify?token=" + user.getVerificationToken();
 
         try {
             emailService.sendVerificationEmail(
                     user.getEmail(),
                     user.getFullName(),
-                    user.getVerificationToken(),
-                    baseUrl
+                    verificationUrl
             );
             log.info("Verification email sent successfully");
         } catch (MessagingException | UnsupportedEncodingException e) {
@@ -365,4 +363,3 @@ public class UserServiceImpl implements UserService {
     }
 
 }
-

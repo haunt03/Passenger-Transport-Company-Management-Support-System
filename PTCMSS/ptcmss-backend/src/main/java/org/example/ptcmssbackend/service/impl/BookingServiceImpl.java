@@ -16,6 +16,7 @@ import org.example.ptcmssbackend.enums.*;
 import org.example.ptcmssbackend.repository.*;
 import org.example.ptcmssbackend.service.BookingService;
 import org.example.ptcmssbackend.service.CustomerService;
+import org.example.ptcmssbackend.service.SystemSettingService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -48,6 +49,7 @@ public class BookingServiceImpl implements BookingService {
     private final TripRepository tripRepository;
     private final BookingVehicleDetailsRepository bookingVehicleDetailsRepository;
     private final TripDriverRepository tripDriverRepository;
+    private final SystemSettingService systemSettingService;
     private final TripVehicleRepository tripVehicleRepository;
     private final InvoiceRepository invoiceRepository;
     private final DriverRepository driverRepository;
@@ -86,11 +88,29 @@ public class BookingServiceImpl implements BookingService {
             List<Integer> quantities = request.getVehicles().stream()
                     .map(VehicleDetailRequest::getQuantity)
                     .collect(Collectors.toList());
+            Integer additionalPoints = (request.getAdditionalPickupPoints() != null ? request.getAdditionalPickupPoints() : 0) +
+                    (request.getAdditionalDropoffPoints() != null ? request.getAdditionalDropoffPoints() : 0);
+
+            // Lấy startTime và endTime từ trips để check chuyến trong ngày
+            Instant startTime = null;
+            Instant endTime = null;
+            if (request.getTrips() != null && !request.getTrips().isEmpty()) {
+                TripRequest firstTrip = request.getTrips().get(0);
+                startTime = firstTrip.getStartTime();
+                endTime = firstTrip.getEndTime();
+            }
+
             estimatedCost = calculatePrice(
                     categoryIds,
                     quantities,
                     request.getDistance(),
-                    request.getUseHighway()
+                    request.getUseHighway(),
+                    request.getHireTypeId(),
+                    request.getIsHoliday(),
+                    request.getIsWeekend(),
+                    additionalPoints,
+                    startTime,
+                    endTime
             );
         }
 
@@ -111,9 +131,31 @@ public class BookingServiceImpl implements BookingService {
         booking.setUseHighway(request.getUseHighway() != null ? request.getUseHighway() : false);
         booking.setEstimatedCost(estimatedCost);
         booking.setTotalCost(totalCost);
-        booking.setDepositAmount(request.getDepositAmount() != null ? request.getDepositAmount() : BigDecimal.ZERO);
+
+        // Tính tiền cọc tự động nếu chưa có
+        BigDecimal depositAmount = request.getDepositAmount();
+        if (depositAmount == null && totalCost.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal defaultDepositPercent = getSystemSettingDecimal("DEFAULT_DEPOSIT_PERCENT", new BigDecimal("0.50"));
+            depositAmount = totalCost.multiply(defaultDepositPercent).setScale(2, RoundingMode.HALF_UP);
+        }
+        booking.setDepositAmount(depositAmount != null ? depositAmount : BigDecimal.ZERO);
+
         booking.setStatus(parseBookingStatus(request.getStatus()));
         booking.setNote(request.getNote());
+
+        // Lưu các field mới
+        if (request.getIsHoliday() != null) {
+            booking.setIsHoliday(request.getIsHoliday());
+        }
+        if (request.getIsWeekend() != null) {
+            booking.setIsWeekend(request.getIsWeekend());
+        }
+        if (request.getAdditionalPickupPoints() != null) {
+            booking.setAdditionalPickupPoints(request.getAdditionalPickupPoints());
+        }
+        if (request.getAdditionalDropoffPoints() != null) {
+            booking.setAdditionalDropoffPoints(request.getAdditionalDropoffPoints());
+        }
 
         booking = bookingRepository.save(booking);
         log.info("[BookingService] Created booking: {}", booking.getId());
@@ -193,6 +235,10 @@ public class BookingServiceImpl implements BookingService {
             throw new RuntimeException("Cannot update booking with status: " + booking.getStatus());
         }
 
+        // Validation: Kiểm tra loại thay đổi và thời gian cho phép
+        boolean isMajorChange = isMajorModification(booking, request);
+        validateModificationTime(booking, isMajorChange);
+
         BookingStatus oldStatus = booking.getStatus();
 
         // Update customer nếu có
@@ -230,15 +276,54 @@ public class BookingServiceImpl implements BookingService {
             List<Integer> quantities = request.getVehicles().stream()
                     .map(VehicleDetailRequest::getQuantity)
                     .collect(Collectors.toList());
+            Integer additionalPoints = (request.getAdditionalPickupPoints() != null ? request.getAdditionalPickupPoints() : 0) +
+                    (request.getAdditionalDropoffPoints() != null ? request.getAdditionalDropoffPoints() : 0);
+
+            // Lấy startTime và endTime từ trips để check chuyến trong ngày
+            Instant startTime = null;
+            Instant endTime = null;
+            if (request.getTrips() != null && !request.getTrips().isEmpty()) {
+                TripRequest firstTrip = request.getTrips().get(0);
+                startTime = firstTrip.getStartTime();
+                endTime = firstTrip.getEndTime();
+            } else {
+                // Nếu không có trips trong request, lấy từ trips hiện tại của booking
+                List<Trips> existingTrips = tripRepository.findByBooking_Id(booking.getId());
+                if (existingTrips != null && !existingTrips.isEmpty()) {
+                    startTime = existingTrips.get(0).getStartTime();
+                    endTime = existingTrips.get(0).getEndTime();
+                }
+            }
+
             BigDecimal estimatedCost = calculatePrice(
                     categoryIds,
                     quantities,
                     request.getDistance(),
-                    request.getUseHighway() != null ? request.getUseHighway() : booking.getUseHighway()
+                    request.getUseHighway() != null ? request.getUseHighway() : booking.getUseHighway(),
+                    request.getHireTypeId() != null ? request.getHireTypeId() : (booking.getHireType() != null ? booking.getHireType().getId() : null),
+                    request.getIsHoliday() != null ? request.getIsHoliday() : (booking.getIsHoliday() != null ? booking.getIsHoliday() : false),
+                    request.getIsWeekend() != null ? request.getIsWeekend() : (booking.getIsWeekend() != null ? booking.getIsWeekend() : false),
+                    additionalPoints,
+                    startTime,
+                    endTime
             );
             booking.setEstimatedCost(estimatedCost);
         } else if (request.getEstimatedCost() != null) {
             booking.setEstimatedCost(request.getEstimatedCost());
+        }
+
+        // Update các field mới
+        if (request.getIsHoliday() != null) {
+            booking.setIsHoliday(request.getIsHoliday());
+        }
+        if (request.getIsWeekend() != null) {
+            booking.setIsWeekend(request.getIsWeekend());
+        }
+        if (request.getAdditionalPickupPoints() != null) {
+            booking.setAdditionalPickupPoints(request.getAdditionalPickupPoints());
+        }
+        if (request.getAdditionalDropoffPoints() != null) {
+            booking.setAdditionalDropoffPoints(request.getAdditionalDropoffPoints());
         }
 
         // Update discount và totalCost
@@ -426,17 +511,54 @@ public class BookingServiceImpl implements BookingService {
     public void delete(Integer bookingId) {
         Bookings booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
+
+        // Validation: Chỉ cho phép hủy trước khi khởi hành
+        validateCanCancelOrModify(booking, "hủy");
+
+        // Tính % mất cọc dựa trên thời gian hủy
+        BigDecimal depositLossAmount = calculateDepositLoss(booking);
+
         booking.setStatus(BookingStatus.CANCELLED);
         bookingRepository.save(booking);
+
+        // Ghi nhận mất cọc nếu có
+        if (depositLossAmount != null && depositLossAmount.compareTo(BigDecimal.ZERO) > 0) {
+            try {
+                // Tạo invoice để ghi nhận mất cọc
+                Invoices depositLossInvoice = new Invoices();
+                depositLossInvoice.setBooking(booking);
+                depositLossInvoice.setBranch(booking.getBranch());
+                depositLossInvoice.setCustomer(booking.getCustomer());
+                depositLossInvoice.setType(org.example.ptcmssbackend.enums.InvoiceType.INCOME);
+                depositLossInvoice.setIsDeposit(false); // Không phải tiền cọc, mà là tiền mất do hủy
+                depositLossInvoice.setAmount(depositLossAmount);
+                depositLossInvoice.setPaymentMethod("AUTO"); // Tự động (không cần thanh toán)
+                depositLossInvoice.setPaymentStatus(org.example.ptcmssbackend.enums.PaymentStatus.PAID);
+                depositLossInvoice.setStatus(org.example.ptcmssbackend.enums.InvoiceStatus.ACTIVE);
+                depositLossInvoice.setNote(String.format("Tiền mất cọc do hủy đơn (%.0f%% tiền cọc)",
+                        depositLossAmount.divide(booking.getDepositAmount() != null && booking.getDepositAmount().compareTo(BigDecimal.ZERO) > 0
+                                        ? booking.getDepositAmount()
+                                        : BigDecimal.ONE, 2, RoundingMode.HALF_UP)
+                                .multiply(BigDecimal.valueOf(100)).doubleValue()));
+                invoiceRepository.save(depositLossInvoice);
+
+                log.info("[Booking] Deposit loss recorded: {} VNĐ for booking {}", depositLossAmount, bookingId);
+            } catch (Exception e) {
+                log.warn("Failed to record deposit loss invoice", e);
+            }
+        }
 
         // Send WebSocket notification for cancellation
         try {
             String customerName = booking.getCustomer() != null ? booking.getCustomer().getFullName() : "Khách hàng";
             String bookingCode = "ORD-" + bookingId;
+            String message = depositLossAmount != null && depositLossAmount.compareTo(BigDecimal.ZERO) > 0
+                    ? String.format("Đơn %s - %s đã bị hủy. Mất cọc: %,.0f VNĐ", bookingCode, customerName, depositLossAmount)
+                    : String.format("Đơn %s - %s đã bị hủy", bookingCode, customerName);
 
             webSocketNotificationService.sendGlobalNotification(
                     "Đơn hàng bị hủy",
-                    String.format("Đơn %s - %s đã bị hủy", bookingCode, customerName),
+                    message,
                     "WARNING"
             );
 
@@ -450,6 +572,68 @@ public class BookingServiceImpl implements BookingService {
         }
     }
 
+    /**
+     * Tính số tiền mất cọc khi hủy đơn dựa trên thời gian hủy
+     * - Hủy < 24h trước khởi hành: Mất 100% tiền cọc
+     * - Hủy < 48h trước khởi hành: Mất 30% tiền cọc
+     * - Hủy >= 48h trước khởi hành: Không mất cọc (hoàn lại)
+     */
+    private BigDecimal calculateDepositLoss(Bookings booking) {
+        if (booking.getDepositAmount() == null || booking.getDepositAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO; // Không có tiền cọc
+        }
+
+        // Lấy thời gian khởi hành từ trips
+        List<Trips> trips = tripRepository.findByBooking_Id(booking.getId());
+        if (trips == null || trips.isEmpty()) {
+            log.warn("[Booking] No trips found for booking {}, cannot calculate deposit loss", booking.getId());
+            return BigDecimal.ZERO; // Không có trip, không tính mất cọc
+        }
+
+        // Lấy thời gian khởi hành sớm nhất
+        Instant earliestStartTime = trips.stream()
+                .map(Trips::getStartTime)
+                .filter(java.util.Objects::nonNull)
+                .min(Instant::compareTo)
+                .orElse(null);
+
+        if (earliestStartTime == null) {
+            log.warn("[Booking] No start time found for booking {}, cannot calculate deposit loss", booking.getId());
+            return BigDecimal.ZERO;
+        }
+
+        // Tính số giờ từ bây giờ đến khởi hành
+        Instant now = Instant.now();
+        long hoursUntilStart = java.time.Duration.between(now, earliestStartTime).toHours();
+
+        // Lấy cấu hình từ SystemSettings
+        int fullLossHours = getSystemSettingInt("CANCELLATION_FULL_DEPOSIT_LOSS_HOURS", 24);
+        int partialLossHours = getSystemSettingInt("CANCELLATION_PARTIAL_DEPOSIT_LOSS_HOURS", 48);
+        BigDecimal partialLossPercent = getSystemSettingDecimal("CANCELLATION_PARTIAL_DEPOSIT_PERCENT", new BigDecimal("0.30"));
+
+        BigDecimal depositAmount = booking.getDepositAmount();
+
+        if (hoursUntilStart < 0) {
+            // Đã quá thời gian khởi hành, mất 100%
+            log.info("[Booking] Cancellation after start time, full deposit loss: {} VNĐ", depositAmount);
+            return depositAmount;
+        } else if (hoursUntilStart < fullLossHours) {
+            // Hủy < 24h trước khởi hành: Mất 100%
+            log.info("[Booking] Cancellation < {} hours before start, full deposit loss: {} VNĐ", fullLossHours, depositAmount);
+            return depositAmount;
+        } else if (hoursUntilStart < partialLossHours) {
+            // Hủy < 48h trước khởi hành: Mất 30%
+            BigDecimal lossAmount = depositAmount.multiply(partialLossPercent).setScale(2, RoundingMode.HALF_UP);
+            log.info("[Booking] Cancellation < {} hours before start, partial deposit loss ({}%): {} VNĐ",
+                    partialLossHours, partialLossPercent.multiply(BigDecimal.valueOf(100)), lossAmount);
+            return lossAmount;
+        } else {
+            // Hủy >= 48h trước khởi hành: Không mất cọc
+            log.info("[Booking] Cancellation >= {} hours before start, no deposit loss", partialLossHours);
+            return BigDecimal.ZERO;
+        }
+    }
+
     @Override
     public BigDecimal calculatePrice(
             List<Integer> vehicleCategoryIds,
@@ -457,8 +641,67 @@ public class BookingServiceImpl implements BookingService {
             Double distance,
             Boolean useHighway
     ) {
+        // Gọi overloaded method với các tham số mặc định
+        return calculatePrice(
+                vehicleCategoryIds,
+                quantities,
+                distance,
+                useHighway,
+                null, // hireTypeId - sẽ được xác định từ booking
+                false, // isHoliday
+                false, // isWeekend
+                0, // additionalPoints
+                null, // startTime
+                null // endTime
+        );
+    }
+
+    /**
+     * Tính giá với logic mới theo yêu cầu:
+     * - Nếu là chuyến trong ngày (6h sáng - 11h đêm cùng ngày): Dùng giá cố định (sameDayFixedPrice)
+     * - Nếu không: GIÁ THUÊ = TỔNG QUÃNG ĐƯỜNG × ĐƠN GIÁ THEO LOẠI XE × HỆ SỐ + PHỤ PHÍ
+     */
+    public BigDecimal calculatePrice(
+            List<Integer> vehicleCategoryIds,
+            List<Integer> quantities,
+            Double distance,
+            Boolean useHighway,
+            Integer hireTypeId,
+            Boolean isHoliday,
+            Boolean isWeekend,
+            Integer additionalPoints,
+            Instant startTime,
+            Instant endTime
+    ) {
         if (vehicleCategoryIds == null || vehicleCategoryIds.isEmpty()) {
             return BigDecimal.ZERO;
+        }
+
+        // Lấy cấu hình từ SystemSettings
+        BigDecimal holidaySurchargeRate = getSystemSettingDecimal("HOLIDAY_SURCHARGE_RATE", new BigDecimal("0.25"));
+        BigDecimal weekendSurchargeRate = getSystemSettingDecimal("WEEKEND_SURCHARGE_RATE", new BigDecimal("0.20"));
+        BigDecimal oneWayDiscountRate = getSystemSettingDecimal("ONE_WAY_DISCOUNT_RATE", new BigDecimal("0.6667"));
+        BigDecimal additionalPointSurchargeRate = getSystemSettingDecimal("ADDITIONAL_POINT_SURCHARGE_RATE", new BigDecimal("0.05"));
+
+        // Check xem có phải chuyến trong ngày không (6h sáng - 11h đêm cùng ngày)
+        boolean isSameDayTrip = isSameDayTrip(startTime, endTime);
+
+        // Xác định hệ số đi 1 chiều vs 2 chiều
+        BigDecimal tripTypeMultiplier = BigDecimal.ONE;
+        if (hireTypeId != null) {
+            HireTypes hireType = hireTypesRepository.findById(hireTypeId).orElse(null);
+            if (hireType != null && "ONE_WAY".equals(hireType.getCode())) {
+                tripTypeMultiplier = oneWayDiscountRate;
+            }
+        }
+
+        // Tính hệ số phụ phí ngày lễ/cuối tuần
+        BigDecimal surchargeRate = BigDecimal.ZERO;
+        if (isHoliday != null && isHoliday) {
+            surchargeRate = surchargeRate.add(holidaySurchargeRate);
+        }
+        if (isWeekend != null && isWeekend) {
+            surchargeRate = surchargeRate.add(weekendSurchargeRate);
         }
 
         BigDecimal totalPrice = BigDecimal.ZERO;
@@ -474,34 +717,330 @@ public class BookingServiceImpl implements BookingService {
                 continue; // Bỏ qua loại xe không active
             }
 
-            // Tính giá cho 1 xe: baseFare + (pricePerKm * distance) + highwayFee (nếu có)
-            BigDecimal baseFare = category.getBaseFare() != null ? category.getBaseFare() : BigDecimal.ZERO;
             BigDecimal pricePerKm = category.getPricePerKm() != null ? category.getPricePerKm() : BigDecimal.ZERO;
             BigDecimal highwayFee = category.getHighwayFee() != null ? category.getHighwayFee() : BigDecimal.ZERO;
-            BigDecimal fixedCosts = category.getFixedCosts() != null ? category.getFixedCosts() : BigDecimal.ZERO;
+            BigDecimal sameDayFixedPrice = category.getSameDayFixedPrice() != null ? category.getSameDayFixedPrice() : BigDecimal.ZERO;
 
-            BigDecimal priceForOneVehicle = baseFare;
+            BigDecimal basePrice = BigDecimal.ZERO;
 
-            if (distance != null && distance > 0 && pricePerKm.compareTo(BigDecimal.ZERO) > 0) {
-                priceForOneVehicle = priceForOneVehicle.add(
-                        pricePerKm.multiply(BigDecimal.valueOf(distance))
-                );
+            // Nếu là chuyến trong ngày và có giá cố định, ưu tiên dùng giá cố định
+            if (isSameDayTrip && sameDayFixedPrice.compareTo(BigDecimal.ZERO) > 0) {
+                basePrice = sameDayFixedPrice;
+                // Nếu chưa bao gồm cao tốc và có yêu cầu cao tốc, cộng thêm phí cao tốc
+                // Giá cố định thường đã bao gồm cao tốc, nhưng nếu chưa thì cộng thêm
+                // (Theo yêu cầu: 2,600,000đ đã bao cao tốc, 2,500,000đ chưa + 300k)
+                if (useHighway != null && useHighway && highwayFee.compareTo(BigDecimal.ZERO) > 0) {
+                    // Kiểm tra: nếu giá cố định = 2,500,000 (chưa cao tốc) thì cộng thêm
+                    // Nếu = 2,600,000 (đã có cao tốc) thì không cộng
+                    // Logic: nếu giá cố định < 2,600,000 thì cộng thêm phí cao tốc
+                    BigDecimal standardWithHighway = new BigDecimal("2600000");
+                    if (sameDayFixedPrice.compareTo(standardWithHighway) < 0) {
+                        basePrice = basePrice.add(highwayFee);
+                    }
+                }
+            } else {
+                // Công thức tính theo km: GIÁ = distance × pricePerKm × hệ số loại chuyến
+                if (distance != null && distance > 0 && pricePerKm.compareTo(BigDecimal.ZERO) > 0) {
+                    basePrice = pricePerKm
+                            .multiply(BigDecimal.valueOf(distance))
+                            .multiply(tripTypeMultiplier);
+                }
+
+                // Phụ phí cao tốc
+                if (useHighway != null && useHighway && highwayFee.compareTo(BigDecimal.ZERO) > 0) {
+                    basePrice = basePrice.add(highwayFee);
+                }
             }
 
-            if (useHighway != null && useHighway && highwayFee.compareTo(BigDecimal.ZERO) > 0) {
-                priceForOneVehicle = priceForOneVehicle.add(highwayFee);
+            // Phụ phí xe hạng sang
+            if (category.getIsPremium() != null && category.getIsPremium()) {
+                BigDecimal premiumSurcharge = category.getPremiumSurcharge() != null
+                        ? category.getPremiumSurcharge()
+                        : new BigDecimal("1000000");
+                basePrice = basePrice.add(premiumSurcharge);
             }
 
-            if (fixedCosts.compareTo(BigDecimal.ZERO) > 0) {
-                priceForOneVehicle = priceForOneVehicle.add(fixedCosts);
+            // Phụ phí ngày lễ/cuối tuần
+            if (surchargeRate.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal surcharge = basePrice.multiply(surchargeRate);
+                basePrice = basePrice.add(surcharge);
             }
 
-            // Nhân với số lượng
-            BigDecimal priceForThisCategory = priceForOneVehicle.multiply(BigDecimal.valueOf(quantity));
+            // Phụ phí địa điểm phát sinh (tăng % mỗi điểm)
+            if (additionalPoints != null && additionalPoints > 0) {
+                BigDecimal additionalPointFee = basePrice
+                        .multiply(additionalPointSurchargeRate)
+                        .multiply(BigDecimal.valueOf(additionalPoints));
+                basePrice = basePrice.add(additionalPointFee);
+            }
+
+            // Nhân với số lượng xe
+            BigDecimal priceForThisCategory = basePrice.multiply(BigDecimal.valueOf(quantity));
             totalPrice = totalPrice.add(priceForThisCategory);
         }
 
         return totalPrice.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Helper method: Lấy giá trị decimal từ SystemSettings
+     */
+    private BigDecimal getSystemSettingDecimal(String key, BigDecimal defaultValue) {
+        try {
+            var setting = systemSettingService.getByKey(key);
+            if (setting != null && setting.getSettingValue() != null) {
+                return new BigDecimal(setting.getSettingValue());
+            }
+        } catch (Exception e) {
+            log.warn("Cannot get system setting {}: {}", key, e.getMessage());
+        }
+        return defaultValue;
+    }
+
+    /**
+     * Helper method: Kiểm tra xem có phải chuyến trong ngày không
+     * Chuyến trong ngày: Khởi hành từ 6h sáng, về 7-8h tối (hoặc đến 10-11h đêm cùng ngày)
+     */
+    private boolean isSameDayTrip(Instant startTime, Instant endTime) {
+        if (startTime == null || endTime == null) {
+            return false;
+        }
+
+        try {
+            // Lấy cấu hình từ SystemSettings
+            int startHour = getSystemSettingInt("SAME_DAY_TRIP_START_HOUR", 6);
+            int endHour = getSystemSettingInt("SAME_DAY_TRIP_END_HOUR", 23);
+
+            java.time.ZonedDateTime startZoned = startTime.atZone(java.time.ZoneId.systemDefault());
+            java.time.ZonedDateTime endZoned = endTime.atZone(java.time.ZoneId.systemDefault());
+
+            // Check cùng ngày
+            if (!startZoned.toLocalDate().equals(endZoned.toLocalDate())) {
+                return false;
+            }
+
+            // Check giờ khởi hành >= 6h sáng
+            int startHourOfDay = startZoned.getHour();
+            if (startHourOfDay < startHour) {
+                return false;
+            }
+
+            // Check giờ về <= 11h đêm (23h)
+            int endHourOfDay = endZoned.getHour();
+            if (endHourOfDay > endHour) {
+                return false;
+            }
+
+            return true;
+        } catch (Exception e) {
+            log.warn("Error checking same day trip: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Helper method: Lấy giá trị int từ SystemSettings
+     */
+    private int getSystemSettingInt(String key, int defaultValue) {
+        try {
+            var setting = systemSettingService.getByKey(key);
+            if (setting != null && setting.getSettingValue() != null) {
+                return Integer.parseInt(setting.getSettingValue());
+            }
+        } catch (Exception e) {
+            log.warn("Cannot get system setting {}: {}", key, e.getMessage());
+        }
+        return defaultValue;
+    }
+
+    /**
+     * Kiểm tra xem request có phải là thay đổi lớn không
+     * Thay đổi lớn: điểm đón/trả, hành trình, số ngày, loại xe
+     * Thay đổi nhỏ: thông tin khách hàng, ghi chú, trạng thái
+     */
+    private boolean isMajorModification(Bookings booking, UpdateBookingRequest request) {
+        // Thay đổi trips (điểm đón, điểm trả, thời gian) = thay đổi lớn
+        if (request.getTrips() != null && !request.getTrips().isEmpty()) {
+            List<Trips> existingTrips = tripRepository.findByBooking_Id(booking.getId());
+
+            // Số lượng trips khác nhau
+            if (existingTrips.size() != request.getTrips().size()) {
+                log.info("[Booking] Major change detected: trip count changed");
+                return true;
+            }
+
+            // Check từng trip xem có thay đổi điểm đón/trả không
+            for (int i = 0; i < request.getTrips().size(); i++) {
+                TripRequest tripReq = request.getTrips().get(i);
+                if (i < existingTrips.size()) {
+                    Trips existingTrip = existingTrips.get(i);
+
+                    // Check điểm đón
+                    if (tripReq.getStartLocation() != null &&
+                            !tripReq.getStartLocation().equals(existingTrip.getStartLocation())) {
+                        log.info("[Booking] Major change detected: pickup location changed");
+                        return true;
+                    }
+
+                    // Check điểm trả
+                    if (tripReq.getEndLocation() != null &&
+                            !tripReq.getEndLocation().equals(existingTrip.getEndLocation())) {
+                        log.info("[Booking] Major change detected: dropoff location changed");
+                        return true;
+                    }
+
+                    // Check ngày/giờ khởi hành thay đổi > 2 giờ
+                    if (tripReq.getStartTime() != null && existingTrip.getStartTime() != null) {
+                        long hoursDiff = Math.abs(java.time.Duration.between(
+                                tripReq.getStartTime(), existingTrip.getStartTime()).toHours());
+                        if (hoursDiff > 2) {
+                            log.info("[Booking] Major change detected: start time changed by {} hours", hoursDiff);
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Thay đổi loại xe = thay đổi lớn
+        if (request.getVehicles() != null && !request.getVehicles().isEmpty()) {
+            List<BookingVehicleDetails> existingVehicles = bookingVehicleDetailsRepository.findByBookingId(booking.getId());
+
+            // Số lượng loại xe khác nhau
+            if (existingVehicles.size() != request.getVehicles().size()) {
+                log.info("[Booking] Major change detected: vehicle count changed");
+                return true;
+            }
+
+            // Check từng loại xe
+            for (int i = 0; i < request.getVehicles().size(); i++) {
+                VehicleDetailRequest vReq = request.getVehicles().get(i);
+                if (i < existingVehicles.size()) {
+                    BookingVehicleDetails existingV = existingVehicles.get(i);
+
+                    // Loại xe khác
+                    if (!vReq.getVehicleCategoryId().equals(existingV.getVehicleCategory().getId())) {
+                        log.info("[Booking] Major change detected: vehicle category changed");
+                        return true;
+                    }
+
+                    // Số lượng xe khác
+                    if (!vReq.getQuantity().equals(existingV.getQuantity())) {
+                        log.info("[Booking] Major change detected: vehicle quantity changed");
+                        return true;
+                    }
+                }
+            }
+        }
+
+        // Không có thay đổi lớn
+        return false;
+    }
+
+    /**
+     * Validation thời gian cho phép sửa đổi
+     * - Thay đổi nhỏ: >= 24h trước khởi hành
+     * - Thay đổi lớn: >= 72h trước khởi hành
+     */
+    private void validateModificationTime(Bookings booking, boolean isMajorChange) {
+        List<Trips> trips = tripRepository.findByBooking_Id(booking.getId());
+        if (trips == null || trips.isEmpty()) {
+            return; // Chưa có trip, cho phép sửa
+        }
+
+        Instant earliestStartTime = trips.stream()
+                .map(Trips::getStartTime)
+                .filter(java.util.Objects::nonNull)
+                .min(Instant::compareTo)
+                .orElse(null);
+
+        if (earliestStartTime == null) {
+            return;
+        }
+
+        Instant now = Instant.now();
+
+        // Check đã khởi hành chưa
+        if (now.isAfter(earliestStartTime)) {
+            throw new RuntimeException("Không thể sửa đổi đơn hàng sau khi đã khởi hành");
+        }
+
+        // Check có trip đang diễn ra không
+        boolean hasInProgressTrip = trips.stream()
+                .anyMatch(t -> t.getStatus() == TripStatus.ONGOING);
+        if (hasInProgressTrip) {
+            throw new RuntimeException("Không thể sửa đổi đơn hàng khi có chuyến đang diễn ra");
+        }
+
+        long hoursUntilStart = java.time.Duration.between(now, earliestStartTime).toHours();
+
+        if (isMajorChange) {
+            // Thay đổi lớn: >= 72h
+            int minHours = getSystemSettingInt("BOOKING_MAJOR_MODIFICATION_MIN_HOURS", 72);
+            if (hoursUntilStart < minHours) {
+                throw new RuntimeException(
+                        String.format("Thay đổi lớn (điểm đón/trả, hành trình, loại xe) phải thực hiện trước %d giờ khởi hành. " +
+                                "Còn %d giờ trước khi khởi hành.", minHours, hoursUntilStart)
+                );
+            }
+        } else {
+            // Thay đổi nhỏ: >= 24h
+            int minHours = getSystemSettingInt("BOOKING_MINOR_MODIFICATION_MIN_HOURS", 24);
+            if (hoursUntilStart < minHours) {
+                throw new RuntimeException(
+                        String.format("Sửa đổi đơn hàng phải thực hiện trước %d giờ khởi hành. " +
+                                "Còn %d giờ trước khi khởi hành.", minHours, hoursUntilStart)
+                );
+            }
+        }
+
+        log.info("[Booking] Modification allowed: isMajorChange={}, hoursUntilStart={}", isMajorChange, hoursUntilStart);
+    }
+
+    /**
+     * Validation: Kiểm tra xem có thể hủy booking không
+     * - Chỉ cho phép trước khi khởi hành
+     * - Hủy: được phép nhưng có phạt cọc theo quy định
+     * (Dùng cho delete/cancel, không dùng cho update)
+     */
+    private void validateCanCancelOrModify(Bookings booking, String action) {
+        // Lấy thời gian khởi hành từ trips
+        List<Trips> trips = tripRepository.findByBooking_Id(booking.getId());
+        if (trips == null || trips.isEmpty()) {
+            // Không có trip, cho phép hủy
+            return;
+        }
+
+        // Lấy thời gian khởi hành sớm nhất
+        Instant earliestStartTime = trips.stream()
+                .map(Trips::getStartTime)
+                .filter(java.util.Objects::nonNull)
+                .min(Instant::compareTo)
+                .orElse(null);
+
+        if (earliestStartTime == null) {
+            // Không có thời gian khởi hành, cho phép
+            return;
+        }
+
+        // Check xem đã khởi hành chưa
+        Instant now = Instant.now();
+        if (now.isAfter(earliestStartTime)) {
+            throw new RuntimeException(
+                    String.format("Không thể %s đơn hàng sau khi đã khởi hành. Thời gian khởi hành: %s",
+                            action, earliestStartTime.toString())
+            );
+        }
+
+        // Check xem có trip nào đang IN_PROGRESS không
+        boolean hasInProgressTrip = trips.stream()
+                .anyMatch(t -> t.getStatus() == TripStatus.ONGOING);
+
+        if (hasInProgressTrip) {
+            throw new RuntimeException(
+                    String.format("Không thể %s đơn hàng khi có chuyến đang diễn ra", action)
+            );
+        }
     }
 
     @Override
@@ -624,19 +1163,45 @@ public class BookingServiceImpl implements BookingService {
         Bookings booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
 
-        Invoices inv = new Invoices();
-        inv.setBooking(booking);
-        inv.setBranch(booking.getBranch());
-        inv.setCustomer(booking.getCustomer());
-        inv.setType(org.example.ptcmssbackend.enums.InvoiceType.INCOME);
-        inv.setIsDeposit(Boolean.TRUE.equals(request.getDeposit()));
-        inv.setAmount(request.getAmount());
-        inv.setPaymentMethod(request.getPaymentMethod());
-        inv.setPaymentStatus(org.example.ptcmssbackend.enums.PaymentStatus.PAID);
-        inv.setStatus(org.example.ptcmssbackend.enums.InvoiceStatus.ACTIVE);
-        inv.setNote(request.getNote());
-        if (employeeId != null) {
-            inv.setCreatedBy(employeeRepository.findById(employeeId).orElse(null));
+        // Tìm invoice UNPAID với cùng số tiền và isDeposit để cập nhật thay vì tạo mới
+        List<Invoices> existingInvoices = invoiceRepository.findByBooking_IdOrderByCreatedAtDesc(bookingId);
+        Invoices matchingUnpaidInvoice = existingInvoices.stream()
+                .filter(inv -> inv.getPaymentStatus() == org.example.ptcmssbackend.enums.PaymentStatus.UNPAID
+                        && inv.getAmount() != null
+                        && inv.getAmount().compareTo(request.getAmount()) == 0
+                        && inv.getIsDeposit() != null
+                        && inv.getIsDeposit().equals(Boolean.TRUE.equals(request.getDeposit())))
+                .findFirst()
+                .orElse(null);
+
+        Invoices inv;
+        if (matchingUnpaidInvoice != null) {
+            // Cập nhật invoice UNPAID thành PAID
+            inv = matchingUnpaidInvoice;
+            inv.setPaymentMethod(request.getPaymentMethod());
+            inv.setPaymentStatus(org.example.ptcmssbackend.enums.PaymentStatus.PAID);
+            if (request.getNote() != null && !request.getNote().isEmpty()) {
+                inv.setNote(request.getNote());
+            }
+            if (employeeId != null) {
+                inv.setCreatedBy(employeeRepository.findById(employeeId).orElse(null));
+            }
+        } else {
+            // Tạo invoice mới nếu không tìm thấy invoice UNPAID phù hợp
+            inv = new Invoices();
+            inv.setBooking(booking);
+            inv.setBranch(booking.getBranch());
+            inv.setCustomer(booking.getCustomer());
+            inv.setType(org.example.ptcmssbackend.enums.InvoiceType.INCOME);
+            inv.setIsDeposit(Boolean.TRUE.equals(request.getDeposit()));
+            inv.setAmount(request.getAmount());
+            inv.setPaymentMethod(request.getPaymentMethod());
+            inv.setPaymentStatus(org.example.ptcmssbackend.enums.PaymentStatus.PAID);
+            inv.setStatus(org.example.ptcmssbackend.enums.InvoiceStatus.ACTIVE);
+            inv.setNote(request.getNote());
+            if (employeeId != null) {
+                inv.setCreatedBy(employeeRepository.findById(employeeId).orElse(null));
+            }
         }
         invoiceRepository.save(inv);
 
@@ -865,6 +1430,13 @@ public class BookingServiceImpl implements BookingService {
                 .min(Instant::compareTo)
                 .orElse(null);
 
+        // Tính paidAmount từ invoices
+        BigDecimal paidAmount = invoiceRepository.calculatePaidAmountByBookingId(
+                booking.getId(),
+                InvoiceType.INCOME,
+                PaymentStatus.PAID);
+        if (paidAmount == null) paidAmount = BigDecimal.ZERO;
+
         return BookingListResponse.builder()
                 .id(booking.getId())
                 .customerName(booking.getCustomer().getFullName())
@@ -872,6 +1444,8 @@ public class BookingServiceImpl implements BookingService {
                 .routeSummary(routeSummary)
                 .startDate(startDate)
                 .totalCost(booking.getTotalCost())
+                .depositAmount(booking.getDepositAmount())
+                .paidAmount(paidAmount)
                 .status(booking.getStatus() != null ? booking.getStatus().name() : null)
                 .createdAt(booking.getCreatedAt())
                 .consultantId(booking.getConsultant() != null ? booking.getConsultant().getEmployeeId() : null)

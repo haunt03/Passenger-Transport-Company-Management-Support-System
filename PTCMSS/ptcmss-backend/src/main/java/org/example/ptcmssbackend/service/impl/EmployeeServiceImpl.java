@@ -216,11 +216,11 @@ public class EmployeeServiceImpl implements EmployeeService {
         if (savedUser.getEmail() != null && !savedUser.getEmail().isEmpty()) {
             try {
                 String baseUrl = "http://localhost:8080"; // TODO: Get from config
+                String verificationUrl = baseUrl + "/api/auth/verify?token=" + savedUser.getVerificationToken();
                 emailService.sendVerificationEmail(
                         savedUser.getEmail(),
                         savedUser.getFullName(),
-                        savedUser.getVerificationToken(),
-                        baseUrl
+                        verificationUrl
                 );
                 System.out.println("✉️ Verification email sent to: " + savedUser.getEmail());
             } catch (Exception e) {
@@ -232,4 +232,8 @@ public class EmployeeServiceImpl implements EmployeeService {
         return savedEmployee;
     }
 
+    @Override
+    public Employees findByUserId(Integer userId) {
+        return employeeRepository.findByUserId(userId).orElse(null);
+    }
 }
