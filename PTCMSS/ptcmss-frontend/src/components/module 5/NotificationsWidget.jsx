@@ -1,5 +1,5 @@
 import React from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
     Bell,
     ShieldAlert,
@@ -22,11 +22,16 @@ import {
     Inbox,
     Clock,
     XCircle,
+    CreditCard,
+    MapPin,
+    Phone,
+    ChevronRight,
 } from "lucide-react";
 import { getCurrentRole, getStoredUserId, ROLES } from "../../utils/session";
 import { getBranchByUserId } from "../../api/branches";
 import { apiFetch } from "../../api/http";
 import { useNotifications } from "../../hooks/useNotifications";
+import { getBookingsPendingDeposit, pageBookings } from "../../api/bookings";
 
 /**
  * NotificationsWidget – Hiển thị cảnh báo & yêu cầu chờ duyệt
@@ -37,6 +42,7 @@ import { useNotifications } from "../../hooks/useNotifications";
  */
 export default function NotificationsWidget() {
     const location = useLocation();
+    const navigate = useNavigate();
     const isPageMode = location.pathname === "/dispatch/notifications";
     const [dashboard, setDashboard] = React.useState(null);
     const [loading, setLoading] = React.useState(false);
@@ -48,12 +54,17 @@ export default function NotificationsWidget() {
     const [showDropdown, setShowDropdown] = React.useState(false);
     const [branchLoaded, setBranchLoaded] = React.useState(false);
 
+    // Consultant-specific: bookings pending deposit
+    const [pendingDepositBookings, setPendingDepositBookings] = React.useState([]);
+    const [loadingDeposit, setLoadingDeposit] = React.useState(false);
+
     const role = getCurrentRole();
     const userId = getStoredUserId();
     const isAdmin = role === ROLES.ADMIN;
+    const isConsultant = role === ROLES.CONSULTANT;
 
     // WebSocket real-time notifications
-    const { connected, notifications: wsNotifications, unreadCount } = useNotifications();
+    const { connected, notifications: wsNotifications, unreadCount, markAsRead, clearNotification } = useNotifications();
 
     // Load branches for admin
     React.useEffect(() => {
@@ -104,6 +115,8 @@ export default function NotificationsWidget() {
         // }
     }, [userId, isAdmin, branchLoaded]);
 
+    const loadingRef = React.useRef(false);
+
     const fetchAll = React.useCallback(async () => {
         // Skip for DRIVER role - they don't have access to notifications dashboard
         if (role === ROLES.DRIVER) {
@@ -113,12 +126,13 @@ export default function NotificationsWidget() {
             return;
         }
 
-        // Prevent multiple simultaneous calls
-        if (loading) {
+        // Prevent multiple simultaneous calls using ref (avoid re-render loop)
+        if (loadingRef.current) {
             console.log('[NotificationsWidget] Already loading, skipping...');
             return;
         }
 
+        loadingRef.current = true;
         setLoading(true);
         setError("");
         try {
@@ -131,9 +145,59 @@ export default function NotificationsWidget() {
             setError("Không lấy được dữ liệu thông báo");
             setDashboard(null);
         } finally {
+            loadingRef.current = false;
             setLoading(false);
         }
-    }, [branchId, loading, role]);
+    }, [branchId, role]);
+
+    // Fetch pending deposit bookings for consultant
+    const fetchPendingDeposit = React.useCallback(async () => {
+        if (!isConsultant && !isAdmin) return;
+
+        setLoadingDeposit(true);
+        try {
+            // Try the dedicated endpoint first
+            let data;
+            try {
+                data = await getBookingsPendingDeposit({ consultantId: isConsultant ? userId : undefined });
+            } catch {
+                // Fallback: fetch bookings and filter client-side
+                // Get bookings that are PENDING or CONFIRMED but not yet deposited, within 48h
+                const now = new Date();
+                const in48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+
+                const result = await pageBookings({
+                    status: 'PENDING,CONFIRMED,QUOTATION_SENT',
+                    consultantId: isConsultant ? userId : undefined,
+                    size: 100,
+                });
+
+                const bookings = result?.content || result?.data || result || [];
+
+                // Filter: trip starts within 48h AND no deposit yet
+                data = bookings.filter(b => {
+                    const trip = b.trips?.[0];
+                    if (!trip?.startTime) return false;
+
+                    const tripStart = new Date(trip.startTime);
+                    const isWithin48h = tripStart <= in48h && tripStart > now;
+
+                    // Check if deposit is missing
+                    const depositAmount = b.depositAmount || 0;
+                    const hasDeposit = depositAmount > 0;
+
+                    return isWithin48h && !hasDeposit;
+                });
+            }
+
+            setPendingDepositBookings(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error("Failed to load pending deposit bookings:", err);
+            setPendingDepositBookings([]);
+        } finally {
+            setLoadingDeposit(false);
+        }
+    }, [isConsultant, isAdmin, userId]);
 
     // Fetch when dropdown opens OR when in page mode
     React.useEffect(() => {
@@ -143,6 +207,13 @@ export default function NotificationsWidget() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [showDropdown, isPageMode, isAdmin, branchLoaded]);
 
+    // Fetch pending deposit for consultant when dropdown opens
+    React.useEffect(() => {
+        if (showDropdown && (isConsultant || isAdmin)) {
+            fetchPendingDeposit();
+        }
+    }, [showDropdown, isConsultant, isAdmin, fetchPendingDeposit]);
+
     // Auto-open dropdown when in page mode
     React.useEffect(() => {
         if (isPageMode) {
@@ -150,9 +221,12 @@ export default function NotificationsWidget() {
         }
     }, [isPageMode]);
 
-    // Auto-refresh when receiving WebSocket notifications
+    // Auto-refresh when receiving NEW WebSocket notifications (not on initial load)
+    const prevNotifCountRef = React.useRef(0);
     React.useEffect(() => {
-        if (wsNotifications.length > 0 && showDropdown) {
+        // Only trigger if we have MORE notifications than before (new one arrived)
+        // This prevents triggering on initial load from DB
+        if (wsNotifications.length > prevNotifCountRef.current && showDropdown) {
             const latest = wsNotifications[0];
             if (
                 latest.type === 'BOOKING_UPDATE' ||
@@ -164,8 +238,9 @@ export default function NotificationsWidget() {
                 fetchAll();
             }
         }
+        prevNotifCountRef.current = wsNotifications.length;
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [wsNotifications, showDropdown]);
+    }, [wsNotifications.length, showDropdown]);
 
     // Close dropdown when clicking outside
     React.useEffect(() => {
@@ -422,7 +497,112 @@ export default function NotificationsWidget() {
 
     // Calculate unread count (alerts not acknowledged + pending approvals)
     const unreadAlerts = alerts.filter(a => !a.isAcknowledged).length;
-    const badgeCount = unreadAlerts + pending.length;
+
+    // For DRIVER role, use WebSocket unreadCount (personal notifications)
+    // For CONSULTANT role, use pending deposit bookings count
+    // For other roles, use alerts + pending count (dashboard notifications)
+    const badgeCount = role === ROLES.DRIVER
+        ? unreadCount  // WebSocket notifications for driver
+        : role === ROLES.CONSULTANT
+            ? pendingDepositBookings.length  // Pending deposit for consultant
+            : (unreadAlerts + pending.length + pendingDepositBookings.length);
+
+    // Helper to format time remaining
+    const formatTimeRemaining = (startTime) => {
+        const now = new Date();
+        const start = new Date(startTime);
+        const diffMs = start - now;
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+        const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+        if (diffHours <= 0 && diffMins <= 0) return "Đã quá hạn";
+        if (diffHours < 1) return `${diffMins} phút`;
+        if (diffHours < 24) return `${diffHours}h ${diffMins}p`;
+        return `${Math.floor(diffHours / 24)} ngày`;
+    };
+
+    // Pending deposit booking item component
+    const PendingDepositItem = ({ booking }) => {
+        const trip = booking.trips?.[0];
+        const customer = booking.customer;
+        const startTime = trip?.startTime;
+        const timeRemaining = startTime ? formatTimeRemaining(startTime) : "";
+        const isUrgent = startTime && (new Date(startTime) - new Date()) < 24 * 60 * 60 * 1000;
+
+        return (
+            <div
+                className="flex items-start gap-3 px-4 py-3.5 border-b border-slate-100 hover:bg-gradient-to-r hover:from-amber-50 hover:to-white transition-all duration-200 group cursor-pointer"
+                onClick={() => {
+                    setShowDropdown(false);
+                    navigate(`/orders/${booking.bookingId || booking.id}`);
+                }}
+            >
+                <div className={cls(
+                    "mt-0.5 p-2 rounded-lg shadow-sm transition-transform group-hover:scale-110",
+                    isUrgent ? "bg-red-50" : "bg-amber-50"
+                )}>
+                    <CreditCard className={cls("h-4 w-4", isUrgent ? "text-red-600" : "text-amber-600")} />
+                </div>
+
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="text-slate-900 font-semibold text-sm">
+                            #{booking.bookingId || booking.id}
+                        </span>
+                        <span className={cls(
+                            "px-2 py-0.5 text-[10px] font-bold rounded-full border",
+                            isUrgent
+                                ? "bg-red-100 text-red-800 border-red-200"
+                                : "bg-amber-100 text-amber-800 border-amber-200"
+                        )}>
+                            Chưa cọc
+                        </span>
+                        {isUrgent && (
+                            <span className="px-2 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full animate-pulse">
+                                Khẩn cấp
+                            </span>
+                        )}
+                    </div>
+
+                    <div className="text-[12px] leading-5 text-slate-600 space-y-1">
+                        {customer && (
+                            <div className="flex items-center gap-1.5">
+                                <Phone className="h-3 w-3 text-slate-400" />
+                                <span className="font-medium text-slate-700">{customer.fullName || customer.phone}</span>
+                            </div>
+                        )}
+                        {trip?.startLocation && (
+                            <div className="flex items-start gap-1.5 truncate" title={trip.startLocation}>
+                                <MapPin className="h-3 w-3 text-slate-400 shrink-0 mt-0.5" />
+                                <span className="truncate">{trip.startLocation}</span>
+                            </div>
+                        )}
+                        {startTime && (
+                            <div className="flex items-center gap-1.5">
+                                <Clock className="h-3 w-3 text-slate-400" />
+                                <span>
+                                    {new Date(startTime).toLocaleDateString('vi-VN')} {new Date(startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                                <span className={cls(
+                                    "ml-1 text-[10px] font-semibold",
+                                    isUrgent ? "text-red-600" : "text-amber-600"
+                                )}>
+                                    (còn {timeRemaining})
+                                </span>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="mt-2 text-[11px] text-slate-500 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3 text-amber-500" />
+                        Yêu cầu đặt cọc trước 48h - Tài xế/xe chưa giữ lịch
+                    </div>
+                </div>
+
+                <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-amber-600 transition-colors shrink-0" />
+            </div>
+        );
+    };
 
     return (
         <div className={isPageMode ? "min-h-screen" : "relative"}>
@@ -600,6 +780,23 @@ export default function NotificationsWidget() {
                                     count={wsNotifications.length}
                                 />
 
+                                {/* Connection Status for Driver */}
+                                <div className="px-4 py-2 mb-2">
+                                    <div className="flex items-center gap-2 text-xs">
+                                        {connected ? (
+                                            <>
+                                                <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                                                <span className="text-green-600">Đã kết nối</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className="h-2 w-2 rounded-full bg-red-500"></div>
+                                                <span className="text-red-600">Mất kết nối</span>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+
                                 {wsNotifications.length === 0 && (
                                     <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
                                         <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mb-3">
@@ -611,22 +808,110 @@ export default function NotificationsWidget() {
                                 )}
 
                                 {wsNotifications.map((notif) => (
-                                    <div key={notif.id} className="flex items-start gap-3 px-4 py-3.5 border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                                        <div className="mt-0.5 p-2 rounded-lg bg-sky-50 shadow-sm">
-                                            <Bell className="h-4 w-4 text-sky-600" />
+                                    <div
+                                        key={notif.id}
+                                        className={cls(
+                                            "flex items-start gap-3 px-4 py-3.5 border-b border-slate-100 transition-colors cursor-pointer group",
+                                            notif.read
+                                                ? "bg-slate-50/50 hover:bg-slate-100/50"
+                                                : "bg-white hover:bg-sky-50/50"
+                                        )}
+                                        onClick={() => {
+                                            if (!notif.read) {
+                                                markAsRead(notif.id);
+                                            }
+                                        }}
+                                    >
+                                        <div className={cls(
+                                            "mt-0.5 p-2 rounded-lg shadow-sm",
+                                            notif.read ? "bg-slate-100" : "bg-sky-50"
+                                        )}>
+                                            <Bell className={cls(
+                                                "h-4 w-4",
+                                                notif.read ? "text-slate-400" : "text-sky-600"
+                                            )} />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <div className="text-sm font-semibold text-slate-900 mb-1">
+                                            <div className={cls(
+                                                "text-sm mb-1",
+                                                notif.read
+                                                    ? "font-medium text-slate-600"
+                                                    : "font-semibold text-slate-900"
+                                            )}>
                                                 {notif.title}
+                                                {!notif.read && (
+                                                    <span className="ml-2 inline-block h-2 w-2 rounded-full bg-sky-500"></span>
+                                                )}
                                             </div>
-                                            <div className="text-xs text-slate-600 leading-relaxed">
+                                            <div className={cls(
+                                                "text-xs leading-relaxed",
+                                                notif.read ? "text-slate-500" : "text-slate-600"
+                                            )}>
                                                 {notif.message}
                                             </div>
                                             <div className="text-[10px] text-slate-400 mt-1">
                                                 {new Date(notif.timestamp).toLocaleString('vi-VN')}
                                             </div>
                                         </div>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                clearNotification(notif.id);
+                                            }}
+                                            className="shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+                                            title="Xóa thông báo"
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </button>
                                     </div>
+                                ))}
+                            </div>
+                        ) : role === ROLES.CONSULTANT ? (
+                            // Consultant view - Show pending deposit bookings
+                            <div className="min-h-[300px] max-h-[calc(85vh-80px)] overflow-y-auto text-sm scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100">
+                                <SectionHeader
+                                    icon={<CreditCard className="h-4 w-4 text-amber-600" />}
+                                    title="Đơn chưa đặt cọc"
+                                    count={pendingDepositBookings.length}
+                                    right={
+                                        <button
+                                            onClick={fetchPendingDeposit}
+                                            className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+                                            title="Làm mới"
+                                        >
+                                            <RefreshCw className={cls("h-3.5 w-3.5 text-slate-500", loadingDeposit && "animate-spin")} />
+                                        </button>
+                                    }
+                                />
+
+                                {/* Info banner */}
+                                <div className="mx-4 mt-3 px-3 py-2.5 text-[11px] leading-5 text-amber-800 bg-gradient-to-r from-amber-50 to-amber-100 border border-amber-200 rounded-lg flex items-start gap-2">
+                                    <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                                    <div>
+                                        <div className="font-semibold mb-0.5">Yêu cầu đặt cọc trước 48 giờ</div>
+                                        <span>Đơn chưa cọc coi như chưa xác nhận. Tài xế - xe chưa giữ lịch.</span>
+                                    </div>
+                                </div>
+
+                                {loadingDeposit && (
+                                    <div className="flex flex-col items-center justify-center px-4 py-12">
+                                        <Loader2 className="h-8 w-8 text-amber-600 animate-spin mb-3" />
+                                        <div className="text-sm text-slate-600 font-medium">Đang tải...</div>
+                                    </div>
+                                )}
+
+                                {!loadingDeposit && pendingDepositBookings.length === 0 && (
+                                    <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
+                                        <div className="h-16 w-16 rounded-full bg-emerald-100 flex items-center justify-center mb-3">
+                                            <Check className="h-8 w-8 text-emerald-600" />
+                                        </div>
+                                        <div className="text-sm font-medium text-slate-600 mb-1">Không có đơn nào chờ cọc</div>
+                                        <div className="text-xs text-slate-500">Tất cả đơn trong 48h tới đều đã đặt cọc!</div>
+                                    </div>
+                                )}
+
+                                {!loadingDeposit && pendingDepositBookings.map((booking) => (
+                                    <PendingDepositItem key={booking.bookingId || booking.id} booking={booking} />
                                 ))}
                             </div>
                         ) : (
