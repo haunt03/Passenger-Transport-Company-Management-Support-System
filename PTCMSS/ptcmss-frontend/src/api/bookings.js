@@ -128,3 +128,13 @@ export function generateBookingQrPayment(id, { amount, note, deposit = true }) {
     };
     return apiFetch(`/api/bookings/${id}/payments/qr`, { method: 'POST', body });
 }
+
+// Get bookings pending deposit (within 48h of trip start)
+// For consultant notification bell
+export function getBookingsPendingDeposit({ branchId, consultantId } = {}) {
+    const params = new URLSearchParams();
+    if (branchId != null) params.append("branchId", String(branchId));
+    if (consultantId != null) params.append("consultantId", String(consultantId));
+    const qs = params.toString();
+    return apiFetch(`/api/bookings/pending-deposit${qs ? `?${qs}` : ""}`);
+}

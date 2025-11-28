@@ -1,4 +1,5 @@
 import { apiFetch } from "./http";
+import { getStoredUserId } from "../utils/session";
 
 /**
  * Notifications API
@@ -93,3 +94,38 @@ export function getPendingApprovals(branchId) {
     return apiFetch(`/api/notifications/approvals/pending${params.toString() ? `?${params.toString()}` : ""}`);
 }
 
+export function approveApprovalRequest(historyId, { userId, note } = {}) {
+    const resolvedUserId = userId ?? getStoredUserId();
+    if (!resolvedUserId) {
+        throw new Error("USER_ID_REQUIRED");
+    }
+    return apiFetch(`/api/notifications/approvals/${historyId}/approve`, {
+        method: "POST",
+        body: { userId: resolvedUserId, note },
+    });
+}
+
+export function rejectApprovalRequest(historyId, { userId, note } = {}) {
+    const resolvedUserId = userId ?? getStoredUserId();
+    if (!resolvedUserId) {
+        throw new Error("USER_ID_REQUIRED");
+    }
+    return apiFetch(`/api/notifications/approvals/${historyId}/reject`, {
+        method: "POST",
+        body: { userId: resolvedUserId, note },
+    });
+}
+
+/**
+ * Delete notification
+ * DELETE /api/notifications/{notificationId}?userId={userId}
+ */
+export function deleteNotification(notificationId, userId) {
+    const resolvedUserId = userId ?? getStoredUserId();
+    if (!resolvedUserId) {
+        throw new Error("USER_ID_REQUIRED");
+    }
+    return apiFetch(`/api/notifications/${notificationId}?userId=${resolvedUserId}`, {
+        method: "DELETE",
+    });
+}

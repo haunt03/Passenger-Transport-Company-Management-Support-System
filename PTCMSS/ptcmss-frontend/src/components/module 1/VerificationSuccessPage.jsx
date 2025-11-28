@@ -1,109 +1,55 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CheckCircle, Mail, ArrowRight } from 'lucide-react';
+import React, { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { CheckCircle2 } from "lucide-react";
 
 export default function VerificationSuccessPage() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const [countdown, setCountdown] = useState(10);
-    const message = searchParams.get('message') || 'Xác thực thành công';
+    const [countdown, setCountdown] = useState(6);
+    const message =
+        searchParams.get("message") || "Mật khẩu đã được thiết lập thành công.";
 
     useEffect(() => {
         const timer = setInterval(() => {
             setCountdown((prev) => {
                 if (prev <= 1) {
                     clearInterval(timer);
-                    navigate('/login');
+                    navigate("/login");
                     return 0;
                 }
                 return prev - 1;
             });
         }, 1000);
-
         return () => clearInterval(timer);
     }, [navigate]);
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-blue-50 flex items-center justify-center p-4">
-            <div className="max-w-md w-full">
-                <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
-                    {/* Success Icon */}
-                    <div className="mb-6 flex justify-center">
-                        <div className="relative">
-                            <div className="absolute inset-0 bg-amber-400 rounded-full blur-xl opacity-50 animate-pulse"></div>
-                            <div className="relative bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full p-4">
-                                <CheckCircle className="h-16 w-16 text-white" strokeWidth={2.5} />
-                            </div>
-                        </div>
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+            <div className="w-full max-w-sm">
+                <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-4 text-center">
+                    <div className="flex justify-center">
+            <span className="rounded-full bg-emerald-50 border border-emerald-100 p-3 text-emerald-600">
+              <CheckCircle2 className="h-8 w-8" />
+            </span>
                     </div>
 
-                    {/* Title */}
-                    <h1 className="text-2xl font-bold text-gray-900 mb-3">
-                        Xác thực thành công!
+                    <h1 className="text-xl font-semibold text-slate-900">
+                        Hoàn tất thiết lập
                     </h1>
+                    <p className="text-sm text-slate-600">{message.replace(/\+/g, " ")}</p>
 
-                    {/* Message */}
-                    <p className="text-gray-600 mb-6 leading-relaxed">
-                        {message.replace(/\+/g, ' ')}
-                    </p>
-
-                    {/* Email Notice */}
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                        <div className="flex items-start gap-3">
-                            <Mail className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                            <div className="text-left">
-                                <p className="text-sm font-medium text-blue-900 mb-1">
-                                    Kiểm tra email của bạn
-                                </p>
-                                <p className="text-xs text-blue-700 leading-relaxed">
-                                    Mật khẩu đăng nhập đã được gửi đến email của bạn.
-                                    Vui lòng kiểm tra hộp thư (bao gồm cả thư mục spam).
-                                </p>
-                            </div>
-                        </div>
+                    <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 text-xs text-slate-500">
+                        Bạn sẽ được chuyển về trang đăng nhập sau{" "}
+                        <span className="font-semibold text-slate-800">{countdown}s</span>.
                     </div>
 
-                    {/* Security Tips */}
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-                        <p className="text-xs font-medium text-amber-900 mb-2">
-                            Lưu ý bảo mật
-                        </p>
-                        <ul className="text-xs text-amber-800 text-left space-y-1">
-                            <li>• Đổi mật khẩu ngay sau khi đăng nhập lần đầu</li>
-                            <li>• Không chia sẻ thông tin đăng nhập với bất kỳ ai</li>
-                            <li>• Lưu mật khẩu ở nơi an toàn</li>
-                        </ul>
-                    </div>
-
-                    {/* Auto redirect notice */}
-                    <div className="text-sm text-gray-500 mb-6">
-                        Tự động chuyển đến trang đăng nhập sau{' '}
-                        <span className="font-bold text-amber-600">{countdown}</span> giây
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="space-y-3">
-                        <button
-                            onClick={() => navigate('/login')}
-                            className="w-full bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-[#EDC531] hover:to-emerald-700 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30"
-                        >
-                            <span>Đăng nhập ngay</span>
-                            <ArrowRight className="h-4 w-4" />
-                        </button>
-
-                        <button
-                            onClick={() => window.location.href = 'mailto:support@transpomanager.com'}
-                            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-lg transition-all duration-200"
-                        >
-                            Liên hệ hỗ trợ
-                        </button>
-                    </div>
+                    <button
+                        onClick={() => navigate("/login")}
+                        className="w-full rounded-lg bg-slate-900 text-white py-2.5 text-sm font-semibold shadow-sm"
+                    >
+                        Đăng nhập ngay
+                    </button>
                 </div>
-
-                {/* Footer */}
-                <p className="text-center text-sm text-gray-500 mt-6">
-                    © 2025 TranspoManager. All rights reserved.
-                </p>
             </div>
         </div>
     );
