@@ -3,7 +3,6 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { getConsultantDashboard } from "../../api/bookings";
 import {
-    PlusCircle,
     ClipboardList,
     CheckCircle2,
     DollarSign,
@@ -266,15 +265,9 @@ export default function ConsultantDashboardPage() {
         return () => { mounted = false; };
     }, []);
 
-    // CTA
-    const handleCreateOrder = () => {
-        navigate("/orders/new");
-    };
-
     // click 1 đơn trong queue
     const handleSelectPending = (order) => {
-        push("Mở chi tiết yêu cầu " + order.code + " (design-only)", "success");
-        // navigate(`/orders/${order.id}`)
+        navigate(`/orders/${order.id}`);
     };
 
     return (
@@ -302,16 +295,7 @@ export default function ConsultantDashboardPage() {
                     </div>
                 </div>
 
-                <div className="flex flex-col gap-2 w-full max-w-[220px]">
-                    <button
-                        onClick={handleCreateOrder}
-                        type="button"
-                        className="rounded-md bg-sky-600 hover:bg-sky-500 text-white font-medium text-[13px] px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500/20 flex items-center justify-center gap-2"
-                    >
-                        <PlusCircle className="h-4 w-4" />
-                        <span>Tạo đơn hàng mới</span>
-                    </button>
-                </div>
+
             </div>
 
             {/* KPI ROW */}
