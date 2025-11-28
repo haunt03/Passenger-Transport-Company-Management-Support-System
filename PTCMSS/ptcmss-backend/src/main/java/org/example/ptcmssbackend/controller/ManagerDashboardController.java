@@ -67,16 +67,17 @@ public class ManagerDashboardController {
 
     /**
      * Get driver performance for branch
-     * GET /api/v1/manager/analytics/driver-performance?branchId=1&limit=5
+     * GET /api/v1/manager/analytics/driver-performance?branchId=1&limit=5&period=THIS_MONTH
      */
     @GetMapping("/analytics/driver-performance")
     @Operation(summary = "Get top driver performance")
     public ResponseEntity<List<Map<String, Object>>> getDriverPerformance(
             @RequestParam Integer branchId,
-            @RequestParam(required = false, defaultValue = "5") Integer limit
+            @RequestParam(required = false, defaultValue = "5") Integer limit,
+            @RequestParam(required = false, defaultValue = "THIS_MONTH") String period
     ) {
-        log.info("GET /api/v1/manager/analytics/driver-performance - branchId: {}, limit: {}", branchId, limit);
-        List<Map<String, Object>> performance = analyticsService.getDriverPerformance(branchId, limit);
+        log.info("GET /api/v1/manager/analytics/driver-performance - branchId: {}, limit: {}, period: {}", branchId, limit, period);
+        List<Map<String, Object>> performance = analyticsService.getDriverPerformance(branchId, limit, period);
         return ResponseEntity.ok(performance);
     }
 
@@ -92,6 +93,21 @@ public class ManagerDashboardController {
         log.info("GET /api/v1/manager/analytics/vehicle-utilization - branchId: {}", branchId);
         Map<String, Object> utilization = analyticsService.getVehicleUtilization(branchId);
         return ResponseEntity.ok(utilization);
+    }
+
+    /**
+     * Get vehicle efficiency (cost per km) for branch
+     * GET /api/v1/manager/analytics/vehicle-efficiency?branchId=1&period=THIS_MONTH
+     */
+    @GetMapping("/analytics/vehicle-efficiency")
+    @Operation(summary = "Get branch vehicle efficiency")
+    public ResponseEntity<List<Map<String, Object>>> getVehicleEfficiency(
+            @RequestParam Integer branchId,
+            @RequestParam(defaultValue = "THIS_MONTH") String period
+    ) {
+        log.info("GET /api/v1/manager/analytics/vehicle-efficiency - branchId: {}, period: {}", branchId, period);
+        List<Map<String, Object>> efficiency = analyticsService.getVehicleEfficiency(branchId, period);
+        return ResponseEntity.ok(efficiency);
     }
 
     /**

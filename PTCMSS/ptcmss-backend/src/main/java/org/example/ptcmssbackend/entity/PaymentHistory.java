@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
+import org.example.ptcmssbackend.enums.PaymentConfirmationStatus;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.math.BigDecimal;
@@ -37,6 +38,10 @@ public class PaymentHistory {
     @Size(max = 50)
     @Column(name = "paymentMethod", nullable = false, length = 50)
     private String paymentMethod; // CASH, BANK_TRANSFER, QR, CREDIT_CARD
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "confirmationStatus", length = 20)
+    private PaymentConfirmationStatus confirmationStatus = PaymentConfirmationStatus.PENDING; // Chờ xác nhận bởi kế toán
 
     // Bank transfer fields
     @Size(max = 100)

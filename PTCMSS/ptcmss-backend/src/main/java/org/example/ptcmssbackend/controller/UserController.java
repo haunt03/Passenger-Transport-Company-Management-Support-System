@@ -49,9 +49,9 @@ public class UserController {
         }
     }
 
-    @Operation(summary = "Cập nhật người dùng", description = "Cập nhật thông tin người dùng (chỉ dành cho Admin).")
+    @Operation(summary = "Cập nhật người dùng", description = "Cập nhật thông tin người dùng (Admin và Manager).")
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')") //  Chỉ Admin mới được cập nhật thông tin user
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')") //  Admin và Manager được cập nhật thông tin user
     public ResponseData<?> updateUser(
             @Parameter(description = "ID người dùng") @PathVariable Integer id,
             @Valid @RequestBody UpdateUserRequest request) {
@@ -94,7 +94,7 @@ public class UserController {
 
     @Operation(summary = "Xem chi tiết người dùng", description = "Lấy thông tin chi tiết của 1 người dùng.")
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or #id == authentication.principal.id") /// Admin hoặc chính người đó
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER') or #id == authentication.principal.id") /// Admin, Manager hoặc chính người đó
     public ResponseData<?> getUserById(
             @Parameter(description = "ID người dùng") @PathVariable Integer id) {
         try {
@@ -224,4 +224,3 @@ public class UserController {
         }
     }
 }
-

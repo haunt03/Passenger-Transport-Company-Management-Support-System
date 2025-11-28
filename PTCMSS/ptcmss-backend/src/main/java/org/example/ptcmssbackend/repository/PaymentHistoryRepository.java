@@ -17,6 +17,12 @@ public interface PaymentHistoryRepository extends JpaRepository<PaymentHistory, 
     @Query("SELECT COALESCE(SUM(ph.amount), 0) FROM PaymentHistory ph WHERE ph.invoice.id = :invoiceId")
     BigDecimal sumByInvoiceId(@Param("invoiceId") Integer invoiceId);
 
+    /**
+     * Tính tổng thanh toán đã được xác nhận (chỉ tính các payment có confirmationStatus = CONFIRMED)
+     */
+    @Query("SELECT COALESCE(SUM(ph.amount), 0) FROM PaymentHistory ph WHERE ph.invoice.id = :invoiceId AND ph.confirmationStatus = 'CONFIRMED'")
+    BigDecimal sumConfirmedByInvoiceId(@Param("invoiceId") Integer invoiceId);
+
     @Query("SELECT ph FROM PaymentHistory ph WHERE ph.invoice.id = :invoiceId ORDER BY ph.paymentDate DESC")
     List<PaymentHistory> findAllByInvoiceId(@Param("invoiceId") Integer invoiceId);
 }

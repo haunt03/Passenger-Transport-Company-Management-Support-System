@@ -3,6 +3,9 @@ package org.example.ptcmssbackend.service;
 import org.example.ptcmssbackend.dto.request.Booking.CustomerRequest;
 import org.example.ptcmssbackend.dto.response.Booking.CustomerResponse;
 import org.example.ptcmssbackend.entity.Customers;
+import org.springframework.data.domain.Page;
+
+import java.time.LocalDate;
 
 public interface CustomerService {
     /**
@@ -26,4 +29,9 @@ public interface CustomerService {
      * Map entity sang response DTO
      */
     CustomerResponse toResponse(Customers customer);
+
+    /**
+     * Danh sách customer với filter và phân trang
+     */
+    Page<CustomerResponse> listCustomers(String keyword, Integer branchId, LocalDate fromDate, LocalDate toDate, int page, int size);
 }

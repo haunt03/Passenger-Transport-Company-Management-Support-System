@@ -47,6 +47,17 @@ public class VehicleCategoryPricing {
     @Column(name = "fixedCosts", precision = 10, scale = 2)
     private BigDecimal fixedCosts;
 
+    @Column(name = "sameDayFixedPrice", precision = 10, scale = 2)
+    private BigDecimal sameDayFixedPrice;
+
+    @ColumnDefault("0")
+    @Column(name = "isPremium")
+    private Boolean isPremium = false;
+
+    @ColumnDefault("1000000.00")
+    @Column(name = "premiumSurcharge", precision = 10, scale = 2)
+    private BigDecimal premiumSurcharge;
+
     @ColumnDefault("(curdate())")
     @Column(name = "effectiveDate")
     private LocalDate effectiveDate;

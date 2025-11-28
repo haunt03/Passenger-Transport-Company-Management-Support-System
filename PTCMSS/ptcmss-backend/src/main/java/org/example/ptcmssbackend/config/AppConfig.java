@@ -9,7 +9,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
-import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.Customizer;
@@ -25,7 +25,7 @@ import static org.springframework.security.config.http.SessionCreationPolicy.STA
 
 @Configuration
 @RequiredArgsConstructor
-@EnableGlobalMethodSecurity(prePostEnabled = true)
+@EnableMethodSecurity
 public class AppConfig implements WebMvcConfigurer {
 
     private final CustomizeRequestFilter customizeRequestFilter;
@@ -38,8 +38,10 @@ public class AppConfig implements WebMvcConfigurer {
             "/api/auth/**",          // login, register, refresh
             "/api/test/**",          // test endpoints (generate hash, test password)
             "/api/graphhopper/**",   // GraphHopper API for geocoding and routing
-            "/verify",
-            "/set-password"
+            "/set-password",
+            "/ws/**",                // WebSocket endpoint
+            "/topic/**",             // WebSocket topic subscriptions
+            "/app/**"                // WebSocket app destination prefix
     };
 
     @Bean

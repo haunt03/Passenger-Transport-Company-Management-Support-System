@@ -12,6 +12,7 @@ public class PaymentHistoryResponse {
     private Instant paymentDate;
     private BigDecimal amount;
     private String paymentMethod;
+    private String confirmationStatus; // PENDING | CONFIRMED | REJECTED
 
     // Bank transfer info
     private String bankName;

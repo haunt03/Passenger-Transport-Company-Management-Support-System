@@ -7,6 +7,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -58,14 +59,18 @@ public class AnalyticsService {
 
         Map<String, Object> tripStats = jdbcTemplate.queryForMap(tripSql, startDate, endDate);
 
-        // Query fleet utilization
+        // Query fleet utilization (count vehicles assigned to active/scheduled trips)
         String fleetSql = "SELECT " +
-                "COUNT(DISTINCT CASE WHEN status = 'INUSE' THEN vehicleId END) as inUse, " +
-                "COUNT(DISTINCT CASE WHEN status = 'AVAILABLE' THEN vehicleId END) as available, " +
-                "COUNT(DISTINCT CASE WHEN status = 'MAINTENANCE' THEN vehicleId END) as maintenance, " +
-                "COUNT(DISTINCT vehicleId) as total " +
-                "FROM vehicles " +
-                "WHERE status IN ('AVAILABLE', 'INUSE', 'MAINTENANCE')";
+                "COUNT(DISTINCT CASE WHEN tv.tripId IS NOT NULL AND t.status IN ('SCHEDULED', 'ASSIGNED', 'ONGOING') THEN v.vehicleId END) as inUse, "
+                +
+                "COUNT(DISTINCT CASE WHEN v.status = 'AVAILABLE' THEN v.vehicleId END) as available, " +
+                "COUNT(DISTINCT CASE WHEN v.status = 'MAINTENANCE' THEN v.vehicleId END) as maintenance, "
+                +
+                "COUNT(DISTINCT v.vehicleId) as total " +
+                "FROM vehicles v " +
+                "LEFT JOIN trip_vehicles tv ON v.vehicleId = tv.vehicleId " +
+                "LEFT JOIN trips t ON tv.tripId = t.tripId " +
+                "WHERE v.status != 'INACTIVE'";
 
         Map<String, Object> fleetStats = jdbcTemplate.queryForMap(fleetSql);
         Long inUse = (Long) fleetStats.get("inUse");
@@ -140,19 +145,26 @@ public class AnalyticsService {
                 "COALESCE(SUM(CASE WHEN i.type = 'INCOME' THEN i.amount ELSE 0 END), 0) as revenue, " +
                 "COALESCE(SUM(CASE WHEN i.type = 'EXPENSE' THEN i.amount ELSE 0 END), 0) as expense, " +
                 "COALESCE(SUM(CASE WHEN i.type = 'INCOME' THEN i.amount ELSE 0 END), 0) - " +
-                "COALESCE(SUM(CASE WHEN i.type = 'EXPENSE' THEN i.amount ELSE 0 END), 0) as netProfit, " +
+                "COALESCE(SUM(CASE WHEN i.type = 'EXPENSE' THEN i.amount ELSE 0 END), 0) as netProfit, "
+                +
                 "COUNT(DISTINCT bk.bookingId) as totalBookings, " +
                 "COUNT(DISTINCT t.tripId) as totalTrips, " +
-                "COUNT(DISTINCT CASE WHEN t.status = 'COMPLETED' THEN t.tripId END) as completedTrips, " +
+                "COUNT(DISTINCT CASE WHEN t.status = 'COMPLETED' THEN t.tripId END) as completedTrips, "
+                +
                 "COUNT(DISTINCT v.vehicleId) as totalVehicles, " +
-                "COUNT(DISTINCT CASE WHEN v.status = 'INUSE' THEN v.vehicleId END) as vehiclesInUse, " +
+                "COUNT(DISTINCT CASE WHEN tv.tripId IS NOT NULL AND t2.status IN ('SCHEDULED', 'ASSIGNED', 'ONGOING') THEN v.vehicleId END) as vehiclesInUse, "
+                +
                 "COUNT(DISTINCT d.driverId) as totalDrivers, " +
                 "COUNT(DISTINCT CASE WHEN d.status = 'ONTRIP' THEN d.driverId END) as driversOnTrip " +
                 "FROM branches b " +
-                "LEFT JOIN invoices i ON b.branchId = i.branchId AND i.status = 'ACTIVE' AND i.invoiceDate BETWEEN ? AND ? " +
-                "LEFT JOIN bookings bk ON b.branchId = bk.branchId AND bk.bookingDate BETWEEN ? AND ? " +
+                "LEFT JOIN invoices i ON b.branchId = i.branchId AND i.status = 'ACTIVE' AND i.invoiceDate BETWEEN ? AND ? "
+                +
+                "LEFT JOIN bookings bk ON b.branchId = bk.branchId AND bk.bookingDate BETWEEN ? AND ? "
+                +
                 "LEFT JOIN trips t ON bk.bookingId = t.bookingId " +
-                "LEFT JOIN vehicles v ON b.branchId = v.branchId " +
+                "LEFT JOIN vehicles v ON b.branchId = v.branchId AND v.status != 'INACTIVE' " +
+                "LEFT JOIN trip_vehicles tv ON v.vehicleId = tv.vehicleId " +
+                "LEFT JOIN trips t2 ON tv.tripId = t2.tripId " +
                 "LEFT JOIN drivers d ON b.branchId = d.branchId " +
                 "WHERE b.status = 'ACTIVE' " +
                 "GROUP BY b.branchId, b.branchName, b.location " +
@@ -290,21 +302,27 @@ public class AnalyticsService {
                 "COUNT(*) as totalTrips, " +
                 "COUNT(CASE WHEN t.status = 'COMPLETED' THEN 1 END) as completedTrips, " +
                 "COUNT(CASE WHEN t.status = 'ONGOING' THEN 1 END) as ongoingTrips, " +
-                "COUNT(CASE WHEN t.status = 'SCHEDULED' THEN 1 END) as scheduledTrips " +
+                "COUNT(CASE WHEN t.status = 'SCHEDULED' THEN 1 END) as scheduledTrips, " +
+                "COALESCE(SUM(CASE WHEN t.status = 'COMPLETED' THEN t.distance ELSE 0 END), 0) as totalKm "
+                +
                 "FROM trips t " +
                 "INNER JOIN bookings bk ON t.bookingId = bk.bookingId " +
                 "WHERE bk.branchId = ? AND t.startTime BETWEEN ? AND ?";
 
         Map<String, Object> tripStats = jdbcTemplate.queryForMap(tripSql, branchId, startDate, endDate);
 
-        // Query fleet utilization for branch
+        // Query fleet utilization for branch (count vehicles assigned to active/scheduled trips)
         String fleetSql = "SELECT " +
-                "COUNT(DISTINCT CASE WHEN status = 'INUSE' THEN vehicleId END) as inUse, " +
-                "COUNT(DISTINCT CASE WHEN status = 'AVAILABLE' THEN vehicleId END) as available, " +
-                "COUNT(DISTINCT CASE WHEN status = 'MAINTENANCE' THEN vehicleId END) as maintenance, " +
-                "COUNT(DISTINCT vehicleId) as total " +
-                "FROM vehicles " +
-                "WHERE branchId = ? AND status IN ('AVAILABLE', 'INUSE', 'MAINTENANCE')";
+                "COUNT(DISTINCT CASE WHEN tv.tripId IS NOT NULL AND t.status IN ('SCHEDULED', 'ASSIGNED', 'ONGOING') THEN v.vehicleId END) as inUse, "
+                +
+                "COUNT(DISTINCT CASE WHEN v.status = 'AVAILABLE' THEN v.vehicleId END) as available, " +
+                "COUNT(DISTINCT CASE WHEN v.status = 'MAINTENANCE' THEN v.vehicleId END) as maintenance, "
+                +
+                "COUNT(DISTINCT v.vehicleId) as total " +
+                "FROM vehicles v " +
+                "LEFT JOIN trip_vehicles tv ON v.vehicleId = tv.vehicleId " +
+                "LEFT JOIN trips t ON tv.tripId = t.tripId " +
+                "WHERE v.branchId = ? AND v.status != 'INACTIVE'";
 
         Map<String, Object> fleetStats = jdbcTemplate.queryForMap(fleetSql, branchId);
         Long inUse = (Long) fleetStats.get("inUse");
@@ -320,6 +338,10 @@ public class AnalyticsService {
                 "WHERE branchId = ? AND status != 'INACTIVE'";
 
         Map<String, Object> driverStats = jdbcTemplate.queryForMap(driverSql, branchId);
+
+        BigDecimal totalKm = (BigDecimal) tripStats.get("totalKm");
+        if (totalKm == null)
+            totalKm = BigDecimal.ZERO;
 
         return AdminDashboardResponse.builder()
                 .totalRevenue(totalRevenue)
@@ -354,7 +376,8 @@ public class AnalyticsService {
                 "SUM(CASE WHEN type = 'INCOME' THEN amount ELSE 0 END) - " +
                 "SUM(CASE WHEN type = 'EXPENSE' THEN amount ELSE 0 END) as netProfit " +
                 "FROM invoices " +
-                "WHERE status = 'ACTIVE' AND branchId = ? AND invoiceDate >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) " +
+                "WHERE status = 'ACTIVE' AND branchId = ? AND invoiceDate >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) "
+                +
                 "GROUP BY DATE_FORMAT(invoiceDate, '%Y-%m') " +
                 "ORDER BY month";
 
@@ -367,9 +390,13 @@ public class AnalyticsService {
     }
 
     /**
-     * Get driver performance for branch
+     * Get driver performance for branch (filtered by period)
      */
-    public List<Map<String, Object>> getDriverPerformance(Integer branchId, Integer limit) {
+    public List<Map<String, Object>> getDriverPerformance(Integer branchId, Integer limit, String period) {
+        Map<String, LocalDateTime> dates = getPeriodDates(period);
+        LocalDateTime startDate = dates.get("start");
+        LocalDateTime endDate = dates.get("end");
+
         String sql = "SELECT " +
                 "d.driverId, " +
                 "u.fullName as driverName, " +
@@ -381,6 +408,7 @@ public class AnalyticsService {
                 "INNER JOIN users u ON e.userId = u.userId " +
                 "LEFT JOIN trip_drivers td ON d.driverId = td.driverId " +
                 "LEFT JOIN trips t ON td.tripId = t.tripId AND t.status = 'COMPLETED' " +
+                "AND t.endTime BETWEEN ? AND ? " +
                 "LEFT JOIN bookings bk ON t.bookingId = bk.bookingId " +
                 "WHERE d.branchId = ? AND d.status != 'INACTIVE' " +
                 "GROUP BY d.driverId, u.fullName " +
@@ -392,8 +420,7 @@ public class AnalyticsService {
                 "driverName", rs.getString("driverName"),
                 "totalTrips", rs.getLong("totalTrips"),
                 "completedTrips", rs.getLong("completedTrips"),
-                "totalKm", rs.getBigDecimal("totalKm")
-        ), branchId, limit);
+                "totalKm", rs.getBigDecimal("totalKm")), startDate, endDate, branchId, limit);
     }
 
     /**
@@ -401,29 +428,90 @@ public class AnalyticsService {
      */
     public Map<String, Object> getVehicleUtilization(Integer branchId) {
         String sql = "SELECT " +
-                "COUNT(DISTINCT CASE WHEN v.status = 'INUSE' THEN v.vehicleId END) as vehiclesInUse, " +
-                "COUNT(DISTINCT CASE WHEN v.status = 'AVAILABLE' THEN v.vehicleId END) as vehiclesAvailable, " +
-                "COUNT(DISTINCT CASE WHEN v.status = 'MAINTENANCE' THEN v.vehicleId END) as vehiclesMaintenance, " +
+                "COUNT(DISTINCT CASE WHEN v.status = 'AVAILABLE' THEN v.vehicleId END) as vehiclesAvailable, "
+                +
+                "COUNT(DISTINCT CASE WHEN v.status = 'MAINTENANCE' THEN v.vehicleId END) as vehiclesMaintenance, "
+                +
                 "COUNT(DISTINCT v.vehicleId) as totalVehicles, " +
-                "COUNT(DISTINCT CASE WHEN tv.tripId IS NOT NULL AND t.status = 'ONGOING' THEN v.vehicleId END) as vehiclesOnTrip " +
+                "COUNT(DISTINCT CASE WHEN tv.tripId IS NOT NULL AND t.status = 'ONGOING' THEN v.vehicleId END) as vehiclesOnTrip "
+                +
                 "FROM vehicles v " +
                 "LEFT JOIN trip_vehicles tv ON v.vehicleId = tv.vehicleId " +
-                "LEFT JOIN trips t ON tv.tripId = t.tripId " +
+                "LEFT JOIN trips t ON tv.tripId = t.tripId AND t.status = 'ONGOING' " +
                 "WHERE v.branchId = ? AND v.status != 'INACTIVE'";
 
         Map<String, Object> stats = jdbcTemplate.queryForMap(sql, branchId);
         Long total = (Long) stats.get("totalVehicles");
-        Long inUse = (Long) stats.get("vehiclesInUse");
-        Double utilizationRate = total > 0 ? (inUse * 100.0 / total) : 0.0;
+        Long onTrip = (Long) stats.get("vehiclesOnTrip");
+        Double utilizationRate = total > 0 ? (onTrip * 100.0 / total) : 0.0;
 
         return Map.of(
                 "totalVehicles", stats.get("totalVehicles"),
-                "vehiclesInUse", stats.get("vehiclesInUse"),
+                "vehiclesInUse", onTrip, // Use vehiclesOnTrip as vehiclesInUse
                 "vehiclesAvailable", stats.get("vehiclesAvailable"),
                 "vehiclesMaintenance", stats.get("vehiclesMaintenance"),
                 "vehiclesOnTrip", stats.get("vehiclesOnTrip"),
-                "utilizationRate", utilizationRate
-        );
+                "utilizationRate", utilizationRate);
+    }
+
+    /**
+     * Get vehicle efficiency (cost per km) for branch
+     */
+    public List<Map<String, Object>> getVehicleEfficiency(Integer branchId, String period) {
+        Map<String, LocalDateTime> dates = getPeriodDates(period);
+        LocalDateTime startDate = dates.get("start");
+        LocalDateTime endDate = dates.get("end");
+
+        // Convert to Timestamp for JDBC compatibility
+        Timestamp tripStart = Timestamp.valueOf(startDate);
+        Timestamp tripEnd = Timestamp.valueOf(endDate);
+        Timestamp invoiceStart = Timestamp.valueOf(startDate);
+        Timestamp invoiceEnd = Timestamp.valueOf(endDate);
+
+        String sql = """
+                                SELECT
+                                        v.licensePlate AS licensePlate,
+                                        COALESCE(trips.totalKm, 0) AS totalKm,
+                                        COALESCE(costs.totalCost, 0) AS totalCost,
+                                        CASE
+                                                WHEN COALESCE(trips.totalKm, 0) > 0 THEN COALESCE(costs.totalCost, 0) / COALESCE(trips.totalKm, 1)
+                                                ELSE 0
+                                        END AS costPerKm
+                                FROM vehicles v
+                                LEFT JOIN (
+                                        SELECT
+                                                tv.vehicleId AS vehicleId,
+                                                SUM(t.distance) AS totalKm
+                                        FROM trip_vehicles tv
+                                        INNER JOIN trips t ON tv.tripId = t.tripId
+                                                AND t.status = 'COMPLETED'
+                                                AND t.startTime BETWEEN ? AND ?
+                                        GROUP BY tv.vehicleId
+                                ) trips ON v.vehicleId = trips.vehicleId
+                                LEFT JOIN (
+                                        SELECT
+                                                e.vehicleId AS vehicleId,
+                                                SUM(e.amount) AS totalCost
+                                        FROM expenses e
+                                        WHERE e.vehicleId IS NOT NULL
+                                          AND e.branchId = ?
+                                          AND e.category IN ('FUEL', 'MAINTENANCE', 'TOLL')
+                                          AND e.status IN ('APPROVED', 'PAID')
+                                          AND e.expenseDate BETWEEN ? AND ?
+                                        GROUP BY e.vehicleId
+                                ) costs ON v.vehicleId = costs.vehicleId
+                                WHERE v.branchId = ?
+                                  AND v.status <> 'INACTIVE'
+                                  AND COALESCE(trips.totalKm, 0) > 0
+                                ORDER BY costPerKm ASC, totalKm DESC
+                                LIMIT 10
+                                """;
+        return jdbcTemplate.query(sql, (rs, rowNum) -> Map.of(
+                        "licensePlate", rs.getString("licensePlate"),
+                        "totalKm", rs.getBigDecimal("totalKm"),
+                        "totalCost", rs.getBigDecimal("totalCost"),
+                        "costPerKm", rs.getBigDecimal("costPerKm")), tripStart, tripEnd, branchId, invoiceStart,
+                invoiceEnd, branchId);
     }
 
     /**
@@ -449,10 +537,10 @@ public class AnalyticsService {
                 "ORDER BY totalAmount DESC";
 
         return jdbcTemplate.query(sql, (rs, rowNum) -> Map.of(
-                "category", rs.getString("costType") != null ? rs.getString("costType") : "UNCATEGORIZED",
+                "category",
+                rs.getString("costType") != null ? rs.getString("costType") : "UNCATEGORIZED",
                 "totalAmount", rs.getBigDecimal("totalAmount"),
-                "count", rs.getLong("count")
-        ), branchId, startInstant, endInstant);
+                "count", rs.getLong("count")), branchId, startInstant, endInstant);
     }
 
     /**
@@ -483,12 +571,13 @@ public class AnalyticsService {
                         "approvalId", rs.getInt("approvalId"),
                         "approvalType", rs.getString("approvalType"),
                         "relatedEntityId", rs.getInt("relatedEntityId"),
-                        "requestReason", rs.getString("requestReason") != null ? rs.getString("requestReason") : "",
+                        "requestReason",
+                        rs.getString("requestReason") != null ? rs.getString("requestReason")
+                                : "",
                         "requestedAt", rs.getTimestamp("requestedAt").toString(),
                         "requestedBy", rs.getString("requestedBy"),
                         "branchName", rs.getString("branchName"),
-                        "branchId", rs.getInt("branchId")
-                ), branchId);
+                        "branchId", rs.getInt("branchId")), branchId);
             } else {
                 // Admin: all branches
                 sql = "SELECT " +
@@ -509,12 +598,13 @@ public class AnalyticsService {
                         "approvalId", rs.getInt("approvalId"),
                         "approvalType", rs.getString("approvalType"),
                         "relatedEntityId", rs.getInt("relatedEntityId"),
-                        "requestReason", rs.getString("requestReason") != null ? rs.getString("requestReason") : "",
+                        "requestReason",
+                        rs.getString("requestReason") != null ? rs.getString("requestReason")
+                                : "",
                         "requestedAt", rs.getTimestamp("requestedAt").toString(),
                         "requestedBy", rs.getString("requestedBy"),
                         "branchName", rs.getString("branchName"),
-                        "branchId", rs.getInt("branchId")
-                ));
+                        "branchId", rs.getInt("branchId")));
             }
 
             return results;
@@ -538,7 +628,8 @@ public class AnalyticsService {
                     "t.endLocation, " +
                     "COUNT(DISTINCT t.tripId) as tripCount, " +
                     "COALESCE(SUM(t.distance), 0) as totalDistance, " +
-                    "COALESCE(SUM(CASE WHEN i.type = 'INCOME' THEN i.amount ELSE 0 END), 0) as totalRevenue " +
+                    "COALESCE(SUM(CASE WHEN i.type = 'INCOME' THEN i.amount ELSE 0 END), 0) as totalRevenue "
+                    +
                     "FROM trips t " +
                     "INNER JOIN bookings bk ON t.bookingId = bk.bookingId " +
                     "LEFT JOIN invoices i ON bk.bookingId = i.bookingId AND i.type = 'INCOME' " +
@@ -548,12 +639,13 @@ public class AnalyticsService {
                     "LIMIT ?";
 
             return jdbcTemplate.query(sql, (rs, rowNum) -> Map.of(
-                    "startLocation", rs.getString("startLocation") != null ? rs.getString("startLocation") : "",
-                    "endLocation", rs.getString("endLocation") != null ? rs.getString("endLocation") : "",
+                    "startLocation",
+                    rs.getString("startLocation") != null ? rs.getString("startLocation") : "",
+                    "endLocation",
+                    rs.getString("endLocation") != null ? rs.getString("endLocation") : "",
                     "tripCount", rs.getLong("tripCount"),
                     "totalDistance", rs.getBigDecimal("totalDistance"),
-                    "totalRevenue", rs.getBigDecimal("totalRevenue")
-            ), startDate, endDate, limit);
+                    "totalRevenue", rs.getBigDecimal("totalRevenue")), startDate, endDate, limit);
         } catch (Exception e) {
             log.error("Error getting top routes for period: {}, limit: {}", period, limit, e);
             return List.of(); // Return empty list instead of throwing exception

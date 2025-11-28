@@ -26,15 +26,14 @@ public class EmailService {
     @Value("${spring.mail.username}")
     private String fromEmail;
 
-    public void sendVerificationEmail(String toEmail, String fullName, String token, String baseUrl)
+    public void sendVerificationEmail(String toEmail, String fullName, String verificationUrl)
             throws MessagingException, UnsupportedEncodingException {
 
         String subject = "✨ Chào mừng đến TranspoManager - Xác thực tài khoản của bạn";
-        String verifyUrl = baseUrl + "/verify?token=" + token;
 
         Map<String, Object> variables = new HashMap<>();
         variables.put("fullName", fullName);
-        variables.put("verifyUrl", verifyUrl);
+        variables.put("verifyUrl", verificationUrl);
 
         Context context = new Context();
         context.setVariables(variables);

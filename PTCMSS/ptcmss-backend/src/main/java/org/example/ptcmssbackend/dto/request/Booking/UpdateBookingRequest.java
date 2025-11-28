@@ -18,6 +18,14 @@ public class UpdateBookingRequest {
     private Integer hireTypeId;
     private Boolean useHighway;
 
+    private Boolean isHoliday; // Có phải ngày lễ không
+
+    private Boolean isWeekend; // Có phải cuối tuần không
+
+    private Integer additionalPickupPoints; // Số điểm đón thêm
+
+    private Integer additionalDropoffPoints; // Số điểm trả thêm
+
     // Thông tin chuyến đi
     @Valid
     private List<TripRequest> trips;

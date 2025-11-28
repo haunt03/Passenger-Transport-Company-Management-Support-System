@@ -10,8 +10,15 @@ import org.example.ptcmssbackend.enums.CustomerStatus;
 import org.example.ptcmssbackend.repository.CustomerRepository;
 import org.example.ptcmssbackend.repository.EmployeeRepository;
 import org.example.ptcmssbackend.service.CustomerService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 
 @Slf4j
 @Service
@@ -93,6 +100,22 @@ public class CustomerServiceImpl implements CustomerService {
                 .address(customer.getAddress())
                 .note(customer.getNote())
                 .status(customer.getStatus() != null ? customer.getStatus().name() : null)
+                .createdAt(customer.getCreatedAt())
                 .build();
+    }
+
+    @Override
+    public Page<CustomerResponse> listCustomers(String keyword, Integer branchId, LocalDate fromDate, LocalDate toDate, int page, int size) {
+        log.info("[CustomerService] List customers - keyword={}, branchId={}, from={}, to={}, page={}, size={}",
+                keyword, branchId, fromDate, toDate, page, size);
+
+        Instant fromInstant = fromDate != null ? fromDate.atStartOfDay(ZoneId.systemDefault()).toInstant() : null;
+        Instant toInstant = toDate != null ? toDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant() : null;
+
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        Page<Customers> customersPage = customerRepository.findWithFilters(keyword, branchId, fromInstant, toInstant, pageable);
+
+        return customersPage.map(this::toResponse);
     }
 }

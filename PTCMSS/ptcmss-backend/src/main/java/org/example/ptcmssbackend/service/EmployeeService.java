@@ -23,5 +23,7 @@ public interface EmployeeService {
     Employees updateEmployee(Integer id, org.example.ptcmssbackend.dto.request.Employee.UpdateEmployeeRequest request);
 
     Employees createEmployeeWithUser(org.example.ptcmssbackend.dto.request.Employee.CreateEmployeeWithUserRequest request);
+
+    Employees findByUserId(Integer userId);
 }
 

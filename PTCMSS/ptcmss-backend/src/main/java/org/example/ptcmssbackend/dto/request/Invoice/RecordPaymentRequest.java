@@ -15,6 +15,8 @@ public class RecordPaymentRequest {
     @NotNull
     private String paymentMethod; // CASH, BANK_TRANSFER, QR, CREDIT_CARD
 
+    private String confirmationStatus; // PENDING | CONFIRMED | REJECTED (mặc định PENDING, kế toán sẽ xác nhận)
+
     // Bank transfer info (required if paymentMethod = BANK_TRANSFER)
     private String bankName;
     private String bankAccount;

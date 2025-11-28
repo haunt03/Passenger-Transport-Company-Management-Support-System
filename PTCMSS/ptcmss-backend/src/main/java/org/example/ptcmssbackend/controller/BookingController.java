@@ -23,6 +23,7 @@ import org.example.ptcmssbackend.entity.Employees;
 import org.example.ptcmssbackend.entity.Users;
 import org.example.ptcmssbackend.repository.EmployeeRepository;
 import org.example.ptcmssbackend.service.BookingService;
+import org.example.ptcmssbackend.service.CustomerService;
 import org.example.ptcmssbackend.service.PaymentService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -44,6 +45,7 @@ public class BookingController {
 
     private final BookingService bookingService;
     private final PaymentService paymentService;
+    private final CustomerService customerService;
     private final EmployeeRepository employeeRepository;
 
     /**
@@ -367,19 +369,26 @@ public class BookingController {
     /**
      * Tính giá tự động
      */
-    @Operation(summary = "Tính giá tự động", description = "Tính giá ước tính dựa trên loại xe, số lượng, khoảng cách và cao tốc")
+    @Operation(summary = "Tính giá tự động", description = "Tính giá ước tính dựa trên loại xe, số lượng, khoảng cách, cao tốc, loại chuyến, ngày lễ/cuối tuần, điểm phát sinh và thời gian (để check chuyến trong ngày)")
     @PostMapping("/calculate-price")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT')")
     public ResponseEntity<ApiResponse<java.math.BigDecimal>> calculatePrice(
             @Parameter(description = "Danh sách ID loại xe") @RequestParam List<Integer> vehicleCategoryIds,
             @Parameter(description = "Danh sách số lượng tương ứng") @RequestParam List<Integer> quantities,
             @Parameter(description = "Khoảng cách (km)") @RequestParam Double distance,
-            @Parameter(description = "Có đi cao tốc không") @RequestParam(required = false, defaultValue = "false") Boolean useHighway
+            @Parameter(description = "Có đi cao tốc không") @RequestParam(required = false, defaultValue = "false") Boolean useHighway,
+            @Parameter(description = "ID loại thuê (hireTypeId) - để xác định 1 chiều/2 chiều") @RequestParam(required = false) Integer hireTypeId,
+            @Parameter(description = "Có phải ngày lễ không") @RequestParam(required = false, defaultValue = "false") Boolean isHoliday,
+            @Parameter(description = "Có phải cuối tuần không") @RequestParam(required = false, defaultValue = "false") Boolean isWeekend,
+            @Parameter(description = "Tổng số điểm đón/trả thêm") @RequestParam(required = false, defaultValue = "0") Integer additionalPoints,
+            @Parameter(description = "Thời gian khởi hành (ISO format) - để check chuyến trong ngày") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant startTime,
+            @Parameter(description = "Thời gian kết thúc (ISO format) - để check chuyến trong ngày") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant endTime
     ) {
         try {
-            java.math.BigDecimal price = bookingService.calculatePrice(
-                    vehicleCategoryIds, quantities, distance, useHighway
-            );
+            // Sử dụng overloaded method với các tham số mới
+            java.math.BigDecimal price = ((org.example.ptcmssbackend.service.impl.BookingServiceImpl) bookingService)
+                    .calculatePrice(vehicleCategoryIds, quantities, distance, useHighway,
+                            hireTypeId, isHoliday, isWeekend, additionalPoints, startTime, endTime);
             return ResponseEntity.ok(ApiResponse.<java.math.BigDecimal>builder()
                     .success(true)
                     .message("Tính giá thành công")
@@ -391,6 +400,41 @@ public class BookingController {
                     .success(false)
                     .message("Lỗi khi tính giá: " + e.getMessage())
                     .build());
+        }
+    }
+
+    /**
+     * Tìm customer theo số điện thoại
+     */
+    @Operation(summary = "Tìm customer theo số điện thoại", description = "Tìm kiếm khách hàng theo số điện thoại để auto-fill thông tin")
+    @GetMapping("/customers/phone/{phone}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'CONSULTANT')")
+    public ResponseEntity<ApiResponse<org.example.ptcmssbackend.dto.response.Booking.CustomerResponse>> findCustomerByPhone(
+            @Parameter(description = "Số điện thoại") @PathVariable String phone) {
+        try {
+            var customer = customerService.findByPhone(phone);
+            if (customer != null) {
+                return ResponseEntity.ok(ApiResponse.<org.example.ptcmssbackend.dto.response.Booking.CustomerResponse>builder()
+                        .success(true)
+                        .message("Tìm thấy khách hàng")
+                        .data(customerService.toResponse(customer))
+                        .build());
+            } else {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(ApiResponse.<org.example.ptcmssbackend.dto.response.Booking.CustomerResponse>builder()
+                                .success(false)
+                                .message("Không tìm thấy khách hàng với số điện thoại này")
+                                .data(null)
+                                .build());
+            }
+        } catch (Exception e) {
+            log.error("Error finding customer by phone: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.<org.example.ptcmssbackend.dto.response.Booking.CustomerResponse>builder()
+                            .success(false)
+                            .message("Lỗi khi tìm kiếm khách hàng: " + e.getMessage())
+                            .data(null)
+                            .build());
         }
     }
 
