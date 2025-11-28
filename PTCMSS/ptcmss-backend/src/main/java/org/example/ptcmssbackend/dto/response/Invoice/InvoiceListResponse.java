@@ -14,6 +14,7 @@ public class InvoiceListResponse {
     private String branchName;
     private Integer customerId;
     private String customerName;
+    private String customerEmail;
     private Integer bookingId;
     private String type;
     private BigDecimal amount;
