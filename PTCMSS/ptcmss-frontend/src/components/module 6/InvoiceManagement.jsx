@@ -16,6 +16,7 @@ import {
     XCircle,
     Clock,
     X,
+    AlertTriangle,
 } from "lucide-react";
 
 import DepositModal from "./DepositModal.jsx";
@@ -30,6 +31,7 @@ import {
 } from "../../api/invoices";
 import { listBookings } from "../../api/bookings";
 import { exportInvoiceListToExcel, exportInvoiceToPdf } from "../../api/exports";
+import { getCurrentRole, ROLES } from "../../utils/session";
 
 /* ===== Helpers / constants ===== */
 const BRAND_COLOR = "#0079BC";
@@ -363,11 +365,12 @@ function Toolbar({
                      loading,
                      debtMode,
                      toggleDebtMode,
+                     canCreate,
                  }) {
     return (
         <div className="flex flex-wrap items-center gap-3 w-full">
-            {/* nút tạo hóa đơn (ẩn khi ở công nợ) */}
-            {!debtMode && (
+            {/* nút tạo hóa đơn (ẩn khi ở công nợ hoặc không có quyền) */}
+            {!debtMode && canCreate && (
                 <button
                     onClick={
                         onCreateClick
@@ -1166,6 +1169,9 @@ function sortDebtPriority(list) {
 /* ===== Main Page ===== */
 export default function InvoiceManagement() {
     const { toasts, push } = useToasts();
+    const role = getCurrentRole();
+    // Accountant chỉ xem, không tạo hóa đơn thủ công
+    const canCreate = role !== ROLES.ACCOUNTANT;
 
     const [loading, setLoading] = React.useState(false);
     const [initialLoading, setInitialLoading] = React.useState(true);
@@ -1664,6 +1670,9 @@ export default function InvoiceManagement() {
                     toggleDebtMode={
                         toggleDebtMode
                     }
+                    canCreate={
+                        canCreate
+                    }
                 />
             </div>
 
@@ -1686,6 +1695,7 @@ export default function InvoiceManagement() {
                             onRecordPayment={onRecordPayment}
                             onSendInvoice={onSendInvoice}
                             onExportPdf={onExportPdf}
+                            onViewPaymentHistory={onViewPaymentHistory}
                         />
                         {/* Pagination */}
                         {totalPages > 1 && (
@@ -1721,7 +1731,7 @@ export default function InvoiceManagement() {
             </div>
 
             {/* Modals */}
-            {!debtMode && (
+            {!debtMode && canCreate && (
                 <CreateInvoiceModal
                     open={createOpen}
                     orders={completedOrders}

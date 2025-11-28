@@ -114,8 +114,9 @@ export default function DepositModal({
             ? String(bankAccount).trim().length > 0
             : true;
 
+    // Validation: số tiền phải nằm trong khoảng còn thiếu (không cho overpay)
     const valid =
-        baseValid && bankValid && (allowOverpay || !overpay);
+        baseValid && bankValid && !overpay;
 
     // ----- EFFECT: reset khi open -----
     React.useEffect(() => {
@@ -298,9 +299,11 @@ export default function DepositModal({
                 await createDeposit(context.id, depositPayload);
             } else {
                 // Record payment for invoice - Backend expects RecordPaymentRequest
+                // Kế toán tạo payment CONFIRMED luôn (không qua PENDING)
                 const paymentPayload = {
                     amount,
                     paymentMethod: method,
+                    confirmationStatus: "CONFIRMED", // Kế toán xác nhận ngay
                     note: note || undefined,
                     createdBy: userId ? parseInt(userId) : undefined,
                 };
@@ -531,10 +534,8 @@ export default function DepositModal({
                         {/* Overpay warning */}
                         {overpay ? (
                             <div className="mt-1 text-[11px] text-rose-600 leading-relaxed">
-                                Số tiền lớn hơn phần còn lại ({fmtVND(remaining)} đ).
-                                {allowOverpay
-                                    ? " Bạn vẫn có thể xác nhận (cho phép overpay)."
-                                    : " Không được phép overpay."}
+                                ⚠️ Số tiền lớn hơn phần còn lại ({fmtVND(remaining)} đ).
+                                Vui lòng nhập số tiền nhỏ hơn hoặc bằng số tiền còn thiếu.
                             </div>
                         ) : null}
                     </div>
@@ -681,11 +682,8 @@ export default function DepositModal({
                         <div>
                             Điền đầy đủ thông tin. Nếu chọn chuyển khoản, bắt buộc
                             nhập{" "}
-                            <b className="text-slate-700">Số tài khoản</b>. Số
-                            tiền phải &gt; 0.
-                            {!allowOverpay
-                                ? " Không được vượt quá phần còn lại."
-                                : " Nếu vượt quá phần còn lại, hệ thống vẫn cho xác nhận (demo)."}
+                            <b className="text-slate-700">Số tài khoản</b>.
+                            Số tiền phải lớn hơn 0 và không vượt quá số tiền còn thiếu.
                         </div>
                     </div>
 
