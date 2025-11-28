@@ -5,27 +5,92 @@ import {
     createVehicleCategory,
     updateVehicleCategory,
 } from "../../api/vehicleCategories";
+import { apiFetch } from "../../api/http";
+import { getBranchByUserId } from "../../api/branches";
 import {
     CarFront,
     PlusCircle,
     X,
     Check,
     AlertTriangle,
+    Pencil,
+    Users,
+    ChevronLeft,
+    ChevronRight,
+    Search,
+    Calendar,
+    Building2,
+    Phone,
+    Mail,
+    FileText,
 } from "lucide-react";
 
 /* --------------------------------- helper ---------------------------------- */
 const cls = (...a) => a.filter(Boolean).join(" ");
+const fmtVND = (n) => new Intl.NumberFormat("vi-VN").format(Math.max(0, Number(n || 0)));
+
+// API helper for customers - sử dụng API bookings để lấy danh sách khách hàng từ đơn hàng
+async function listCustomers({ branchId, startDate, endDate, page = 1, size = 10 } = {}) {
+    const params = new URLSearchParams();
+    if (branchId) params.append("branchId", String(branchId));
+    if (startDate) params.append("startDate", startDate);
+    if (endDate) params.append("endDate", endDate);
+    if (page != null) params.append("page", String(page));
+    if (size != null) params.append("size", String(size));
+    const qs = params.toString();
+
+    // Sử dụng trực tiếp API bookings để lấy thông tin khách hàng
+    console.log("📞 Fetching customers from bookings...");
+    const bookings = await apiFetch(`/api/bookings?${qs}`);
+    console.log("📦 Bookings response:", bookings);
+
+    const items = bookings?.data?.items || bookings?.items || bookings?.content || [];
+    console.log("📋 Booking items:", items);
+
+    // Extract unique customers from bookings
+    const customerMap = new Map();
+    items.forEach(b => {
+        console.log("🔍 Processing booking:", b);
+        // Thử nhiều cách lấy thông tin khách hàng
+        const customer = b.customer || {};
+        const customerName = customer.fullName || customer.name || b.customerName || b.customer_name || "";
+        const customerEmail = customer.email || b.customerEmail || b.customer_email || "";
+        const customerPhone = customer.phone || customer.phoneNumber || b.customerPhone || b.customer_phone || "";
+        const customerNote = customer.note || b.note || "";
+
+        // Dùng phone hoặc email làm key để loại trùng
+        const key = customerPhone || customerEmail || `${customerName}-${Math.random()}`;
+
+        if (key && !customerMap.has(key)) {
+            customerMap.set(key, {
+                id: customer.id || b.customerId || b.id,
+                fullName: customerName,
+                email: customerEmail,
+                phone: customerPhone,
+                note: customerNote,
+            });
+        }
+    });
+
+    const result = {
+        items: Array.from(customerMap.values()),
+        totalElements: customerMap.size,
+        totalPages: 1,
+    };
+    console.log("✅ Extracted customers:", result);
+    return result;
+}
 
 /* --------------------------------- Toast ----------------------------------- */
 function useToasts() {
     const [toasts, setToasts] = React.useState([]);
-    const pushToast = (msg, kind = "info", ttl = 2600) => {
+    const pushToast = React.useCallback((msg, kind = "info", ttl = 2600) => {
         const id = Math.random().toString(36).slice(2);
         setToasts((arr) => [...arr, { id, msg, kind }]);
         setTimeout(() => {
             setToasts((arr) => arr.filter((t) => t.id !== id));
         }, ttl);
-    };
+    }, []);
     return { toasts, pushToast };
 }
 
@@ -60,7 +125,7 @@ function StatusPill({ status }) {
     const map = {
         ACTIVE: {
             label: "Đang hoạt động",
-            cls: "bg-amber-50 text-amber-700 border-amber-200",
+            cls: "bg-green-50 text-green-700 border-green-200",
         },
         INACTIVE: {
             label: "Ngưng",
@@ -84,6 +149,10 @@ function StatusPill({ status }) {
 function VehicleCategoryCreateModal({ open, onClose, onCreated }) {
     const [name, setName] = React.useState("");
     const [seats, setSeats] = React.useState("");
+    const [baseFee, setBaseFee] = React.useState("");
+    const [sameDayFixedPrice, setSameDayFixedPrice] = React.useState("");
+    const [pricePerKm, setPricePerKm] = React.useState("");
+    const [status, setStatus] = React.useState("ACTIVE");
     const [loading, setLoading] = React.useState(false);
     const [touchedName, setTouchedName] = React.useState(false);
     const [touchedSeats, setTouchedSeats] = React.useState(false);
@@ -93,6 +162,10 @@ function VehicleCategoryCreateModal({ open, onClose, onCreated }) {
         if (open) {
             setName("");
             setSeats("");
+            setBaseFee("");
+            setSameDayFixedPrice("");
+            setPricePerKm("");
+            setStatus("ACTIVE");
             setTouchedName(false);
             setTouchedSeats(false);
         }
@@ -102,6 +175,9 @@ function VehicleCategoryCreateModal({ open, onClose, onCreated }) {
 
     const cleanDigits = (s) => s.replace(/[^0-9]/g, "");
     const seatsNum = Number(cleanDigits(seats));
+    const baseFeeNum = baseFee ? Number(cleanDigits(baseFee)) : null;
+    const sameDayFixedPriceNum = sameDayFixedPrice ? Number(cleanDigits(sameDayFixedPrice)) : null;
+    const pricePerKmNum = pricePerKm ? Number(cleanDigits(pricePerKm)) : null;
 
     const nameError = name.trim().length === 0;
     const seatsError = isNaN(seatsNum) || seatsNum <= 0;
@@ -115,7 +191,10 @@ function VehicleCategoryCreateModal({ open, onClose, onCreated }) {
             id: Date.now(),
             name: name.trim(),
             seats: seatsNum,
-            status: "ACTIVE",
+            baseFee: baseFeeNum,
+            sameDayFixedPrice: sameDayFixedPriceNum,
+            pricePerKm: pricePerKmNum,
+            status: status,
             vehicles_count: 0,
         };
 
@@ -158,58 +237,122 @@ function VehicleCategoryCreateModal({ open, onClose, onCreated }) {
                 </div>
 
                 {/* body */}
-                <div className="px-5 py-4 space-y-5 text-[13px]">
-                    {/* Name */}
-                    <div>
-                        <div className="text-[12px] text-slate-600 mb-1">
-                            Tên danh mục <span className="text-red-500">*</span>
+                <div className="px-5 py-4 space-y-4 text-[13px] max-h-[60vh] overflow-y-auto">
+                    {/* Name & Seats - 2 columns */}
+                    <div className="grid grid-cols-2 gap-3">
+                        {/* Name */}
+                        <div>
+                            <div className="text-[12px] text-slate-600 mb-1">
+                                Tên danh mục <span className="text-red-500">*</span>
+                            </div>
+                            <input
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                onBlur={() => setTouchedName(true)}
+                                className={cls(
+                                    "w-full rounded-md border px-3 py-2 text-[13px]",
+                                    touchedName && nameError
+                                        ? "border-red-400 bg-red-50"
+                                        : "border-slate-300 bg-white",
+                                    "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition"
+                                )}
+                                placeholder="Xe 7 chỗ"
+                            />
+                            {touchedName && nameError && (
+                                <div className="text-[11px] text-red-500 mt-1">
+                                    Tên danh mục không được để trống.
+                                </div>
+                            )}
                         </div>
 
-                        <input
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            onBlur={() => setTouchedName(true)}
-                            className={cls(
-                                "w-full rounded-md border px-3 py-2 text-[13px]",
-                                touchedName && nameError
-                                    ? "border-red-400 bg-red-50"
-                                    : "border-slate-300 bg-white",
-                                "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition"
-                            )}
-                        />
-                        {touchedName && nameError && (
-                            <div className="text-[11px] text-red-500 mt-1">
-                                Tên danh mục không được để trống.
+                        {/* Seats */}
+                        <div>
+                            <div className="text-[12px] text-slate-600 mb-1">
+                                Số ghế <span className="text-red-500">*</span>
                             </div>
-                        )}
+                            <input
+                                value={seats}
+                                onChange={(e) => setSeats(cleanDigits(e.target.value))}
+                                onBlur={() => setTouchedSeats(true)}
+                                inputMode="numeric"
+                                className={cls(
+                                    "w-full rounded-md border px-3 py-2 text-[13px] tabular-nums",
+                                    touchedSeats && seatsError
+                                        ? "border-red-400 bg-red-50"
+                                        : "border-slate-300 bg-white",
+                                    "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition"
+                                )}
+                                placeholder="7"
+                            />
+                            {touchedSeats && seatsError && (
+                                <div className="text-[11px] text-red-500 mt-1">
+                                    Số ghế phải là số {'>'} 0.
+                                </div>
+                            )}
+                        </div>
                     </div>
 
-                    {/* Seats */}
-                    <div>
-                        <div className="text-[12px] text-slate-600 mb-1">
-                            Số ghế <span className="text-red-500">*</span>
+                    {/* Pricing fields - 2 columns */}
+                    <div className="grid grid-cols-2 gap-3">
+                        {/* Phí mở cửa */}
+                        <div>
+                            <div className="text-[12px] text-slate-600 mb-1">
+                                Phí mở cửa (VNĐ)
+                            </div>
+                            <input
+                                value={baseFee}
+                                onChange={(e) => setBaseFee(cleanDigits(e.target.value))}
+                                inputMode="numeric"
+                                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] tabular-nums focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition"
+                                placeholder="50000"
+                            />
                         </div>
 
-                        <input
-                            value={seats}
-                            onChange={(e) => setSeats(cleanDigits(e.target.value))}
-                            onBlur={() => setTouchedSeats(true)}
-                            inputMode="numeric"
-                            className={cls(
-                                "w-full rounded-md border px-3 py-2 text-[13px] tabular-nums",
-                                touchedSeats && seatsError
-                                    ? "border-red-400 bg-red-50"
-                                    : "border-slate-300 bg-white",
-                                "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition"
-                            )}
-                            placeholder="7"
-                        />
-
-                        {touchedSeats && seatsError && (
-                            <div className="text-[11px] text-red-500 mt-1">
-                                Số ghế phải là số {'>'} 0.
+                        {/* Giá theo km */}
+                        <div>
+                            <div className="text-[12px] text-slate-600 mb-1">
+                                Giá theo km (VNĐ)
                             </div>
-                        )}
+                            <input
+                                value={pricePerKm}
+                                onChange={(e) => setPricePerKm(cleanDigits(e.target.value))}
+                                inputMode="numeric"
+                                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] tabular-nums focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition"
+                                placeholder="15000"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Giá cố định/ngày & Status - 2 columns */}
+                    <div className="grid grid-cols-2 gap-3">
+                        {/* Giá cố định/ngày */}
+                        <div>
+                            <div className="text-[12px] text-slate-600 mb-1">
+                                Giá cố định/ngày (VNĐ)
+                            </div>
+                            <input
+                                value={sameDayFixedPrice}
+                                onChange={(e) => setSameDayFixedPrice(cleanDigits(e.target.value))}
+                                inputMode="numeric"
+                                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] tabular-nums focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition"
+                                placeholder="1500000"
+                            />
+                        </div>
+
+                        {/* Status */}
+                        <div>
+                            <div className="text-[12px] text-slate-600 mb-1">
+                                Trạng thái
+                            </div>
+                            <select
+                                value={status}
+                                onChange={(e) => setStatus(e.target.value)}
+                                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition"
+                            >
+                                <option value="ACTIVE">Đang hoạt động</option>
+                                <option value="INACTIVE">Ngưng hoạt động</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
@@ -248,69 +391,43 @@ function VehicleCategoryEditModal({
                                       onClose,
                                       onSaved,
                                   }) {
-    const [name, setName] = React.useState("");
-    const [seats, setSeats] = React.useState("");
-    const [description, setDescription] = React.useState("");
-    const [baseFare, setBaseFare] = React.useState("");
+    const [baseFee, setBaseFee] = React.useState("");
+    const [sameDayFixedPrice, setSameDayFixedPrice] = React.useState("");
     const [pricePerKm, setPricePerKm] = React.useState("");
-    const [highwayFee, setHighwayFee] = React.useState("");
-    const [fixedCosts, setFixedCosts] = React.useState("");
     const [status, setStatus] = React.useState("ACTIVE");
-    const [error, setError] = React.useState("");
-    const [touchedName, setTouchedName] = React.useState(false);
-    const [touchedSeats, setTouchedSeats] = React.useState(false);
-
     const [loadingSave, setLoadingSave] = React.useState(false);
 
     React.useEffect(() => {
         if (open && data) {
-            setName(data.name || "");
-            setSeats(String(data.seats ?? ""));
-            setDescription(data.description || "");
-            setBaseFare(String(data.baseFare ?? ""));
+            console.log("📝 Edit modal data:", data);
+            console.log("📝 baseFee value:", data.baseFee);
+            setBaseFee(String(data.baseFee ?? ""));
+            setSameDayFixedPrice(String(data.sameDayFixedPrice ?? ""));
             setPricePerKm(String(data.pricePerKm ?? ""));
-            setHighwayFee(String(data.highwayFee ?? ""));
-            setFixedCosts(String(data.fixedCosts ?? ""));
             setStatus(data.status ?? "ACTIVE");
-            setError("");
-            setTouchedName(false);
-            setTouchedSeats(false);
         }
     }, [open, data]);
 
     if (!open || !data) return null;
 
-    const cleanDigits = (s) => s.replace(/[^0-9]/g, "");
-    const cleanNumber = (s) => s.replace(/[^0-9.]/g, "");
+    const cleanNumber = (s) => s.replace(/[^0-9]/g, "");
 
-    const seatsNum = Number(cleanDigits(seats));
-    const baseFareNum = baseFare ? Number(cleanNumber(baseFare)) : null;
+    const baseFeeNum = baseFee ? Number(cleanNumber(baseFee)) : null;
+    const sameDayFixedPriceNum = sameDayFixedPrice ? Number(cleanNumber(sameDayFixedPrice)) : null;
     const pricePerKmNum = pricePerKm ? Number(cleanNumber(pricePerKm)) : null;
-    const highwayFeeNum = highwayFee ? Number(cleanNumber(highwayFee)) : null;
-    const fixedCostsNum = fixedCosts ? Number(cleanNumber(fixedCosts)) : null;
-
-    const nameError = name.trim().length === 0;
-    const seatsError = isNaN(seatsNum) || seatsNum <= 0;
-    const valid = !nameError && !seatsError;
 
     async function handleSave() {
-        if (!valid) return;
         setLoadingSave(true);
-
-        await new Promise((r) => setTimeout(r, 300));
-
         onSaved({
             id: data.id,
-            name: name.trim(),
-            seats: seatsNum,
-            description: description.trim() || null,
-            baseFare: baseFareNum,
+            name: data.name,
+            seats: data.seats,
+            description: data.description,
+            baseFee: baseFeeNum,
+            sameDayFixedPrice: sameDayFixedPriceNum,
             pricePerKm: pricePerKmNum,
-            highwayFee: highwayFeeNum,
-            fixedCosts: fixedCostsNum,
             status,
         });
-
         setLoadingSave(false);
         onClose();
     }
@@ -321,13 +438,13 @@ function VehicleCategoryEditModal({
             onClick={onClose}
         >
             <div
-                className="w-full max-w-lg rounded-xl bg-white border border-slate-200 shadow-xl"
+                className="w-full max-w-md rounded-xl bg-white border border-slate-200 shadow-xl"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* header */}
                 <div className="flex items-start gap-3 border-b border-slate-200 px-5 py-4">
                     <div className="h-10 w-10 rounded-md border border-sky-200 bg-sky-50 text-sky-600 flex items-center justify-center shadow-sm">
-                        <CarFront className="h-5 w-5" />
+                        <Pencil className="h-5 w-5" />
                     </div>
 
                     <div className="flex flex-col leading-tight">
@@ -335,7 +452,7 @@ function VehicleCategoryEditModal({
                             Chỉnh sửa danh mục
                         </div>
                         <div className="text-[11px] text-slate-500">
-                            ID #{data.id}
+                            {data.name} (ID #{data.id})
                         </div>
                     </div>
 
@@ -348,133 +465,47 @@ function VehicleCategoryEditModal({
                 </div>
 
                 {/* body */}
-                <div className="px-5 py-4 space-y-4 text-[13px] max-h-[70vh] overflow-y-auto">
-                    {/* Name */}
+                <div className="px-5 py-4 space-y-4 text-[13px]">
+                    {/* Base Fee */}
                     <div>
                         <div className="text-[12px] text-slate-600 mb-1">
-                            Tên danh mục <span className="text-red-500">*</span>
+                            Phí mở cửa (VNĐ)
                         </div>
                         <input
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            onBlur={() => setTouchedName(true)}
-                            className={cls(
-                                "w-full rounded-md border px-3 py-2 text-[13px]",
-                                touchedName && nameError
-                                    ? "border-red-400 bg-red-50"
-                                    : "border-slate-300 bg-white",
-                                "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition"
-                            )}
-                        />
-                        {touchedName && nameError && (
-                            <div className="text-[11px] text-red-500 mt-1">
-                                Tên danh mục không được để trống.
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Seats */}
-                    <div>
-                        <div className="text-[12px] text-slate-600 mb-1">
-                            Số ghế <span className="text-red-500">*</span>
-                        </div>
-                        <input
-                            value={seats}
-                            onChange={(e) => setSeats(cleanDigits(e.target.value))}
-                            onBlur={() => setTouchedSeats(true)}
+                            value={baseFee}
+                            onChange={(e) => setBaseFee(cleanNumber(e.target.value))}
                             inputMode="numeric"
-                            className={cls(
-                                "w-full rounded-md border px-3 py-2 text-[13px] tabular-nums",
-                                touchedSeats && seatsError
-                                    ? "border-red-400 bg-red-50"
-                                    : "border-slate-300 bg-white",
-                                "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition"
-                            )}
+                            placeholder="0"
+                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-[13px] tabular-nums bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition"
                         />
-                        {touchedSeats && seatsError && (
-                            <div className="text-[11px] text-red-500 mt-1">
-                                Số ghế phải là số {'>'} 0.
-                            </div>
-                        )}
                     </div>
 
-                    {/* Description */}
+                    {/* Same Day Fixed Price */}
                     <div>
                         <div className="text-[12px] text-slate-600 mb-1">
-                            Mô tả
+                            Giá cố định/ngày (VNĐ)
                         </div>
-                        <textarea
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            rows={2}
-                            placeholder="Ví dụ: Ford Transit, Mercedes Sprinter"
-                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-[13px] bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition resize-none"
+                        <input
+                            value={sameDayFixedPrice}
+                            onChange={(e) => setSameDayFixedPrice(cleanNumber(e.target.value))}
+                            inputMode="numeric"
+                            placeholder="0"
+                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-[13px] tabular-nums bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition"
                         />
                     </div>
 
-                    {/* PRICING SECTION */}
-                    <div className="border-t pt-4 mt-4">
-                        <div className="text-[13px] font-semibold text-slate-700 mb-3">
-                            💰 Thông tin giá
+                    {/* Price per Km */}
+                    <div>
+                        <div className="text-[12px] text-slate-600 mb-1">
+                            Giá theo km (VNĐ)
                         </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                            {/* Base Fare */}
-                            <div>
-                                <div className="text-[12px] text-slate-600 mb-1">
-                                    Giá cơ bản (VNĐ)
-                                </div>
-                                <input
-                                    value={baseFare}
-                                    onChange={(e) => setBaseFare(cleanNumber(e.target.value))}
-                                    inputMode="decimal"
-                                    placeholder="800000"
-                                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-[13px] tabular-nums bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition"
-                                />
-                            </div>
-
-                            {/* Price per Km */}
-                            <div>
-                                <div className="text-[12px] text-slate-600 mb-1">
-                                    Giá/km (VNĐ)
-                                </div>
-                                <input
-                                    value={pricePerKm}
-                                    onChange={(e) => setPricePerKm(cleanNumber(e.target.value))}
-                                    inputMode="decimal"
-                                    placeholder="15000"
-                                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-[13px] tabular-nums bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition"
-                                />
-                            </div>
-
-                            {/* Highway Fee */}
-                            <div>
-                                <div className="text-[12px] text-slate-600 mb-1">
-                                    Phí cao tốc (VNĐ)
-                                </div>
-                                <input
-                                    value={highwayFee}
-                                    onChange={(e) => setHighwayFee(cleanNumber(e.target.value))}
-                                    inputMode="decimal"
-                                    placeholder="100000"
-                                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-[13px] tabular-nums bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition"
-                                />
-                            </div>
-
-                            {/* Fixed Costs */}
-                            <div>
-                                <div className="text-[12px] text-slate-600 mb-1">
-                                    Chi phí cố định (VNĐ)
-                                </div>
-                                <input
-                                    value={fixedCosts}
-                                    onChange={(e) => setFixedCosts(cleanNumber(e.target.value))}
-                                    inputMode="decimal"
-                                    placeholder="0"
-                                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-[13px] tabular-nums bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition"
-                                />
-                            </div>
-                        </div>
+                        <input
+                            value={pricePerKm}
+                            onChange={(e) => setPricePerKm(cleanNumber(e.target.value))}
+                            inputMode="numeric"
+                            placeholder="0"
+                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-[13px] tabular-nums bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition"
+                        />
                     </div>
 
                     {/* Status */}
@@ -491,18 +522,6 @@ function VehicleCategoryEditModal({
                             <option value="INACTIVE">Ngưng sử dụng</option>
                         </select>
                     </div>
-
-                    {/* Info */}
-                    <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-[12px] text-slate-600">
-                        Số xe đang thuộc danh mục:
-                        <span className="ml-1 font-semibold text-slate-900">
-                            {data.vehicles_count}
-                        </span>
-                    </div>
-
-                    {error && (
-                        <div className="text-red-500 text-[12px]">{error}</div>
-                    )}
                 </div>
 
                 {/* footer */}
@@ -516,16 +535,259 @@ function VehicleCategoryEditModal({
 
                     <button
                         onClick={handleSave}
-                        disabled={!valid || loadingSave}
-                        className={cls(
-                            "rounded-md px-3 py-2 text-[13px] font-medium text-white shadow-sm",
-                            valid
-                                ? "bg-sky-600 hover:bg-sky-500"
-                                : "bg-slate-400 cursor-not-allowed"
-                        )}
+                        disabled={loadingSave}
+                        className="rounded-md px-3 py-2 text-[13px] font-medium text-white shadow-sm bg-sky-600 hover:bg-sky-500 disabled:opacity-50"
                     >
                         {loadingSave ? "Đang lưu..." : "Lưu thay đổi"}
                     </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* ---------------------- Modal Customer List ------------------------ */
+function CustomerListModal({ open, onClose }) {
+    const [customers, setCustomers] = React.useState([]);
+    const [loading, setLoading] = React.useState(false);
+    const [error, setError] = React.useState("");
+    const [page, setPage] = React.useState(1);
+    const [totalPages, setTotalPages] = React.useState(1);
+    const [totalItems, setTotalItems] = React.useState(0);
+    const [startDate, setStartDate] = React.useState("");
+    const [endDate, setEndDate] = React.useState("");
+    const [branchId, setBranchId] = React.useState("");
+    const [branchName, setBranchName] = React.useState("");
+    const pageSize = 10;
+
+    // Load branch for current user
+    React.useEffect(() => {
+        if (!open) return;
+        (async () => {
+            try {
+                const userId = localStorage.getItem("userId");
+                if (userId) {
+                    const branch = await getBranchByUserId(Number(userId));
+                    if (branch) {
+                        setBranchId(String(branch.id || branch.branchId || ""));
+                        setBranchName(branch.branchName || "");
+                    }
+                }
+            } catch (err) {
+                console.warn("Could not load branch:", err);
+            }
+        })();
+    }, [open]);
+
+    // Load customers
+    const loadCustomers = React.useCallback(async () => {
+        setLoading(true);
+        setError("");
+        try {
+            const result = await listCustomers({
+                branchId: branchId || undefined,
+                startDate: startDate || undefined,
+                endDate: endDate || undefined,
+                page,
+                size: pageSize,
+            });
+
+            // Handle different response structures
+            const items = result?.data?.items || result?.items || result?.content || result?.data?.content || [];
+            const total = result?.data?.totalElements || result?.totalElements || result?.data?.total || items.length;
+            const pages = result?.data?.totalPages || result?.totalPages || Math.ceil(total / pageSize) || 1;
+
+            setCustomers(items);
+            setTotalItems(total);
+            setTotalPages(pages);
+        } catch (err) {
+            console.error("Load customers error:", err);
+            setError("Không thể tải danh sách khách hàng");
+            setCustomers([]);
+        } finally {
+            setLoading(false);
+        }
+    }, [branchId, startDate, endDate, page]);
+
+    React.useEffect(() => {
+        if (open) {
+            loadCustomers();
+        }
+    }, [open, loadCustomers]);
+
+    if (!open) return null;
+
+    return (
+        <div
+            className="fixed inset-0 z-[999] flex items-center justify-center bg-black/40 p-4"
+            onClick={onClose}
+        >
+            <div
+                className="w-full max-w-4xl rounded-xl bg-white border border-slate-200 shadow-xl max-h-[90vh] flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* header */}
+                <div className="flex items-start gap-3 border-b border-slate-200 px-5 py-4">
+                    <div className="h-10 w-10 rounded-md border border-sky-200 bg-sky-50 text-sky-600 flex items-center justify-center shadow-sm">
+                        <Users className="h-5 w-5" />
+                    </div>
+
+                    <div className="flex flex-col leading-tight flex-1">
+                        <div className="text-slate-900 font-semibold text-[14px]">
+                            Danh sách khách hàng
+                        </div>
+                        <div className="text-[11px] text-slate-500">
+                            {totalItems} khách hàng
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={onClose}
+                        className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+                </div>
+
+                {/* filter bar */}
+                <div className="px-5 py-3 border-b border-slate-200 bg-slate-50 flex flex-wrap gap-3 items-center">
+                    {/* Branch info */}
+                    {branchName && (
+                        <div className="flex items-center gap-2 text-[12px] text-slate-600">
+                            <Building2 className="h-4 w-4 text-slate-400" />
+                            <span>{branchName}</span>
+                        </div>
+                    )}
+
+                    {/* Start date */}
+                    <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-slate-400" />
+                        <input
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => {
+                                setStartDate(e.target.value);
+                                setPage(1);
+                            }}
+                            className="rounded-md border border-slate-300 px-2 py-1.5 text-[12px] bg-white"
+                            placeholder="Từ ngày"
+                        />
+                    </div>
+
+                    {/* End date */}
+                    <div className="flex items-center gap-2">
+                        <span className="text-slate-400 text-[12px]">đến</span>
+                        <input
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => {
+                                setEndDate(e.target.value);
+                                setPage(1);
+                            }}
+                            className="rounded-md border border-slate-300 px-2 py-1.5 text-[12px] bg-white"
+                            placeholder="Đến ngày"
+                        />
+                    </div>
+
+                    {/* Search button */}
+                    <button
+                        onClick={() => {
+                            setPage(1);
+                            loadCustomers();
+                        }}
+                        className="rounded-md border border-sky-300 bg-sky-50 px-3 py-1.5 text-[12px] text-sky-700 hover:bg-sky-100 flex items-center gap-1"
+                    >
+                        <Search className="h-3.5 w-3.5" />
+                        Tìm kiếm
+                    </button>
+                </div>
+
+                {/* body */}
+                <div className="flex-1 overflow-auto">
+                    {loading ? (
+                        <div className="px-5 py-10 text-center text-slate-500 text-[13px]">
+                            Đang tải...
+                        </div>
+                    ) : error ? (
+                        <div className="px-5 py-10 text-center text-red-500 text-[13px]">
+                            {error}
+                        </div>
+                    ) : customers.length === 0 ? (
+                        <div className="px-5 py-10 text-center text-slate-400 text-[13px]">
+                            Không có khách hàng nào
+                        </div>
+                    ) : (
+                        <table className="w-full text-[13px]">
+                            <thead className="bg-slate-100 border-b text-[11px] uppercase text-slate-500 sticky top-0">
+                            <tr>
+                                <th className="px-4 py-2 text-left">Tên</th>
+                                <th className="px-4 py-2 text-left">Email</th>
+                                <th className="px-4 py-2 text-left">SĐT</th>
+                                <th className="px-4 py-2 text-left">Ghi chú</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {customers.map((c, idx) => (
+                                <tr
+                                    key={c.id || idx}
+                                    className="hover:bg-slate-50 transition border-b border-slate-200 last:border-none"
+                                >
+                                    <td className="px-4 py-3">
+                                        <div className="flex items-center gap-2">
+                                            <div className="h-8 w-8 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[11px] font-semibold">
+                                                {(c.fullName || c.name || "?").charAt(0).toUpperCase()}
+                                            </div>
+                                            <span className="font-medium text-slate-900">
+                                                    {c.fullName || c.name || "—"}
+                                                </span>
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <div className="flex items-center gap-1 text-slate-600">
+                                            <Mail className="h-3.5 w-3.5 text-slate-400" />
+                                            {c.email || "—"}
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <div className="flex items-center gap-1 text-slate-600">
+                                            <Phone className="h-3.5 w-3.5 text-slate-400" />
+                                            {c.phone || c.phoneNumber || "—"}
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <div className="flex items-center gap-1 text-slate-500 text-[12px]">
+                                            <FileText className="h-3.5 w-3.5 text-slate-400" />
+                                            {c.note || c.notes || "—"}
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+
+                {/* pagination */}
+                <div className="border-t border-slate-200 bg-slate-50 px-5 py-3 flex items-center justify-between">
+                    <div className="text-[12px] text-slate-500">
+                        Trang {page} / {totalPages} ({totalItems} khách hàng)
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setPage((p) => Math.max(1, p - 1))}
+                            disabled={page <= 1}
+                            className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[12px] text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <ChevronLeft className="h-4 w-4" />
+                        </button>
+                        <button
+                            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                            disabled={page >= totalPages}
+                            className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[12px] text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <ChevronRight className="h-4 w-4" />
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -538,18 +800,22 @@ export default function VehicleCategoryManagePage() {
     const [categories, setCategories] = React.useState([]);
 
     const mapCat = React.useCallback(
-        (c) => ({
-            id: c.id,
-            name: c.categoryName || c.name,
-            status: c.status || "ACTIVE",
-            seats: c.seats ?? null,
-            vehicles_count: c.vehiclesCount ?? c.vehicles_count ?? 0,
-            description: c.description || "",
-            baseFare: c.baseFare ?? null,
-            pricePerKm: c.pricePerKm ?? null,
-            highwayFee: c.highwayFee ?? null,
-            fixedCosts: c.fixedCosts ?? null,
-        }),
+        (c) => {
+            console.log("📦 Raw category data from API:", c);
+            return {
+                id: c.id,
+                name: c.categoryName || c.name,
+                status: c.status || "ACTIVE",
+                seats: c.seats ?? null,
+                vehicles_count: c.vehiclesCount ?? c.vehicles_count ?? 0,
+                description: c.description || "",
+                baseFee: c.baseFare ?? c.baseFee ?? null,
+                sameDayFixedPrice: c.sameDayFixedPrice ?? null,
+                pricePerKm: c.pricePerKm ?? null,
+                highwayFee: c.highwayFee ?? null,
+                fixedCosts: c.fixedCosts ?? null,
+            };
+        },
         []
     );
 
@@ -567,6 +833,7 @@ export default function VehicleCategoryManagePage() {
     const [createOpen, setCreateOpen] = React.useState(false);
     const [editOpen, setEditOpen] = React.useState(false);
     const [editData, setEditData] = React.useState(null);
+    const [customerListOpen, setCustomerListOpen] = React.useState(false);
 
     async function handleCreated(cat) {
         try {
@@ -590,10 +857,9 @@ export default function VehicleCategoryManagePage() {
                 categoryName: cat.name,
                 seats: cat.seats,
                 description: cat.description,
-                baseFare: cat.baseFare,
+                baseFee: cat.baseFee,
+                sameDayFixedPrice: cat.sameDayFixedPrice,
                 pricePerKm: cat.pricePerKm,
-                highwayFee: cat.highwayFee,
-                fixedCosts: cat.fixedCosts,
                 status: cat.status,
             });
 
@@ -658,13 +924,15 @@ export default function VehicleCategoryManagePage() {
                         <tr>
                             <th className="px-4 py-2 text-left">Tên danh mục</th>
                             <th className="px-4 py-2 text-left">Số ghế</th>
+                            <th className="px-4 py-2 text-center">Số xe</th>
+                            <th className="px-4 py-2 text-right">Phí mở cửa</th>
+                            <th className="px-4 py-2 text-right">Giá cố định/ngày</th>
+                            <th className="px-4 py-2 text-right">Giá theo km</th>
                             <th className="px-4 py-2 text-left">Trạng thái</th>
-                            <th className="px-4 py-2 text-left">Số xe</th>
                             <th className="px-4 py-2 text-left">Hành động</th>
                         </tr>
                         </thead>
 
-                        {/* ❌ Không dùng divide-y nữa */}
                         <tbody>
                         {categories.map((cat) => (
                             <tr
@@ -684,24 +952,49 @@ export default function VehicleCategoryManagePage() {
                                     {cat.seats} ghế
                                 </td>
 
-                                <td className="px-4 py-3 align-top">
-                                    <StatusPill status={cat.status} />
+                                <td className="px-4 py-3 align-top text-center">
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[11px] font-medium">
+                                            <CarFront className="h-3 w-3" />
+                                            {cat.vehicles_count ?? 0}
+                                        </span>
                                 </td>
-                                <td className="px-4 py-3 align-top">
-                                    {cat.vehicles_count}
+
+                                <td className="px-4 py-3 align-top text-right tabular-nums">
+                                    {cat.baseFee ? fmtVND(cat.baseFee) + " đ" : "—"}
+                                </td>
+
+                                <td className="px-4 py-3 align-top text-right tabular-nums">
+                                    {cat.sameDayFixedPrice ? fmtVND(cat.sameDayFixedPrice) + " đ" : "—"}
+                                </td>
+
+                                <td className="px-4 py-3 align-top text-right tabular-nums">
+                                    {cat.pricePerKm ? fmtVND(cat.pricePerKm) + " đ" : "—"}
                                 </td>
 
                                 <td className="px-4 py-3 align-top">
-                                    <button
-                                        onClick={() => {
-                                            console.log("[EDIT] Opening modal for category:", cat);
-                                            setEditData(cat);
-                                            setEditOpen(true);
-                                        }}
-                                        className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-[12px] hover:bg-slate-100 text-slate-700 shadow-sm"
-                                    >
-                                        Chỉnh sửa
-                                    </button>
+                                    <StatusPill status={cat.status} />
+                                </td>
+
+                                <td className="px-4 py-3 align-top">
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => {
+                                                setEditData(cat);
+                                                setEditOpen(true);
+                                            }}
+                                            className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] hover:bg-slate-100 text-slate-700 shadow-sm flex items-center gap-1"
+                                        >
+                                            <Pencil className="h-3.5 w-3.5" />
+                                            Sửa
+                                        </button>
+                                        <button
+                                            onClick={() => setCustomerListOpen(true)}
+                                            className="rounded-md border border-sky-300 bg-sky-50 px-2.5 py-1.5 text-[11px] hover:bg-sky-100 text-sky-700 shadow-sm flex items-center gap-1"
+                                        >
+                                            <Users className="h-3.5 w-3.5" />
+                                            DS khách hàng
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         ))}
@@ -709,7 +1002,7 @@ export default function VehicleCategoryManagePage() {
                         {categories.length === 0 && (
                             <tr>
                                 <td
-                                    colSpan={5}
+                                    colSpan={8}
                                     className="px-4 py-10 text-center text-slate-400"
                                 >
                                     Chưa có danh mục nào.
@@ -733,6 +1026,11 @@ export default function VehicleCategoryManagePage() {
                 data={editData}
                 onClose={() => setEditOpen(false)}
                 onSaved={handleSaved}
+            />
+
+            <CustomerListModal
+                open={customerListOpen}
+                onClose={() => setCustomerListOpen(false)}
             />
         </div>
     );
