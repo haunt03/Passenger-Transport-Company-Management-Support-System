@@ -519,7 +519,7 @@ export default function SystemSettingsPage() {
                         </button>
 
                         {/* nút thêm tham số */}
-                        <button
+                        {/* <button
                             onClick={startAdd}
                             disabled={adding}
                             className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-lg disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-xl transition-all active:scale-[0.98]"
@@ -527,7 +527,7 @@ export default function SystemSettingsPage() {
                         >
                             <Plus className="h-4 w-4" />
                             <span>Thêm tham số</span>
-                        </button>
+                        </button> */}
                     </div>
                 </div>
 

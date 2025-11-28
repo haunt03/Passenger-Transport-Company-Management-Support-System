@@ -18,8 +18,9 @@ import {
     ResponsiveContainer,
 } from "recharts";
 import { getRevenueReport } from "../../api/accounting";
-import { listBranches } from "../../api/branches";
+import { listBranches, getBranchByUserId } from "../../api/branches";
 import { exportRevenueReportToExcel, exportRevenueReportToCsv } from "../../api/exports";
+import { getCurrentRole, getStoredUserId, ROLES } from "../../utils/session";
 
 /**
  * ReportRevenuePage (phiên bản light theme đồng nhất)
@@ -57,11 +58,22 @@ function fmtVND(n) {
 }
 
 export default function ReportRevenuePage() {
+    // ====== ROLE & USER ======
+    const role = getCurrentRole();
+    const userId = getStoredUserId();
+    const isAccountant = role === ROLES.ACCOUNTANT;
+    const isAdmin = role === ROLES.ADMIN;
+    const isManager = role === ROLES.MANAGER;
+    // Accountant chỉ xem được chi nhánh của mình
+    const canChangeBranch = isAdmin || isManager;
+
     // ====== STATE FILTERS ======
     const [fromDate, setFromDate] = React.useState("");
     const [toDate, setToDate] = React.useState("");
     const [period, setPeriod] = React.useState("THIS_MONTH");
     const [branchId, setBranchId] = React.useState(null);
+    const [userBranchId, setUserBranchId] = React.useState(null);
+    const [userBranchName, setUserBranchName] = React.useState("");
     const [customerId, setCustomerId] = React.useState(null);
     const [customerQuery, setCustomerQuery] = React.useState("");
 
@@ -84,8 +96,30 @@ export default function ReportRevenuePage() {
 
     const [branches, setBranches] = React.useState([]);
 
-    // Load branches on mount
+    // Load user's branch if ACCOUNTANT
     React.useEffect(() => {
+        if (!isAccountant || !userId) return;
+
+        (async () => {
+            try {
+                const branch = await getBranchByUserId(userId);
+                const id = branch?.branchId || branch?.id;
+                const name = branch?.branchName || branch?.name || "";
+                if (id) {
+                    setUserBranchId(id);
+                    setUserBranchName(name);
+                    setBranchId(id); // Auto-set branch filter
+                }
+            } catch (err) {
+                console.error("[ReportRevenuePage] Error loading user branch:", err);
+            }
+        })();
+    }, [isAccountant, userId]);
+
+    // Load branches on mount (only for Admin/Manager)
+    React.useEffect(() => {
+        if (!canChangeBranch) return;
+
         (async () => {
             try {
                 const branchesData = await listBranches({ size: 100 });
@@ -107,7 +141,7 @@ export default function ReportRevenuePage() {
                 setBranches([]);
             }
         })();
-    }, []);
+    }, [canChangeBranch]);
 
     // Load revenue report
     const loadReport = React.useCallback(async () => {
@@ -349,27 +383,41 @@ export default function ReportRevenuePage() {
                         <label className="text-[12px] text-gray-600 mb-1 flex items-center gap-1">
                             <Building2 className="h-3.5 w-3.5 text-gray-400" />
                             <span>Chi nhánh</span>
+                            {!canChangeBranch && (
+                                <span className="text-[10px] text-amber-600 ml-1">(Chỉ xem chi nhánh của bạn)</span>
+                            )}
                         </label>
-                        <div className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm">
-                            <select
-                                className="bg-transparent outline-none text-[13px] text-gray-800 w-full"
-                                value={branchId || ""}
-                                onChange={(e) => {
-                                    console.log('[ReportRevenuePage] Branch selected:', e.target.value);
-                                    setBranchId(e.target.value ? Number(e.target.value) : null);
-                                }}
-                            >
-                                <option value="">Tất cả chi nhánh</option>
-                                {branches.length > 0 ? (
-                                    branches.map((b) => (
-                                        <option key={b.branchId || b.id} value={b.branchId || b.id}>
-                                            {b.branchName || b.name || 'Unknown'}
-                                        </option>
-                                    ))
-                                ) : (
-                                    <option disabled>Đang tải...</option>
-                                )}
-                            </select>
+                        <div className={cls(
+                            "flex items-center gap-2 rounded-lg border px-3 py-2 shadow-sm",
+                            canChangeBranch
+                                ? "border-gray-300 bg-white"
+                                : "border-gray-200 bg-gray-100 cursor-not-allowed"
+                        )}>
+                            {canChangeBranch ? (
+                                <select
+                                    className="bg-transparent outline-none text-[13px] text-gray-800 w-full"
+                                    value={branchId || ""}
+                                    onChange={(e) => {
+                                        console.log('[ReportRevenuePage] Branch selected:', e.target.value);
+                                        setBranchId(e.target.value ? Number(e.target.value) : null);
+                                    }}
+                                >
+                                    <option value="">Tất cả chi nhánh</option>
+                                    {branches.length > 0 ? (
+                                        branches.map((b) => (
+                                            <option key={b.branchId || b.id} value={b.branchId || b.id}>
+                                                {b.branchName || b.name || 'Unknown'}
+                                            </option>
+                                        ))
+                                    ) : (
+                                        <option disabled>Đang tải...</option>
+                                    )}
+                                </select>
+                            ) : (
+                                <span className="text-[13px] text-gray-700 font-medium">
+                                    {userBranchName || "Đang tải..."}
+                                </span>
+                            )}
                         </div>
                     </div>
 

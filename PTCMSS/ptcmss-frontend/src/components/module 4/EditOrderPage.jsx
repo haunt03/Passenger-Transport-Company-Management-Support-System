@@ -5,6 +5,8 @@ import { getBooking, updateBooking, calculatePrice, assignBooking } from "../../
 import { calculateDistance } from "../../api/graphhopper";
 import { listVehicleCategories } from "../../api/vehicleCategories";
 import { listBranches } from "../../api/branches";
+import { listDriversByBranch } from "../../api/drivers";
+import { listVehicles } from "../../api/vehicles";
 import {
     ArrowLeft,
     User,
@@ -16,9 +18,13 @@ import {
     DollarSign,
     AlertTriangle,
     Save,
-    Send,
     Loader2,
     Navigation,
+    Users,
+    FileText,
+    Search,
+    ChevronDown,
+    X,
 } from "lucide-react";
 
 /**
@@ -79,13 +85,13 @@ function StatusPill({ status }) {
 /* ---------------- Toast mini (light style) ---------------- */
 function useToasts() {
     const [toasts, setToasts] = React.useState([]);
-    const pushToast = (msg, kind = "info", ttl = 2600) => {
+    const pushToast = React.useCallback((msg, kind = "info", ttl = 2600) => {
         const id = Math.random().toString(36).slice(2);
         setToasts((arr) => [...arr, { id, msg, kind }]);
         setTimeout(() => {
             setToasts((arr) => arr.filter((t) => t.id !== id));
         }, ttl);
-    };
+    }, []);
     return { toasts, pushToast };
 }
 
@@ -167,14 +173,19 @@ export default function EditOrderPage() {
     const [distanceError, setDistanceError] = React.useState("");
 
     /* --- thông số xe --- */
-    const [pax, setPax] = React.useState("0");
+    const [pax, setPax] = React.useState("1");
     const [vehiclesNeeded, setVehiclesNeeded] = React.useState("1");
     const [categoryId, setCategoryId] = React.useState("");
     const [categories, setCategories] = React.useState([]);
+    const [selectedCategory, setSelectedCategory] = React.useState(null);
     const [branches, setBranches] = React.useState([]);
 
     const [availabilityMsg, setAvailabilityMsg] =
         React.useState("");
+    const [checkingAvailability, setCheckingAvailability] = React.useState(false);
+
+    /* --- ghi chú --- */
+    const [bookingNote, setBookingNote] = React.useState("");
 
     /* --- giá --- */
     const [systemPrice, setSystemPrice] = React.useState(0);
@@ -185,6 +196,23 @@ export default function EditOrderPage() {
     // assignment
     const [driverId, setDriverId] = React.useState("");
     const [vehicleId, setVehicleId] = React.useState("");
+    const [tripIds, setTripIds] = React.useState([]); // Store trip IDs for assignment
+    const [driversList, setDriversList] = React.useState([]);
+    const [vehiclesList, setVehiclesList] = React.useState([]);
+    const [loadingDrivers, setLoadingDrivers] = React.useState(false);
+    const [loadingVehicles, setLoadingVehicles] = React.useState(false);
+    const [driverSearch, setDriverSearch] = React.useState("");
+    const [vehicleSearch, setVehicleSearch] = React.useState("");
+    const [showDriverDropdown, setShowDriverDropdown] = React.useState(false);
+    const [showVehicleDropdown, setShowVehicleDropdown] = React.useState(false);
+
+    // Assigned driver/vehicle info and cooldown
+    const [assignedDriver, setAssignedDriver] = React.useState(null);
+    const [assignedVehicle, setAssignedVehicle] = React.useState(null);
+    const [assignedDriverId, setAssignedDriverId] = React.useState(null); // Raw ID from API
+    const [assignedVehicleId, setAssignedVehicleId] = React.useState(null); // Raw ID from API
+    const [lastAssignmentTime, setLastAssignmentTime] = React.useState(null);
+    const [cooldownRemaining, setCooldownRemaining] = React.useState(0);
 
     /* --- submit state --- */
     const [submittingDraft, setSubmittingDraft] =
@@ -193,8 +221,22 @@ export default function EditOrderPage() {
         React.useState(false);
 
     /* --- quyền sửa --- */
-    const canEdit =
-        status === "DRAFT" || status === "PENDING";
+    // Check: status phải là DRAFT/PENDING/CONFIRMED/ASSIGNED và còn >= 12h trước chuyến
+    const canEdit = React.useMemo(() => {
+        const editableStatuses = ["DRAFT", "PENDING", "CONFIRMED", "ASSIGNED", "QUOTATION_SENT"];
+        if (!editableStatuses.includes(status)) return false;
+
+        // Check thời gian: phải còn >= 12h trước chuyến
+        if (startTime) {
+            const tripStart = new Date(startTime);
+            const now = new Date();
+            const hoursUntilTrip = (tripStart - now) / (1000 * 60 * 60);
+            if (hoursUntilTrip < 12) {
+                return false; // Còn < 12h, không cho sửa
+            }
+        }
+        return true;
+    }, [status, startTime]);
 
     // helper ISO
     const toIsoZ = (s) => {
@@ -231,7 +273,12 @@ export default function EditOrderPage() {
             try {
                 const cats = await listVehicleCategories();
                 if (Array.isArray(cats) && cats.length > 0) {
-                    setCategories(cats);
+                    const mapped = cats.map(c => ({
+                        id: String(c.id),
+                        categoryName: c.categoryName,
+                        seats: c.seats || 0
+                    }));
+                    setCategories(mapped);
                 } else {
                     pushToast("Không thể tải danh mục xe: Dữ liệu trống", "error");
                 }
@@ -262,9 +309,34 @@ export default function EditOrderPage() {
                 setCustomerEmail(b.customer?.email || "");
                 setPickup(t.startLocation || "");
                 setDropoff(t.endLocation || "");
-                setStartTime((t.startTime || "").toString().replace("Z", ""));
-                setEndTime((t.endTime || "").toString().replace("Z", ""));
+                // Convert UTC to local datetime-local format (YYYY-MM-DDTHH:mm)
+                if (t.startTime) {
+                    const d = new Date(t.startTime);
+                    if (!Number.isNaN(d.getTime())) {
+                        const localStr = d.getFullYear() + '-' +
+                            String(d.getMonth() + 1).padStart(2, '0') + '-' +
+                            String(d.getDate()).padStart(2, '0') + 'T' +
+                            String(d.getHours()).padStart(2, '0') + ':' +
+                            String(d.getMinutes()).padStart(2, '0');
+                        setStartTime(localStr);
+                    }
+                }
+                if (t.endTime) {
+                    const d2 = new Date(t.endTime);
+                    if (!Number.isNaN(d2.getTime())) {
+                        const localStr2 = d2.getFullYear() + '-' +
+                            String(d2.getMonth() + 1).padStart(2, '0') + '-' +
+                            String(d2.getDate()).padStart(2, '0') + 'T' +
+                            String(d2.getHours()).padStart(2, '0') + ':' +
+                            String(d2.getMinutes()).padStart(2, '0');
+                        setEndTime(localStr2);
+                    }
+                }
                 setDistanceKm(String(t.distance || ""));
+                // Load pax from trip or booking
+                const paxValue = t.paxCount || b.paxCount || 1;
+                setPax(String(paxValue));
+
                 const qty = Array.isArray(b.vehicles) ? b.vehicles.reduce((s, v) => s + (v.quantity || 0), 0) : 1;
                 const catId = Array.isArray(b.vehicles) && b.vehicles.length ? String(b.vehicles[0].vehicleCategoryId) : "";
                 setVehiclesNeeded(String(qty));
@@ -272,9 +344,185 @@ export default function EditOrderPage() {
                 setSystemPrice(Number(b.estimatedCost || 0));
                 setDiscountAmount(String(b.discountAmount || 0));
                 setFinalPrice(Number(b.totalCost || 0));
+                // Load note
+                setBookingNote(b.note || "");
+                // Load trip IDs for assignment
+                if (Array.isArray(b.trips) && b.trips.length > 0) {
+                    const ids = b.trips.map(t => t.tripId || t.id).filter(Boolean);
+                    setTripIds(ids);
+                    // Load assigned driver/vehicle info from first trip
+                    const firstTrip = b.trips[0];
+                    if (firstTrip.driverId || firstTrip.driver) {
+                        const dId = firstTrip.driverId || firstTrip.driver?.driverId;
+                        setAssignedDriverId(dId);
+                        // If we have full driver info from API, use it
+                        if (firstTrip.driver?.driverName || firstTrip.driver?.fullName) {
+                            setAssignedDriver({
+                                id: dId,
+                                name: firstTrip.driver?.driverName || firstTrip.driver?.fullName,
+                                phone: firstTrip.driver?.phone || ""
+                            });
+                        }
+                    }
+                    if (firstTrip.vehicleId || firstTrip.vehicle) {
+                        const vId = firstTrip.vehicleId || firstTrip.vehicle?.vehicleId;
+                        setAssignedVehicleId(vId);
+                        // If we have full vehicle info from API, use it
+                        if (firstTrip.vehicle?.licensePlate) {
+                            setAssignedVehicle({
+                                id: vId,
+                                licensePlate: firstTrip.vehicle?.licensePlate,
+                                categoryName: firstTrip.vehicle?.categoryName || ""
+                            });
+                        }
+                    }
+                }
             } catch { }
         })();
     }, [orderId]);
+
+    // Update selectedCategory khi categoryId thay đổi
+    React.useEffect(() => {
+        if (categoryId && categories.length > 0) {
+            const found = categories.find(c => c.id === categoryId);
+            if (found) {
+                setSelectedCategory(found);
+            }
+        }
+    }, [categoryId, categories]);
+
+    // Update assigned driver info when driversList is loaded
+    React.useEffect(() => {
+        if (assignedDriverId && driversList.length > 0 && !assignedDriver) {
+            const found = driversList.find(d => String(d.id) === String(assignedDriverId));
+            if (found) {
+                setAssignedDriver({
+                    id: found.id,
+                    name: found.name,
+                    phone: found.phone || ""
+                });
+            }
+        }
+    }, [assignedDriverId, driversList, assignedDriver]);
+
+    // Update assigned vehicle info when vehiclesList is loaded
+    React.useEffect(() => {
+        if (assignedVehicleId && vehiclesList.length > 0 && !assignedVehicle) {
+            const found = vehiclesList.find(v => String(v.id) === String(assignedVehicleId));
+            if (found) {
+                setAssignedVehicle({
+                    id: found.id,
+                    licensePlate: found.licensePlate,
+                    categoryName: found.categoryName || ""
+                });
+            }
+        }
+    }, [assignedVehicleId, vehiclesList, assignedVehicle]);
+
+    // Load drivers và vehicles khi branchId thay đổi
+    React.useEffect(() => {
+        if (!branchId) return;
+
+        // Load drivers
+        (async () => {
+            setLoadingDrivers(true);
+            try {
+                const drivers = await listDriversByBranch(branchId);
+                const list = Array.isArray(drivers) ? drivers : (drivers?.data || []);
+                setDriversList(list.map(d => ({
+                    id: d.driverId || d.id,
+                    name: d.driverName || d.fullName || d.name || `Driver #${d.driverId || d.id}`,
+                    phone: d.phone || "",
+                    status: d.status || "AVAILABLE"
+                })));
+            } catch (err) {
+                console.error("Failed to load drivers:", err);
+                setDriversList([]);
+            } finally {
+                setLoadingDrivers(false);
+            }
+        })();
+
+        // Load vehicles
+        (async () => {
+            setLoadingVehicles(true);
+            try {
+                const vehicles = await listVehicles({ branchId, categoryId: categoryId || undefined });
+                const list = Array.isArray(vehicles) ? vehicles : (vehicles?.data || []);
+                setVehiclesList(list.map(v => ({
+                    id: v.vehicleId || v.id,
+                    licensePlate: v.licensePlate || `#${v.vehicleId || v.id}`,
+                    categoryName: v.categoryName || "",
+                    status: v.status || "AVAILABLE"
+                })));
+            } catch (err) {
+                console.error("Failed to load vehicles:", err);
+                setVehiclesList([]);
+            } finally {
+                setLoadingVehicles(false);
+            }
+        })();
+    }, [branchId, categoryId]);
+
+    // Filter drivers and vehicles based on search
+    const filteredDrivers = React.useMemo(() => {
+        if (!driverSearch) return driversList;
+        const search = driverSearch.toLowerCase();
+        return driversList.filter(d =>
+            d.name.toLowerCase().includes(search) ||
+            d.phone.toLowerCase().includes(search)
+        );
+    }, [driversList, driverSearch]);
+
+    const filteredVehicles = React.useMemo(() => {
+        if (!vehicleSearch) return vehiclesList;
+        const search = vehicleSearch.toLowerCase();
+        return vehiclesList.filter(v =>
+            v.licensePlate.toLowerCase().includes(search) ||
+            v.categoryName.toLowerCase().includes(search)
+        );
+    }, [vehiclesList, vehicleSearch]);
+
+    // Get selected driver/vehicle info
+    const selectedDriver = React.useMemo(() =>
+            driversList.find(d => String(d.id) === String(driverId)),
+        [driversList, driverId]
+    );
+    const selectedVehicle = React.useMemo(() =>
+            vehiclesList.find(v => String(v.id) === String(vehicleId)),
+        [vehiclesList, vehicleId]
+    );
+
+    // Close dropdowns when clicking outside
+    React.useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (!e.target.closest('.driver-dropdown-container')) {
+                setShowDriverDropdown(false);
+            }
+            if (!e.target.closest('.vehicle-dropdown-container')) {
+                setShowVehicleDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Cooldown timer for reassignment (5 minutes)
+    React.useEffect(() => {
+        if (!lastAssignmentTime) {
+            setCooldownRemaining(0);
+            return;
+        }
+        const COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+        const updateCooldown = () => {
+            const elapsed = Date.now() - lastAssignmentTime;
+            const remaining = Math.max(0, COOLDOWN_MS - elapsed);
+            setCooldownRemaining(remaining);
+        };
+        updateCooldown();
+        const interval = setInterval(updateCooldown, 1000);
+        return () => clearInterval(interval);
+    }, [lastAssignmentTime]);
 
     // Auto-calculate distance when both pickup and dropoff are entered
     React.useEffect(() => {
@@ -323,29 +571,43 @@ export default function EditOrderPage() {
 
     /* --- check availability (real call) --- */
     const checkAvailability = async () => {
+        if (!categoryId || !branchId) {
+            setAvailabilityMsg("Thiếu loại xe hoặc chi nhánh");
+            pushToast("Vui lòng chọn loại xe và chi nhánh trước", "error");
+            return;
+        }
+        if (!startTime || !endTime) {
+            setAvailabilityMsg("Thiếu thời gian đón/trả");
+            pushToast("Vui lòng nhập thời gian đón và trả", "error");
+            return;
+        }
+
+        setCheckingAvailability(true);
+        setAvailabilityMsg("");
+
         try {
-            if (!categoryId || !branchId) {
-                setAvailabilityMsg("Thiếu loại xe hoặc chi nhánh");
-                return;
-            }
             const { checkVehicleAvailability } = await import("../../api/bookings");
             const result = await checkVehicleAvailability({
-                branchId,
-                categoryId,
+                branchId: Number(branchId),
+                categoryId: Number(categoryId),
                 startTime: toIsoZ(startTime),
                 endTime: toIsoZ(endTime),
-                quantity: vehiclesNeeded,
+                quantity: Number(vehiclesNeeded || 1),
             });
-            if (result?.ok) {
-                setAvailabilityMsg(`Khả dụng: Còn ${result.availableCount} xe`);
-                pushToast(`Xe còn sẵn (${result.availableCount} chiếc)`, "success");
+            if (result?.ok || result?.available) {
+                const count = result.availableCount || result.count || 0;
+                setAvailabilityMsg(`✓ Khả dụng: Còn ${count} xe`);
+                pushToast(`Xe còn sẵn (${count} chiếc)`, "success");
             } else {
-                setAvailabilityMsg("Cảnh báo: Hết xe trong khung giờ này");
+                setAvailabilityMsg("⚠ Cảnh báo: Hết xe trong khung giờ này");
                 pushToast("Hết xe khớp loại bạn chọn", "error");
             }
         } catch (e) {
-            setAvailabilityMsg("Không kiểm tra được khả dụng xe");
-            pushToast("Không kiểm tra được khả dụng xe", "error");
+            console.error("Check availability error:", e);
+            setAvailabilityMsg("Không kiểm tra được - thử lại sau");
+            pushToast("Không kiểm tra được khả dụng xe: " + (e.message || "Lỗi"), "error");
+        } finally {
+            setCheckingAvailability(false);
         }
     };
 
@@ -368,77 +630,88 @@ export default function EditOrderPage() {
 
     /* --- PUT status=DRAFT --- */
     const onSaveDraft = async () => {
+        // Validate thông tin khách hàng
+        if (!customerPhone || customerPhone.trim().length < 10) {
+            pushToast("Số điện thoại không hợp lệ (cần ít nhất 10 số)", "error");
+            return;
+        }
+        if (!customerName || customerName.trim().length < 2) {
+            pushToast("Vui lòng nhập tên khách hàng", "error");
+            return;
+        }
+
+        // Validate điểm đón/trả
+        if (!pickup || pickup.trim().length < 3) {
+            pushToast("Vui lòng nhập điểm đón", "error");
+            return;
+        }
+        if (!dropoff || dropoff.trim().length < 3) {
+            pushToast("Vui lòng nhập điểm đến", "error");
+            return;
+        }
+
         // Validate time
-        if (startTime && endTime) {
-            const startDate = new Date(startTime);
-            const endDate = new Date(endTime);
-            const now = new Date();
+        if (!startTime || !endTime) {
+            pushToast("Vui lòng nhập thời gian đón và kết thúc", "error");
+            return;
+        }
 
-            // Check if start time is in the past
-            if (startDate < now) {
-                pushToast("Thời gian đón phải lớn hơn hoặc bằng thời gian hiện tại", "error");
-                return;
-            }
+        const startDate = new Date(startTime);
+        const endDate = new Date(endTime);
+        const now = new Date();
 
-            // Check if end time is after start time
-            if (endDate <= startDate) {
-                pushToast("Thời gian kết thúc phải sau thời gian đón", "error");
-                return;
-            }
+        // Check if start time is in the past
+        if (startDate < now) {
+            pushToast("Thời gian đón phải lớn hơn thời gian hiện tại", "error");
+            return;
+        }
+
+        // Check if end time is after start time
+        if (endDate <= startDate) {
+            pushToast("Thời gian kết thúc phải sau thời gian đón", "error");
+            return;
+        }
+
+        // Validate số khách
+        const paxNum = Number(pax || 0);
+        if (paxNum < 1) {
+            pushToast("Số khách phải >= 1", "error");
+            return;
+        }
+        if (selectedCategory && selectedCategory.seats && paxNum >= selectedCategory.seats) {
+            pushToast(`Số khách phải < ${selectedCategory.seats} (số ghế xe)`, "error");
+            return;
         }
 
         setSubmittingDraft(true);
 
         const cleanDiscount = Number(
-            String(discountAmount || "0").replace(
-                /[^0-9]/g,
-                ""
-            )
+            String(discountAmount || "0").replace(/[^0-9]/g, "")
         );
 
-        const payload = {
-            customer_phone: customerPhone,
-            customer_name: customerName,
-            customer_email: customerEmail,
-            pickup,
-            dropoff,
-            start_time: startTime,
-            end_time: endTime,
-            pax: Number(pax || 0),
-            vehicles_needed: Number(
-                vehiclesNeeded || 0
-            ),
-            category_id: categoryId,
-            branch_id: branchId,
-            system_price: Number(
-                systemPrice || 0
-            ),
-            discount_amount: cleanDiscount,
-            discount_reason: discountReason,
-            quoted_price: Number(
-                finalPrice || 0
-            ),
-            status: "DRAFT",
-        };
-
         const req = {
-            customer: { fullName: customerName, phone: customerPhone, email: customerEmail },
+            customer: { fullName: customerName.trim(), phone: customerPhone.trim(), email: customerEmail?.trim() || null },
             branchId: Number(branchId || 0) || undefined,
-            trips: [{ startLocation: pickup, endLocation: dropoff, startTime: toIsoZ(startTime), endTime: toIsoZ(endTime) }],
+            trips: [{
+                startLocation: pickup.trim(),
+                endLocation: dropoff.trim(),
+                startTime: toIsoZ(startTime),
+                endTime: toIsoZ(endTime),
+                distance: distanceKm ? Number(distanceKm) : undefined,
+                paxCount: paxNum
+            }],
             vehicles: [{ vehicleCategoryId: Number(categoryId || 0), quantity: Number(vehiclesNeeded || 1) }],
             estimatedCost: Number(systemPrice || 0),
             discountAmount: cleanDiscount,
             totalCost: Number(finalPrice || 0),
-            status: 'PENDING',
+            note: bookingNote?.trim() || null,
         };
         try {
             await updateBooking(orderId, req);
-            setStatus('PENDING');
-            pushToast('Đã lưu nháp đơn hàng.', 'success');
-            // quay về danh sách và yêu cầu refresh
-            navigate('/orders', { state: { refresh: true, toast: 'Đã lưu nháp đơn hàng.' } });
-        } catch {
-            pushToast('Lưu nháp thất bại', 'error');
+            pushToast('Đã lưu thay đổi.', 'success');
+            navigate('/orders', { state: { refresh: true, toast: 'Đã lưu thay đổi.' } });
+        } catch (err) {
+            pushToast('Lưu thất bại: ' + (err.response?.data?.message || err.message || 'Lỗi không xác định'), 'error');
         }
 
         setSubmittingDraft(false);
@@ -502,7 +775,7 @@ export default function EditOrderPage() {
         const req2 = {
             customer: { fullName: customerName, phone: customerPhone, email: customerEmail },
             branchId: Number(branchId || 0) || undefined,
-            trips: [{ startLocation: pickup, endLocation: dropoff, startTime: toIsoZ(startTime), endTime: toIsoZ(endTime) }],
+            trips: [{ startLocation: pickup, endLocation: dropoff, startTime: toIsoZ(startTime), endTime: toIsoZ(endTime), distance: distanceKm ? Number(distanceKm) : undefined }],
             vehicles: [{ vehicleCategoryId: Number(categoryId || 0), quantity: Number(vehiclesNeeded || 1) }],
             estimatedCost: Number(systemPrice || 0),
             discountAmount: cleanDiscount,
@@ -512,26 +785,58 @@ export default function EditOrderPage() {
         try {
             await updateBooking(orderId, req2);
             setStatus('PENDING');
-            pushToast('Đã cập nhật đơn hàng & chuyển trạng thái PENDING.', 'success');
-            // quay về danh sách và yêu cầu refresh
+            pushToast('Đã cập nhật đơn hàng.', 'success');
             navigate('/orders', { state: { refresh: true, toast: 'Đã cập nhật đơn hàng.' } });
-        } catch {
-            pushToast('Cập nhật đơn thất bại', 'error');
+        } catch (err) {
+            pushToast('Cập nhật đơn thất bại: ' + (err.response?.data?.message || err.message || 'Lỗi không xác định'), 'error');
         }
 
         setSubmittingUpdate(false);
     };
 
     // Assign driver/vehicle to all trips
+    const [assigning, setAssigning] = React.useState(false);
     const onAssign = async () => {
+        if (tripIds.length === 0) {
+            pushToast("Không tìm thấy chuyến để gán. Vui lòng tải lại trang.", "error");
+            return;
+        }
+
+        // Check cooldown
+        if (cooldownRemaining > 0) {
+            const mins = Math.floor(cooldownRemaining / 60000);
+            const secs = Math.floor((cooldownRemaining % 60000) / 1000);
+            pushToast(`Vui lòng đợi ${mins}:${String(secs).padStart(2, '0')} để thay đổi tài xế/xe`, "error");
+            return;
+        }
+
+        setAssigning(true);
         try {
             await assignBooking(orderId, {
                 driverId: driverId ? Number(driverId) : undefined,
                 vehicleId: vehicleId ? Number(vehicleId) : undefined,
+                tripIds: tripIds,
             });
             pushToast("Đã gán tài xế/xe cho đơn hàng", "success");
+            // Store assigned info and start cooldown
+            if (driverId && selectedDriver) {
+                setAssignedDriverId(driverId);
+                setAssignedDriver({ ...selectedDriver });
+            }
+            if (vehicleId && selectedVehicle) {
+                setAssignedVehicleId(vehicleId);
+                setAssignedVehicle({ ...selectedVehicle });
+            }
+            setLastAssignmentTime(Date.now());
+            // Reset selection
+            setDriverId("");
+            setVehicleId("");
         } catch (e) {
-            pushToast("Gán tài xế/xe thất bại", "error");
+            console.error("Assign error:", e);
+            const msg = e.response?.data?.message || e.message || "Lỗi không xác định";
+            pushToast("Gán tài xế/xe thất bại: " + msg, "error");
+        } finally {
+            setAssigning(false);
         }
     };
 
@@ -559,17 +864,37 @@ export default function EditOrderPage() {
         : { disabled: true, readOnly: true };
 
     /* ---------------- locked banner ---------------- */
-    const lockedBanner = !canEdit ? (
+    const lockedReason = React.useMemo(() => {
+        const editableStatuses = ["DRAFT", "PENDING", "CONFIRMED", "ASSIGNED", "QUOTATION_SENT"];
+        if (!editableStatuses.includes(status)) {
+            return `Đơn hàng ở trạng thái ${ORDER_STATUS_LABEL[status] || status}. Không thể chỉnh sửa.`;
+        }
+        if (startTime) {
+            // startTime đã được convert sang local format (YYYY-MM-DDTHH:mm)
+            const tripStart = new Date(startTime);
+            const now = new Date();
+            const diffMs = tripStart.getTime() - now.getTime();
+            const hoursUntilTrip = diffMs / (1000 * 60 * 60);
+
+            if (hoursUntilTrip < 12) {
+                const absHours = Math.abs(hoursUntilTrip);
+                const hours = Math.floor(absHours);
+                const minutes = Math.floor((absHours - hours) * 60);
+
+                if (hoursUntilTrip < 0) {
+                    return `Chuyến đi đã diễn ra ${hours} giờ ${minutes} phút trước. Không thể chỉnh sửa.`;
+                }
+                return `Chỉ còn ${hours} giờ ${minutes} phút trước chuyến đi. Cần >= 12 giờ để chỉnh sửa.`;
+            }
+        }
+        return null;
+    }, [status, startTime]);
+
+    const lockedBanner = !canEdit && lockedReason ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 text-amber-700 text-[12px] flex items-start gap-2 px-3 py-2">
             <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
             <div className="leading-relaxed">
-                Đơn hàng ở trạng thái{" "}
-                <span className="font-semibold">
-                    {ORDER_STATUS_LABEL[status] ||
-                        status}
-                </span>
-                . Thay đổi nội dung phải thông qua
-                Điều phối viên.
+                {lockedReason}
             </div>
         </div>
     ) : null;
@@ -610,12 +935,12 @@ export default function EditOrderPage() {
                 </div>
 
                 <div className="flex flex-col gap-2 w-full max-w-[250px]">
-                    {/* Cập nhật đơn (PENDING) */}
+                    {/* Lưu thay đổi */}
                     <button
                         disabled={
-                            !canEdit || submittingUpdate
+                            !canEdit || submittingDraft
                         }
-                        onClick={onSubmitOrder}
+                        onClick={onSaveDraft}
                         className={cls(
                             "rounded-md font-medium text-[13px] px-4 py-2 flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed",
                             canEdit
@@ -623,29 +948,10 @@ export default function EditOrderPage() {
                                 : "bg-slate-200 text-slate-400 cursor-not-allowed"
                         )}
                     >
-                        <Send className="h-4 w-4" />
-                        {submittingUpdate
-                            ? "Đang cập nhật..."
-                            : "Cập nhật đơn (PENDING)"}
-                    </button>
-
-                    {/* Lưu nháp */}
-                    <button
-                        disabled={
-                            !canEdit || submittingDraft
-                        }
-                        onClick={onSaveDraft}
-                        className={cls(
-                            "rounded-md border text-[13px] px-4 py-2 flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed",
-                            canEdit
-                                ? "border-slate-300 bg-white hover:bg-slate-50 text-slate-700"
-                                : "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
-                        )}
-                    >
-                        <Save className="h-4 w-4 text-slate-500" />
+                        <Save className="h-4 w-4" />
                         {submittingDraft
                             ? "Đang lưu..."
-                            : "Lưu nháp"}
+                            : "Lưu thay đổi"}
                     </button>
                 </div>
             </div>
@@ -977,33 +1283,47 @@ export default function EditOrderPage() {
                         {/* Số khách / Số xe */}
                         <div className="grid grid-cols-2 gap-3 mb-3">
                             <div>
-                                <label className="text-[12px] text-slate-600 mb-1 block">
-                                    Số khách (pax)
+                                <label className={labelCls}>
+                                    <Users className="h-3.5 w-3.5 text-slate-400" />
+                                    <span>Số khách</span>
+                                    {selectedCategory && selectedCategory.seats > 0 && (
+                                        <span className="text-[11px] text-slate-500 font-normal ml-1">
+                                            (Tối đa: {selectedCategory.seats - 1})
+                                        </span>
+                                    )}
                                 </label>
                                 <input
+                                    type="number"
+                                    min="1"
+                                    max={selectedCategory && selectedCategory.seats ? selectedCategory.seats - 1 : undefined}
                                     className={makeInputCls({
                                         enabled: inputEnabledCls,
                                         disabled: inputDisabledCls,
                                     })}
                                     value={pax}
-                                    onChange={(e) =>
-                                        setPax(
-                                            e.target.value.replace(
-                                                /[^0-9]/g,
-                                                ""
-                                            )
-                                        )
-                                    }
-                                    placeholder="3"
+                                    onChange={(e) => {
+                                        const val = e.target.value.replace(/[^0-9]/g, "");
+                                        setPax(val);
+                                    }}
+                                    placeholder="1"
                                     {...disableInputProps}
                                 />
+                                {selectedCategory && selectedCategory.seats && Number(pax) >= selectedCategory.seats && (
+                                    <div className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
+                                        <AlertTriangle className="h-3 w-3" />
+                                        Số khách phải nhỏ hơn {selectedCategory.seats} (số ghế)
+                                    </div>
+                                )}
                             </div>
 
                             <div>
-                                <label className="text-[12px] text-slate-600 mb-1 block">
-                                    Số lượng xe
+                                <label className={labelCls}>
+                                    <CarFront className="h-3.5 w-3.5 text-slate-400" />
+                                    <span>Số lượng xe</span>
                                 </label>
                                 <input
+                                    type="number"
+                                    min="1"
                                     className={makeInputCls({
                                         enabled: inputEnabledCls,
                                         disabled: inputDisabledCls,
@@ -1011,10 +1331,7 @@ export default function EditOrderPage() {
                                     value={vehiclesNeeded}
                                     onChange={(e) =>
                                         setVehiclesNeeded(
-                                            e.target.value.replace(
-                                                /[^0-9]/g,
-                                                ""
-                                            )
+                                            e.target.value.replace(/[^0-9]/g, "")
                                         )
                                     }
                                     placeholder="1"
@@ -1089,29 +1406,59 @@ export default function EditOrderPage() {
                                 type="button"
                                 className={cls(
                                     "rounded-md border text-[12px] px-3 py-2 flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed",
-                                    canEdit
+                                    canEdit && !checkingAvailability
                                         ? "border-slate-300 bg-white hover:bg-slate-50 text-slate-700"
                                         : "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
                                 )}
-                                disabled={!canEdit}
+                                disabled={!canEdit || checkingAvailability}
                                 onClick={checkAvailability}
                             >
-                                <CarFront className="h-4 w-4 text-amber-600" />
-                                <span>Kiểm tra xe</span>
+                                {checkingAvailability ? (
+                                    <Loader2 className="h-4 w-4 text-slate-400 animate-spin" />
+                                ) : (
+                                    <CarFront className="h-4 w-4 text-amber-600" />
+                                )}
+                                <span>{checkingAvailability ? "Đang kiểm tra..." : "Kiểm tra xe"}</span>
                             </button>
 
                             {availabilityMsg ? (
-                                <div className="text-[12px] text-slate-700">
+                                <div className={cls(
+                                    "text-[12px]",
+                                    availabilityMsg.includes("✓") ? "text-emerald-600" :
+                                        availabilityMsg.includes("⚠") ? "text-amber-600" : "text-slate-700"
+                                )}>
                                     {availabilityMsg}
                                 </div>
                             ) : (
                                 <div className="text-[11px] text-slate-400 leading-relaxed">
-                                    Hệ thống sẽ cảnh báo nếu
-                                    hết xe khả dụng.
+                                    Hệ thống sẽ cảnh báo nếu hết xe khả dụng.
                                 </div>
                             )}
                         </div>
                     </div>
+
+                    {/* Ghi chú cho tài xế */}
+                    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div className="text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center gap-2 mb-4">
+                            <FileText className="h-4 w-4 text-amber-600" />
+                            Ghi chú cho tài xế
+                        </div>
+                        <textarea
+                            rows={3}
+                            className={makeInputCls({
+                                enabled: cls(textareaEnabledCls, "resize-none"),
+                                disabled: cls(textareaDisabledCls, "resize-none"),
+                            })}
+                            value={bookingNote}
+                            onChange={(e) => setBookingNote(e.target.value)}
+                            placeholder="VD: Đón thêm 1 khách ở 123 Trần Hưng Đạo lúc 8h30, hành lý cồng kềnh..."
+                            {...disableInputProps}
+                        />
+                        <div className="text-[11px] text-slate-400 mt-2">
+                            Ghi chú này sẽ hiển thị cho tài xế trong chi tiết chuyến đi.
+                        </div>
+                    </div>
+
                     {/* Gán tài xế / xe */}
                     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                         <div className="text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center gap-2 mb-4">
@@ -1120,21 +1467,252 @@ export default function EditOrderPage() {
                         </div>
 
                         <div className="grid md:grid-cols-2 gap-4 text-[13px]">
-                            <div>
-                                <label className="text-[12px] text-slate-600 mb-1 block">Driver ID</label>
-                                <input className={selectEnabledCls} placeholder="Nhập driverId" value={driverId} onChange={(e) => setDriverId(e.target.value)} />
+                            {/* Driver Dropdown */}
+                            <div className="relative driver-dropdown-container">
+                                <label className={labelCls}>
+                                    <User className="h-3.5 w-3.5 text-slate-400" />
+                                    <span>Tài xế</span>
+                                    {loadingDrivers && <Loader2 className="h-3 w-3 animate-spin ml-1" />}
+                                </label>
+                                <div className="relative">
+                                    <div
+                                        className={cls(
+                                            "flex items-center gap-2 cursor-pointer",
+                                            inputEnabledCls
+                                        )}
+                                        onClick={() => setShowDriverDropdown(!showDriverDropdown)}
+                                    >
+                                        <Search className="h-4 w-4 text-slate-400" />
+                                        <input
+                                            type="text"
+                                            className="flex-1 bg-transparent outline-none text-sm"
+                                            placeholder={selectedDriver ? "" : "Tìm tài xế..."}
+                                            value={showDriverDropdown ? driverSearch : (selectedDriver?.name || "")}
+                                            onChange={(e) => {
+                                                setDriverSearch(e.target.value);
+                                                setShowDriverDropdown(true);
+                                            }}
+                                            onFocus={() => setShowDriverDropdown(true)}
+                                        />
+                                        {selectedDriver && !showDriverDropdown && (
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setDriverId("");
+                                                    setDriverSearch("");
+                                                }}
+                                                className="p-0.5 hover:bg-slate-100 rounded"
+                                            >
+                                                <X className="h-3.5 w-3.5 text-slate-400" />
+                                            </button>
+                                        )}
+                                        <ChevronDown className={cls("h-4 w-4 text-slate-400 transition-transform", showDriverDropdown && "rotate-180")} />
+                                    </div>
+
+                                    {showDriverDropdown && (
+                                        <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-auto">
+                                            {loadingDrivers ? (
+                                                <div className="p-3 text-center text-slate-500 text-sm">
+                                                    <Loader2 className="h-4 w-4 animate-spin mx-auto mb-1" />
+                                                    Đang tải...
+                                                </div>
+                                            ) : filteredDrivers.length === 0 ? (
+                                                <div className="p-3 text-center text-slate-500 text-sm">
+                                                    Không tìm thấy tài xế
+                                                </div>
+                                            ) : (
+                                                filteredDrivers.map(d => (
+                                                    <div
+                                                        key={d.id}
+                                                        className={cls(
+                                                            "px-3 py-2 cursor-pointer hover:bg-slate-50 flex items-center justify-between",
+                                                            String(d.id) === String(driverId) && "bg-sky-50"
+                                                        )}
+                                                        onClick={() => {
+                                                            setDriverId(String(d.id));
+                                                            setDriverSearch("");
+                                                            setShowDriverDropdown(false);
+                                                        }}
+                                                    >
+                                                        <div>
+                                                            <div className="font-medium text-slate-900">{d.name}</div>
+                                                            {d.phone && <div className="text-[11px] text-slate-500">{d.phone}</div>}
+                                                        </div>
+                                                        <span className={cls(
+                                                            "text-[10px] px-1.5 py-0.5 rounded",
+                                                            d.status === "AVAILABLE" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
+                                                        )}>
+                                                            {d.status === "AVAILABLE" ? "Sẵn sàng" : d.status}
+                                                        </span>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                                {selectedDriver && (
+                                    <div className="text-[11px] text-emerald-600 mt-1">
+                                        ✓ Đã chọn: {selectedDriver.name}
+                                    </div>
+                                )}
                             </div>
-                            <div>
-                                <label className="text-[12px] text-slate-600 mb-1 block">Vehicle ID</label>
-                                <input className={selectEnabledCls} placeholder="Nhập vehicleId" value={vehicleId} onChange={(e) => setVehicleId(e.target.value)} />
+
+                            {/* Vehicle Dropdown */}
+                            <div className="relative vehicle-dropdown-container">
+                                <label className={labelCls}>
+                                    <CarFront className="h-3.5 w-3.5 text-slate-400" />
+                                    <span>Xe</span>
+                                    {loadingVehicles && <Loader2 className="h-3 w-3 animate-spin ml-1" />}
+                                </label>
+                                <div className="relative">
+                                    <div
+                                        className={cls(
+                                            "flex items-center gap-2 cursor-pointer",
+                                            inputEnabledCls
+                                        )}
+                                        onClick={() => setShowVehicleDropdown(!showVehicleDropdown)}
+                                    >
+                                        <Search className="h-4 w-4 text-slate-400" />
+                                        <input
+                                            type="text"
+                                            className="flex-1 bg-transparent outline-none text-sm"
+                                            placeholder={selectedVehicle ? "" : "Tìm xe (biển số)..."}
+                                            value={showVehicleDropdown ? vehicleSearch : (selectedVehicle?.licensePlate || "")}
+                                            onChange={(e) => {
+                                                setVehicleSearch(e.target.value);
+                                                setShowVehicleDropdown(true);
+                                            }}
+                                            onFocus={() => setShowVehicleDropdown(true)}
+                                        />
+                                        {selectedVehicle && !showVehicleDropdown && (
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setVehicleId("");
+                                                    setVehicleSearch("");
+                                                }}
+                                                className="p-0.5 hover:bg-slate-100 rounded"
+                                            >
+                                                <X className="h-3.5 w-3.5 text-slate-400" />
+                                            </button>
+                                        )}
+                                        <ChevronDown className={cls("h-4 w-4 text-slate-400 transition-transform", showVehicleDropdown && "rotate-180")} />
+                                    </div>
+
+                                    {showVehicleDropdown && (
+                                        <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-auto">
+                                            {loadingVehicles ? (
+                                                <div className="p-3 text-center text-slate-500 text-sm">
+                                                    <Loader2 className="h-4 w-4 animate-spin mx-auto mb-1" />
+                                                    Đang tải...
+                                                </div>
+                                            ) : filteredVehicles.length === 0 ? (
+                                                <div className="p-3 text-center text-slate-500 text-sm">
+                                                    Không tìm thấy xe
+                                                </div>
+                                            ) : (
+                                                filteredVehicles.map(v => (
+                                                    <div
+                                                        key={v.id}
+                                                        className={cls(
+                                                            "px-3 py-2 cursor-pointer hover:bg-slate-50 flex items-center justify-between",
+                                                            String(v.id) === String(vehicleId) && "bg-sky-50"
+                                                        )}
+                                                        onClick={() => {
+                                                            setVehicleId(String(v.id));
+                                                            setVehicleSearch("");
+                                                            setShowVehicleDropdown(false);
+                                                        }}
+                                                    >
+                                                        <div>
+                                                            <div className="font-medium text-slate-900">{v.licensePlate}</div>
+                                                            {v.categoryName && <div className="text-[11px] text-slate-500">{v.categoryName}</div>}
+                                                        </div>
+                                                        <span className={cls(
+                                                            "text-[10px] px-1.5 py-0.5 rounded",
+                                                            v.status === "AVAILABLE" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                                                        )}>
+                                                            {v.status === "AVAILABLE" ? "Sẵn sàng" : v.status}
+                                                        </span>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                                {selectedVehicle && (
+                                    <div className="text-[11px] text-emerald-600 mt-1">
+                                        ✓ Đã chọn: {selectedVehicle.licensePlate} {selectedVehicle.categoryName && `(${selectedVehicle.categoryName})`}
+                                    </div>
+                                )}
                             </div>
                         </div>
 
+                        {/* Hiển thị thông tin đã gán */}
+                        {(assignedDriver || assignedVehicle || assignedDriverId || assignedVehicleId) && (
+                            <div className="mt-4 p-3 rounded-lg border border-emerald-200 bg-emerald-50">
+                                <div className="text-[11px] uppercase tracking-wide text-emerald-700 font-medium mb-2">
+                                    Đã gán cho đơn hàng
+                                </div>
+                                <div className="grid md:grid-cols-2 gap-3 text-[13px]">
+                                    {(assignedDriver || assignedDriverId) && (
+                                        <div className="flex items-start gap-2">
+                                            <User className="h-4 w-4 text-emerald-600 mt-0.5" />
+                                            <div>
+                                                <div className="text-[11px] text-slate-500 mb-0.5">Tài xế:</div>
+                                                <div className="font-medium text-slate-900">
+                                                    {assignedDriver?.name || `Đang tải... (ID: ${assignedDriverId})`}
+                                                </div>
+                                                {assignedDriver?.phone && <div className="text-[11px] text-slate-500">{assignedDriver.phone}</div>}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {(assignedVehicle || assignedVehicleId) && (
+                                        <div className="flex items-start gap-2">
+                                            <CarFront className="h-4 w-4 text-emerald-600 mt-0.5" />
+                                            <div>
+                                                <div className="text-[11px] text-slate-500 mb-0.5">Xe:</div>
+                                                <div className="font-medium text-slate-900">
+                                                    {assignedVehicle?.licensePlate || `Đang tải... (ID: ${assignedVehicleId})`}
+                                                </div>
+                                                {assignedVehicle?.categoryName && <div className="text-[11px] text-slate-500">{assignedVehicle.categoryName}</div>}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                {cooldownRemaining > 0 && (
+                                    <div className="mt-2 text-[11px] text-amber-600 flex items-center gap-1">
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                        Có thể thay đổi sau: {Math.floor(cooldownRemaining / 60000)}:{String(Math.floor((cooldownRemaining % 60000) / 1000)).padStart(2, '0')}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         <div className="mt-4 flex items-center gap-3">
-                            <button type="button" onClick={onAssign} className="rounded-md bg-sky-600 hover:bg-sky-500 text-white font-medium text-[13px] px-4 py-2 shadow-sm">
-                                Gán tài xế / xe
+                            <button
+                                type="button"
+                                onClick={onAssign}
+                                disabled={(!driverId && !vehicleId) || cooldownRemaining > 0 || assigning}
+                                className={cls(
+                                    "rounded-md font-medium text-[13px] px-4 py-2 shadow-sm flex items-center gap-2",
+                                    (driverId || vehicleId) && cooldownRemaining === 0
+                                        ? "bg-sky-600 hover:bg-sky-500 text-white"
+                                        : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                                )}
+                            >
+                                {assigning ? <Loader2 className="h-4 w-4 animate-spin" /> : <CarFront className="h-4 w-4" />}
+                                {assigning ? "Đang gán..." : (cooldownRemaining > 0 ? "Đang chờ..." : "Gán tài xế / xe")}
                             </button>
-                            <div className="text-[11px] text-slate-500">Áp dụng cho toàn bộ chuyến của đơn.</div>
+                            <div className="text-[11px] text-slate-500">
+                                {cooldownRemaining > 0
+                                    ? `Đợi ${Math.floor(cooldownRemaining / 60000)}:${String(Math.floor((cooldownRemaining % 60000) / 1000)).padStart(2, '0')} để thay đổi`
+                                    : (!driverId && !vehicleId
+                                        ? "Chọn ít nhất tài xế hoặc xe để gán"
+                                        : "Áp dụng cho toàn bộ chuyến của đơn.")}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1142,7 +1720,7 @@ export default function EditOrderPage() {
 
             {/* FOOTNOTE */}
             <div className="text-[11px] text-slate-500 mt-8 leading-relaxed">
-                <div className="text-slate-700 font-mono text-[11px]">
+                {/* <div className="text-slate-700 font-mono text-[11px]">
                     PUT /api/orders/{MOCK_ORDER.id}
                 </div>
                 <div>
@@ -1151,8 +1729,8 @@ export default function EditOrderPage() {
                         {ORDER_STATUS_LABEL[status] ||
                             status}
                     </span>
-                </div>
-                <div className="text-[12px] text-slate-600">
+                </div> */}
+                {/* <div className="text-[12px] text-slate-600">
                     Nếu trạng thái là{" "}
                     <span className="text-amber-600 font-semibold">
                         ASSIGNED
@@ -1163,7 +1741,7 @@ export default function EditOrderPage() {
                     </span>
                     , chỉnh sửa phải thông qua điều
                     phối viên.
-                </div>
+                </div> */}
             </div>
         </div>
     );

@@ -3,14 +3,12 @@ import {
     LayoutDashboard,
     DollarSign,
     TrendingUp,
-    Car,
     MapPin,
     RefreshCw,
     Upload,
     Calendar,
     Building2,
     BarChart3,
-    AlertTriangle,
 } from "lucide-react";
 import {
     BarChart,
@@ -28,15 +26,11 @@ import {
 
 import KpiCard from "./shared/KpiCard";
 import TrendChart from "./shared/TrendChart";
-import AlertsPanel from "./shared/AlertsPanel";
 import {
     getAdminDashboard,
     getRevenueTrend,
     getBranchComparison,
-    getFleetUtilization,
     getTopRoutes,
-    getSystemAlerts,
-    acknowledgeAlert,
     getPendingApprovals,
     exportDashboardReport,
 } from "../../api/dashboards";
@@ -102,16 +96,11 @@ export default function AdminDashboard() {
         totalExpense: 0,
         netProfit: 0,
         totalTrips: 0,
-        fleetUtilization: 0,
-        vehiclesInUse: 0,
-        totalVehicles: 0,
     });
 
     const [revenueTrend, setRevenueTrend] = React.useState([]);
     const [branchComparison, setBranchComparison] = React.useState([]);
-    const [fleetData, setFleetData] = React.useState([]);
     const [topRoutes, setTopRoutes] = React.useState([]);
-    const [alerts, setAlerts] = React.useState([]);
     const [pendingApprovals, setPendingApprovals] = React.useState([]);
 
     // Load all dashboard data
@@ -123,12 +112,10 @@ export default function AdminDashboard() {
                 getAdminDashboard({ period }),
                 getRevenueTrend(),
                 getBranchComparison({ period }),
-                getFleetUtilization(),
                 getTopRoutes({ period }).catch(err => {
                     console.warn("Top routes API failed, returning empty array:", err);
                     return [];
                 }),
-                getSystemAlerts({ severity: "HIGH,CRITICAL" }),
                 getPendingApprovals().catch(err => {
                     console.warn("Pending approvals API failed, returning empty array:", err);
                     return [];
@@ -139,9 +126,7 @@ export default function AdminDashboard() {
                 dashboardResult,
                 trendResult,
                 branchResult,
-                fleetUtilResult,
                 routesResult,
-                alertsResult,
                 approvalsResult,
             ] = results;
 
@@ -149,9 +134,7 @@ export default function AdminDashboard() {
             const dashboardData = dashboardResult.status === 'fulfilled' ? dashboardResult.value : null;
             const trendData = trendResult.status === 'fulfilled' ? trendResult.value : [];
             const branchData = branchResult.status === 'fulfilled' ? branchResult.value : [];
-            const fleetUtilData = fleetUtilResult.status === 'fulfilled' ? fleetUtilResult.value : [];
             const routesData = routesResult.status === 'fulfilled' ? routesResult.value : [];
-            const alertsData = alertsResult.status === 'fulfilled' ? alertsResult.value : [];
             const approvalsData = approvalsResult.status === 'fulfilled' ? approvalsResult.value : [];
 
             // KPIs
@@ -160,19 +143,14 @@ export default function AdminDashboard() {
                 totalExpense: dashboardData?.totalExpense || 0,
                 netProfit: dashboardData?.netProfit || 0,
                 totalTrips: dashboardData?.totalTrips || 0,
-                fleetUtilization: dashboardData?.fleetUtilization || 0,
-                vehiclesInUse: dashboardData?.vehiclesInUse || 0,
-                totalVehicles: dashboardData?.totalVehicles || 0,
             });
 
             // Charts
             setRevenueTrend(trendData || []);
             setBranchComparison(branchData || []);
-            setFleetData(fleetUtilData || []);
             setTopRoutes(routesData || []);
 
-            // Alerts & Approvals
-            setAlerts(alertsData || []);
+            // Approvals
             setPendingApprovals(approvalsData || []);
 
             // Show warning if some APIs failed
@@ -191,17 +169,6 @@ export default function AdminDashboard() {
     React.useEffect(() => {
         loadDashboard();
     }, [loadDashboard]);
-
-    const handleAcknowledgeAlert = async (alert) => {
-        try {
-            await acknowledgeAlert(alert.alertId || alert.id);
-            setAlerts((prev) => prev.filter((a) => a.alertId !== alert.alertId && a.id !== alert.id));
-            push("Đã đánh dấu cảnh báo", "success");
-        } catch (err) {
-            console.error("Error acknowledging alert:", err);
-            push("Lỗi khi xử lý cảnh báo", "error");
-        }
-    };
 
     const handleExport = async () => {
         try {
@@ -280,7 +247,7 @@ export default function AdminDashboard() {
             ) : (
                 <>
                     {/* KPI CARDS */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
                         <KpiCard
                             title="Tổng Doanh Thu"
                             value={kpis.totalRevenue}
@@ -313,63 +280,28 @@ export default function AdminDashboard() {
                             color="purple"
                             loading={loading}
                         />
-                        <KpiCard
-                            title="Tỷ Lệ Sử Dụng Xe"
-                            value={kpis.fleetUtilization}
-                            format="percentage"
-                            icon={Car}
-                            color="yellow"
-                            subtitle={`${kpis.vehiclesInUse || 0}/${kpis.totalVehicles || 0} xe đang sử dụng`}
-                            loading={loading}
-                        />
                     </div>
 
-                    {/* MAIN CONTENT GRID */}
-                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 mb-5">
-                        {/* REVENUE TREND */}
-                        <div className="xl:col-span-2 rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                            <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 text-sm text-slate-600 flex items-center gap-2">
-                                <TrendingUp className="h-4 w-4 text-amber-600" />
-                                <span className="font-medium text-slate-700">
-                                    Xu hướng Doanh thu & Chi phí (12 tháng)
-                                </span>
-                            </div>
-                            <div className="p-4">
-                                <TrendChart
-                                    data={revenueTrend}
-                                    lines={[
-                                        { dataKey: "revenue", name: "Doanh thu", color: "#10b981" },
-                                        { dataKey: "expense", name: "Chi phí", color: "#ef4444" },
-                                        { dataKey: "netProfit", name: "Lợi nhuận", color: "#0079BC" },
-                                    ]}
-                                    xKey="month"
-                                    height={300}
-                                    loading={loading}
-                                />
-                            </div>
+                    {/* REVENUE TREND */}
+                    <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden mb-5">
+                        <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 text-sm text-slate-600 flex items-center gap-2">
+                            <TrendingUp className="h-4 w-4 text-amber-600" />
+                            <span className="font-medium text-slate-700">
+                                Xu hướng Doanh thu & Chi phí (12 tháng)
+                            </span>
                         </div>
-
-                        {/* ALERTS PANEL */}
-                        <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                            <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 text-sm text-slate-600 flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <AlertTriangle className="h-4 w-4 text-rose-600" />
-                                    <span className="font-medium text-slate-700">
-                                        Cảnh Báo Hệ Thống
-                                    </span>
-                                </div>
-                                <span className="text-xs text-slate-500">
-                                    {alerts.length} mục
-                                </span>
-                            </div>
-                            <div className="p-4">
-                                <AlertsPanel
-                                    alerts={alerts}
-                                    onAcknowledge={handleAcknowledgeAlert}
-                                    loading={loading}
-                                    maxHeight={300}
-                                />
-                            </div>
+                        <div className="p-4">
+                            <TrendChart
+                                data={revenueTrend}
+                                lines={[
+                                    { dataKey: "revenue", name: "Doanh thu", color: "#10b981" },
+                                    { dataKey: "expense", name: "Chi phí", color: "#ef4444" },
+                                    { dataKey: "netProfit", name: "Lợi nhuận", color: "#0079BC" },
+                                ]}
+                                xKey="month"
+                                height={300}
+                                loading={loading}
+                            />
                         </div>
                     </div>
 
@@ -389,23 +321,6 @@ export default function AdminDashboard() {
                                         dataKey="branchName"
                                         stroke="#64748b"
                                         style={{ fontSize: "12px" }}
-                                        tick={(props) => {
-                                            const { x, y, payload } = props;
-                                            const branch = branchComparison.find(b => b.branchName === payload.value);
-                                            const utilRate = branch?.vehicleUtilizationRate || 0;
-                                            const vehiclesText = branch ? `${branch.vehiclesInUse}/${branch.totalVehicles}` : '';
-                                            return (
-                                                <g transform={`translate(${x},${y})`}>
-                                                    <text x={0} y={0} dy={16} textAnchor="middle" fill="#64748b" fontSize="12px">
-                                                        {payload.value}
-                                                    </text>
-                                                    <text x={0} y={0} dy={32} textAnchor="middle" fill="#f59e0b" fontSize="11px" fontWeight="600">
-                                                        {utilRate.toFixed(1)}% ({vehiclesText})
-                                                    </text>
-                                                </g>
-                                            );
-                                        }}
-                                        height={60}
                                     />
                                     <YAxis
                                         stroke="#64748b"
@@ -426,12 +341,6 @@ export default function AdminDashboard() {
                                     <Bar dataKey="expense" name="Chi phí" fill="#ef4444" />
                                 </BarChart>
                             </ResponsiveContainer>
-                            <div className="mt-3 pt-3 border-t border-slate-200 flex items-start gap-2 text-xs text-slate-500">
-                                <Car className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                                <div>
-                                    <span className="font-medium text-amber-600">Tỷ lệ sử dụng xe:</span> Phần trăm và số lượng xe đang được gán vào chuyến (SCHEDULED/ASSIGNED/ONGOING) so với tổng số xe của chi nhánh
-                                </div>
-                            </div>
                         </div>
                     </div>
 

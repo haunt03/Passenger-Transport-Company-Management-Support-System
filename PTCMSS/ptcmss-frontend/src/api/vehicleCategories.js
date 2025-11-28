@@ -9,12 +9,14 @@ export function getVehicleCategory(id) {
 }
 
 // Map UI fields to backend request
+// Backend uses 'baseFare' not 'baseFee'
 function toReq(b) {
     return {
         categoryName: b.categoryName ?? b.name,
         seats: b.seats ?? null,
         description: b.description ?? "",
-        baseFare: b.baseFare ?? null,
+        baseFare: b.baseFee ?? b.baseFare ?? null,
+        sameDayFixedPrice: b.sameDayFixedPrice ?? null,
         pricePerKm: b.pricePerKm ?? null,
         highwayFee: b.highwayFee ?? null,
         fixedCosts: b.fixedCosts ?? null,
@@ -34,4 +36,3 @@ export function updateVehicleCategory(id, body) {
 export function deleteVehicleCategory(id) {
     return apiFetch(`/api/vehicle-categories/${id}`, { method: "DELETE" });
 }
-

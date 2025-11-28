@@ -111,13 +111,13 @@ function VehicleStatusBadge({ status }) {
 /* ---------------- toast system (light) ---------------- */
 function useToasts() {
     const [toasts, setToasts] = React.useState([]);
-    const push = (msg, kind = "info", ttl = 2400) => {
+    const push = React.useCallback((msg, kind = "info", ttl = 2400) => {
         const id = Math.random().toString(36).slice(2);
         setToasts((arr) => [...arr, { id, msg, kind }]);
         setTimeout(() => {
             setToasts((arr) => arr.filter((t) => t.id !== id));
         }, ttl);
-    };
+    }, []);
     return { toasts, push };
 }
 
@@ -878,6 +878,38 @@ export default function VehicleDetailPage() {
     // save handler
     const handleSaveProfile = async () => {
         try {
+            // Validation: không cho phép cập nhật ngày đăng kiểm, bảo hiểm về quá khứ
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            if (vehicleForm.reg_due_date) {
+                const regDate = new Date(vehicleForm.reg_due_date);
+                if (regDate < today) {
+                    push("Ngày đăng kiểm không được là ngày trong quá khứ", "error");
+                    return;
+                }
+            }
+
+            if (vehicleForm.ins_due_date) {
+                const insDate = new Date(vehicleForm.ins_due_date);
+                if (insDate < today) {
+                    push("Ngày hết hạn bảo hiểm không được là ngày trong quá khứ", "error");
+                    return;
+                }
+            }
+
+            // Validation: Nếu xe đang "ON_TRIP", không cho phép đổi trạng thái
+            if (savedVehicle.status === "ON_TRIP" && vehicleForm.status !== "ON_TRIP") {
+                push("Không thể thay đổi trạng thái khi xe đang trong chuyến đi", "error");
+                return;
+            }
+
+            // Validation: Nếu xe không phải "ON_TRIP", không cho phép đổi sang "ON_TRIP"
+            if (savedVehicle.status !== "ON_TRIP" && vehicleForm.status === "ON_TRIP") {
+                push("Trạng thái 'Đang chạy' chỉ được cập nhật tự động khi xe trong chuyến", "error");
+                return;
+            }
+
             await updateVehicle(vehicleForm.id, {
                 license_plate: vehicleForm.license_plate,
                 category_id: vehicleForm.category_id,

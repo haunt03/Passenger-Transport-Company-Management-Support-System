@@ -11,10 +11,6 @@ import {
     CheckCircle2,
     XCircle,
     Gauge,
-    AlertTriangle,
-    FileCheck,
-    DollarSign,
-    Clock,
 } from "lucide-react";
 import { getStoredUserId } from "../../utils/session";
 import { getBranchByUserId } from "../../api/branches";
@@ -22,17 +18,7 @@ import {
     getManagerDashboard,
     getBranchRevenueTrend,
     getBranchDriverPerformance,
-    getBranchVehicleUtilization,
-    getBranchVehicleEfficiency,
-    getBranchExpenseBreakdown,
-    getBranchPendingApprovals,
-    getBranchAlerts,
-    approveDayOff,
-    rejectDayOff,
-    approveExpenseRequest,
-    rejectExpenseRequest,
 } from "../../api/dashboards";
-import AlertsPanel from "./shared/AlertsPanel";
 import TrendChart from "./shared/TrendChart";
 
 /**
@@ -147,9 +133,9 @@ function KpiBlock({
 }
 
 /* -------------------- TripsSummary Card (light) -------------------- */
-function TripsSummaryCard({ completed, cancelled, kmTotal }) {
-    const cancelRate =
-        (cancelled / Math.max(1, completed + cancelled)) * 100;
+function TripsSummaryCard({ completed, inProgress, cancelled }) {
+    const total = completed + inProgress + cancelled;
+    const cancelRate = (cancelled / Math.max(1, total)) * 100;
 
     return (
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-4 flex flex-col gap-3">
@@ -165,11 +151,25 @@ function TripsSummaryCard({ completed, cancelled, kmTotal }) {
                 {/* Hoàn thành */}
                 <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-3 flex flex-col items-start">
                     <div className="flex items-center gap-1 text-[11px] text-slate-500">
-                        <CheckCircle2 className="h-3.5 w-3.5 text-amber-600" />
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
                         <span>Hoàn thành</span>
                     </div>
                     <div className="text-lg font-semibold text-slate-900 leading-none">
                         {fmtInt(completed)}
+                    </div>
+                    <div className="text-[10px] text-slate-500 mt-1">
+                        chuyến
+                    </div>
+                </div>
+
+                {/* Đang thực hiện */}
+                <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-3 flex flex-col items-start">
+                    <div className="flex items-center gap-1 text-[11px] text-slate-500">
+                        <Car className="h-3.5 w-3.5 text-sky-600" />
+                        <span>Đang thực hiện</span>
+                    </div>
+                    <div className="text-lg font-semibold text-slate-900 leading-none">
+                        {fmtInt(inProgress)}
                     </div>
                     <div className="text-[10px] text-slate-500 mt-1">
                         chuyến
@@ -187,20 +187,6 @@ function TripsSummaryCard({ completed, cancelled, kmTotal }) {
                     </div>
                     <div className="text-[10px] text-slate-500 mt-1">
                         {cancelRate.toFixed(1)}% huỷ
-                    </div>
-                </div>
-
-                {/* Km chạy */}
-                <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-3 flex flex-col items-start">
-                    <div className="flex items-center gap-1 text-[11px] text-slate-500">
-                        <Car className="h-3.5 w-3.5 text-sky-600" />
-                        <span>KM chạy</span>
-                    </div>
-                    <div className="text-lg font-semibold text-slate-900 leading-none">
-                        {fmtInt(kmTotal)}
-                    </div>
-                    <div className="text-[10px] text-slate-500 mt-1">
-                        km / kỳ
                     </div>
                 </div>
             </div>
@@ -278,76 +264,6 @@ function DriverPerfTable({ rows }) {
     );
 }
 
-/* -------------------- Vehicle Efficiency table (light) -------------------- */
-function VehiclePerfTable({ rows }) {
-    return (
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex flex-wrap items-center gap-2 text-sm">
-                <div className="h-8 w-8 rounded-md bg-sky-100 text-sky-600 border border-sky-200 flex items-center justify-center shadow-sm">
-                    <Car className="h-4 w-4" />
-                </div>
-
-                <div className="text-slate-700 font-medium leading-none">
-                    Hiệu suất xe
-                </div>
-
-                <div className="text-[11px] text-slate-500 leading-none ml-auto">
-                    Chi phí/km thấp là tốt
-                </div>
-            </div>
-
-            <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                    <thead className="text-[11px] uppercase tracking-wide text-slate-500 bg-slate-50 border-b border-slate-200">
-                    <tr>
-                        <th className="px-3 py-2 font-medium text-slate-600 text-xs text-left">
-                            Biển số
-                        </th>
-                        <th className="px-3 py-2 font-medium text-slate-600 text-xs text-left whitespace-nowrap">
-                            Chi phí/km
-                        </th>
-                        <th className="px-3 py-2 font-medium text-slate-600 text-xs text-left whitespace-nowrap">
-                            KM chạy
-                        </th>
-                    </tr>
-                    </thead>
-
-                    <tbody>
-                    {(!rows || rows.length === 0) ? (
-                        <tr>
-                            <td colSpan="3" className="px-3 py-8 text-center text-slate-500 text-sm">
-                                Chưa có dữ liệu xe trong kỳ này
-                            </td>
-                        </tr>
-                    ) : (
-                        rows.map((v, idx) => (
-                            <tr
-                                key={v.licensePlate || idx}
-                                className="border-b border-slate-200 hover:bg-slate-50/70"
-                            >
-                                <td className="px-3 py-2 text-slate-900 text-sm font-medium">
-                                    {v.licensePlate}
-                                </td>
-                                <td className="px-3 py-2 text-slate-700 text-sm font-medium tabular-nums">
-                                    {fmtVND(v.costPerKm)} đ/km
-                                </td>
-                                <td className="px-3 py-2 text-slate-700 text-sm tabular-nums">
-                                    {fmtInt(v.totalKm)} km
-                                </td>
-                            </tr>
-                        ))
-                    )}
-                    </tbody>
-                </table>
-            </div>
-
-            <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 text-[11px] text-slate-500 leading-relaxed">
-                Gồm nhiên liệu, bảo trì, phí cầu đường...
-            </div>
-        </div>
-    );
-}
-
 /* -------------------- MAIN COMPONENT (light theme) -------------------- */
 export default function ManagerDashboardPro() {
     const { toasts, push } = useToasts();
@@ -373,11 +289,6 @@ export default function ManagerDashboardPro() {
     const [dashboardData, setDashboardData] = React.useState(null);
     const [revenueTrend, setRevenueTrend] = React.useState([]);
     const [driverPerformance, setDriverPerformance] = React.useState([]);
-    const [vehicleUtilization, setVehicleUtilization] = React.useState({});
-    const [vehicleEfficiency, setVehicleEfficiency] = React.useState([]);
-    const [expenseBreakdown, setExpenseBreakdown] = React.useState([]);
-    const [pendingApprovals, setPendingApprovals] = React.useState([]);
-    const [alerts, setAlerts] = React.useState([]);
     const [dataLoading, setDataLoading] = React.useState(false);
 
     // Check if user is admin
@@ -458,12 +369,7 @@ export default function ManagerDashboardPro() {
                 const results = await Promise.allSettled([
                     getManagerDashboard({ branchId: branchInfo.id, period }),
                     getBranchRevenueTrend({ branchId: branchInfo.id }),
-                    getBranchDriverPerformance({ branchId: branchInfo.id, limit: 5 }),
-                    getBranchVehicleUtilization({ branchId: branchInfo.id }),
-                    getBranchVehicleEfficiency({ branchId: branchInfo.id, period }),
-                    getBranchExpenseBreakdown({ branchId: branchInfo.id }),
-                    getBranchPendingApprovals({ branchId: branchInfo.id }),
-                    getBranchAlerts({ branchId: branchInfo.id, severity: "HIGH,CRITICAL" }),
+                    getBranchDriverPerformance({ branchId: branchInfo.id, limit: 5, period }),
                 ]);
 
                 if (cancelled) return;
@@ -473,11 +379,6 @@ export default function ManagerDashboardPro() {
                     dashboardResult,
                     revenueTrendResult,
                     driverPerformanceResult,
-                    vehicleUtilizationResult,
-                    vehicleEfficiencyResult,
-                    expenseBreakdownResult,
-                    pendingApprovalsResult,
-                    alertsResult,
                 ] = results;
 
                 // Set data, using fallback values for failed requests
@@ -490,11 +391,6 @@ export default function ManagerDashboardPro() {
 
                 setRevenueTrend(revenueTrendResult.status === 'fulfilled' ? (revenueTrendResult.value || []) : []);
                 setDriverPerformance(driverPerformanceResult.status === 'fulfilled' ? (driverPerformanceResult.value || []) : []);
-                setVehicleUtilization(vehicleUtilizationResult.status === 'fulfilled' ? (vehicleUtilizationResult.value || {}) : {});
-                setVehicleEfficiency(vehicleEfficiencyResult.status === 'fulfilled' ? (vehicleEfficiencyResult.value || []) : []);
-                setExpenseBreakdown(expenseBreakdownResult.status === 'fulfilled' ? (expenseBreakdownResult.value || []) : []);
-                setPendingApprovals(pendingApprovalsResult.status === 'fulfilled' ? (pendingApprovalsResult.value || []) : []);
-                setAlerts(alertsResult.status === 'fulfilled' ? (alertsResult.value || []) : []);
 
                 // Log any errors for debugging
                 const errors = results
@@ -505,11 +401,6 @@ export default function ManagerDashboardPro() {
                         'dashboard',
                         'revenue-trend',
                         'driver-performance',
-                        'vehicle-utilization',
-                        'vehicle-efficiency',
-                        'expense-breakdown',
-                        'pending-approvals',
-                        'alerts'
                     ];
                     console.warn("Some APIs failed to load:", errors.map(idx => apiNames[idx]).join(', '));
                 }
@@ -543,12 +434,7 @@ export default function ManagerDashboardPro() {
                 const results = await Promise.allSettled([
                     getManagerDashboard({ branchId: branchInfo.id, period }),
                     getBranchRevenueTrend({ branchId: branchInfo.id }),
-                    getBranchDriverPerformance({ branchId: branchInfo.id, limit: 5 }),
-                    getBranchVehicleUtilization({ branchId: branchInfo.id }),
-                    getBranchVehicleEfficiency({ branchId: branchInfo.id, period }),
-                    getBranchExpenseBreakdown({ branchId: branchInfo.id }),
-                    getBranchPendingApprovals({ branchId: branchInfo.id }),
-                    getBranchAlerts({ branchId: branchInfo.id, severity: "HIGH,CRITICAL" }),
+                    getBranchDriverPerformance({ branchId: branchInfo.id, limit: 5, period }),
                 ]);
 
                 // Extract results, handling both fulfilled and rejected promises
@@ -556,11 +442,6 @@ export default function ManagerDashboardPro() {
                     dashboardResult,
                     revenueTrendResult,
                     driverPerformanceResult,
-                    vehicleUtilizationResult,
-                    vehicleEfficiencyResult,
-                    expenseBreakdownResult,
-                    pendingApprovalsResult,
-                    alertsResult,
                 ] = results;
 
                 // Set data, using fallback values for failed requests
@@ -572,11 +453,6 @@ export default function ManagerDashboardPro() {
 
                 setRevenueTrend(revenueTrendResult.status === 'fulfilled' ? (revenueTrendResult.value || []) : []);
                 setDriverPerformance(driverPerformanceResult.status === 'fulfilled' ? (driverPerformanceResult.value || []) : []);
-                setVehicleUtilization(vehicleUtilizationResult.status === 'fulfilled' ? (vehicleUtilizationResult.value || {}) : {});
-                setVehicleEfficiency(vehicleEfficiencyResult.status === 'fulfilled' ? (vehicleEfficiencyResult.value || []) : []);
-                setExpenseBreakdown(expenseBreakdownResult.status === 'fulfilled' ? (expenseBreakdownResult.value || []) : []);
-                setPendingApprovals(pendingApprovalsResult.status === 'fulfilled' ? (pendingApprovalsResult.value || []) : []);
-                setAlerts(alertsResult.status === 'fulfilled' ? (alertsResult.value || []) : []);
 
                 // Check if any requests failed
                 const failedCount = results.filter(r => r.status === 'rejected').length;
@@ -593,55 +469,6 @@ export default function ManagerDashboardPro() {
         })();
     };
 
-    // Approval handlers
-    const handleApproveDayOff = async (dayOffId) => {
-        try {
-            await approveDayOff(dayOffId, { note: "Đã duyệt" });
-            push("Đã duyệt yêu cầu nghỉ phép", "success");
-            onRefresh();
-        } catch (err) {
-            push("Lỗi khi duyệt yêu cầu: " + (err.message || "Lỗi không xác định"), "error");
-        }
-    };
-
-    const handleRejectDayOff = async (dayOffId, reason) => {
-        if (!reason || reason.trim() === "") {
-            push("Vui lòng nhập lý do từ chối", "error");
-            return;
-        }
-        try {
-            await rejectDayOff(dayOffId, { reason });
-            push("Đã từ chối yêu cầu nghỉ phép", "success");
-            onRefresh();
-        } catch (err) {
-            push("Lỗi khi từ chối yêu cầu: " + (err.message || "Lỗi không xác định"), "error");
-        }
-    };
-
-    const handleApproveExpense = async (expenseRequestId) => {
-        try {
-            await approveExpenseRequest(expenseRequestId, { note: "Đã duyệt" });
-            push("Đã duyệt yêu cầu chi phí", "success");
-            onRefresh();
-        } catch (err) {
-            push("Lỗi khi duyệt yêu cầu: " + (err.message || "Lỗi không xác định"), "error");
-        }
-    };
-
-    const handleRejectExpense = async (expenseRequestId, reason) => {
-        if (!reason || reason.trim() === "") {
-            push("Vui lòng nhập lý do từ chối", "error");
-            return;
-        }
-        try {
-            await rejectExpenseRequest(expenseRequestId, { reason });
-            push("Đã từ chối yêu cầu chi phí", "success");
-            onRefresh();
-        } catch (err) {
-            push("Lỗi khi từ chối yêu cầu: " + (err.message || "Lỗi không xác định"), "error");
-        }
-    };
-
     // Extract data with fallbacks
     const totalRevenue = dashboardData?.totalRevenue || 0;
     const totalExpense = dashboardData?.totalExpense || 0;
@@ -650,9 +477,6 @@ export default function ManagerDashboardPro() {
     const completedTrips = dashboardData?.completedTrips || 0;
     const ongoingTrips = dashboardData?.ongoingTrips || 0;
     const scheduledTrips = dashboardData?.scheduledTrips || 0;
-    const fleetUtilization = dashboardData?.fleetUtilization || 0;
-    const totalVehicles = dashboardData?.totalVehicles || 0;
-    const vehiclesInUse = dashboardData?.vehiclesInUse || 0;
     const totalDrivers = dashboardData?.totalDrivers || 0;
     const driversOnTrip = dashboardData?.driversOnTrip || 0;
     const driversAvailable = dashboardData?.driversAvailable || 0;
@@ -663,13 +487,6 @@ export default function ManagerDashboardPro() {
         driverName: d.driverName,
         trips: d.totalTrips || 0,
         km: d.totalKm || 0,
-    }));
-
-    // Map vehicle efficiency from API
-    const vehicleEfficiencyRows = (vehicleEfficiency || []).map((v) => ({
-        licensePlate: v.licensePlate || "N/A",
-        costPerKm: Number(v.costPerKm || 0),
-        totalKm: Number(v.totalKm || 0),
     }));
 
     // Tỷ lệ lợi nhuận (profit margin)
@@ -772,7 +589,7 @@ export default function ManagerDashboardPro() {
                     Đang tải dữ liệu...
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
                     <KpiBlock
                         label="Doanh thu chi nhánh"
                         value={fmtVND(totalRevenue) + " đ"}
@@ -815,32 +632,21 @@ export default function ManagerDashboardPro() {
                         icon={<Gauge className="h-3.5 w-3.5 text-indigo-600" />}
                     />
 
-                    <KpiBlock
-                        label="Tỷ lệ sử dụng xe"
-                        value={fleetUtilization.toFixed(1) + " %"}
-                        sub={`${vehiclesInUse}/${totalVehicles} xe đang sử dụng`}
-                        deltaPct={null}
-                        up={true}
-                        icon={<Car className="h-3.5 w-3.5 text-amber-500" />}
-                    />
                 </div>
             )}
 
             {/* SECOND ROW: Trips summary + 2 tables */}
             {!dataLoading && (
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                     {/* cột trái: hiệu suất chuyến */}
                     <TripsSummaryCard
                         completed={completedTrips}
+                        inProgress={ongoingTrips}
                         cancelled={totalTrips - completedTrips - ongoingTrips - scheduledTrips}
-                        kmTotal={dashboardData?.totalKm ? Number(dashboardData.totalKm) : 0}
                     />
 
                     {/* cột giữa: tài xế */}
                     <DriverPerfTable rows={topDrivers} />
-
-                    {/* cột phải: xe */}
-                    <VehiclePerfTable rows={vehicleEfficiencyRows} />
                 </div>
             )}
 
@@ -860,107 +666,6 @@ export default function ManagerDashboardPro() {
                         xKey="month"
                         height={300}
                     />
-                </div>
-            )}
-
-            {/* ALERTS & PENDING APPROVALS */}
-            {!dataLoading && (alerts.length > 0 || pendingApprovals.length > 0) && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-                    {/* Alerts Panel */}
-                    {alerts.length > 0 && (
-                        <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-4">
-                            <div className="flex items-center gap-2 mb-4">
-                                <AlertTriangle className="h-5 w-5 text-amber-600" />
-                                <div className="text-sm font-semibold text-slate-900">
-                                    Cảnh báo Chi nhánh
-                                </div>
-                                <span className="ml-auto text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded">
-                                    {alerts.length} cảnh báo
-                                </span>
-                            </div>
-                            <AlertsPanel alerts={alerts} maxHeight={300} />
-                        </div>
-                    )}
-
-                    {/* Pending Approvals */}
-                    {pendingApprovals.length > 0 && (
-                        <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-4">
-                            <div className="flex items-center gap-2 mb-4">
-                                <Clock className="h-5 w-5 text-blue-600" />
-                                <div className="text-sm font-semibold text-slate-900">
-                                    Chờ Duyệt
-                                </div>
-                                <span className="ml-auto text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded">
-                                    {pendingApprovals.length} yêu cầu
-                                </span>
-                            </div>
-                            <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                                {pendingApprovals.map((approval) => (
-                                    <div
-                                        key={approval.approvalId}
-                                        className="border border-slate-200 rounded-lg p-3 bg-slate-50"
-                                    >
-                                        <div className="flex items-start justify-between gap-2">
-                                            <div className="flex-1">
-                                                <div className="text-sm font-medium text-slate-900">
-                                                    {approval.approvalType === "DRIVER_DAY_OFF"
-                                                        ? "Nghỉ phép"
-                                                        : approval.approvalType === "EXPENSE_REQUEST"
-                                                            ? "Chi phí"
-                                                            : approval.approvalType}
-                                                </div>
-                                                <div className="text-xs text-slate-600 mt-1">
-                                                    {approval.requestReason || "Không có lý do"}
-                                                </div>
-                                                <div className="text-xs text-slate-500 mt-1">
-                                                    Yêu cầu bởi: {approval.requestedBy}
-                                                </div>
-                                            </div>
-                                            <div className="flex gap-1">
-                                                {approval.approvalType === "DRIVER_DAY_OFF" ? (
-                                                    <>
-                                                        <button
-                                                            onClick={() => handleApproveDayOff(approval.relatedEntityId)}
-                                                            className="px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded hover:bg-amber-200"
-                                                        >
-                                                            Duyệt
-                                                        </button>
-                                                        <button
-                                                            onClick={() => {
-                                                                const reason = prompt("Lý do từ chối:");
-                                                                if (reason) handleRejectDayOff(approval.relatedEntityId, reason);
-                                                            }}
-                                                            className="px-2 py-1 text-xs bg-rose-100 text-rose-700 rounded hover:bg-rose-200"
-                                                        >
-                                                            Từ chối
-                                                        </button>
-                                                    </>
-                                                ) : approval.approvalType === "EXPENSE_REQUEST" ? (
-                                                    <>
-                                                        <button
-                                                            onClick={() => handleApproveExpense(approval.relatedEntityId)}
-                                                            className="px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded hover:bg-amber-200"
-                                                        >
-                                                            Duyệt
-                                                        </button>
-                                                        <button
-                                                            onClick={() => {
-                                                                const reason = prompt("Lý do từ chối:");
-                                                                if (reason) handleRejectExpense(approval.relatedEntityId, reason);
-                                                            }}
-                                                            className="px-2 py-1 text-xs bg-rose-100 text-rose-700 rounded hover:bg-rose-200"
-                                                        >
-                                                            Từ chối
-                                                        </button>
-                                                    </>
-                                                ) : null}
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
                 </div>
             )}
 

@@ -21,6 +21,7 @@ import {
   startTrip as apiStartTrip,
   completeTrip as apiCompleteTrip,
 } from "../../api/drivers";
+import { useWebSocket } from "../../contexts/WebSocketContext";
 
 /**
  * DriverDashboard – M2.S1 (LIGHT THEME VERSION, CONNECTED TO API)
@@ -276,6 +277,7 @@ function TripCard({
                     onFinish,
                     loading,
                     backendStatus,
+                    isTripToday = true, // Default to true for backward compatibility
                   }) {
   if (!activeTrip) {
     return (
@@ -400,40 +402,48 @@ function TripCard({
 
         {/* actions */}
         {isCurrent ? (
-            <div className="flex flex-wrap gap-3 pt-5 border-t border-slate-200">
-              <ActionButton
-                  active={phase === "READY"}
-                  color="start"
-                  icon={<PlayCircle className="h-4 w-4 shrink-0 text-sky-700" />}
-                  label="Bắt đầu chuyến"
-                  onClick={onStart}
-                  loading={loading}
-              />
-              <ActionButton
-                  active={phase === "ON_ROUTE"}
-                  color="picked"
-                  icon={
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-amber-700" />
-                  }
-                  label="Đã đón khách"
-                  onClick={onPicked}
-                  loading={false}
-              />
-              <ActionButton
-                  active={phase === "PICKED"}
-                  color="finish"
-                  icon={<Flag className="h-4 w-4 shrink-0 text-amber-700" />}
-                  label="Hoàn thành chuyến"
-                  onClick={onFinish}
-                  loading={loading}
-              />
+            <div className="flex flex-col gap-3 pt-5 border-t border-slate-200">
+              {!isTripToday && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 text-amber-700 px-3 py-2 text-xs flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <span>Chỉ có thể cập nhật trạng thái chuyến trong ngày diễn ra</span>
+                  </div>
+              )}
+              <div className="flex flex-wrap gap-3">
+                <ActionButton
+                    active={phase === "READY" && isTripToday}
+                    color="start"
+                    icon={<PlayCircle className="h-4 w-4 shrink-0 text-sky-700" />}
+                    label="Bắt đầu chuyến"
+                    onClick={onStart}
+                    loading={loading}
+                />
+                <ActionButton
+                    active={phase === "ON_ROUTE" && isTripToday}
+                    color="picked"
+                    icon={
+                      <CheckCircle2 className="h-4 w-4 shrink-0 text-amber-700" />
+                    }
+                    label="Đã đón khách"
+                    onClick={onPicked}
+                    loading={false}
+                />
+                <ActionButton
+                    active={phase === "PICKED" && isTripToday}
+                    color="finish"
+                    icon={<Flag className="h-4 w-4 shrink-0 text-amber-700" />}
+                    label="Hoàn thành chuyến"
+                    onClick={onFinish}
+                    loading={loading}
+                />
 
-              <div className="text-[11px] text-slate-500 font-mono ml-auto self-center">
-                ID: <span className="text-slate-700">{t.trip_id}</span>
+                <div className="text-[11px] text-slate-500 font-mono ml-auto self-center">
+                  ID: <span className="text-slate-700">{t.trip_id}</span>
+                </div>
               </div>
             </div>
         ) : (
-            <div className="flex flex-wrap items-center gap-2 pt-5 border-t border-slate-200 text-xs text-slate-500 leading-relaxed">
+            <div className="flex flex-wrap items-center gap-2 pt-5 border-slate-200 text-xs text-slate-500 leading-relaxed">
               Chuyến này chưa bắt đầu · Bạn sẽ được nhắc khi đến giờ đón.
             </div>
         )}
@@ -466,6 +476,9 @@ export default function DriverDashboard() {
   const navigate = useNavigate();
   const { toasts, push } = useToasts();
 
+  // Get WebSocket notifications for real-time updates
+  const { notifications: wsNotifications } = useWebSocket();
+
   const [driver, setDriver] = React.useState(null);
   const [trip, setTrip] = React.useState(null);
   const [upcomingTrips, setUpcomingTrips] = React.useState([]);
@@ -490,20 +503,33 @@ export default function DriverDashboard() {
       console.log("📞 Customer Phone:", dash?.customerPhone);
       console.log("🗺️ Distance:", dash?.distance);
 
-      const mapped =
-          dash && dash.tripId
-              ? {
-                tripId: dash.tripId,
-                pickupAddress: dash.startLocation,
-                dropoffAddress: dash.endLocation ?? dash.EndLocation,
-                pickupTime: dash.startTime,
-                endTime: dash.endTime,
-                status: dash.status || "SCHEDULED",
-                customerName: dash.customerName,
-                customerPhone: dash.customerPhone,
-                distance: dash.distance,
-              }
-              : null;
+      let mapped = null;
+      if (dash && dash.tripId) {
+        // Check if trip is today
+        const tripDate = new Date(dash.startTime);
+        const today = new Date();
+        const isToday =
+            tripDate.getDate() === today.getDate() &&
+            tripDate.getMonth() === today.getMonth() &&
+            tripDate.getFullYear() === today.getFullYear();
+
+        // Only show trip if it's today
+        if (isToday) {
+          mapped = {
+            tripId: dash.tripId,
+            pickupAddress: dash.startLocation,
+            dropoffAddress: dash.endLocation ?? dash.EndLocation,
+            pickupTime: dash.startTime,
+            endTime: dash.endTime,
+            status: dash.status || "SCHEDULED",
+            customerName: dash.customerName,
+            customerPhone: dash.customerPhone,
+            distance: dash.distance,
+          };
+        } else {
+          console.log("⏭️ Trip is not today, skipping:", dash.startTime);
+        }
+      }
       console.log("🔄 Mapped Trip:", mapped);
       setTrip(mapped);
 
@@ -513,12 +539,17 @@ export default function DriverDashboard() {
         const upcoming = Array.isArray(schedule)
             ? schedule
                 .filter((t) => {
-                  // Filter for future trips only
+                  // Filter for today's trips only
                   const tripDate = new Date(t.startTime || t.start_time);
-                  const now = new Date();
-                  return tripDate > now && t.status === "SCHEDULED";
+                  const today = new Date();
+                  return (
+                      tripDate.getDate() === today.getDate() &&
+                      tripDate.getMonth() === today.getMonth() &&
+                      tripDate.getFullYear() === today.getFullYear() &&
+                      t.status === "SCHEDULED"
+                  );
                 })
-                .slice(0, 5) // Show max 5 upcoming trips
+                .slice(0, 10) // Show max 10 today's trips
                 .map((t) => ({
                   tripId: t.tripId || t.trip_id,
                   pickupAddress: t.startLocation || t.start_location || "—",
@@ -665,14 +696,36 @@ export default function DriverDashboard() {
       }
       : null;
 
-  // demo notifications – sau này có thể lấy từ API khác
-  const notifications = [
-    {
-      id: 1,
-      type: "info",
-      text: "Điều phối sẽ thông báo cho bạn khi có chuyến mới.",
-    },
-  ];
+  // Check if trip is today
+  const isTripToday = React.useMemo(() => {
+    if (!trip?.pickupTime) return false;
+    const tripDate = new Date(trip.pickupTime);
+    const today = new Date();
+    return (
+        tripDate.getDate() === today.getDate() &&
+        tripDate.getMonth() === today.getMonth() &&
+        tripDate.getFullYear() === today.getFullYear()
+    );
+  }, [trip?.pickupTime]);
+
+  // Format WebSocket notifications for display
+  const notifications = React.useMemo(() => {
+    const formatted = (wsNotifications || []).slice(0, 5).map(n => ({
+      id: n.id,
+      type: n.type === "SUCCESS" ? "success" : n.type === "ERROR" ? "error" : "info",
+      text: n.message || n.title || "Thông báo mới",
+    }));
+
+    // If no notifications, show default message
+    if (formatted.length === 0) {
+      return [{
+        id: "default",
+        type: "info",
+        text: "Điều phối sẽ thông báo cho bạn khi có chuyến mới.",
+      }];
+    }
+    return formatted;
+  }, [wsNotifications]);
 
   // Get current month name
   const currentMonthName = new Date().toLocaleDateString("vi-VN", {
@@ -724,7 +777,7 @@ export default function DriverDashboard() {
         )}
 
         {/* STATS ROW */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <StatsCard
               icon={Clock}
               label="Số chuyến hôm nay"
@@ -738,15 +791,9 @@ export default function DriverDashboard() {
           />
           <StatsCard
               icon={Calendar}
-              label="Ngày nghỉ đã dùng"
+              label="Số buổi nghỉ trong tháng"
               value={`${stats.daysOffUsed}/${stats.daysOffAllowed}`}
-              sublabel="Trong tháng này"
-          />
-          <StatsCard
-              icon={AlertCircle}
-              label="Ngày nghỉ còn lại"
-              value={stats.daysOffAllowed - stats.daysOffUsed}
-              sublabel="Có thể xin nghỉ"
+              sublabel="Đã nghỉ / Cho phép"
           />
         </div>
 
@@ -761,6 +808,7 @@ export default function DriverDashboard() {
               onFinish={handleComplete}
               loading={tripLoading}
               backendStatus={trip?.status}
+              isTripToday={isTripToday}
           />
 
           <div className="flex flex-col gap-6">
@@ -776,7 +824,7 @@ export default function DriverDashboard() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-50 text-sky-600 ring-1 ring-inset ring-sky-100 shadow-sm">
                   <Calendar className="h-4 w-4" />
                 </div>
-                <div className="flex-1">Chuyến sắp tới</div>
+                <div className="flex-1">Chuyến hôm nay</div>
                 <div className="text-[11px] text-slate-500">{upcomingTrips.length} chuyến</div>
               </div>
 

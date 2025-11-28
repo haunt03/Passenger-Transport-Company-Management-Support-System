@@ -17,6 +17,7 @@ import {
   UserCog,
 } from "lucide-react";
 import AnimatedDialog from "../common/AnimatedDialog";
+import ProvinceAutocomplete from "../common/ProvinceAutocomplete";
 
 const cls = (...a) => a.filter(Boolean).join(" ");
 
@@ -73,32 +74,25 @@ function Toasts({ toasts }) {
 function CreateBranchModal({ open, onClose, onSave, availableManagers }) {
   const [name, setName] = React.useState("");
   const [address, setAddress] = React.useState("");
-  const [phone, setPhone] = React.useState("");
   const [managerId, setManagerId] = React.useState("");
   const [fieldErrors, setFieldErrors] = React.useState({});
 
   const reset = () => {
     setName("");
     setAddress("");
-    setPhone("");
     setManagerId("");
     setFieldErrors({});
   };
 
-  const validatePhone = React.useCallback((phoneStr) => {
-    const cleaned = phoneStr.trim();
+  const validateBranchName = React.useCallback((nameStr) => {
+    const cleaned = nameStr.trim();
 
-    if (/[^0-9\s\-+]/.test(cleaned)) {
-      return "Chỉ dùng số, dấu cách, gạch ngang hoặc +84";
+    if (!cleaned) {
+      return "Vui lòng chọn tỉnh/thành phố";
     }
 
-    const digitsOnly = cleaned.replace(/[^0-9]/g, "");
-    if (digitsOnly.length < 9 || digitsOnly.length > 12) {
-      return "Số điện thoại cần 9–12 chữ số (có thể kèm +84)";
-    }
-
-    if (cleaned.startsWith("+") && !digitsOnly.startsWith("84")) {
-      return "Khi dùng mã quốc gia, hãy nhập dạng +84...";
+    if (cleaned.toLowerCase().includes("chi nhánh")) {
+      return "Tên chi nhánh không được chứa cụm từ 'chi nhánh'";
     }
 
     return null;
@@ -106,26 +100,26 @@ function CreateBranchModal({ open, onClose, onSave, availableManagers }) {
 
   const validate = () => {
     const errs = {};
-    if (!name.trim()) errs.name = "Vui lòng nhập tên chi nhánh";
-    if (!address.trim()) errs.address = "Vui lòng nhập địa chỉ";
 
-    if (!phone.trim()) {
-      errs.phone = "Vui lòng nhập số điện thoại";
+    if (!name.trim()) {
+      errs.name = "Vui lòng nhập tên chi nhánh";
     } else {
-      const phoneError = validatePhone(phone);
-      if (phoneError) errs.phone = phoneError;
+      const nameError = validateBranchName(name);
+      if (nameError) errs.name = nameError;
     }
+
+    if (!address.trim()) errs.address = "Vui lòng nhập địa chỉ";
 
     setFieldErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
   const isFormValid = React.useMemo(() => {
-    if (!name.trim() || !address.trim() || !phone.trim()) {
+    if (!name.trim() || !address.trim()) {
       return false;
     }
-    return validatePhone(phone) === null;
-  }, [name, address, phone, validatePhone]);
+    return validateBranchName(name) === null;
+  }, [name, address, validateBranchName]);
 
   React.useEffect(() => {
     if (!open) reset();
@@ -159,18 +153,14 @@ function CreateBranchModal({ open, onClose, onSave, availableManagers }) {
                 <span>Tên chi nhánh</span>
                 <span className="text-red-500">*</span>
               </label>
-              <input
+              <ProvinceAutocomplete
                   value={name}
-                  onChange={(e) => {
-                    setName(e.target.value);
+                  onChange={(value) => {
+                    setName(value);
                     setFieldErrors((p) => ({ ...p, name: undefined }));
                   }}
-                  className={`w-full border rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 ${
-                      fieldErrors.name
-                          ? "border-red-400 focus:border-red-500 focus:ring-red-200"
-                          : "border-slate-300 focus:border-[#0079BC]/50 focus:ring-[#0079BC]/20"
-                  }`}
-                  placeholder="VD: Chi nhánh Hà Nội"
+                  error={fieldErrors.name}
+                  placeholder="Chọn tỉnh/thành phố (VD: Hà Nội, Cần Thơ...)"
               />
               {fieldErrors.name && (
                   <div className="text-xs text-red-600 mt-1.5 flex items-center gap-1.5">
@@ -178,6 +168,9 @@ function CreateBranchModal({ open, onClose, onSave, availableManagers }) {
                     <span>{fieldErrors.name}</span>
                   </div>
               )}
+              <div className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                💡 Chỉ được chọn từ danh sách 63 tỉnh/thành phố Việt Nam. Không được nhập "Chi nhánh" vào tên.
+              </div>
             </div>
 
             {/* ADDRESS */}
@@ -209,42 +202,6 @@ function CreateBranchModal({ open, onClose, onSave, availableManagers }) {
               )}
             </div>
 
-            {/* PHONE */}
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                <Phone className="h-4 w-4 text-slate-400" />
-                <span>Số điện thoại</span>
-                <span className="text-red-500">*</span>
-              </label>
-              <input
-                  value={phone}
-                  onChange={(e) => {
-                    const cleaned = e.target.value.replace(/[^0-9\s\-+]/g, "");
-                    setPhone(cleaned);
-                    setFieldErrors((p) => ({ ...p, phone: undefined }));
-                  }}
-                  className={`w-full border rounded-lg px-4 py-2.5 text-sm tabular-nums transition-all focus:outline-none focus:ring-2 ${
-                      fieldErrors.phone
-                          ? "border-red-400 focus:border-red-500 focus:ring-red-200"
-                          : "border-slate-300 focus:border-[#0079BC]/50 focus:ring-[#0079BC]/20"
-                  }`}
-                  placeholder="0123456789 hoặc +84 123 456 789"
-                  maxLength={15}
-              />
-              {fieldErrors.phone && (
-                  <div className="text-xs text-red-600 mt-1.5 flex items-center gap-1.5">
-                    <X className="h-3.5 w-3.5" />
-                    <span>{fieldErrors.phone}</span>
-                  </div>
-              )}
-              {!fieldErrors.phone && phone.trim() && (
-                  <div className="text-xs text-emerald-600 mt-1.5 flex items-center gap-1.5">
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                    <span>Hỗ trợ định dạng: 0123456789, +84123456789, 0123 456 789</span>
-                  </div>
-              )}
-            </div>
-
             {/* MANAGER (optional) */}
             <div className="space-y-2">
               <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
@@ -267,12 +224,12 @@ function CreateBranchModal({ open, onClose, onSave, availableManagers }) {
                 <option value="">-- Không gán Manager --</option>
                 {availableManagers.map((m) => (
                     <option key={m.id} value={m.id}>
-                      {m.name} ({m.email})
+                      {m.name}{m.email ? ` (${m.email})` : ''}
                     </option>
                 ))}
               </select>
               <div className="text-xs text-slate-500 mt-1.5 leading-relaxed">
-                Chỉ hiển thị các Manager đã có bản ghi nhân viên. Có thể để trống nếu chưa có.
+                Chỉ hiển thị các Manager đã có bản ghi nhân viên. Có thể để trống nếu chưa có. Số điện thoại sẽ lấy từ thông tin Manager.
               </div>
             </div>
           </div>
@@ -291,7 +248,6 @@ function CreateBranchModal({ open, onClose, onSave, availableManagers }) {
                   onSave({
                     name: name.trim(),
                     address: address.trim(),
-                    phone: phone.trim(),
                     managerId: managerId ? Number(managerId) : null,
                   });
                 }}
@@ -377,19 +333,19 @@ export default function AdminBranchesPage() {
     onRefresh();
   }, []);
 
-  const handleCreateBranch = async ({ name, address, phone, managerId }) => {
+  const handleCreateBranch = async ({ name, address, managerId }) => {
     try {
       await createBranch({
         branchName: name,
         location: address,
-        phone,
         managerId,
       });
       push("Tạo chi nhánh thành công", "success");
       setOpenCreate(false);
       onRefresh();
     } catch (e) {
-      push("Tạo chi nhánh thất bại", "error");
+      const errorMsg = e.response?.data?.message || e.message || "Tạo chi nhánh thất bại";
+      push(errorMsg, "error", 4000);
     }
   };
 
@@ -488,6 +444,9 @@ export default function AdminBranchesPage() {
                     Địa chỉ
                   </th>
                   <th className="text-left font-semibold px-6 py-3.5 text-xs text-slate-700 uppercase tracking-wider">
+                    Số điện thoại
+                  </th>
+                  <th className="text-left font-semibold px-6 py-3.5 text-xs text-slate-700 uppercase tracking-wider">
                     Quản lý
                   </th>
                   <th className="text-left font-semibold px-6 py-3.5 text-xs text-slate-700 uppercase tracking-wider">
@@ -506,7 +465,7 @@ export default function AdminBranchesPage() {
                 {current.length === 0 ? (
                     <tr>
                       <td
-                          colSpan={6}
+                          colSpan={7}
                           className="px-6 py-12 text-center"
                       >
                         <div className="flex flex-col items-center gap-3">
@@ -528,6 +487,12 @@ export default function AdminBranchesPage() {
                             <div className="flex items-start gap-2 text-slate-700">
                               <MapPin className="h-4 w-4 text-slate-400 mt-0.5 flex-shrink-0" />
                               <span className="text-sm">{b.address || "—"}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2 text-slate-700">
+                              <Phone className="h-4 w-4 text-slate-400" />
+                              <span className="text-sm font-mono">{b.phone || "—"}</span>
                             </div>
                           </td>
                           <td className="px-6 py-4">

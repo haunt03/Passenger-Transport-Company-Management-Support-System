@@ -7,6 +7,7 @@ import {
     listBookingPayments,
     generateBookingQrPayment,
 } from "../../api/bookings";
+import { getCurrentRole, ROLES } from "../../utils/session";
 import {
     ClipboardList,
     User,
@@ -875,6 +876,10 @@ export default function OrderDetailPage() {
     const { toasts, push } = useToasts();
     const { orderId } = useParams();
 
+    // Check role - ẩn phần thanh toán cho Consultant
+    const currentRole = React.useMemo(() => getCurrentRole(), []);
+    const isConsultant = currentRole === ROLES.CONSULTANT;
+
     const [order, setOrder] = React.useState(null);
     const [loading, setLoading] = React.useState(true);
     const [paymentHistory, setPaymentHistory] = React.useState([]);
@@ -1091,54 +1096,56 @@ export default function OrderDetailPage() {
                     )}
                 </div>
 
-                {/* thanh toán summary box */}
-                <div className="w-full max-w-[260px] rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-3 text-sm shadow-sm">
-                    <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                        <DollarSign className="h-3.5 w-3.5 text-amber-600" />
-                        Tình trạng thanh toán
-                    </div>
-
-                    <div className="flex items-baseline justify-between">
-                        <div className="text-[12px] text-slate-500">
-                            Giá chốt
-                        </div>
-                        <div className="font-semibold text-slate-900 tabular-nums">
-                            {fmtVND(finalPrice)}
-                        </div>
-                    </div>
-
-                    <div className="flex items-baseline justify-between">
-                        <div className="text-[12px] text-slate-500">
-                            Đã thu
-                        </div>
-                        <div className="font-semibold text-amber-600 tabular-nums flex items-center gap-1">
+                {/* thanh toán summary box - ẩn với Consultant */}
+                {!isConsultant && (
+                    <div className="w-full max-w-[260px] rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-3 text-sm shadow-sm">
+                        <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
                             <DollarSign className="h-3.5 w-3.5 text-amber-600" />
-                            <span>{fmtVND(paid)}</span>
+                            Tình trạng thanh toán
                         </div>
-                    </div>
 
-                    <div className="flex items-baseline justify-between">
-                        <div className="text-[12px] text-slate-500">
-                            Còn lại
+                        <div className="flex items-baseline justify-between">
+                            <div className="text-[12px] text-slate-500">
+                                Giá chốt
+                            </div>
+                            <div className="font-semibold text-slate-900 tabular-nums">
+                                {fmtVND(finalPrice)}
+                            </div>
                         </div>
-                        <div className="font-semibold text-amber-600 tabular-nums flex items-center gap-1">
-                            <DollarSign className="h-3.5 w-3.5 text-amber-600" />
+
+                        <div className="flex items-baseline justify-between">
+                            <div className="text-[12px] text-slate-500">
+                                Đã thu
+                            </div>
+                            <div className="font-semibold text-amber-600 tabular-nums flex items-center gap-1">
+                                <DollarSign className="h-3.5 w-3.5 text-amber-600" />
+                                <span>{fmtVND(paid)}</span>
+                            </div>
+                        </div>
+
+                        <div className="flex items-baseline justify-between">
+                            <div className="text-[12px] text-slate-500">
+                                Còn lại
+                            </div>
+                            <div className="font-semibold text-amber-600 tabular-nums flex items-center gap-1">
+                                <DollarSign className="h-3.5 w-3.5 text-amber-600" />
+                                <span>
+                                    {fmtVND(remain)}
+                                </span>
+                            </div>
+                        </div>
+
+                        <button
+                            className="w-full rounded-md bg-[#EDC531] hover:bg-amber-500 text-white font-medium text-[13px] px-4 py-2 shadow-sm flex items-center justify-center gap-2"
+                            onClick={openDeposit}
+                        >
+                            <BadgeDollarSign className="h-4 w-4" />
                             <span>
-                                {fmtVND(remain)}
+                                Ghi nhận thanh toán
                             </span>
-                        </div>
+                        </button>
                     </div>
-
-                    <button
-                        className="w-full rounded-md bg-[#EDC531] hover:bg-amber-500 text-white font-medium text-[13px] px-4 py-2 shadow-sm flex items-center justify-center gap-2"
-                        onClick={openDeposit}
-                    >
-                        <BadgeDollarSign className="h-4 w-4" />
-                        <span>
-                            Ghi nhận thanh toán
-                        </span>
-                    </button>
-                </div>
+                )}
             </div>
 
             {/* BODY GRID */}
@@ -1149,14 +1156,16 @@ export default function OrderDetailPage() {
                 <TripInfoCard trip={order.trip} />
             </div>
 
-            <div className="grid xl:grid-cols-2 gap-5 mb-5">
+            <div className={`grid ${isConsultant ? 'xl:grid-cols-1' : 'xl:grid-cols-2'} gap-5 mb-5`}>
                 <QuoteInfoCard quote={order.quote} />
-                <PaymentInfoCard
-                    payment={order.payment}
-                    history={paymentHistory}
-                    onOpenDeposit={openDeposit}
-                    onGenerateQr={openQrModal}
-                />
+                {!isConsultant && (
+                    <PaymentInfoCard
+                        payment={order.payment}
+                        history={paymentHistory}
+                        onOpenDeposit={openDeposit}
+                        onGenerateQr={openQrModal}
+                    />
+                )}
             </div>
 
             <div className="grid xl:grid-cols-2 gap-5">
@@ -1186,46 +1195,51 @@ export default function OrderDetailPage() {
                 </div>
             </div>
 
-            <QrPaymentModal
-                open={qrModalOpen}
-                bookingCode={order.code}
-                customerName={order.customer.name}
-                defaultAmount={remain}
-                onClose={() => setQrModalOpen(false)}
-                onGenerate={handleQrGenerate}
-            />
+            {/* Payment modals - ẩn với Consultant */}
+            {!isConsultant && (
+                <>
+                    <QrPaymentModal
+                        open={qrModalOpen}
+                        bookingCode={order.code}
+                        customerName={order.customer.name}
+                        defaultAmount={remain}
+                        onClose={() => setQrModalOpen(false)}
+                        onGenerate={handleQrGenerate}
+                    />
 
-            {/* Deposit / Payment modal */}
-            <DepositModal
-                open={depositOpen}
-                context={{
-                    type: "order",
-                    id: order.id,
-                    branchId: order.branchId,
-                    customerId: order.customerId,
-                    title:
-                        order.customer.name +
-                        " · " +
-                        order.trip.pickup +
-                        " → " +
-                        order.trip.dropoff,
-                }}
-                /* Tổng & Đã trả truyền cho modal light */
-                totals={{
-                    total: order.quote.final_price,
-                    paid: order.payment.paid,
-                }}
-                /* Số mặc định = phần còn lại */
-                defaultAmount={Math.max(
-                    0,
-                    order.quote.final_price -
-                    order.payment.paid
-                )}
-                modeLabel="Thanh toán"
-                allowOverpay={false}
-                onClose={() => setDepositOpen(false)}
-                onSubmitted={handleDepositSubmitted}
-            />
+                    {/* Deposit / Payment modal */}
+                    <DepositModal
+                        open={depositOpen}
+                        context={{
+                            type: "order",
+                            id: order.id,
+                            branchId: order.branchId,
+                            customerId: order.customerId,
+                            title:
+                                order.customer.name +
+                                " · " +
+                                order.trip.pickup +
+                                " → " +
+                                order.trip.dropoff,
+                        }}
+                        /* Tổng & Đã trả truyền cho modal light */
+                        totals={{
+                            total: order.quote.final_price,
+                            paid: order.payment.paid,
+                        }}
+                        /* Số mặc định = phần còn lại */
+                        defaultAmount={Math.max(
+                            0,
+                            order.quote.final_price -
+                            order.payment.paid
+                        )}
+                        modeLabel="Thanh toán"
+                        allowOverpay={false}
+                        onClose={() => setDepositOpen(false)}
+                        onSubmitted={handleDepositSubmitted}
+                    />
+                </>
+            )}
         </div>
     );
 }

@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { getCookie } from "../../utils/cookies";
 import { getDriverProfileByUser, getDriverSchedule } from "../../api/drivers";
+import Pagination from "../common/Pagination";
 
 const cls = (...a) => a.filter(Boolean).join(" ");
 
@@ -83,6 +84,9 @@ export default function DriverTripsListPage() {
     const [error, setError] = React.useState("");
     const [searchQuery, setSearchQuery] = React.useState("");
     const [statusFilter, setStatusFilter] = React.useState("ALL");
+    const [timeFilter, setTimeFilter] = React.useState("ALL"); // ALL, THIS_WEEK, NEXT_WEEK, THIS_MONTH, LAST_MONTH
+    const [currentPage, setCurrentPage] = React.useState(1);
+    const pageSize = 9; // 3x3 grid
 
     React.useEffect(() => {
         let mounted = true;
@@ -132,10 +136,52 @@ export default function DriverTripsListPage() {
     const filteredTrips = React.useMemo(() => {
         let result = trips;
 
+        // Filter by status
         if (statusFilter !== "ALL") {
             result = result.filter((t) => t.status === statusFilter);
         }
 
+        // Filter by time period
+        if (timeFilter !== "ALL") {
+            const now = new Date();
+            result = result.filter((t) => {
+                const tripDate = new Date(t.startTime);
+
+                switch (timeFilter) {
+                    case "THIS_WEEK":
+                        const startOfWeek = new Date(now);
+                        startOfWeek.setDate(now.getDate() - now.getDay());
+                        startOfWeek.setHours(0, 0, 0, 0);
+                        const endOfWeek = new Date(startOfWeek);
+                        endOfWeek.setDate(startOfWeek.getDate() + 6);
+                        endOfWeek.setHours(23, 59, 59, 999);
+                        return tripDate >= startOfWeek && tripDate <= endOfWeek;
+
+                    case "THIS_MONTH":
+                        return tripDate.getMonth() === now.getMonth() &&
+                            tripDate.getFullYear() === now.getFullYear();
+
+                    case "NEXT_WEEK":
+                        const startOfNextWeek = new Date(now);
+                        startOfNextWeek.setDate(now.getDate() + (7 - now.getDay()));
+                        startOfNextWeek.setHours(0, 0, 0, 0);
+                        const endOfNextWeek = new Date(startOfNextWeek);
+                        endOfNextWeek.setDate(startOfNextWeek.getDate() + 6);
+                        endOfNextWeek.setHours(23, 59, 59, 999);
+                        return tripDate >= startOfNextWeek && tripDate <= endOfNextWeek;
+
+                    case "LAST_MONTH":
+                        const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                        const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+                        return tripDate >= lastMonth && tripDate <= lastMonthEnd;
+
+                    default:
+                        return true;
+                }
+            });
+        }
+
+        // Filter by search query
         if (searchQuery.trim()) {
             const q = searchQuery.toLowerCase();
             result = result.filter(
@@ -150,7 +196,14 @@ export default function DriverTripsListPage() {
             const bTime = new Date(b.startTime).getTime();
             return bTime - aTime;
         });
-    }, [trips, statusFilter, searchQuery]);
+    }, [trips, statusFilter, timeFilter, searchQuery]);
+
+    // Pagination
+    const totalPages = Math.ceil(filteredTrips.length / pageSize);
+    const paginatedTrips = filteredTrips.slice(
+        (currentPage - 1) * pageSize,
+        currentPage * pageSize
+    );
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 p-6">
@@ -193,13 +246,28 @@ export default function DriverTripsListPage() {
                         </div>
 
                         <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                            <Calendar className="h-4 w-4 text-slate-400" />
+                            <select
+                                value={timeFilter}
+                                onChange={(e) => setTimeFilter(e.target.value)}
+                                className="bg-transparent outline-none text-sm text-slate-700"
+                            >
+                                <option value="ALL">Tất cả thời gian</option>
+                                <option value="THIS_WEEK">Tuần này</option>
+                                <option value="NEXT_WEEK">Tuần tới</option>
+                                <option value="THIS_MONTH">Tháng này</option>
+                                <option value="LAST_MONTH">Tháng trước</option>
+                            </select>
+                        </div>
+
+                        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
                             <Filter className="h-4 w-4 text-slate-400" />
                             <select
                                 value={statusFilter}
                                 onChange={(e) => setStatusFilter(e.target.value)}
                                 className="bg-transparent outline-none text-sm text-slate-700"
                             >
-                                <option value="ALL">Tất cả</option>
+                                <option value="ALL">Tất cả trạng thái</option>
                                 <option value="SCHEDULED">Chưa bắt đầu</option>
                                 <option value="ONGOING">Đang chạy</option>
                                 <option value="COMPLETED">Hoàn thành</option>
@@ -208,13 +276,13 @@ export default function DriverTripsListPage() {
                     </div>
 
                     {/* Trips List */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {filteredTrips.length === 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                        {paginatedTrips.length === 0 ? (
                             <div className="col-span-full text-center py-12 text-slate-500">
-                                Không tìm thấy chuyến nào
+                                {filteredTrips.length === 0 ? "Không tìm thấy chuyến nào" : "Không có chuyến nào trong trang này"}
                             </div>
                         ) : (
-                            filteredTrips.map((trip) => (
+                            paginatedTrips.map((trip) => (
                                 <TripCard
                                     key={trip.tripId}
                                     trip={trip}
@@ -223,6 +291,15 @@ export default function DriverTripsListPage() {
                             ))
                         )}
                     </div>
+
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            onPageChange={setCurrentPage}
+                        />
+                    )}
                 </>
             )}
         </div>

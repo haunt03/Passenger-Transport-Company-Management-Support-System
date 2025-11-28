@@ -97,6 +97,23 @@ export default function EditEmployeePage() {
             return;
         }
 
+        // Validation: Tài xế đang trong chuyến không được đổi sang INACTIVE
+        if (employeeInfo && formData.status === "INACTIVE") {
+            const roleName = (roles.find(r => r.id === Number(formData.roleId))?.roleName || "").toLowerCase();
+            const isDriver = roleName.includes("driver") || roleName.includes("tài xế");
+
+            if (isDriver) {
+                // TODO: Cần check với backend xem tài xế có đang trong chuyến không
+                // Tạm thời warning
+                const confirmed = window.confirm(
+                    "Bạn đang chuyển trạng thái tài xế sang INACTIVE.\n" +
+                    "Lưu ý: Tài xế đang trong chuyến sẽ không thể cập nhật trạng thái.\n" +
+                    "Bạn có chắc chắn muốn tiếp tục?"
+                );
+                if (!confirmed) return;
+            }
+        }
+
         try {
             const payload = {
                 branchId: Number(formData.branchId),

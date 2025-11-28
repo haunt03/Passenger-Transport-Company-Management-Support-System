@@ -75,6 +75,10 @@ export default function AdminBranchDetailPage() {
         setBranchName(b.branchName || "");
         setAddress(b.location || "");
         setStatus(b.status || "ACTIVE");
+        // Set managerId from the branch data
+        if (b.managerId) {
+          setManagerId(String(b.managerId));
+        }
       } catch {
         push("Tải chi nhánh thất bại", "error");
       } finally {

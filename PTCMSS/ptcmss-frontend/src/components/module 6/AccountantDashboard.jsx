@@ -21,6 +21,13 @@ import {
 } from "lucide-react";
 import { getAccountingDashboard } from "../../api/accounting";
 import { listBranches } from "../../api/branches";
+import {
+    getPendingApprovals,
+    approveApprovalRequest,
+    rejectApprovalRequest,
+} from "../../api/notifications";
+import { getEmployeeByUserId } from "../../api/employees";
+import { getCurrentRole, getStoredUserId, ROLES } from "../../utils/session";
 
 /**
  * AccountantDashboard – (LIGHT THEME giống AdminBranchListPage)
@@ -50,6 +57,18 @@ const fmtVND = (n) =>
         Math.max(0, Number(n || 0))
     );
 const cls = (...a) => a.filter(Boolean).join(" ");
+
+const fmtDateTime = (iso) => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+    });
+};
 
 // Demo queue yêu cầu chi phí (REMOVED - chỉ dùng data từ API)
 const DEMO_QUEUE_OLD = [
@@ -957,17 +976,9 @@ function QueueTable({
                                         </div>
                                         <div className="md:col-span-3">
                                                 <span className="text-slate-500">
-                                                    Chứng
-                                                    từ:
+                                                    Ghi chú:
                                                 </span>{" "}
-                                            {it.attachments &&
-                                            it
-                                                .attachments
-                                                .length
-                                                ? it.attachments.join(
-                                                    ", "
-                                                )
-                                                : "—"}
+                                            {it.note || "—"}
                                         </div>
                                     </div>
                                 </td>
@@ -1254,12 +1265,19 @@ export default function AccountantDashboard() {
 
     const [query, setQuery] = React.useState("");
     const [typeFilter, setTypeFilter] = React.useState("");
+    const [approvalQueue, setApprovalQueue] = React.useState([]);
+    const [queueLoading, setQueueLoading] = React.useState(false);
+    const [queueError, setQueueError] = React.useState("");
 
     const [branchId, setBranchId] = React.useState(null);
     const [branches, setBranches] = React.useState([]);
     const [period, setPeriod] = React.useState("THIS_MONTH");
+    const [userBranchId, setUserBranchId] = React.useState(null); // Chi nhánh của user hiện tại
+    const [branchLocked, setBranchLocked] = React.useState(false); // Khóa dropdown cho accountant
 
     const { toasts, push } = useToasts();
+    const role = getCurrentRole();
+    const isAccountant = role === ROLES.ACCOUNTANT;
 
     // Dashboard data from API
     const [dashboardData, setDashboardData] = React.useState({
@@ -1279,47 +1297,115 @@ export default function AccountantDashboard() {
         topCustomers: [],
     });
 
-    // Load branches on mount
+    // Load branches and user's branch on mount
     React.useEffect(() => {
         (async () => {
             try {
+                // Load branches
                 const branchesData = await listBranches({ size: 100 });
                 setBranches(Array.isArray(branchesData) ? branchesData : []);
+
+                // Nếu là accountant, lấy branchId từ employee record
+                if (isAccountant) {
+                    const userId = getStoredUserId();
+                    if (userId) {
+                        try {
+                            const emp = await getEmployeeByUserId(userId);
+                            const empBranchId = emp?.branchId || emp?.branch?.id || emp?.branch?.branchId;
+                            if (empBranchId) {
+                                setUserBranchId(empBranchId);
+                                setBranchId(empBranchId);
+                                setBranchLocked(true); // Khóa dropdown
+                            }
+                        } catch (err) {
+                            console.error("Error loading employee branch:", err);
+                        }
+                    }
+                }
             } catch (err) {
                 console.error("Error loading branches:", err);
             }
         })();
-    }, []);
+    }, [isAccountant]);
 
-    // Load dashboard data
+    // Load dashboard data with fallback
     const loadDashboard = React.useCallback(async () => {
         setLoading(true);
         setError(null);
+
+        const defaultData = {
+            totalRevenue: 0,
+            totalExpense: 0,
+            netProfit: 0,
+            arBalance: 0,
+            apBalance: 0,
+            invoicesDueIn7Days: 0,
+            overdueInvoices: 0,
+            collectionRate: 0,
+            expenseToRevenueRatio: 0,
+            revenueChart: [],
+            expenseChart: [],
+            expenseByCategory: {},
+            pendingApprovals: [],
+            topCustomers: [],
+        };
+
         try {
+            // Try main dashboard endpoint first
             const data = await getAccountingDashboard({
                 branchId: branchId || undefined,
                 period,
             });
-            setDashboardData(data || {
-                totalRevenue: 0,
-                totalExpense: 0,
-                netProfit: 0,
-                arBalance: 0,
-                apBalance: 0,
-                invoicesDueIn7Days: 0,
-                overdueInvoices: 0,
-                collectionRate: 0,
-                expenseToRevenueRatio: 0,
-                revenueChart: [],
-                expenseChart: [],
-                expenseByCategory: {},
-                pendingApprovals: [],
-                topCustomers: [],
-            });
+
+            if (data && typeof data === 'object') {
+                setDashboardData({
+                    ...defaultData,
+                    ...data,
+                    // Ensure numeric values
+                    totalRevenue: Number(data.totalRevenue || 0),
+                    totalExpense: Number(data.totalExpense || 0),
+                    netProfit: Number(data.netProfit || data.totalRevenue - data.totalExpense || 0),
+                    arBalance: Number(data.arBalance || 0),
+                    apBalance: Number(data.apBalance || 0),
+                    collectionRate: Number(data.collectionRate || 0),
+                    expenseToRevenueRatio: Number(data.expenseToRevenueRatio || 0),
+                });
+            } else {
+                setDashboardData(defaultData);
+            }
         } catch (err) {
             console.error("Error loading dashboard:", err);
-            setError(err.message || "Không thể tải dữ liệu dashboard");
-            push("Lỗi khi tải dữ liệu dashboard", "error");
+
+            // Try fallback: load individual stats
+            try {
+                const { getTotalRevenue, getTotalExpense, getARBalance } = await import("../../api/accounting");
+                const params = { branchId: branchId || undefined, period };
+
+                const [revenueRes, expenseRes, arRes] = await Promise.allSettled([
+                    getTotalRevenue(params),
+                    getTotalExpense(params),
+                    getARBalance(params),
+                ]);
+
+                const revenue = revenueRes.status === 'fulfilled' ? Number(revenueRes.value?.total || revenueRes.value || 0) : 0;
+                const expense = expenseRes.status === 'fulfilled' ? Number(expenseRes.value?.total || expenseRes.value || 0) : 0;
+                const ar = arRes.status === 'fulfilled' ? Number(arRes.value?.total || arRes.value || 0) : 0;
+
+                setDashboardData({
+                    ...defaultData,
+                    totalRevenue: revenue,
+                    totalExpense: expense,
+                    netProfit: revenue - expense,
+                    arBalance: ar,
+                });
+
+                push("Dữ liệu dashboard được tải từ nguồn phụ", "info");
+            } catch (fallbackErr) {
+                console.error("Fallback also failed:", fallbackErr);
+                setError("Không thể tải dữ liệu dashboard. API chưa sẵn sàng.");
+                setDashboardData(defaultData);
+                push("Lỗi khi tải dữ liệu dashboard", "error");
+            }
         } finally {
             setLoading(false);
             setInitialLoading(false);
@@ -1327,49 +1413,94 @@ export default function AccountantDashboard() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [branchId, period]);
 
+    const loadApprovalQueue = React.useCallback(async () => {
+        setQueueLoading(true);
+        setQueueError("");
+        try {
+            const approvals = await getPendingApprovals(branchId || undefined);
+            const list = Array.isArray(approvals)
+                ? approvals
+                : approvals?.items || approvals?.data || [];
+            const expenseOnly = list.filter(
+                (item) => item.approvalType === "EXPENSE_REQUEST"
+            );
+            setApprovalQueue(expenseOnly);
+        } catch (err) {
+            console.error("Error loading approvals:", err);
+            setQueueError(err.message || "Không tải được hàng đợi duyệt chi.");
+            setApprovalQueue([]);
+        } finally {
+            setQueueLoading(false);
+        }
+    }, [branchId]);
+
     // Load dashboard on mount and when filters change
     React.useEffect(() => {
         loadDashboard();
     }, [loadDashboard]);
 
+    React.useEffect(() => {
+        loadApprovalQueue();
+    }, [loadApprovalQueue]);
+
     // Filter pending approvals
     const filteredQueue = React.useMemo(() => {
         const q = query.trim().toLowerCase();
-        const approvals = dashboardData.pendingApprovals || [];
-        return approvals.filter((it) => {
-            const typeMatch = !typeFilter || it.type === typeFilter;
-            const searchMatch = !q || (
-                (it.customerName || "") +
-                " " +
-                (TYPE_LABEL[it.type] || it.type || "") +
-                " " +
-                (it.invoiceNumber || "")
-            ).toLowerCase().includes(q);
+        return (approvalQueue || []).filter((item) => {
+            const details = item.details || {};
+            const rawType = (details.type || "EXPENSE").toUpperCase();
+            const typeMatch =
+                !typeFilter ||
+                rawType === typeFilter ||
+                (typeFilter === "EXPENSE" && rawType !== "INCOME");
+            const haystack = [
+                details.requesterName || item.requestedByName || "",
+                TYPE_LABEL[rawType] || rawType,
+                details.note || "",
+                item.branchName || "",
+            ]
+                .join(" ")
+                .toLowerCase();
+            const searchMatch = !q || haystack.includes(q);
             return typeMatch && searchMatch;
         });
-    }, [dashboardData.pendingApprovals, query, typeFilter]);
+    }, [approvalQueue, query, typeFilter]);
 
-    // Approve/reject - Note: These are pending invoices, not expense requests
-    // For now, we'll just remove from list (actual approval would be via invoice approval flow)
-    const approveOne = (invoiceId) => {
-        setDashboardData((prev) => ({
-            ...prev,
-            pendingApprovals: (prev.pendingApprovals || []).filter(
-                (x) => x.invoiceId !== invoiceId
-            ),
-        }));
-        push(`Đã xử lý hóa đơn #${invoiceId}`, "success");
-    };
+    const approveOne = React.useCallback(
+        async (historyId) => {
+            try {
+                console.log("[AccountantDashboard] Approving request:", historyId);
+                await approveApprovalRequest(historyId, {});
+                push(`Đã duyệt yêu cầu #${historyId}`, "success");
+                // Reload both dashboard and queue
+                loadApprovalQueue();
+                loadDashboard();
+            } catch (err) {
+                console.error("Approve request failed:", err);
+                const errorMsg = err?.response?.data?.message || err.message || "Không thể duyệt yêu cầu";
+                push(errorMsg, "error");
+            }
+        },
+        [loadApprovalQueue, loadDashboard, push]
+    );
 
-    const rejectOne = (invoiceId, reason) => {
-        setDashboardData((prev) => ({
-            ...prev,
-            pendingApprovals: (prev.pendingApprovals || []).filter(
-                (x) => x.invoiceId !== invoiceId
-            ),
-        }));
-        push(`Đã từ chối hóa đơn #${invoiceId}${reason ? " · " + reason : ""}`, "info");
-    };
+    const rejectOne = React.useCallback(
+        async (historyId, reason) => {
+            try {
+                console.log("[AccountantDashboard] Rejecting request:", historyId, reason);
+                await rejectApprovalRequest(historyId, { note: reason });
+                push(`Đã từ chối yêu cầu #${historyId}${reason ? " · " + reason : ""}`, "info");
+                // Reload both dashboard and queue
+                loadApprovalQueue();
+                loadDashboard();
+            } catch (err) {
+                console.error("Reject request failed:", err);
+                const errorMsg = err?.response?.data?.message || err.message || "Không thể từ chối yêu cầu";
+                push(errorMsg, "error");
+            }
+        },
+        [loadApprovalQueue, loadDashboard, push]
+    );
 
     // Transform chart data from API
     const chartData = React.useMemo(() => {
@@ -1451,18 +1582,23 @@ export default function AccountantDashboard() {
                         </select>
                     </div>
 
-                    {/* Chi nhánh */}
+                    {/* Chi nhánh - Accountant chỉ xem chi nhánh của mình */}
                     <div className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-[13px] text-slate-700 shadow-sm">
                         <Building2 className="h-4 w-4 text-slate-500" />
                         <select
                             value={branchId || ""}
                             onChange={(e) => {
+                                if (branchLocked) return; // Không cho đổi nếu đã khóa
                                 const val = e.target.value;
                                 setBranchId(val ? Number(val) : null);
                             }}
-                            className="bg-transparent outline-none text-[13px] text-slate-900"
+                            disabled={branchLocked}
+                            className={cls(
+                                "bg-transparent outline-none text-[13px]",
+                                branchLocked ? "text-slate-500 cursor-not-allowed" : "text-slate-900"
+                            )}
                         >
-                            <option value="">Tất cả chi nhánh</option>
+                            {!branchLocked && <option value="">Tất cả chi nhánh</option>}
                             {branches.map((b) => (
                                 <option key={b.branchId} value={b.branchId}>
                                     {b.branchName}
@@ -1488,6 +1624,20 @@ export default function AccountantDashboard() {
                 </div>
             </div>
 
+            {/* Error message */}
+            {error && (
+                <div className="mb-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 flex items-center gap-2">
+                    <Info className="h-4 w-4 text-rose-500" />
+                    <span>{error}</span>
+                    <button
+                        onClick={loadDashboard}
+                        className="ml-auto text-rose-600 hover:underline text-xs font-medium"
+                    >
+                        Thử lại
+                    </button>
+                </div>
+            )}
+
             {/* TOP SECTION: Chart (left) + KPIs (right) */}
             <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-5 mb-5">
                 {/* Biểu đồ Doanh thu vs Chi phí */}
@@ -1498,13 +1648,18 @@ export default function AccountantDashboard() {
                             Doanh thu vs Chi phí
                             (tháng)
                         </span>
+                        {loading && (
+                            <RefreshCw className="h-3.5 w-3.5 text-slate-400 animate-spin ml-auto" />
+                        )}
                     </div>
                     <div className="p-3">
-                        <RevExpChart
-                            data={
-                                chartData
-                            }
-                        />
+                        {initialLoading ? (
+                            <div className="h-[250px] flex items-center justify-center text-slate-400">
+                                <RefreshCw className="h-6 w-6 animate-spin" />
+                            </div>
+                        ) : (
+                            <RevExpChart data={chartData} />
+                        )}
                     </div>
                 </div>
 
@@ -1622,15 +1777,15 @@ export default function AccountantDashboard() {
                 </div>
 
                 {/* bảng queue */}
-                {initialLoading ? (
+                {queueLoading ? (
                     <div className="px-4 py-8 text-center text-slate-500 text-sm">
                         Đang tải dữ liệu...
                     </div>
-                ) : error ? (
+                ) : queueError ? (
                     <div className="px-4 py-8 text-center text-rose-600 text-sm">
-                        {error}
+                        {queueError}
                         <button
-                            onClick={loadDashboard}
+                            onClick={loadApprovalQueue}
                             className="ml-2 text-sky-600 hover:underline"
                         >
                             Thử lại
@@ -1638,15 +1793,18 @@ export default function AccountantDashboard() {
                     </div>
                 ) : (
                     <QueueTable
-                        items={filteredQueue.map((item) => ({
-                            id: item.invoiceId,
-                            creator: item.createdByName || "—",
-                            type: item.type || "EXPENSE",
-                            amount: Number(item.amount || 0),
-                            trip: item.invoiceNumber || "—",
-                            created_at: item.createdAt || "",
-                            attachments: [],
-                        }))}
+                        items={filteredQueue.map((item) => {
+                            const details = item.details || {};
+                            return {
+                                id: item.id,
+                                creator: details.requesterName || item.requestedByName || "—",
+                                type: (details.type || "EXPENSE").toUpperCase(),
+                                amount: Number(details.amount || 0),
+                                trip: item.branchName || "—",
+                                created_at: fmtDateTime(item.requestedAt || item.createdAt),
+                                note: details.note || item.requestReason || "",
+                            };
+                        })}
                         onApprove={approveOne}
                         onReject={rejectOne}
                     />
@@ -1654,7 +1812,7 @@ export default function AccountantDashboard() {
 
                 {/* footer note */}
                 <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 text-[11px] text-slate-500 leading-relaxed">
-                    Dữ liệu được tải từ API. Hóa đơn chờ duyệt: {dashboardData.pendingApprovals?.length || 0} mục.
+                    Dữ liệu được tải từ API. Yêu cầu chi phí chờ duyệt: {approvalQueue.length} mục.
                     HĐ đến hạn 7 ngày: {dashboardData.invoicesDueIn7Days || 0}.
                     HĐ quá hạn: {dashboardData.overdueInvoices || 0}.
                 </div>

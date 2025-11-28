@@ -67,3 +67,8 @@ export function createEmployeeWithUser(req) {
     // req: { username, password, fullName, email, phone, address, branchId, roleId, status }
     return apiFetch("/api/employees/create-with-user", { method: "POST", body: req });
 }
+
+// GET /api/employees/user/{userId} - Lấy employee theo userId
+export function getEmployeeByUserId(userId) {
+    return apiFetch(`/api/employees/user/${userId}`);
+}

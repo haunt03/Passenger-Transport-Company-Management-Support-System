@@ -108,7 +108,7 @@ export function confirmPayment(paymentId, status) {
     // status: "CONFIRMED" hoặc "REJECTED"
     return apiFetch(`/api/invoices/payments/${paymentId}/confirm?status=${encodeURIComponent(status)}`, {
         method: "PATCH",
-    }).then(res => res.data);
+    });
 }
 
 // Get payment history for invoice
@@ -128,6 +128,13 @@ export function markInvoiceAsPaid(invoiceId) {
     });
 }
 
+// Delete payment (only PENDING)
+export function deletePayment(paymentId) {
+    return apiFetch(`/api/invoices/payments/${paymentId}`, {
+        method: "DELETE",
+    });
+}
+
 // Generate invoice number
 export function generateInvoiceNumber(branchId) {
     const params = new URLSearchParams();
@@ -135,4 +142,3 @@ export function generateInvoiceNumber(branchId) {
     const qs = params.toString();
     return apiFetch(`/api/invoices/generate-number${qs ? `?${qs}` : ""}`);
 }
-

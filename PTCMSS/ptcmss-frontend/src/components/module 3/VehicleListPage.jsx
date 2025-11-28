@@ -1,6 +1,7 @@
 import React from "react";
 import { listVehicles, createVehicle, updateVehicle, listVehicleCategories } from "../../api/vehicles";
 import { listBranches } from "../../api/branches";
+import { getCurrentRole, ROLES } from "../../utils/session";
 import {
     CarFront,
     PlusCircle,
@@ -39,13 +40,13 @@ const cls = (...a) => a.filter(Boolean).join(" ");
 /* -------------------------------- */
 function useToasts() {
     const [toasts, setToasts] = React.useState([]);
-    const push = (msg, kind = "info", ttl = 2400) => {
+    const push = React.useCallback((msg, kind = "info", ttl = 2400) => {
         const id = Math.random().toString(36).slice(2);
         setToasts((arr) => [...arr, { id, msg, kind }]);
         setTimeout(() => {
             setToasts((arr) => arr.filter((t) => t.id !== id));
         }, ttl);
-    };
+    }, []);
     return { toasts, push };
 }
 
@@ -278,7 +279,7 @@ function CreateVehicleModal({
                         {/* Hãng SX */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1">
-                                Hãng sản xuất xe
+                                Hãng xe
                             </div>
                             <input
                                 value={brand}
@@ -309,10 +310,10 @@ function CreateVehicleModal({
                             />
                         </div>
 
-                        {/* N─âm SX */}
+                        {/* Năm sản xuất */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1">
-                                Năm SX{" "}
+                                Năm sản xuất{" "}
                                 <span className="text-red-500">*</span>
                             </div>
                             <input
@@ -397,7 +398,7 @@ function CreateVehicleModal({
                             </select>
                         </div>
 
-                        {/* Chi nh├ính */}
+                        {/* Chi nhánh */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1">
                                 Chi nhánh quản lý{" "}
@@ -506,22 +507,14 @@ function EditVehicleModal({
                               branches,
                               categories,
                           }) {
-    const [branchId, setBranchId] = React.useState("");
     const [status, setStatus] = React.useState("");
-    const [categoryId, setCategoryId] = React.useState("");
-    const [model, setModel] = React.useState("");
-    const [year, setYear] = React.useState("");
     const [regDueDate, setRegDueDate] = React.useState("");
     const [insDueDate, setInsDueDate] = React.useState("");
     const [error, setError] = React.useState("");
 
     React.useEffect(() => {
         if (open && vehicle) {
-            setBranchId(vehicle.branch_id || "");
-            setCategoryId(vehicle.category_id || "");
             setStatus(vehicle.status || "AVAILABLE");
-            setModel(vehicle.model || "");
-            setYear(String(vehicle.year || ""));
             setRegDueDate(vehicle.reg_due_date || "");
             setInsDueDate(vehicle.ins_due_date || "");
             setError("");
@@ -530,12 +523,7 @@ function EditVehicleModal({
 
     if (!open || !vehicle) return null;
 
-    const numericOnly = (s) => s.replace(/[^0-9]/g, "");
-    const valid =
-        branchId !== "" &&
-        categoryId !== "" &&
-        status !== "" &&
-        year.trim() !== "";
+    const valid = status !== "";
 
     const handleSubmit = () => {
         if (!valid) {
@@ -543,12 +531,44 @@ function EditVehicleModal({
             return;
         }
 
+        // Validation: không cho phép cập nhật ngày đăng kiểm, bảo hiểm về quá khứ
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        if (regDueDate) {
+            const regDate = new Date(regDueDate);
+            if (regDate < today) {
+                setError("Ngày đăng kiểm không được là ngày trong quá khứ");
+                return;
+            }
+        }
+
+        if (insDueDate) {
+            const insDate = new Date(insDueDate);
+            if (insDate < today) {
+                setError("Ngày hết hạn bảo hiểm không được là ngày trong quá khứ");
+                return;
+            }
+        }
+
+        // Validation: Xe đang "Đang chạy" (ON_TRIP) không cho phép đổi trạng thái
+        if (vehicle.status === "ON_TRIP" && status !== "ON_TRIP") {
+            setError("Không thể thay đổi trạng thái khi xe đang trong chuyến đi");
+            return;
+        }
+
+        // Validation: Không cho phép đổi sang "Đang chạy" thủ công
+        if (vehicle.status !== "ON_TRIP" && status === "ON_TRIP") {
+            setError("Trạng thái 'Đang chạy' chỉ được cập nhật tự động khi xe trong chuyến");
+            return;
+        }
+
         const payload = {
-            branchId: Number(branchId),
-            categoryId: Number(categoryId),
+            branchId: Number(vehicle.branch_id), // Không cho sửa, giữ nguyên
+            categoryId: Number(vehicle.category_id), // Không cho sửa, giữ nguyên
             status,
-            model: model.trim() || null,
-            productionYear: year ? Number(year) : null,
+            model: vehicle.model || null, // Không cho sửa, giữ nguyên
+            productionYear: vehicle.year || null, // Không cho sửa, giữ nguyên
             inspectionExpiry: regDueDate || null,
             insuranceExpiry: insDueDate || null,
         };
@@ -573,7 +593,7 @@ function EditVehicleModal({
                     </div>
                     <div className="flex flex-col leading-tight min-w-0">
                         <div className="font-semibold text-slate-900 text-[14px]">
-                            Chi tiết / Sửa xe  {vehicle.license_plate}
+                            Chi tiết / Sửa xe {vehicle.license_plate}
                         </div>
                         <div className="text-[11px] text-slate-500">
                             Cập nhật trạng thái, phân chi nhánh, hạn đăng kiểm.
@@ -591,7 +611,7 @@ function EditVehicleModal({
                 {/* body */}
                 <div className="p-5 space-y-4 text-[13px]">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* biß╗ân sß╗æ readonly */}
+                        {/* Biển số xe readonly */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1">
                                 Biển số xe
@@ -623,95 +643,47 @@ function EditVehicleModal({
                             </select>
                         </div>
 
-                        {/* model */}
+                        {/* model - READONLY */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1">
                                 Model xe
                             </div>
-                            <input
-                                value={model}
-                                onChange={(e) => setModel(e.target.value)}
-                                className={cls(
-                                    "w-full rounded-md border px-3 py-2 text-[13px] text-slate-900 placeholder:text-slate-400 outline-none",
-                                    "border-slate-300 bg-white shadow-sm",
-                                    "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
-                                )}
-                                placeholder="Fortuner / Solati..."
-                            />
+                            <div className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 font-medium shadow-inner">
+                                {vehicle.model || "—"}
+                            </div>
                         </div>
 
-                        {/* year */}
+                        {/* year - READONLY */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1">
-                                Ngày sản xuất{" "}
-                                <span className="text-red-500">*</span>
+                                Năm sản xuất
                             </div>
-                            <input
-                                value={year}
-                                onChange={(e) =>
-                                    setYear(numericOnly(e.target.value))
-                                }
-                                inputMode="numeric"
-                                className={cls(
-                                    "w-full rounded-md border px-3 py-2 text-[13px] text-slate-900 placeholder:text-slate-400 outline-none",
-                                    "border-slate-300 bg-white shadow-sm",
-                                    "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
-                                )}
-                                placeholder="2022"
-                            />
+                            <div className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 font-medium shadow-inner">
+                                {vehicle.year || "—"}
+                            </div>
                         </div>
 
-                        {/* category */}
+                        {/* category - READONLY */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1">
-                                Danh mục xe{" "}
-                                <span className="text-red-500">*</span>
+                                Danh mục xe
                             </div>
-                            <select
-                                value={categoryId}
-                                onChange={(e) =>
-                                    setCategoryId(e.target.value)
-                                }
-                                className={cls(
-                                    "w-full rounded-md border px-3 py-2 text-[13px] text-slate-700 outline-none",
-                                    "border-slate-300 bg-white shadow-sm",
-                                    "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
-                                )}
-                            >
-                                {categories.map((c) => (
-                                    <option key={c.id} value={c.id}>
-                                        {c.name} ({c.seats} chß╗ù)
-                                    </option>
-                                ))}
-                            </select>
+                            <div className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 font-medium shadow-inner">
+                                {vehicle.category_name || "—"}
+                            </div>
                         </div>
 
-                        {/* branch */}
+                        {/* branch - READONLY (yêu cầu mới: KHÔNG cho chuyển chi nhánh) */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1">
-                                Chi nhánh{" "}
-                                <span className="text-red-500">*</span>
+                                Chi nhánh
                             </div>
-                            <select
-                                value={branchId}
-                                onChange={(e) =>
-                                    setBranchId(e.target.value)
-                                }
-                                className={cls(
-                                    "w-full rounded-md border px-3 py-2 text-[13px] text-slate-700 outline-none",
-                                    "border-slate-300 bg-white shadow-sm",
-                                    "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
-                                )}
-                            >
-                                {branches.map((b) => (
-                                    <option key={b.id} value={b.id}>
-                                        {b.name}
-                                    </option>
-                                ))}
-                            </select>
+                            <div className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 font-medium shadow-inner">
+                                {vehicle.branch_name || "—"}
+                            </div>
                         </div>
 
-                        {/* reg due */}
+                        {/* Ngày đăng kiểm tiếp theo */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1 flex items-center gap-2">
                                 <Calendar className="h-4 w-4 text-slate-400" />
@@ -731,7 +703,7 @@ function EditVehicleModal({
                             />
                         </div>
 
-                        {/* ins due */}
+                        {/* Ngày hết hạn bảo hiểm */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1 flex items-center gap-2">
                                 <Calendar className="h-4 w-4 text-slate-400" />
@@ -757,15 +729,6 @@ function EditVehicleModal({
                             {error}
                         </div>
                     ) : null}
-
-                    {/* <div className="text-[11px] text-slate-500 leading-relaxed rounded-md border border-slate-200 bg-slate-50 p-3">
-                        Sau khi lưu, trạng thái xe sẽ cập nhật ngay trong danh
-                        sách. API thật sẽ gọi{" "}
-                        <code className="text-slate-700">
-                            PUT /api/vehicles/{vehicle.id}
-                        </code>
-                        .
-                    </div> */}
                 </div>
 
                 {/* footer */}
@@ -809,46 +772,53 @@ function FilterBar({
                        onClickCreate,
                        loadingRefresh,
                        onRefresh,
+                       showBranchFilter = true, // Add prop to control branch filter visibility
+                       showCreateButton = true, // Add prop to control create button visibility
+                       createButtonPosition = "left", // "left" or "right"
                    }) {
     return (
         <div className="flex flex-col lg:flex-row lg:flex-wrap gap-3 text-[13px] text-slate-700">
-            {/* N├║t th├¬m xe */}
-            <div className="flex items-center gap-2">
-                <button
-                    className={cls(
-                        "inline-flex items-center gap-2 rounded-md px-3 py-2 font-medium text-white shadow-sm",
-                        "bg-sky-600 hover:bg-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 text-[13px]"
-                    )}
-                    onClick={onClickCreate}
-                >
-                    <PlusCircle className="h-4 w-4" />
-                    <span>Thêm Xe mới</span>
-                </button>
-            </div>
+            {/* Nút thêm xe - left position */}
+            {showCreateButton && createButtonPosition === "left" && (
+                <div className="flex items-center gap-2">
+                    <button
+                        className={cls(
+                            "inline-flex items-center gap-2 rounded-md px-3 py-2 font-medium text-white shadow-sm",
+                            "bg-sky-600 hover:bg-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 text-[13px]"
+                        )}
+                        onClick={onClickCreate}
+                    >
+                        <PlusCircle className="h-4 w-4" />
+                        <span>Thêm xe</span>
+                    </button>
+                </div>
+            )}
 
             {/* Bộ lọc sang phải trên màn lớn */}
             <div className="flex-1" />
 
             {/* filter controls */}
-            <div className="flex flex-col sm:flex-row flex-wrap gap-3">
-                {/* Chi nhánh */}
-                <div className="flex items-center gap-2 rounded-md border border-slate-300 bg-white shadow-sm px-3 py-2 min-w-[180px]">
-                    <Building2 className="h-4 w-4 text-slate-400" />
-                    <select
-                        value={branchFilter}
-                        onChange={(e) => setBranchFilter(e.target.value)}
-                        className="bg-transparent outline-none text-[13px] text-slate-700 flex-1"
-                    >
-                        <option value="">Tất cả chi nhánh</option>
-                        {branches.map((b) => (
-                            <option key={b.id} value={b.id}>
-                                {b.name}
-                            </option>
-                        ))}
-                    </select>
-                </div>
+            <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-center">
+                {/* Chi nhánh - Hidden for Manager */}
+                {showBranchFilter && (
+                    <div className="flex items-center gap-2 rounded-md border border-slate-300 bg-white shadow-sm px-3 py-2 min-w-[180px]">
+                        <Building2 className="h-4 w-4 text-slate-400" />
+                        <select
+                            value={branchFilter}
+                            onChange={(e) => setBranchFilter(e.target.value)}
+                            className="bg-transparent outline-none text-[13px] text-slate-700 flex-1"
+                        >
+                            <option value="">Tất cả chi nhánh</option>
+                            {branches.map((b) => (
+                                <option key={b.id} value={b.id}>
+                                    {b.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
 
-                {/* Danh mß╗Ñc xe */}
+                {/* Danh mục xe */}
                 <div className="flex items-center gap-2 rounded-md border border-slate-300 bg-white shadow-sm px-3 py-2 min-w-[160px]">
                     <Filter className="h-4 w-4 text-slate-400" />
                     <select
@@ -903,6 +873,20 @@ function FilterBar({
                     )}
                     <span>Làm mới</span>
                 </button>
+
+                {/* Nút thêm xe - right position */}
+                {showCreateButton && createButtonPosition === "right" && (
+                    <button
+                        className={cls(
+                            "inline-flex items-center gap-2 rounded-md px-3 py-2 font-medium text-white shadow-sm",
+                            "bg-sky-600 hover:bg-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 text-[13px]"
+                        )}
+                        onClick={onClickCreate}
+                    >
+                        <PlusCircle className="h-4 w-4" />
+                        <span>Thêm xe</span>
+                    </button>
+                )}
             </div>
         </div>
     );
@@ -912,7 +896,7 @@ function FilterBar({
 /* helper định dạng ngày            */
 /* -------------------------------- */
 const fmtDate = (iso) => {
-    if (!iso) return "ΓÇö";
+    if (!iso) return "—";
     const [y, m, d] = String(iso).split("-");
     if (!y || !m || !d) return iso;
     return `${d}/${m}/${y}`;
@@ -972,6 +956,7 @@ function VehicleTable({
                     {headerCell("branch_name", "Chi nhánh")}
                     {headerCell("status", "Trạng thái")}
                     {headerCell("reg_due_date", "Hạn đăng kiểm")}
+                    {headerCell("ins_due_date", "Hạn bảo hiểm")}
                     <th className="px-3 py-2 font-medium text-slate-500">
                         Hành động
                     </th>
@@ -1002,14 +987,19 @@ function VehicleTable({
                             {v.branch_name}
                         </td>
 
-                        {/* Trß║íng th├íi */}
+                        {/* Trạng thái */}
                         <td className="px-3 py-2 whitespace-nowrap">
                             <VehicleStatusBadge status={v.status} />
                         </td>
 
-                        {/* Hß║ín ─æ─âng kiß╗âm */}
+                        {/* Hạn đăng kiểm */}
                         <td className="px-3 py-2 text-slate-500 whitespace-nowrap text-[12px]">
                             {fmtDate(v.reg_due_date)}
+                        </td>
+
+                        {/* Hạn bảo hiểm */}
+                        <td className="px-3 py-2 text-slate-500 whitespace-nowrap text-[12px]">
+                            {fmtDate(v.ins_due_date)}
                         </td>
 
                         {/* Action */}
@@ -1034,7 +1024,7 @@ function VehicleTable({
                 {current.length === 0 && (
                     <tr>
                         <td
-                            colSpan={6}
+                            colSpan={7}
                             className="px-3 py-6 text-center text-slate-400 text-[13px]"
                         >
                             không có dữ liệu.
@@ -1198,6 +1188,10 @@ const MOCK_VEHICLES = [
 export default function VehicleListPage() {
     const { toasts, push } = useToasts();
 
+    // Check current user role
+    const currentRole = React.useMemo(() => getCurrentRole(), []);
+    const isManager = currentRole === ROLES.MANAGER;
+
     // filter state
     const [branchFilter, setBranchFilter] = React.useState("");
     const [categoryFilter, setCategoryFilter] = React.useState("");
@@ -1354,7 +1348,7 @@ export default function VehicleListPage() {
         }
     };
 
-    // L├ám mß╗¢i danh s├ích
+    // Làm mới danh sách
     const handleRefresh = async () => {
         setLoadingRefresh(true);
         try {
@@ -1365,9 +1359,9 @@ export default function VehicleListPage() {
                 status: statusFilter || undefined,
             });
             setVehicles((vehData || []).map(mapVehicle));
-            push("─É├ú l├ám mß╗¢i danh s├ích xe", "info");
+            push("Đã làm mới danh sách xe", "info");
         } catch (e) {
-            push("L├ám mß╗¢i danh s├ích thß║Ñt bß║íi", "error");
+            push("Làm mới danh sách thất bại", "error");
         } finally {
             setLoadingRefresh(false);
         }
@@ -1420,6 +1414,9 @@ export default function VehicleListPage() {
                     onClickCreate={handleCreateNew}
                     loadingRefresh={loadingRefresh}
                     onRefresh={handleRefresh}
+                    showBranchFilter={!isManager}
+                    showCreateButton={true}
+                    createButtonPosition={isManager ? "right" : "left"}
                 />
             </div>
 
@@ -1449,11 +1446,6 @@ export default function VehicleListPage() {
                     totalPages={totalPages}
                     onClickDetail={handleClickDetail}
                 />
-
-                {/* <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 text-[11px] text-slate-500 leading-relaxed">
-                    Design-only: Dữ liệu đang là mock. Khi nối API thật,
-                    Manager sẽ chỉ thấy xe thuộc chi nhánh của họ.
-                </div> */}
             </div>
 
             {/* MODALS */}

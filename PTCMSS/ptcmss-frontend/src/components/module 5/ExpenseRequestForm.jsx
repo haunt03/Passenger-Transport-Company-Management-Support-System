@@ -1,7 +1,6 @@
 import React from "react";
 import {
     ReceiptText,
-    Upload,
     Car,
     ClipboardList,
     Check,
@@ -66,8 +65,6 @@ export default function ExpenseRequestForm() {
 
     const [amountInput, setAmountInput] = React.useState("");
     const [notes, setNotes] = React.useState("");
-    const [files, setFiles] = React.useState([]);
-
     const [branchId, setBranchId] = React.useState("");
     const [branchName, setBranchName] = React.useState("");
     const [branchLoading, setBranchLoading] = React.useState(true);
@@ -186,34 +183,11 @@ export default function ExpenseRequestForm() {
         setAmountInput(e.target.value);
     };
 
-    const onPickFiles = (e) => {
-        const selected = Array.from(e.target.files || []);
-        const maxFiles = 5;
-        const maxSize = 10 * 1024 * 1024;
-        const valid = [];
-        let rejected = 0;
-        for (const file of selected) {
-            if (file.size <= maxSize && valid.length < maxFiles) {
-                valid.push(file);
-            } else {
-                rejected++;
-            }
-        }
-        setFiles(valid);
-        if (rejected > 0) {
-            setError(
-                `${rejected} file bị bỏ qua (quá 10MB hoặc vượt quá ${maxFiles} file).`
-            );
-            setSuccess("");
-        }
-    };
-
     const resetForm = () => {
         setType("");
         setVehicleId("");
         setAmountInput("");
         setNotes("");
-        setFiles([]);
         setError("");
     };
 
@@ -241,17 +215,17 @@ export default function ExpenseRequestForm() {
 
         setSubmitting(true);
         try {
-            const form = new FormData();
-            form.append("type", type);
-            form.append("amount", String(amount));
-            form.append("branchId", String(branchId));
-            if (vehicleId) form.append("vehicleId", vehicleId);
             const noteClean = notes.trim();
-            if (noteClean) form.append("note", noteClean);
-            if (userId) form.append("requesterUserId", String(userId));
-            files.forEach((file) => form.append("files", file));
+            const payload = {
+                type,
+                amount,
+                branchId: Number(branchId),
+                vehicleId: vehicleId ? Number(vehicleId) : undefined,
+                note: noteClean || undefined,
+                requesterUserId: userId ? Number(userId) : undefined,
+            };
 
-            await createExpenseRequest(form);
+            await createExpenseRequest(payload);
             setSuccess(
                 `Đã gửi yêu cầu chi phí lúc ${new Date().toLocaleString(
                     "vi-VN"
@@ -389,54 +363,6 @@ export default function ExpenseRequestForm() {
                     />
                 </div>
 
-                <div>
-                    <div className="text-xs text-slate-600 mb-1">
-                        Upload chứng từ (tối đa 5 file, mỗi file ≤10MB)
-                    </div>
-                    <label className="flex items-center justify-between gap-3 rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-600 cursor-pointer hover:border-slate-400">
-                        <div className="flex items-center gap-2">
-                            <Upload className="h-4 w-4 text-sky-600" />
-                            <span>Chọn file</span>
-                        </div>
-                        <input
-                            type="file"
-                            accept="image/*,.pdf"
-                            multiple
-                            className="hidden"
-                            onChange={onPickFiles}
-                        />
-                        <span className="text-xs text-slate-500">
-                            {files.length > 0
-                                ? `${files.length} file đã chọn`
-                                : "Chưa có file"}
-                        </span>
-                    </label>
-                    {files.length > 0 && (
-                        <ul className="mt-2 text-[12px] leading-4 text-slate-700 space-y-1">
-                            {files.map((file, index) => (
-                                <li
-                                    key={`${file.name}-${index}`}
-                                    className="flex items-center justify-between gap-2"
-                                >
-                                    <span className="truncate">{file.name}</span>
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setFiles((prev) =>
-                                                prev.filter((_, i) => i !== index)
-                                            )
-                                        }
-                                        className="text-slate-400 hover:text-slate-600"
-                                        title="Bỏ file này"
-                                    >
-                                        <X className="h-3.5 w-3.5" />
-                                    </button>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </div>
-
                 {error && (
                     <div className="flex items-start gap-2 text-rose-700 bg-rose-50 border border-rose-200/80 rounded-md px-3 py-2 text-sm shadow-sm">
                         <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
@@ -483,22 +409,6 @@ export default function ExpenseRequestForm() {
                     </button>
                 </div>
 
-                {/* <div className="text-[11px] text-slate-500 font-mono leading-relaxed break-all bg-slate-50 border border-slate-200 rounded-md p-3 shadow-inner">
-                    POST /api/expense-requests{"\n"}
-                    {JSON.stringify(
-                        {
-                            type,
-                            vehicleId: vehicleId || undefined,
-                            amount: parseAmount(amountInput),
-                            note: notes.trim() || undefined,
-                            branchId: branchId || undefined,
-                            requesterUserId: userId || undefined,
-                            attachments: files.map((file) => file.name),
-                        },
-                        null,
-                        2
-                    )}
-                </div> */}
             </form>
         </div>
     );

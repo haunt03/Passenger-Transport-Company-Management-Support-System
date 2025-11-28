@@ -2,7 +2,6 @@ import React from "react";
 import {
     Building2,
     User,
-    Phone,
     MapPin,
     Save,
     X,
@@ -64,12 +63,12 @@ function Toasts({ toasts }) {
 function CreateBranchModal({
                                open,
                                managers,
+                               existingBranches,
                                onClose,
                                onCreate,
                            }) {
     const [name, setName] = React.useState("");
     const [address, setAddress] = React.useState("");
-    const [phone, setPhone] = React.useState("");
     const [managerId, setManagerId] = React.useState("");
 
     const [loading, setLoading] = React.useState(false);
@@ -80,7 +79,6 @@ function CreateBranchModal({
         if (open) {
             setName("");
             setAddress("");
-            setPhone("");
             setManagerId("");
             setLoading(false);
             setError("");
@@ -92,7 +90,6 @@ function CreateBranchModal({
     const valid =
         name.trim() !== "" &&
         address.trim() !== "" &&
-        phone.trim() !== "" &&
         managerId !== "";
 
     const handleSubmit = async () => {
@@ -101,23 +98,34 @@ function CreateBranchModal({
             return;
         }
 
+        // Validate tên chi nhánh không trùng
+        const trimmedName = name.trim();
+        const isDuplicate = existingBranches.some(
+            (b) => b.name.toLowerCase() === trimmedName.toLowerCase()
+        );
+        if (isDuplicate) {
+            setError("Tên chi nhánh đã tồn tại. Vui lòng chọn tên khác.");
+            return;
+        }
+
         setLoading(true);
         setError("");
 
         const payload = {
-            name: name.trim(),
-            address: address.trim(),
-            phone: phone.trim(),
-            manager_id: Number(managerId),
+            branchName: trimmedName,
+            location: address.trim(),
+            managerId: Number(managerId),
         };
 
         try {
-            // TODO gọi API thật ở đây
-            await new Promise((r) => setTimeout(r, 400));
+            const { createBranch } = await import("../../api/branches");
+            const result = await createBranch(payload);
 
             const newBranch = {
-                id: Date.now(),
-                ...payload,
+                id: result?.id || result?.data?.id,
+                name: result?.branchName || result?.data?.branchName,
+                address: result?.location || result?.data?.location,
+                manager_id: result?.managerId || result?.data?.managerId,
                 manager_name:
                     managers.find(
                         (m) => String(m.id) === String(managerId)
@@ -126,8 +134,9 @@ function CreateBranchModal({
 
             onCreate && onCreate(newBranch);
             onClose && onClose();
-        } catch {
-            setError("Không thể tạo chi nhánh. Thử lại.");
+        } catch (err) {
+            const errorMsg = err?.response?.data?.message || err?.data?.message || err?.message || "Không thể tạo chi nhánh. Thử lại.";
+            setError(errorMsg);
         } finally {
             setLoading(false);
         }
@@ -196,29 +205,6 @@ function CreateBranchModal({
                             rows={2}
                             className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 placeholder:text-slate-400"
                             placeholder="Số 123 Đường ABC, Q. XYZ, Hà Nội"
-                        />
-                    </div>
-
-                    {/* Số điện thoại */}
-                    <div>
-                        <div className="text-xs text-slate-600 mb-1 flex items-center gap-1">
-                            <Phone className="h-3.5 w-3.5 text-slate-400" />
-                            <span>
-                                Số điện thoại{" "}
-                                <span className="text-rose-500">*</span>
-                            </span>
-                        </div>
-                        <input
-                            value={phone}
-                            onChange={(e) => {
-                                const raw = e.target.value.replace(
-                                    /[^0-9+]/g,
-                                    ""
-                                );
-                                setPhone(raw);
-                            }}
-                            className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm text-slate-900 shadow-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 placeholder:text-slate-400"
-                            placeholder="0123456789"
                         />
                     </div>
 
@@ -324,7 +310,6 @@ export default function AdminBranchesPage() {
             id: 1,
             name: "Chi nhánh Hà Nội",
             address: "Số 12 Phố ABC, Q. Hoàn Kiếm, Hà Nội",
-            phone: "+84 912 345 678",
             manager_id: 11,
             manager_name: "Nguyễn Văn Hùng",
         },
@@ -332,7 +317,6 @@ export default function AdminBranchesPage() {
             id: 2,
             name: "Chi nhánh TP.HCM",
             address: "45 Nguyễn Huệ, Quận 1, TP.HCM",
-            phone: "+84 988 888 888",
             manager_id: 99,
             manager_name: "(đang cập nhật)",
         },
@@ -422,9 +406,6 @@ export default function AdminBranchesPage() {
                                 Địa chỉ
                             </th>
                             <th className="px-3 py-2 font-medium text-slate-600 text-xs whitespace-nowrap">
-                                SĐT
-                            </th>
-                            <th className="px-3 py-2 font-medium text-slate-600 text-xs whitespace-nowrap">
                                 Quản lý
                             </th>
                         </tr>
@@ -451,11 +432,6 @@ export default function AdminBranchesPage() {
                                     {br.address}
                                 </td>
 
-                                {/* Phone */}
-                                <td className="px-3 py-3 text-xs tabular-nums text-slate-600 whitespace-nowrap">
-                                    {br.phone}
-                                </td>
-
                                 {/* Manager */}
                                 <td className="px-3 py-3 text-xs text-slate-700">
                                     <div className="flex items-center gap-2">
@@ -472,7 +448,7 @@ export default function AdminBranchesPage() {
                         {branches.length === 0 ? (
                             <tr>
                                 <td
-                                    colSpan={5}
+                                    colSpan={4}
                                     className="px-3 py-10 text-center text-sm text-slate-500"
                                 >
                                     Chưa có chi nhánh nào.
@@ -500,6 +476,7 @@ export default function AdminBranchesPage() {
             <CreateBranchModal
                 open={openModal}
                 managers={managers}
+                existingBranches={branches}
                 onClose={() => setOpenModal(false)}
                 onCreate={handleCreateBranch}
             />

@@ -77,6 +77,22 @@ export default function UpdateProfilePage() {
 
   const onPickAvatar = (file) => {
     if (!file) return;
+
+    // Validate file size (max 2MB)
+    const maxSize = 2 * 1024 * 1024; // 2MB in bytes
+    if (file.size > maxSize) {
+      setGeneralError("Kích thước ảnh vượt quá 2MB. Vui lòng chọn ảnh khác có kích thước nhỏ hơn.");
+      return;
+    }
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+    if (!validTypes.includes(file.type)) {
+      setGeneralError("Định dạng ảnh không hợp lệ. Vui lòng chọn file JPG, PNG hoặc GIF.");
+      return;
+    }
+
+    setGeneralError(""); // Clear any previous errors
     setAvatarFile(file);
     const reader = new FileReader();
     reader.onload = () => setAvatarPreview(reader.result);
@@ -129,6 +145,14 @@ export default function UpdateProfilePage() {
       if (avatarFile && userId) {
         try {
           await uploadAvatar(userId, avatarFile);
+          console.log("Avatar uploaded successfully, triggering header update");
+
+          // Small delay to ensure backend has processed the upload
+          await new Promise(resolve => setTimeout(resolve, 500));
+
+          // Trigger avatar update in header by dispatching custom event
+          window.dispatchEvent(new CustomEvent('avatarUpdated'));
+          console.log("Avatar update event dispatched");
         } catch (avatarErr) {
           console.error("Avatar upload error:", avatarErr);
           // Không block nếu upload avatar fail, chỉ log
@@ -160,7 +184,7 @@ export default function UpdateProfilePage() {
       setRoleName(p?.roleName || "");
       setRoleId(p?.roleId || null);
       setStatus(p?.status || "");
-      setAvatarPreview(resolveImg(p?.imgUrl || p?.avatarUrl));
+      setAvatarPreview(resolveImg(p?.imgUrl || p?.avatarUrl || p?.avatar));
       setAvatarFile(null);
     } catch (err) {
       console.error("Update profile error:", err);

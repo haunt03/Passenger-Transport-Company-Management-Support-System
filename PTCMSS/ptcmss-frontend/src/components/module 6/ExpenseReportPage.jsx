@@ -12,7 +12,9 @@ import {
 import { getExpenseReport } from "../../api/accounting";
 import { listBranches } from "../../api/branches";
 import { listVehicles } from "../../api/vehicles";
-import { exportExpenseReportToExcel, exportExpenseReportToCsv } from "../../api/exports";
+import { exportExpenseReportToExcel } from "../../api/exports";
+import { getEmployeeByUserId } from "../../api/employees";
+import { getCurrentRole, getStoredUserId, ROLES } from "../../utils/session";
 
 /**
  * ExpenseReportPage (LIGHT THEME giống vibe AdminBranchListPage)
@@ -174,6 +176,43 @@ const PALETTE = [
             "bg-slate-400/80 border-slate-300/30",
     },
 ];
+
+function unwrapListPayload(payload) {
+    if (!payload) return [];
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.data)) return payload.data;
+    if (Array.isArray(payload?.items)) return payload.items;
+    if (Array.isArray(payload?.content)) return payload.content;
+    if (Array.isArray(payload?.data?.items)) return payload.data.items;
+    if (Array.isArray(payload?.data?.content)) return payload.data.content;
+    return [];
+}
+
+function normalizeBranchOptions(payload) {
+    return unwrapListPayload(payload)
+        .map((raw) => {
+            const rawId = raw?.id ?? raw?.branchId ?? raw?.branchID ?? raw?.branch_id;
+            if (rawId == null) return null;
+            const id = Number(rawId);
+            if (Number.isNaN(id)) return null;
+            const branchName = raw?.branchName || raw?.name || raw?.branch_code || `Chi nhánh #${id}`;
+            return { id, branchName };
+        })
+        .filter(Boolean);
+}
+
+function normalizeVehicleOptions(payload) {
+    return unwrapListPayload(payload)
+        .map((raw) => {
+            const rawId = raw?.id ?? raw?.vehicleId ?? raw?.vehicleID ?? raw?.vehicle_id;
+            if (rawId == null) return null;
+            const id = Number(rawId);
+            if (Number.isNaN(id)) return null;
+            const licensePlate = raw?.licensePlate || raw?.vehicleCode || raw?.code || `Xe #${id}`;
+            return { id, licensePlate };
+        })
+        .filter(Boolean);
+}
 
 /* ================= Component: ExpensePieChart (light) ================= */
 function ExpensePieChart({
@@ -414,6 +453,10 @@ function FiltersBar({
                         onRefresh,
                         loading,
                         onExportExcel,
+                        branchDisabled = false,
+                        branchHelperText = "",
+                        branchLoading = false,
+                        branchError = "",
                     }) {
     return (
         <div className="flex flex-col xl:flex-row xl:items-start gap-4 w-full">
@@ -478,23 +521,49 @@ function FiltersBar({
                 </div>
 
                 {/* Branch */}
-                <div className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-[13px] text-slate-700 shadow-sm">
-                    <Building2 className="h-4 w-4 text-slate-500" />
-                    <select
-                        value={branchId || ""}
-                        onChange={(e) => {
-                            const val = e.target.value;
-                            setBranchId(val ? Number(val) : null);
-                        }}
-                        className="bg-transparent outline-none text-[13px] text-slate-900"
-                    >
-                        <option value="">Tất cả chi nhánh</option>
-                        {branchOptions.map((br, idx) => (
-                            <option key={br.branchId || `branch-${idx}`} value={br.branchId || br}>
-                                {br.branchName || br}
-                            </option>
-                        ))}
-                    </select>
+                <div className="flex flex-col gap-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-[13px] text-slate-700 shadow-sm">
+                    <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-slate-500" />
+                        <select
+                            value={branchId ?? ""}
+                            onChange={(e) => {
+                                if (branchDisabled) return;
+                                const val = e.target.value;
+                                if (!val) {
+                                    setBranchId(null);
+                                    return;
+                                }
+                                const parsed = Number(val);
+                                setBranchId(Number.isNaN(parsed) ? null : parsed);
+                            }}
+                            disabled={branchDisabled || branchLoading}
+                            className="bg-transparent outline-none text-[13px] text-slate-900 disabled:text-slate-500"
+                        >
+                            {branchDisabled ? (
+                                <option value={branchId ?? ""}>
+                                    {branchLoading
+                                        ? "Đang xác định chi nhánh..."
+                                        : branchHelperText || "Chi nhánh của bạn"}
+                                </option>
+                            ) : (
+                                <>
+                                    <option value="">Tất cả chi nhánh</option>
+                                    {branchOptions.map((br) => (
+                                        <option key={br.id} value={br.id}>
+                                            {br.branchName}
+                                        </option>
+                                    ))}
+                                </>
+                            )}
+                        </select>
+                    </div>
+                    {branchDisabled && (
+                        <div className={`text-[11px] ${branchError ? "text-rose-600" : "text-amber-600"}`}>
+                            {branchLoading
+                                ? "Đang xác định chi nhánh bạn phụ trách..."
+                                : branchError || branchHelperText || "Chỉ xem dữ liệu chi nhánh bạn phụ trách."}
+                        </div>
+                    )}
                 </div>
 
                 {/* Vehicle */}
@@ -504,14 +573,19 @@ function FiltersBar({
                         value={vehicleId || ""}
                         onChange={(e) => {
                             const val = e.target.value;
-                            setVehicleId(val ? Number(val) : null);
+                            if (!val) {
+                                setVehicleId(null);
+                                return;
+                            }
+                            const parsed = Number(val);
+                            setVehicleId(Number.isNaN(parsed) ? null : parsed);
                         }}
                         className="bg-transparent outline-none text-[13px] text-slate-900"
                     >
                         <option value="">Tất cả xe</option>
-                        {vehicleOptions.map((v, idx) => (
-                            <option key={v.vehicleId || `vehicle-${idx}`} value={v.vehicleId || v}>
-                                {v.licensePlate || v}
+                        {vehicleOptions.map((v) => (
+                            <option key={v.id} value={v.id}>
+                                {v.licensePlate}
                             </option>
                         ))}
                     </select>
@@ -1193,6 +1267,14 @@ const DEMO_EXPENSES = [
 /* ================= Main Page: ExpenseReportPage (light) ================= */
 export default function ExpenseReportPage() {
     const { toasts, push } = useToasts();
+    const currentRole = React.useMemo(() => getCurrentRole(), []);
+    const currentUserId = React.useMemo(() => {
+        const raw = getStoredUserId();
+        if (!raw) return null;
+        const parsed = Number(raw);
+        return Number.isNaN(parsed) ? null : parsed;
+    }, []);
+    const isManagerView = currentRole === ROLES.MANAGER;
 
     // Bộ lọc
     const [fromDate, setFromDate] = React.useState("");
@@ -1215,6 +1297,9 @@ export default function ExpenseReportPage() {
 
     const [branches, setBranches] = React.useState([]);
     const [vehicles, setVehicles] = React.useState([]);
+    const [branchLockLoading, setBranchLockLoading] = React.useState(isManagerView);
+    const [branchLockError, setBranchLockError] = React.useState("");
+    const [branchLockName, setBranchLockName] = React.useState("");
 
     // Load branches and vehicles on mount
     React.useEffect(() => {
@@ -1224,13 +1309,71 @@ export default function ExpenseReportPage() {
                     listBranches({ size: 100 }),
                     listVehicles({ size: 100 }),
                 ]);
-                setBranches(Array.isArray(branchesData) ? branchesData : []);
-                setVehicles(Array.isArray(vehiclesData) ? vehiclesData : []);
+                setBranches(normalizeBranchOptions(branchesData));
+                setVehicles(normalizeVehicleOptions(vehiclesData));
             } catch (err) {
                 console.error("Error loading options:", err);
             }
         })();
     }, []);
+
+    // Lock branch filter for Manager role
+    React.useEffect(() => {
+        if (!isManagerView) {
+            setBranchLockLoading(false);
+            setBranchLockError("");
+            setBranchLockName("");
+            return;
+        }
+        if (currentUserId == null) {
+            setBranchLockLoading(false);
+            setBranchLockError("Không xác định được tài khoản hiện tại.");
+            setBranchLockName("");
+            setBranchId(null);
+            return;
+        }
+        let cancelled = false;
+        async function fetchBranch() {
+            setBranchLockLoading(true);
+            setBranchLockError("");
+            try {
+                const resp = await getEmployeeByUserId(currentUserId);
+                if (cancelled) return;
+                const employee = resp?.data || resp;
+                const rawBranchId = employee?.branchId ?? employee?.branch?.id;
+                if (rawBranchId == null) {
+                    setBranchId(null);
+                    setBranchLockName("");
+                    setBranchLockError("Không tìm thấy chi nhánh phụ trách. Liên hệ Admin.");
+                    return;
+                }
+                const parsed = Number(rawBranchId);
+                if (Number.isNaN(parsed)) {
+                    setBranchId(null);
+                    setBranchLockName("");
+                    setBranchLockError("Chi nhánh không hợp lệ.");
+                    return;
+                }
+                setBranchId(parsed);
+                setBranchLockName(employee?.branchName || employee?.branch?.branchName || employee?.branch?.name || "");
+                setBranchLockError("");
+            } catch (err) {
+                if (!cancelled) {
+                    setBranchId(null);
+                    setBranchLockName("");
+                    setBranchLockError("Không tải được chi nhánh phụ trách.");
+                }
+            } finally {
+                if (!cancelled) {
+                    setBranchLockLoading(false);
+                }
+            }
+        }
+        fetchBranch();
+        return () => {
+            cancelled = true;
+        };
+    }, [isManagerView, currentUserId]);
 
     // Load expense report
     const loadReport = React.useCallback(async () => {
@@ -1261,10 +1404,21 @@ export default function ExpenseReportPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [branchId, vehicleId, catFilter, fromDate, toDate, period]);
 
+    const branchReady = !isManagerView || (!branchLockLoading && branchId != null);
+
     // Load on mount and when filters change
     React.useEffect(() => {
+        if (!branchReady) {
+            return;
+        }
         loadReport();
-    }, [loadReport]);
+    }, [loadReport, branchReady]);
+
+    React.useEffect(() => {
+        if (isManagerView && !branchLockLoading && branchId == null) {
+            setInitialLoading(false);
+        }
+    }, [isManagerView, branchLockLoading, branchId]);
 
     const categoryOptions =
         React.useMemo(
@@ -1320,12 +1474,20 @@ export default function ExpenseReportPage() {
 
     // Refresh
     const onRefresh = () => {
+        if (isManagerView && !branchReady) {
+            push("Đang xác định chi nhánh của bạn...", "info");
+            return;
+        }
         loadReport();
         push("Đã làm mới báo cáo", "info");
     };
 
     // Export excel
     const onExportExcel = async () => {
+        if (isManagerView && !branchReady) {
+            push("Đang xác định chi nhánh của bạn...", "info");
+            return;
+        }
         try {
             await exportExpenseReportToExcel({
                 branchId: branchId || undefined,
@@ -1391,6 +1553,14 @@ export default function ExpenseReportPage() {
                     onRefresh={onRefresh}
                     loading={loading}
                     onExportExcel={onExportExcel}
+                    branchDisabled={isManagerView}
+                    branchHelperText={branchLockName
+                        ? `Chi nhánh ${branchLockName}`
+                        : branchId != null
+                            ? `Chi nhánh #${branchId}`
+                            : ""}
+                    branchLoading={branchLockLoading}
+                    branchError={branchLockError}
                 />
             </div>
 

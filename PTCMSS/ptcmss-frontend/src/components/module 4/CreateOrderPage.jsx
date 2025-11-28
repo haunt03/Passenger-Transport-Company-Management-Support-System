@@ -1,6 +1,8 @@
 // CreateOrderPage.jsx (LIGHT THEME)
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { listVehicleCategories } from "../../api/vehicleCategories";
+import { listHireTypes } from "../../api/hireTypes";
 import { calculatePrice, createBooking, getBooking, pageBookings } from "../../api/bookings";
 import { calculateDistance } from "../../api/graphhopper";
 import { getBranchByUserId, listBranches } from "../../api/branches";
@@ -231,6 +233,7 @@ function AvailabilityBadge({ info }) {
 
 export default function CreateOrderPage() {
     const { toasts, push } = useToasts();
+    const navigate = useNavigate();
 
     /* --- Phần 1: khách hàng --- */
     const [phone, setPhone] = React.useState("");
@@ -241,6 +244,7 @@ export default function CreateOrderPage() {
     const [hireType, setHireType] =
         React.useState("ONE_WAY"); // ONE_WAY | ROUND_TRIP | DAILY
     const [hireTypeId, setHireTypeId] = React.useState(""); // ID từ backend
+    const [hireTypesList, setHireTypesList] = React.useState([]); // Danh sách từ backend
 
     /* --- Phần 3: chuyến đi / yêu cầu xe --- */
     const [pickup, setPickup] = React.useState("");
@@ -315,8 +319,9 @@ export default function CreateOrderPage() {
     // Các field mới cho logic tính giá
     const [isHoliday, setIsHoliday] = React.useState(false);
     const [isWeekend, setIsWeekend] = React.useState(false);
-    const [additionalPickupPoints, setAdditionalPickupPoints] = React.useState(0);
-    const [additionalDropoffPoints, setAdditionalDropoffPoints] = React.useState(0);
+
+    // Note cho tài xế (ghi chú điểm đón/trả, hướng dẫn...)
+    const [bookingNote, setBookingNote] = React.useState("");
     const loadRecentBookingSuggestion = React.useCallback(async (phoneNumber) => {
         if (!phoneNumber) return;
         try {
@@ -512,6 +517,35 @@ export default function CreateOrderPage() {
         })();
     }, []);
 
+    // Load hireTypes từ backend
+    React.useEffect(() => {
+        (async () => {
+            try {
+                const list = await listHireTypes();
+                if (Array.isArray(list) && list.length > 0) {
+                    setHireTypesList(list);
+                    // Set default hireTypeId cho ONE_WAY
+                    const oneWay = list.find(h => h.code === "ONE_WAY");
+                    if (oneWay) {
+                        setHireTypeId(String(oneWay.id));
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to load hire types:", err);
+            }
+        })();
+    }, []);
+
+    // Update hireTypeId khi hireType thay đổi
+    React.useEffect(() => {
+        if (hireType && hireTypesList.length > 0) {
+            const found = hireTypesList.find(h => h.code === hireType);
+            if (found) {
+                setHireTypeId(String(found.id));
+            }
+        }
+    }, [hireType, hireTypesList]);
+
     // Update selectedCategory khi categoryId thay đổi
     React.useEffect(() => {
         if (categoryId && categories.length > 0) {
@@ -598,8 +632,6 @@ export default function CreateOrderPage() {
                 const startISO = toIsoZ(startTime);
                 const endISO = toIsoZ(endTime);
 
-                const totalAdditionalPoints = (additionalPickupPoints || 0) + (additionalDropoffPoints || 0);
-
                 const price = await calculatePrice({
                     vehicleCategoryIds: [Number(categoryId)],
                     quantities: [Number(vehicleCount || 1)],
@@ -608,7 +640,6 @@ export default function CreateOrderPage() {
                     hireTypeId: hireTypeId ? Number(hireTypeId) : undefined,
                     isHoliday: isHoliday,
                     isWeekend: isWeekend,
-                    additionalPoints: totalAdditionalPoints,
                     startTime: startISO,
                     endTime: endISO,
                 });
@@ -623,7 +654,7 @@ export default function CreateOrderPage() {
             }
         };
         run();
-    }, [categoryId, vehicleCount, distanceKm, hireTypeId, isHoliday, isWeekend, additionalPickupPoints, additionalDropoffPoints, startTime, endTime, quotedPriceTouched]);
+    }, [categoryId, vehicleCount, distanceKm, hireTypeId, isHoliday, isWeekend, startTime, endTime, quotedPriceTouched]);
 
     /* --- submit states --- */
     const [loadingDraft, setLoadingDraft] =
@@ -659,7 +690,6 @@ export default function CreateOrderPage() {
                         setCustomerName(customer.fullName);
                         if (customer.email) setEmail(customer.email);
                         push("Đã tìm thấy khách hàng trong hệ thống", "success");
-                        await loadRecentBookingSuggestion(normalizedPhone);
                     }
                 } else if (response.status === 404) {
                     // Không tìm thấy - không làm gì, user sẽ nhập thủ công
@@ -771,13 +801,38 @@ export default function CreateOrderPage() {
 
             // Check if start time is in the past
             if (startDate < now) {
-                push("Thời gian đón phải lớn hơn hoặc bằng thời gian hiện tại", "error");
+                push("Thời gian đón phải lớn hơn thời gian hiện tại", "error");
+                return;
+            }
+
+            // Check max 6 months in the future
+            const sixMonthsLater = new Date();
+            sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6);
+            if (startDate > sixMonthsLater) {
+                push("Thời gian đón không được quá 6 tháng tính từ hiện tại", "error");
                 return;
             }
 
             // Check if end time is after start time
             if (endDate <= startDate) {
                 push("Thời gian kết thúc phải sau thời gian đón", "error");
+                return;
+            }
+
+            // Check minimum duration based on hire type
+            const durationHours = (endDate - startDate) / (1000 * 60 * 60);
+            let minDuration = 1; // Default 1 hour for ONE_WAY
+
+            if (hireType === "ROUND_TRIP") {
+                minDuration = 2; // Minimum 2 hours for round trip
+            } else if (hireType === "DAILY") {
+                minDuration = 8; // Minimum 8 hours for daily hire
+            }
+
+            if (durationHours < minDuration) {
+                const hireTypeLabel = hireType === "ONE_WAY" ? "một chiều" :
+                    hireType === "ROUND_TRIP" ? "hai chiều" : "theo ngày";
+                push(`Thời gian thuê ${hireTypeLabel} tối thiểu ${minDuration} giờ`, "error");
                 return;
             }
         }
@@ -799,8 +854,7 @@ export default function CreateOrderPage() {
                 useHighway: false,
                 isHoliday: isHoliday,
                 isWeekend: isWeekend,
-                additionalPickupPoints: additionalPickupPoints || 0,
-                additionalDropoffPoints: additionalDropoffPoints || 0,
+                note: bookingNote || null,
                 trips: [
                     { startLocation: pickup, endLocation: dropoff, startTime: sStart, endTime: sEnd },
                 ],
@@ -816,8 +870,12 @@ export default function CreateOrderPage() {
             };
 
             console.log("📤 Creating booking:", req);
-            await createBooking(req);
+            const created = await createBooking(req);
             push("Đã lưu nháp đơn hàng", "success");
+            // Redirect to order detail page
+            if (created?.id) {
+                navigate(`/orders/${created.id}`);
+            }
         } catch (err) {
             console.error("❌ Save draft error:", err);
             push("Lưu nháp thất bại: " + (err.message || "Lỗi không xác định"), "error");
@@ -855,13 +913,38 @@ export default function CreateOrderPage() {
 
             // Check if start time is in the past
             if (startDate < now) {
-                push("Thời gian đón phải lớn hơn hoặc bằng thời gian hiện tại", "error");
+                push("Thời gian đón phải lớn hơn thời gian hiện tại", "error");
+                return;
+            }
+
+            // Check max 6 months in the future
+            const sixMonthsLater = new Date();
+            sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6);
+            if (startDate > sixMonthsLater) {
+                push("Thời gian đón không được quá 6 tháng tính từ hiện tại", "error");
                 return;
             }
 
             // Check if end time is after start time
             if (endDate <= startDate) {
                 push("Thời gian kết thúc phải sau thời gian đón", "error");
+                return;
+            }
+
+            // Check minimum duration based on hire type
+            const durationHours = (endDate - startDate) / (1000 * 60 * 60);
+            let minDuration = 1; // Default 1 hour for ONE_WAY
+
+            if (hireType === "ROUND_TRIP") {
+                minDuration = 2; // Minimum 2 hours for round trip
+            } else if (hireType === "DAILY") {
+                minDuration = 8; // Minimum 8 hours for daily hire
+            }
+
+            if (durationHours < minDuration) {
+                const hireTypeLabel = hireType === "ONE_WAY" ? "một chiều" :
+                    hireType === "ROUND_TRIP" ? "hai chiều" : "theo ngày";
+                push(`Thời gian thuê ${hireTypeLabel} tối thiểu ${minDuration} giờ`, "error");
                 return;
             }
         }
@@ -891,8 +974,7 @@ export default function CreateOrderPage() {
                 useHighway: false,
                 isHoliday: isHoliday,
                 isWeekend: isWeekend,
-                additionalPickupPoints: additionalPickupPoints || 0,
-                additionalDropoffPoints: additionalDropoffPoints || 0,
+                note: bookingNote || null,
                 trips: [
                     { startLocation: pickup, endLocation: dropoff, startTime: sStart, endTime: sEnd },
                 ],
@@ -903,13 +985,17 @@ export default function CreateOrderPage() {
                 discountAmount: Number(discount || 0),
                 totalCost: Number(quotedPrice || 0),
                 depositAmount: 0,
-                status: "PENDING", // Changed from CONFIRMED to PENDING so Coordinator can assign driver/vehicle
+                status: "PENDING",
                 distance: Number(distanceKm || 0),
             };
 
             console.log("📤 Creating booking:", req);
             const created = await createBooking(req);
-            push(`Đã tạo đơn hàng #${created?.id || "?"}. Đơn đang chờ điều phối gán xe/tài xế.`, "success");
+            push(`Đã tạo đơn hàng #${created?.id || "?"}`, "success");
+            // Redirect to order detail page to create deposit request
+            if (created?.id) {
+                navigate(`/orders/${created.id}`);
+            }
         } catch (err) {
             console.error("❌ Submit order error:", err);
             push("Tạo đơn hàng thất bại: " + (err.message || "Lỗi không xác định"), "error");
@@ -930,7 +1016,7 @@ export default function CreateOrderPage() {
             <Toasts toasts={toasts} />
 
             {/* DEBUG PANEL - Remove this after testing */}
-            {process.env.NODE_ENV === 'development' && (
+            {/* {process.env.NODE_ENV === 'development' && (
                 <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs">
                     <div className="font-bold mb-2">🔍 Debug Info:</div>
                     <div>loadingBranch: {String(loadingBranch)}</div>
@@ -940,7 +1026,7 @@ export default function CreateOrderPage() {
                     <div>availableBranches: {availableBranches.length} items</div>
                     <div>roleName: {localStorage.getItem("roleName") || 'not set'}</div>
                 </div>
-            )}
+            )} */}
 
             {/* HEADER */}
             <div className="flex flex-col xl:flex-row xl:items-start gap-4 mb-6">
@@ -1157,57 +1243,40 @@ export default function CreateOrderPage() {
                                     </span>
                                 </label>
 
-                                {/* Cuối tuần */}
+                                {/* Cuối tuần - có thể chỉnh sửa */}
                                 <label className="flex items-center gap-2 cursor-pointer">
                                     <input
                                         type="checkbox"
                                         checked={isWeekend}
                                         onChange={(e) => setIsWeekend(e.target.checked)}
-                                        disabled={true}
-                                        className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-50"
+                                        className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                                     />
                                     <span className="text-[13px] text-slate-700">
                                         Cuối tuần (+20%)
-                                        {isWeekend && <span className="text-emerald-600 ml-1">(Tự động)</span>}
                                     </span>
                                 </label>
                             </div>
-
-                            {/* Điểm đón/trả thêm */}
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <div className="text-[12px] text-slate-600 mb-1">
-                                        Điểm đón thêm
-                                    </div>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        value={additionalPickupPoints}
-                                        onChange={(e) => setAdditionalPickupPoints(Number(e.target.value) || 0)}
-                                        className={cls(inputCls, "tabular-nums")}
-                                        placeholder="0"
-                                    />
-                                    <div className="text-[11px] text-slate-500 mt-1">
-                                        Nhập số điểm đón phụ ngoài điểm chính (mỗi điểm = 1 lần ghé thêm).
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="text-[12px] text-slate-600 mb-1">
-                                        Điểm trả thêm
-                                    </div>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        value={additionalDropoffPoints}
-                                        onChange={(e) => setAdditionalDropoffPoints(Number(e.target.value) || 0)}
-                                        className={cls(inputCls, "tabular-nums")}
-                                        placeholder="0"
-                                    />
-                                    <div className="text-[11px] text-slate-500 mt-1">
-                                        Nhập số địa điểm trả khách bổ sung để hệ thống tính phụ phí chính xác.
-                                    </div>
-                                </div>
+                            <div className="text-[11px] text-slate-500">
+                                * Cuối tuần tự động bật khi đặt chuyến T7/CN. Có thể tắt thủ công nếu cần (VD: đi 2 lượt qua 2 ngày).
                             </div>
+                        </div>
+                    </section>
+
+                    {/* Phần NOTE cho tài xế */}
+                    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div className="flex items-center gap-2 text-slate-900 text-[14px] font-semibold mb-4">
+                            <AlertTriangle className="h-4 w-4 text-amber-600" />
+                            <span>Ghi chú cho tài xế</span>
+                        </div>
+                        <textarea
+                            value={bookingNote}
+                            onChange={(e) => setBookingNote(e.target.value)}
+                            rows={3}
+                            className={cls(inputCls, "resize-none")}
+                            placeholder="VD: Đón thêm 1 khách ở 123 Trần Hưng Đạo lúc 8h30, hành lý cồng kềnh cần xe có cốp rộng..."
+                        />
+                        <div className="text-[11px] text-slate-500 mt-2">
+                            Ghi chú này sẽ hiển thị cho tài xế trong chi tiết chuyến đi.
                         </div>
                     </section>
 
