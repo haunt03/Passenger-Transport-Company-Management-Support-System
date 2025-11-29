@@ -31,7 +31,7 @@ public class NotificationController {
             summary = "Lấy dashboard notifications & approvals",
             description = "Trả về tổng quan cảnh báo và yêu cầu chờ duyệt"
     )
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','COORDINATOR')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','COORDINATOR','ACCOUNTANT')")
     @GetMapping("/dashboard")
     public ResponseData<NotificationDashboardResponse> getDashboard(
             @RequestParam(required = false) Integer branchId) {
@@ -48,7 +48,7 @@ public class NotificationController {
             summary = "Lấy danh sách cảnh báo",
             description = "Lấy tất cả cảnh báo chưa xác nhận"
     )
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','COORDINATOR')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','COORDINATOR','ACCOUNTANT')")
     @GetMapping("/alerts")
     public ResponseData<List<AlertResponse>> getAlerts(
             @RequestParam(required = false) Integer branchId) {
@@ -65,7 +65,7 @@ public class NotificationController {
             summary = "Xác nhận đã biết cảnh báo",
             description = "Đánh dấu cảnh báo là đã xem/xử lý"
     )
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','COORDINATOR')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','COORDINATOR','ACCOUNTANT')")
     @PostMapping("/alerts/{alertId}/acknowledge")
     public ResponseData<AlertResponse> acknowledgeAlert(
             @PathVariable Integer alertId,
@@ -87,7 +87,7 @@ public class NotificationController {
             summary = "Lấy danh sách yêu cầu chờ duyệt",
             description = "Lấy tất cả yêu cầu pending (nghỉ phép, tạm ứng, giảm giá, etc.)"
     )
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','COORDINATOR')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','COORDINATOR','ACCOUNTANT')")
     @GetMapping("/approvals/pending")
     public ResponseData<List<ApprovalItemResponse>> getPendingApprovals(
             @RequestParam(required = false) Integer branchId) {
@@ -104,7 +104,7 @@ public class NotificationController {
             summary = "Lấy danh sách yêu cầu đã xử lý",
             description = "Lấy các yêu cầu đã được duyệt hoặc từ chối (APPROVED + REJECTED)"
     )
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','COORDINATOR')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','COORDINATOR','ACCOUNTANT')")
     @GetMapping("/approvals/processed")
     public ResponseData<List<ApprovalItemResponse>> getProcessedApprovals(
             @RequestParam(required = false) Integer branchId,
@@ -122,7 +122,7 @@ public class NotificationController {
             summary = "Phê duyệt yêu cầu",
             description = "Approve một yêu cầu (nghỉ phép, tạm ứng, etc.)"
     )
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT')")
     @PostMapping("/approvals/{historyId}/approve")
     public ResponseData<ApprovalItemResponse> approveRequest(
             @PathVariable Integer historyId,
@@ -147,7 +147,7 @@ public class NotificationController {
             summary = "Từ chối yêu cầu",
             description = "Reject một yêu cầu (nghỉ phép, tạm ứng, etc.)"
     )
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT')")
     @PostMapping("/approvals/{historyId}/reject")
     public ResponseData<ApprovalItemResponse> rejectRequest(
             @PathVariable Integer historyId,
@@ -220,16 +220,11 @@ public class NotificationController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int limit) {
         try {
-            // For now, return empty list since we don't have a user_notifications table yet
-            // TODO: Implement proper user notifications storage and retrieval
             log.info("[Notification] Get notifications for user {} (page={}, limit={})", userId, page, limit);
-
-            return new ResponseData<>(HttpStatus.OK.value(), "Success", Map.of(
-                    "data", List.of(),
-                    "total", 0,
-                    "page", page,
-                    "limit", limit
-            ));
+            Map<String, Object> result = notificationService.getUserNotifications(userId, page, limit);
+            log.info("[Notification] Returning {} notifications for user {}",
+                    ((java.util.List<?>) result.get("data")).size(), userId);
+            return new ResponseData<>(HttpStatus.OK.value(), "Success", result);
         } catch (Exception e) {
             log.error("[Notification] Failed to load user notifications for user {}", userId, e);
             return new ResponseError(HttpStatus.BAD_REQUEST.value(), e.getMessage());
@@ -250,6 +245,24 @@ public class NotificationController {
             return new ResponseData<>(HttpStatus.OK.value(), "Sync triggered successfully", null);
         } catch (Exception e) {
             log.error("[Notification] Failed to sync approvals", e);
+            return new ResponseError(HttpStatus.BAD_REQUEST.value(), e.getMessage());
+        }
+    }
+
+    @Operation(
+            summary = "Xóa notification",
+            description = "Xóa một notification của user khỏi database"
+    )
+    @DeleteMapping("/{notificationId}")
+    public ResponseData<String> deleteNotification(
+            @PathVariable Integer notificationId,
+            @RequestParam Integer userId) {
+        try {
+            log.info("[Notification] Delete notification {} for user {}", notificationId, userId);
+            notificationService.deleteNotification(notificationId, userId);
+            return new ResponseData<>(HttpStatus.OK.value(), "Notification deleted", null);
+        } catch (Exception e) {
+            log.error("[Notification] Failed to delete notification {}", notificationId, e);
             return new ResponseError(HttpStatus.BAD_REQUEST.value(), e.getMessage());
         }
     }

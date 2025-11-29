@@ -6,19 +6,27 @@ import org.example.ptcmssbackend.dto.response.notification.NotificationDashboard
 
 import java.util.List;
 
+import java.util.Map;
+
 public interface NotificationService {
-    
+
     // Alerts
     List<AlertResponse> getAllAlerts(Integer branchId);
     AlertResponse acknowledgeAlert(Integer alertId, Integer userId);
     void generateSystemAlerts(); // Tự động tạo alerts (chạy scheduled)
-    
+
     // Approvals
     List<ApprovalItemResponse> getPendingApprovals(Integer branchId);
     List<ApprovalItemResponse> getProcessedApprovals(Integer branchId, Integer limit); // Lấy các yêu cầu đã xử lý (APPROVED + REJECTED)
     ApprovalItemResponse approveRequest(Integer historyId, Integer userId, String note);
     ApprovalItemResponse rejectRequest(Integer historyId, Integer userId, String note);
-    
+
     // Dashboard
     NotificationDashboardResponse getDashboard(Integer branchId);
+
+    // User notifications
+    Map<String, Object> getUserNotifications(Integer userId, int page, int limit);
+
+    // Delete notification
+    void deleteNotification(Integer notificationId, Integer userId);
 }
