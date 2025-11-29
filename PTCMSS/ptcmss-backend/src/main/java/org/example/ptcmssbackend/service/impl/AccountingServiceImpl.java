@@ -9,11 +9,14 @@ import org.example.ptcmssbackend.dto.response.Accounting.ExpenseReportResponse;
 import org.example.ptcmssbackend.dto.response.Accounting.RevenueReportResponse;
 import org.example.ptcmssbackend.dto.response.Invoice.InvoiceListResponse;
 import org.example.ptcmssbackend.entity.Invoices;
+import org.example.ptcmssbackend.entity.ExpenseRequests;
 import org.example.ptcmssbackend.enums.InvoiceStatus;
 import org.example.ptcmssbackend.enums.InvoiceType;
 import org.example.ptcmssbackend.enums.PaymentStatus;
+import org.example.ptcmssbackend.enums.ExpenseRequestStatus;
 import org.example.ptcmssbackend.repository.InvoiceRepository;
 import org.example.ptcmssbackend.repository.PaymentHistoryRepository;
+import org.example.ptcmssbackend.repository.ExpenseRequestRepository;
 import org.example.ptcmssbackend.service.AccountingService;
 import org.example.ptcmssbackend.service.InvoiceService;
 import org.springframework.stereotype.Service;
@@ -33,6 +36,7 @@ public class AccountingServiceImpl implements AccountingService {
 
     private final InvoiceRepository invoiceRepository;
     private final PaymentHistoryRepository paymentHistoryRepository;
+    private final ExpenseRequestRepository expenseRequestRepository;
     private final InvoiceService invoiceService;
 
     @Override
@@ -98,7 +102,7 @@ public class AccountingServiceImpl implements AccountingService {
 
         BigDecimal totalPaid = invoices.stream()
                 .filter(inv -> inv.getPaymentStatus() == PaymentStatus.PAID)
-                .map(inv -> paymentHistoryRepository.sumByInvoiceId(inv.getId()))
+                .map(inv -> paymentHistoryRepository.sumConfirmedByInvoiceId(inv.getId()))
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -153,44 +157,191 @@ public class AccountingServiceImpl implements AccountingService {
                     .collect(Collectors.toList());
         }
 
-        BigDecimal totalExpense = expenses.stream()
+        // Get expense requests from drivers/coordinators (APPROVED only)
+        List<ExpenseRequests> expenseRequests;
+        if (request.getBranchId() != null) {
+            expenseRequests = expenseRequestRepository.findByStatusAndBranch_Id(
+                    ExpenseRequestStatus.APPROVED, request.getBranchId());
+        } else {
+            expenseRequests = expenseRequestRepository.findByStatus(ExpenseRequestStatus.APPROVED);
+        }
+
+        // Filter expense requests by date range
+        Instant startInstant = startDate.atStartOfDay(ZoneId.systemDefault()).toInstant();
+        Instant endInstant = endDate.atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
+        expenseRequests = expenseRequests.stream()
+                .filter(req -> req.getCreatedAt() != null
+                        && !req.getCreatedAt().isBefore(startInstant)
+                        && !req.getCreatedAt().isAfter(endInstant))
+                .collect(Collectors.toList());
+
+        // Filter by expense type if provided
+        if (request.getExpenseType() != null) {
+            expenseRequests = expenseRequests.stream()
+                    .filter(e -> request.getExpenseType().equals(e.getType()))
+                    .collect(Collectors.toList());
+        }
+
+        // Filter by vehicle if provided
+        if (request.getVehicleId() != null) {
+            expenseRequests = expenseRequests.stream()
+                    .filter(e -> e.getVehicle() != null && request.getVehicleId().equals(e.getVehicle().getId()))
+                    .collect(Collectors.toList());
+        }
+
+        // Calculate total expense (invoices + expense requests)
+        BigDecimal invoiceExpense = expenses.stream()
                 .map(Invoices::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        BigDecimal requestExpense = expenseRequests.stream()
+                .map(ExpenseRequests::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalExpense = invoiceExpense.add(requestExpense);
+
         response.setTotalExpense(totalExpense);
-        response.setTotalExpenseRequests(expenses.size());
+        response.setTotalExpenseRequests(expenses.size() + expenseRequests.size());
 
-        // Breakdowns
-        response.setExpenseByCategory(getExpenseByCategoryMap(expenses));
-        response.setExpenseByDate(getExpenseByDate(expenses, startDate, endDate));
-        response.setExpenseByCategoryDonut(getExpenseByCategoryDonut(expenses));
+        // Combine expenses and requests for category breakdown
+        Map<String, BigDecimal> expenseByCategory = new HashMap<>();
 
-        // Top items
-        response.setTopExpenseItems(getTopExpenseItems(expenses));
-        // TODO: Top expense vehicles (need to join with trips/vehicles)
+        // Add invoice expenses
+        expenses.forEach(inv -> {
+            String category = inv.getCostType() != null ? inv.getCostType() : "OTHER";
+            expenseByCategory.merge(category, inv.getAmount(), BigDecimal::add);
+        });
 
-        // Map expenses list for table display
-        List<ExpenseReportResponse.ExpenseItem> expenseItems = expenses.stream()
+        // Add expense requests
+        expenseRequests.forEach(req -> {
+            String category = req.getType() != null ? req.getType() : "OTHER";
+            expenseByCategory.merge(category, req.getAmount(), BigDecimal::add);
+        });
+
+        response.setExpenseByCategory(expenseByCategory);
+        response.setExpenseByDate(getExpenseByDateCombined(expenses, expenseRequests, startDate, endDate));
+        response.setExpenseByCategoryDonut(getExpenseByCategoryDonutCombined(expenseByCategory));
+
+        // Top items (combined)
+        response.setTopExpenseItems(getTopExpenseItemsCombined(expenseByCategory));
+
+        // Map expenses list for table display (invoices + requests)
+        List<ExpenseReportResponse.ExpenseItem> expenseItems = new ArrayList<>();
+
+        // Add invoice expenses
+        expenseItems.addAll(expenses.stream()
                 .map(inv -> {
                     ExpenseReportResponse.ExpenseItem item = new ExpenseReportResponse.ExpenseItem();
                     item.setInvoiceId(inv.getId());
-                    item.setInvoiceDate(inv.getInvoiceDate() != null 
-                            ? inv.getInvoiceDate().toString() 
+                    item.setInvoiceDate(inv.getInvoiceDate() != null
+                            ? inv.getInvoiceDate().toString()
                             : null);
-                    item.setBranchName(inv.getBranch() != null 
-                            ? inv.getBranch().getBranchName() 
+                    item.setBranchName(inv.getBranch() != null
+                            ? inv.getBranch().getBranchName()
                             : null);
-                    // Vehicle info not directly available from Invoices, would need to join with ExpenseRequests
-                    item.setVehicleLicensePlate(null); // TODO: Get from ExpenseRequests if available
+                    item.setVehicleLicensePlate(null);
                     item.setCostType(inv.getCostType());
                     item.setAmount(inv.getAmount());
                     item.setNote(inv.getNote());
                     return item;
                 })
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()));
+
+        // Add expense requests from drivers/coordinators
+        expenseItems.addAll(expenseRequests.stream()
+                .map(req -> {
+                    ExpenseReportResponse.ExpenseItem item = new ExpenseReportResponse.ExpenseItem();
+                    item.setInvoiceId(req.getId()); // Use expense request ID
+                    item.setInvoiceDate(req.getCreatedAt() != null
+                            ? req.getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate().toString()
+                            : null);
+                    item.setBranchName(req.getBranch() != null
+                            ? req.getBranch().getBranchName()
+                            : null);
+                    item.setVehicleLicensePlate(req.getVehicle() != null
+                            ? req.getVehicle().getLicensePlate()
+                            : null);
+                    item.setCostType(req.getType());
+                    item.setAmount(req.getAmount());
+                    item.setNote(req.getNote());
+                    return item;
+                })
+                .collect(Collectors.toList()));
+
         response.setExpenses(expenseItems);
 
         return response;
+    }
+
+    // Helper method for combined expense by date
+    private List<ExpenseReportResponse.ChartDataPoint> getExpenseByDateCombined(
+            List<Invoices> invoices, List<ExpenseRequests> requests, LocalDate startDate, LocalDate endDate) {
+        Map<String, BigDecimal> expenseByDate = new HashMap<>();
+
+        // Add invoice expenses
+        invoices.stream()
+                .filter(inv -> inv.getInvoiceDate() != null)
+                .forEach(inv -> {
+                    String dateKey = inv.getInvoiceDate().atZone(ZoneId.systemDefault()).toLocalDate().toString();
+                    expenseByDate.merge(dateKey, inv.getAmount(), BigDecimal::add);
+                });
+
+        // Add expense requests
+        requests.stream()
+                .filter(req -> req.getCreatedAt() != null)
+                .forEach(req -> {
+                    String dateKey = req.getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate().toString();
+                    expenseByDate.merge(dateKey, req.getAmount(), BigDecimal::add);
+                });
+
+        List<ExpenseReportResponse.ChartDataPoint> points = new ArrayList<>();
+        LocalDate current = startDate;
+        while (!current.isAfter(endDate)) {
+            ExpenseReportResponse.ChartDataPoint point = new ExpenseReportResponse.ChartDataPoint();
+            point.setDate(current.toString());
+            point.setValue(expenseByDate.getOrDefault(current.toString(), BigDecimal.ZERO));
+            points.add(point);
+            current = current.plusDays(1);
+        }
+        return points;
+    }
+
+    // Helper method for combined donut chart
+    private List<ExpenseReportResponse.DonutChartData> getExpenseByCategoryDonutCombined(
+            Map<String, BigDecimal> byCategory) {
+        BigDecimal total = byCategory.values().stream()
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return byCategory.entrySet().stream()
+                .map(entry -> {
+                    ExpenseReportResponse.DonutChartData data = new ExpenseReportResponse.DonutChartData();
+                    data.setCategory(entry.getKey());
+                    data.setAmount(entry.getValue());
+                    if (total.compareTo(BigDecimal.ZERO) > 0) {
+                        BigDecimal percentage = entry.getValue()
+                                .divide(total, 4, RoundingMode.HALF_UP)
+                                .multiply(BigDecimal.valueOf(100));
+                        data.setPercentage(percentage);
+                    }
+                    return data;
+                })
+                .collect(Collectors.toList());
+    }
+
+    // Helper method for combined top expense items
+    private List<ExpenseReportResponse.TopExpenseItem> getTopExpenseItemsCombined(
+            Map<String, BigDecimal> byCategory) {
+        return byCategory.entrySet().stream()
+                .map(entry -> {
+                    ExpenseReportResponse.TopExpenseItem item = new ExpenseReportResponse.TopExpenseItem();
+                    item.setExpenseType(entry.getKey());
+                    item.setTotalAmount(entry.getValue());
+                    item.setCount(1); // We don't track count separately in the map
+                    return item;
+                })
+                .sorted((a, b) -> b.getTotalAmount().compareTo(a.getTotalAmount()))
+                .limit(5)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -250,7 +401,7 @@ public class AccountingServiceImpl implements AccountingService {
         );
 
         BigDecimal paidAmount = invoices.stream()
-                .map(inv -> paymentHistoryRepository.sumByInvoiceId(inv.getId()))
+                .map(inv -> paymentHistoryRepository.sumConfirmedByInvoiceId(inv.getId()))
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -587,8 +738,8 @@ public class AccountingServiceImpl implements AccountingService {
         response.setStatus(invoice.getStatus() != null ? invoice.getStatus().toString() : null);
         response.setInvoiceDate(invoice.getInvoiceDate());
 
-        // Calculate paid amount and balance
-        BigDecimal paidAmount = paymentHistoryRepository.sumByInvoiceId(invoice.getId());
+        // Calculate paid amount and balance (only CONFIRMED payments)
+        BigDecimal paidAmount = paymentHistoryRepository.sumConfirmedByInvoiceId(invoice.getId());
         response.setPaidAmount(paidAmount != null ? paidAmount : BigDecimal.ZERO);
         response.setBalance(invoiceService.calculateBalance(invoice.getId()));
 
