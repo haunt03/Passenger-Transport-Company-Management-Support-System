@@ -15,6 +15,7 @@ public class AssignRequest {
 
     // Manual mode: client truyền driverId, vehicleId
     private Integer driverId;
+    private Integer secondDriverId; // Tài xế thứ 2 cho chuyến dài (thay ca)
     private Integer vehicleId;
 
     // Auto mode: nếu true -> hệ thống tự tìm driver/vehicle phù hợp

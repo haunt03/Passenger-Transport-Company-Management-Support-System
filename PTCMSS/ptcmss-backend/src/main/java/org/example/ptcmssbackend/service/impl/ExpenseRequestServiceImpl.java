@@ -14,14 +14,12 @@ import org.example.ptcmssbackend.repository.ExpenseRequestRepository;
 import org.example.ptcmssbackend.repository.UsersRepository;
 import org.example.ptcmssbackend.repository.VehicleRepository;
 import org.example.ptcmssbackend.service.ExpenseRequestService;
-import org.example.ptcmssbackend.service.LocalImageService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -32,11 +30,9 @@ public class ExpenseRequestServiceImpl implements ExpenseRequestService {
     private final BranchesRepository branchesRepository;
     private final VehicleRepository vehicleRepository;
     private final UsersRepository usersRepository;
-    private final LocalImageService localImageService;
-
     @Override
     @Transactional
-    public ExpenseRequestResponse createExpenseRequest(CreateExpenseRequest request, List<MultipartFile> attachments) {
+    public ExpenseRequestResponse createExpenseRequest(CreateExpenseRequest request) {
         Branches branch = branchesRepository.findById(request.getBranchId())
                 .orElseThrow(() -> new RuntimeException("Branch not found: " + request.getBranchId()));
 
@@ -60,16 +56,6 @@ public class ExpenseRequestServiceImpl implements ExpenseRequestService {
         entity.setAmount(request.getAmount());
         entity.setNote(request.getNote());
         entity.setStatus(ExpenseRequestStatus.PENDING);
-
-        List<String> attachmentUrls = new ArrayList<>();
-        if (attachments != null) {
-            for (MultipartFile file : attachments) {
-                if (file != null && !file.isEmpty()) {
-                    attachmentUrls.add(localImageService.saveImage(file));
-                }
-            }
-        }
-        entity.setAttachments(attachmentUrls);
 
         ExpenseRequests saved = expenseRequestRepository.save(entity);
         return mapToResponse(saved);
@@ -96,8 +82,77 @@ public class ExpenseRequestServiceImpl implements ExpenseRequestService {
                                 .map(Users::getFullName)
                                 .orElse(null)
                 )
-                .attachments(entity.getAttachments())
                 .createdAt(entity.getCreatedAt())
                 .build();
+    }
+
+    @Override
+    public List<ExpenseRequestResponse> getByDriverId(Integer driverId) {
+        log.info("[ExpenseRequest] getByDriverId: {}", driverId);
+        // Get expense requests where requester is the driver's user
+        // Note: This requires the driver's userId, not driverId
+        // For now, return all requests by the requester
+        List<ExpenseRequests> list = expenseRequestRepository.findByRequester_Id(driverId);
+        return list.stream().map(this::mapToResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    public List<ExpenseRequestResponse> getPendingRequests() {
+        log.info("[ExpenseRequest] getPendingRequests");
+        List<ExpenseRequests> list = expenseRequestRepository.findByStatus(ExpenseRequestStatus.PENDING);
+        return list.stream().map(this::mapToResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public ExpenseRequestResponse approveRequest(Integer id, String note) {
+        log.info("[ExpenseRequest] approveRequest: {} with note: {}", id, note);
+        ExpenseRequests entity = expenseRequestRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Expense request not found: " + id));
+
+        entity.setStatus(ExpenseRequestStatus.APPROVED);
+        if (note != null && !note.isEmpty()) {
+            entity.setNote((entity.getNote() != null ? entity.getNote() + " | " : "") + "Duyệt: " + note);
+        }
+
+        ExpenseRequests saved = expenseRequestRepository.save(entity);
+        return mapToResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public ExpenseRequestResponse rejectRequest(Integer id, String note) {
+        log.info("[ExpenseRequest] rejectRequest: {} with note: {}", id, note);
+        ExpenseRequests entity = expenseRequestRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Expense request not found: " + id));
+
+        entity.setStatus(ExpenseRequestStatus.REJECTED);
+        if (note != null && !note.isEmpty()) {
+            entity.setNote((entity.getNote() != null ? entity.getNote() + " | " : "") + "Từ chối: " + note);
+        }
+
+        ExpenseRequests saved = expenseRequestRepository.save(entity);
+        return mapToResponse(saved);
+    }
+
+    @Override
+    public List<ExpenseRequestResponse> getAllRequests(String status, Integer branchId) {
+        log.info("[ExpenseRequest] getAllRequests - status: {}, branchId: {}", status, branchId);
+
+        List<ExpenseRequests> list;
+
+        if (status != null && branchId != null) {
+            ExpenseRequestStatus statusEnum = ExpenseRequestStatus.valueOf(status.toUpperCase());
+            list = expenseRequestRepository.findByStatusAndBranch_Id(statusEnum, branchId);
+        } else if (status != null) {
+            ExpenseRequestStatus statusEnum = ExpenseRequestStatus.valueOf(status.toUpperCase());
+            list = expenseRequestRepository.findByStatus(statusEnum);
+        } else if (branchId != null) {
+            list = expenseRequestRepository.findByBranch_Id(branchId);
+        } else {
+            list = expenseRequestRepository.findAll();
+        }
+
+        return list.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 }
