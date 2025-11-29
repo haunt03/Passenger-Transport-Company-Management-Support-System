@@ -38,6 +38,12 @@ public class TripDetailResponse {
 
     private TripStatus status;
 
+    // Thông tin từ Booking
+    private String bookingNote;
+    private java.math.BigDecimal totalCost;
+    private java.math.BigDecimal depositAmount;
+    private java.math.BigDecimal remainingAmount;
+
     private List<AssignmentHistoryItem> history;
 
     @Data

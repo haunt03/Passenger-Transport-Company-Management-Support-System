@@ -60,6 +60,9 @@ public class VehicleCategoryServiceImpl implements VehicleCategoryService {
         c.setPricePerKm(req.getPricePerKm());
         c.setHighwayFee(req.getHighwayFee());
         c.setFixedCosts(req.getFixedCosts());
+        c.setSameDayFixedPrice(req.getSameDayFixedPrice());
+        c.setIsPremium(req.getIsPremium());
+        c.setPremiumSurcharge(req.getPremiumSurcharge());
         c.setEffectiveDate(req.getEffectiveDate());
         if (req.getStatus() != null) {
             c.setStatus(VehicleCategoryStatus.valueOf(req.getStatus().toUpperCase()));
@@ -79,8 +82,12 @@ public class VehicleCategoryServiceImpl implements VehicleCategoryService {
                 .pricePerKm(c.getPricePerKm())
                 .highwayFee(c.getHighwayFee())
                 .fixedCosts(c.getFixedCosts())
+                .sameDayFixedPrice(c.getSameDayFixedPrice())
+                .isPremium(c.getIsPremium())
+                .premiumSurcharge(c.getPremiumSurcharge())
                 .effectiveDate(c.getEffectiveDate())
                 .status(c.getStatus())
                 .build();
     }
 }
+

@@ -10,6 +10,7 @@ import org.example.ptcmssbackend.dto.response.dispatch.AssignRespone;
 import org.example.ptcmssbackend.dto.response.dispatch.DispatchDashboardResponse;
 import org.example.ptcmssbackend.dto.response.dispatch.PendingTripResponse;
 import org.example.ptcmssbackend.entity.*;
+import org.example.ptcmssbackend.entity.TripDriverId;
 import org.example.ptcmssbackend.enums.BookingStatus;
 import org.example.ptcmssbackend.enums.DriverDayOffStatus;
 import org.example.ptcmssbackend.enums.TripStatus;
@@ -17,6 +18,7 @@ import org.example.ptcmssbackend.enums.VehicleStatus;
 import org.example.ptcmssbackend.repository.*;
 import org.example.ptcmssbackend.service.BookingService;
 import org.example.ptcmssbackend.service.DispatchService;
+import org.example.ptcmssbackend.service.SystemSettingService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,6 +61,7 @@ public class DispatchServiceImpl implements DispatchService {
     private final BookingService bookingService; // để tái dùng hàm assign của BookingService
     private final TripAssignmentHistoryRepository tripAssignmentHistoryRepository;
     private final org.example.ptcmssbackend.service.WebSocketNotificationService webSocketNotificationService;
+    private final SystemSettingService systemSettingService;
 
     // =========================================================
     // 1) PENDING TRIPS (QUEUE)
@@ -521,7 +524,33 @@ public class DispatchServiceImpl implements DispatchService {
                     .orElseThrow(() -> new RuntimeException("No target trip for auto assign"));
 
             if (driverId == null) {
-                driverId = pickBestDriverForTrip(booking, representativeTrip);
+                // Tính tổng quãng đường của booking để quyết định số lượng tài xế
+                double totalDistance = trips.stream()
+                        .filter(t -> targetTripIds.contains(t.getId()))
+                        .mapToDouble(t -> t.getDistance() != null ? t.getDistance().doubleValue() : 0.0)
+                        .sum();
+
+                // Lấy ngưỡng từ SystemSettings (mặc định 300km)
+                int maxDistanceForSingleDriver = getSystemSettingInt("SINGLE_DRIVER_MAX_DISTANCE_KM", 300);
+
+                if (totalDistance > maxDistanceForSingleDriver) {
+                    // Chuyến dài: cần 2 tài xế
+                    log.info("[Dispatch] Long trip detected ({} km > {} km), assigning 2 drivers", totalDistance, maxDistanceForSingleDriver);
+                    List<Integer> driverIds = pickDriversForLongTrip(booking, representativeTrip, 2);
+                    if (driverIds.size() >= 2) {
+                        driverId = driverIds.get(0); // Gán tài xế đầu tiên
+                        // Tài xế thứ 2 sẽ được gán sau trong logic assign
+                        request.setSecondDriverId(driverIds.get(1));
+                    } else if (driverIds.size() == 1) {
+                        driverId = driverIds.get(0);
+                        log.warn("[Dispatch] Only 1 driver available for long trip, assigning single driver");
+                    } else {
+                        driverId = pickBestDriverForTrip(booking, representativeTrip);
+                    }
+                } else {
+                    // Chuyến ngắn: chỉ cần 1 tài xế
+                    driverId = pickBestDriverForTrip(booking, representativeTrip);
+                }
             }
             if (vehicleId == null) {
                 vehicleId = pickBestVehicleForTrip(booking, representativeTrip);
@@ -542,6 +571,35 @@ public class DispatchServiceImpl implements DispatchService {
         bookingAssignReq.setNote(request.getNote());
 
         var bookingResponse = bookingService.assign(booking.getId(), bookingAssignReq);
+
+        // Nếu có tài xế thứ 2 (cho chuyến dài), gán thêm
+        if (request.getSecondDriverId() != null) {
+            log.info("[Dispatch] Assigning second driver {} for long trip", request.getSecondDriverId());
+            Drivers secondDriver = driverRepository.findById(request.getSecondDriverId())
+                    .orElseThrow(() -> new RuntimeException("Second driver not found: " + request.getSecondDriverId()));
+
+            for (Integer tid : targetTripIds) {
+                // Check xem đã có tài xế thứ 2 chưa
+                List<TripDrivers> existingDrivers = tripDriverRepository.findByTripId(tid);
+                boolean alreadyHasSecondDriver = existingDrivers.stream()
+                        .anyMatch(td -> td.getDriver().getId().equals(secondDriver.getId()));
+
+                if (!alreadyHasSecondDriver) {
+                    TripDrivers td = new TripDrivers();
+                    TripDriverId id = new TripDriverId();
+                    id.setTripId(tid);
+                    id.setDriverId(secondDriver.getId());
+                    td.setId(id);
+                    Trips trip = trips.stream().filter(t -> t.getId().equals(tid)).findFirst().orElseThrow();
+                    td.setTrip(trip);
+                    td.setDriver(secondDriver);
+                    td.setDriverRole("Co-Driver"); // Tài xế thay ca
+                    td.setNote("Tài xế thứ 2 cho chuyến dài");
+                    tripDriverRepository.save(td);
+                    log.info("[Dispatch] Assigned second driver {} to trip {}", secondDriver.getId(), tid);
+                }
+            }
+        }
 
         // Build response cho FE
         List<Trips> updatedTrips = tripRepository.findByBooking_Id(booking.getId());
@@ -782,6 +840,11 @@ public class DispatchServiceImpl implements DispatchService {
                             .build();
                 }).collect(Collectors.toList());
 
+        // Tính số tiền còn lại cần thanh toán
+        java.math.BigDecimal totalCost = booking.getTotalCost() != null ? booking.getTotalCost() : java.math.BigDecimal.ZERO;
+        java.math.BigDecimal depositAmount = booking.getDepositAmount() != null ? booking.getDepositAmount() : java.math.BigDecimal.ZERO;
+        java.math.BigDecimal remainingAmount = totalCost.subtract(depositAmount);
+
         return TripDetailResponse.builder()
                 .tripId(trip.getId())
                 .bookingId(booking.getId())
@@ -797,6 +860,10 @@ public class DispatchServiceImpl implements DispatchService {
                 .vehiclePlate(vehiclePlate)
                 .vehicleModel(vehicleModel)
                 .status(trip.getStatus())
+                .bookingNote(booking.getNote())
+                .totalCost(totalCost)
+                .depositAmount(depositAmount)
+                .remainingAmount(remainingAmount)
                 .history(historyItems)
                 .build();
     }
@@ -1027,6 +1094,93 @@ public class DispatchServiceImpl implements DispatchService {
         return best.getId();
     }
 
+    /**
+     * Chọn nhiều tài xế cho chuyến dài (cần 2 tài xế thay ca)
+     */
+    private List<Integer> pickDriversForLongTrip(Bookings booking, Trips trip, int numberOfDrivers) {
+        Integer branchId = booking.getBranch().getId();
+        log.info("[Dispatch] Picking {} drivers for long trip, branch {}, trip {}", numberOfDrivers, branchId, trip.getId());
+
+        List<Drivers> candidates = driverRepository.findByBranchId(branchId);
+        if (candidates.isEmpty()) {
+            log.warn("[Dispatch] No drivers found in branch {}", branchId);
+            return new ArrayList<>();
+        }
+
+        LocalDate tripDate = trip.getStartTime()
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate();
+
+        List<CandidateScore<Drivers>> scored = new ArrayList<>();
+
+        for (Drivers d : candidates) {
+            // Check nghỉ phép
+            boolean dayOff = !driverDayOffRepository
+                    .findApprovedDayOffOnDate(d.getId(), DriverDayOffStatus.APPROVED, tripDate)
+                    .isEmpty();
+            if (dayOff) continue;
+
+            // Check hạn bằng lái
+            if (d.getLicenseExpiry() != null && d.getLicenseExpiry().isBefore(tripDate)) {
+                continue;
+            }
+
+            // Check trùng giờ
+            List<TripDrivers> driverTrips = tripDriverRepository.findAllByDriverId(d.getId());
+            boolean overlap = driverTrips.stream().anyMatch(td -> {
+                Trips t = td.getTrip();
+                if (t.getId().equals(trip.getId())) return false;
+                if (t.getStatus() == TripStatus.CANCELLED || t.getStatus() == TripStatus.COMPLETED) return false;
+                Instant s1 = t.getStartTime();
+                Instant e1 = t.getEndTime();
+                Instant s2 = trip.getStartTime();
+                Instant e2 = trip.getEndTime();
+                if (s1 == null || e1 == null || s2 == null || e2 == null) return false;
+                return s1.isBefore(e2) && s2.isBefore(e1);
+            });
+            if (overlap) continue;
+
+            // Tính score: số chuyến trong ngày + priorityLevel (ưu tiên priorityLevel cao)
+            long todayTrips = driverTrips.stream().filter(td -> {
+                Trips t = td.getTrip();
+                if (t.getStartTime() == null) return false;
+                LocalDate dDate = t.getStartTime().atZone(ZoneId.systemDefault()).toLocalDate();
+                return dDate.equals(tripDate);
+            }).count();
+
+            // PriorityLevel cao hơn = tốt hơn, nên trừ đi để score thấp hơn
+            int priorityScore = d.getPriorityLevel() != null ? (11 - d.getPriorityLevel()) : 5;
+            scored.add(new CandidateScore<>(d, (int) todayTrips + priorityScore));
+        }
+
+        if (scored.isEmpty()) {
+            log.warn("[Dispatch] No eligible drivers found for long trip {}", trip.getId());
+            return new ArrayList<>();
+        }
+
+        // Sắp xếp và chọn N tài xế tốt nhất
+        scored.sort(Comparator.comparingInt(CandidateScore::getScore));
+        return scored.stream()
+                .limit(numberOfDrivers)
+                .map(cs -> cs.getCandidate().getId())
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Helper method: Lấy giá trị int từ SystemSettings
+     */
+    private int getSystemSettingInt(String key, int defaultValue) {
+        try {
+            var setting = systemSettingService.getByKey(key);
+            if (setting != null && setting.getSettingValue() != null) {
+                return Integer.parseInt(setting.getSettingValue());
+            }
+        } catch (Exception e) {
+            log.warn("Cannot get system setting {}: {}", key, e.getMessage());
+        }
+        return defaultValue;
+    }
+
     private Integer pickBestVehicleForTrip(Bookings booking, Trips trip) {
         Integer branchId = booking.getBranch().getId();
         log.info("[Dispatch] Picking best vehicle for branch {}, trip {}", branchId, trip.getId());
@@ -1084,3 +1238,4 @@ public class DispatchServiceImpl implements DispatchService {
         public int getScore() { return score; }
     }
 }
+
