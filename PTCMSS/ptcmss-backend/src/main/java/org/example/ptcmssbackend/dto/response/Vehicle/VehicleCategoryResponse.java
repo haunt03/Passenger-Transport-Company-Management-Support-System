@@ -19,6 +19,10 @@ public class VehicleCategoryResponse {
     private BigDecimal pricePerKm;
     private BigDecimal highwayFee;
     private BigDecimal fixedCosts;
+    private BigDecimal sameDayFixedPrice;
+    private Boolean isPremium;
+    private BigDecimal premiumSurcharge;
     private LocalDate effectiveDate;
     private VehicleCategoryStatus status;
 }
+

@@ -5,7 +5,6 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.ptcmssbackend.dto.request.Auth.ForgotPasswordRequest;
@@ -13,9 +12,8 @@ import org.example.ptcmssbackend.dto.request.Auth.LoginRequest;
 import org.example.ptcmssbackend.dto.response.Auth.TokenResponse;
 import org.example.ptcmssbackend.service.AuthenticationService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.annotation.Validated;
-import org.springframework.web.servlet.view.RedirectView;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.view.RedirectView;
 import jakarta.validation.Valid;
 
 @Slf4j(topic = "AUTH_CONTROLLER")

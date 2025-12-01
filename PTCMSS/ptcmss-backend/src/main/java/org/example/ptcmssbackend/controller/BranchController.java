@@ -129,7 +129,7 @@ public class BranchController {
         }
     }
 
-    // ======================= LẤY TẤT CẢ ĐỂ LỰA CHỌN =======================
+    // ======================= GET ALL FOR SELECTION =======================
     @Operation(
             summary = "Lấy danh sách tất cả chi nhánh (không phân trang)",
             description = "API trả về danh sách tất cả chi nhánh đang hoạt động để hiển thị trong dropdown/select. " +

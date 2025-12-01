@@ -82,7 +82,7 @@ public class VehicleServiceImpl implements VehicleService {
 
     @Override
     public List<VehicleResponse> getAll() {
-        return vehicleRepository.findAll()
+        return vehicleRepository.findAllWithBranchAndCategory()
                 .stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
