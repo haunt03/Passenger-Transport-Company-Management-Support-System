@@ -43,6 +43,9 @@ public class InvoiceResponse {
     private BigDecimal balance;
     private Integer daysOverdue;
 
+    // Pending payment requests (for accountant to confirm)
+    private Integer pendingPaymentCount;
+
     // Debt management
     private LocalDate promiseToPayDate;
     private String debtLabel;
@@ -59,3 +62,4 @@ public class InvoiceResponse {
     private String note;
     private String img;
 }
+

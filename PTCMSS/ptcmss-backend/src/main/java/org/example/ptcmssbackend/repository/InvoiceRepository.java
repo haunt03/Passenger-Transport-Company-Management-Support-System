@@ -159,4 +159,23 @@ public interface InvoiceRepository extends JpaRepository<Invoices, Integer> {
     Integer findMaxSequenceNumber(
             @Param("branchId") Integer branchId,
             @Param("pattern") String pattern);
+
+    /**
+     * Tìm invoices chưa thanh toán đủ mà trip đã hoàn thành quá 48h
+     * Logic: invoice có booking, booking có trip COMPLETED, trip.endTime + 48h < now
+     */
+    @Query("SELECT DISTINCT i FROM Invoices i " +
+            "JOIN i.booking b " +
+            "JOIN Trips t ON t.booking.id = b.id " +
+            "WHERE i.type = org.example.ptcmssbackend.enums.InvoiceType.INCOME " +
+            "AND i.status = org.example.ptcmssbackend.enums.InvoiceStatus.ACTIVE " +
+            "AND i.paymentStatus = org.example.ptcmssbackend.enums.PaymentStatus.UNPAID " +
+            "AND t.status = org.example.ptcmssbackend.enums.TripStatus.COMPLETED " +
+            "AND t.endTime IS NOT NULL " +
+            "AND t.endTime < :cutoffTime " +
+            "AND (:branchId IS NULL OR i.branch.id = :branchId)")
+    List<Invoices> findUnpaidInvoicesWithCompletedTripsOlderThan(
+            @Param("cutoffTime") Instant cutoffTime,
+            @Param("branchId") Integer branchId);
 }
+

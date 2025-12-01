@@ -33,7 +33,7 @@ public class EmployeeController {
     private final EmployeeMapper employeeMapper;
 
     // ----------- API: Lấy tất cả nhân viên -----------
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT')")
     @Operation(summary = "Lấy danh sách tất cả nhân viên")
     @GetMapping
     public ResponseData<List<EmployeeResponse>> getAllEmployees() {
@@ -58,7 +58,7 @@ public class EmployeeController {
             @ApiResponse(responseCode = "404", description = "Không tìm thấy nhân viên cho vai trò này")
     })
     @GetMapping("/role/{roleName}")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT')")
     public ResponseEntity<List<EmployeeResponse>> getEmployeesByRole(
             @Parameter(description = "Tên vai trò (roleName), ví dụ: Manager, Driver, Admin", example = "Manager")
             @PathVariable String roleName) {
@@ -84,7 +84,7 @@ public class EmployeeController {
             @ApiResponse(responseCode = "404", description = "Không tìm thấy nhân viên cho chi nhánh này")
     })
     @GetMapping("/branch/{branchId}")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT')")
     public ResponseData<List<EmployeeResponse>> getEmployeesByBranch(
             @Parameter(description = "ID chi nhánh", example = "1")
             @PathVariable Integer branchId) {
@@ -108,7 +108,7 @@ public class EmployeeController {
     public ResponseData<EmployeeResponse> getEmployeeById(@PathVariable Integer id) {
         Employees employee = employeeService.findById(id);
         if (employee == null) {
-            throw new RuntimeException("Employee not found with id: " + id);
+            throw new RuntimeException("Không tìm thấy nhân viên với ID: " + id);
         }
         return new ResponseData<>(
                 HttpStatus.OK.value(),
@@ -124,7 +124,7 @@ public class EmployeeController {
     public ResponseData<EmployeeResponse> getEmployeeByUserId(@PathVariable Integer userId) {
         Employees employee = employeeService.findByUserId(userId);
         if (employee == null) {
-            throw new RuntimeException("Employee not found for user id: " + userId);
+            throw new RuntimeException("Không tìm thấy nhân viên cho người dùng ID: " + userId);
         }
         return new ResponseData<>(
                 HttpStatus.OK.value(),
@@ -152,7 +152,7 @@ public class EmployeeController {
         } catch (Exception e) {
             System.err.println("Error creating employee: " + e.getMessage());
             e.printStackTrace();
-            throw new RuntimeException("Failed to create employee: " + e.getMessage());
+            throw new RuntimeException("Không thể tạo nhân viên: " + e.getMessage());
         }
     }
 
@@ -205,7 +205,7 @@ public class EmployeeController {
         } catch (Exception e) {
             System.err.println("Error updating employee: " + e.getMessage());
             e.printStackTrace();
-            throw new RuntimeException("Failed to update employee: " + e.getMessage());
+            throw new RuntimeException("Không thể cập nhật nhân viên: " + e.getMessage());
         }
     }
 

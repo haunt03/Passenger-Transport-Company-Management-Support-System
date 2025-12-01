@@ -10,6 +10,7 @@ import org.example.ptcmssbackend.entity.*;
 import org.example.ptcmssbackend.enums.TripStatus;
 import org.example.ptcmssbackend.repository.*;
 import org.example.ptcmssbackend.service.RatingService;
+import org.example.ptcmssbackend.service.WebSocketNotificationService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,8 +31,10 @@ public class RatingServiceImpl implements RatingService {
     private final DriverRepository driversRepository;
     private final UsersRepository usersRepository;
     private final CustomerRepository customersRepository;
+    private final TripDriverRepository tripDriversRepository;
     private final BookingRepository bookingRepository;
-    private final TripDriverRepository TripDriverRepository;
+    private final NotificationRepository notificationRepository;
+    private final WebSocketNotificationService webSocketNotificationService;
 
     @Override
     @Transactional
@@ -40,20 +43,20 @@ public class RatingServiceImpl implements RatingService {
 
         // Validate trip exists and is COMPLETED
         Trips trip = tripsRepository.findById(request.getTripId())
-                .orElseThrow(() -> new RuntimeException("Trip not found"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến đi"));
 
         if (trip.getStatus() != TripStatus.COMPLETED) {
-            throw new RuntimeException("Can only rate completed trips");
+            throw new RuntimeException("Chỉ có thể đánh giá các chuyến đi đã hoàn thành");
         }
 
         // Check if already rated
         if (ratingsRepository.findByTrip_Id(request.getTripId()).isPresent()) {
-            throw new RuntimeException("Trip already rated");
+            throw new RuntimeException("Chuyến đi đã được đánh giá");
         }
 
         // Get driver from trip (via TripDrivers)
-        TripDrivers tripDriver = TripDriverRepository.findMainDriverByTripId(request.getTripId())
-                .orElseThrow(() -> new RuntimeException("No driver assigned to this trip"));
+        TripDrivers tripDriver = tripDriversRepository.findMainDriverByTripId(request.getTripId())
+                .orElseThrow(() -> new RuntimeException("Chưa có tài xế được phân công cho chuyến đi này"));
         Drivers driver = tripDriver.getDriver();
 
         // Get customer
@@ -80,6 +83,9 @@ public class RatingServiceImpl implements RatingService {
 
         // Update driver's overall rating (30-day average)
         updateDriverOverallRating(driver.getId());
+
+        // GỬI THÔNG BÁO CHO TÀI XẾ
+        sendRatingNotificationToDriver(rating, driver, trip);
 
         log.info("Rating created successfully: {}", rating.getId());
         return mapToResponse(rating);
@@ -110,7 +116,7 @@ public class RatingServiceImpl implements RatingService {
         log.info("Getting performance for driver {} for last {} days", driverId, days);
 
         Drivers driver = driversRepository.findById(driverId)
-                .orElseThrow(() -> new RuntimeException("Driver not found"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài xế"));
 
         Instant since = Instant.now().minus(days, ChronoUnit.DAYS);
 
@@ -228,7 +234,7 @@ public class RatingServiceImpl implements RatingService {
 
     private TripForRatingResponse mapTripToResponse(Trips trip) {
         // Get main driver
-        TripDrivers tripDriver = TripDriverRepository.findMainDriverByTripId(trip.getId()).orElse(null);
+        TripDrivers tripDriver = tripDriversRepository.findMainDriverByTripId(trip.getId()).orElse(null);
 
         String driverName = null;
         Integer driverId = null;
@@ -261,5 +267,69 @@ public class RatingServiceImpl implements RatingService {
                 .endTime(trip.getEndTime())
                 .status(trip.getStatus() != null ? trip.getStatus().name() : null)
                 .build();
+    }
+
+    /**
+     * Gửi thông báo cho tài xế khi có đánh giá mới
+     */
+    private void sendRatingNotificationToDriver(DriverRatings rating, Drivers driver, Trips trip) {
+        try {
+            // Lấy user của tài xế
+            Users driverUser = driver.getEmployee() != null ? driver.getEmployee().getUser() : null;
+            if (driverUser == null) {
+                log.warn("Cannot send notification: Driver {} has no user account", driver.getId());
+                return;
+            }
+
+            // Tạo thông báo
+            Notifications notification = new Notifications();
+            notification.setUser(driverUser);
+            notification.setTitle("Đánh giá mới từ khách hàng");
+
+            // Tạo message với thông tin chi tiết
+            String customerName = rating.getCustomer() != null
+                    ? rating.getCustomer().getFullName()
+                    : "Khách hàng";
+
+            String tripInfo = String.format("Chuyến #%d: %s → %s",
+                    trip.getId(),
+                    trip.getStartLocation() != null ? trip.getStartLocation() : "N/A",
+                    trip.getEndLocation() != null ? trip.getEndLocation() : "N/A"
+            );
+
+            String ratingInfo = String.format("Điểm: %.1f⭐ - %s",
+                    rating.getOverallRating() != null ? rating.getOverallRating().doubleValue() : 0.0,
+                    tripInfo
+            );
+
+            notification.setMessage(String.format("%s đã đánh giá chuyến đi của bạn. %s",
+                    customerName, ratingInfo));
+            notification.setIsRead(false);
+            notification.setCreatedAt(Instant.now());
+
+            // Lưu vào database
+            notificationRepository.save(notification);
+            log.info("Notification saved for driver {} (user {})", driver.getId(), driverUser.getId());
+
+            // Gửi real-time notification qua WebSocket
+            if (webSocketNotificationService != null) {
+                try {
+                    webSocketNotificationService.sendUserNotification(
+                            driverUser.getId(),
+                            notification.getTitle(),
+                            notification.getMessage(),
+                            "RATING_RECEIVED"
+                    );
+                    log.info("Real-time notification sent to driver {} via WebSocket", driver.getId());
+                } catch (Exception e) {
+                    log.warn("Failed to send WebSocket notification to driver {}: {}",
+                            driver.getId(), e.getMessage());
+                }
+            }
+
+        } catch (Exception e) {
+            log.error("Failed to send rating notification to driver {}: {}",
+                    driver.getId(), e.getMessage(), e);
+        }
     }
 }

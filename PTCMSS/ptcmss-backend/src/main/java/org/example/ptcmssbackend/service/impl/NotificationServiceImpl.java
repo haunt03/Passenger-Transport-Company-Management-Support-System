@@ -64,10 +64,10 @@ public class NotificationServiceImpl implements NotificationService {
         log.info("[Notification] Acknowledge alert {} by user {}", alertId, userId);
 
         SystemAlerts alert = alertsRepository.findById(alertId)
-                .orElseThrow(() -> new RuntimeException("Alert not found: " + alertId));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy cảnh báo: " + alertId));
 
         Users user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng: " + userId));
 
         alert.setIsAcknowledged(true);
         alert.setAcknowledgedBy(user);
@@ -319,8 +319,8 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
-    public List<ApprovalItemResponse> getProcessedApprovals(Integer branchId, Integer limit) {
-        log.info("[Notification] Get processed approvals for branch {} (limit: {})", branchId, limit);
+    public List<ApprovalItemResponse> getProcessedApprovals(Integer branchId, Integer processedByUserId, Integer limit) {
+        log.info("[Notification] Get processed approvals for branch {}, processedBy {} (limit: {})", branchId, processedByUserId, limit);
 
         List<ApprovalHistory> approved = branchId == null
                 ? approvalHistoryRepository.findByStatusOrderByRequestedAtDesc(ApprovalStatus.APPROVED)
@@ -334,6 +334,13 @@ public class NotificationServiceImpl implements NotificationService {
         List<ApprovalHistory> allProcessed = new ArrayList<>();
         allProcessed.addAll(approved);
         allProcessed.addAll(rejected);
+
+        // Filter theo người xử lý (nếu có)
+        if (processedByUserId != null) {
+            allProcessed = allProcessed.stream()
+                    .filter(a -> a.getApprovedBy() != null && a.getApprovedBy().getId().equals(processedByUserId))
+                    .collect(Collectors.toList());
+        }
 
         // Sắp xếp theo processedAt DESC (nếu có) hoặc requestedAt DESC
         allProcessed.sort((a, b) -> {
@@ -359,14 +366,20 @@ public class NotificationServiceImpl implements NotificationService {
         log.info("[Notification] Approve request {} by user {}", historyId, userId);
 
         ApprovalHistory history = approvalHistoryRepository.findById(historyId)
-                .orElseThrow(() -> new RuntimeException("Approval history not found: " + historyId));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy lịch sử phê duyệt: " + historyId));
 
         if (history.getStatus() != ApprovalStatus.PENDING) {
-            throw new RuntimeException("Request already processed");
+            throw new RuntimeException("Yêu cầu đã được xử lý");
         }
 
         Users user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng: " + userId));
+
+        // Coordinator chỉ được duyệt nghỉ phép (DRIVER_DAY_OFF)
+        String userRole = user.getRole() != null ? user.getRole().getRoleName().toUpperCase() : "";
+        if ("COORDINATOR".equals(userRole) && history.getApprovalType() != ApprovalType.DRIVER_DAY_OFF) {
+            throw new RuntimeException("Coordinator chỉ được duyệt yêu cầu nghỉ phép tài xế");
+        }
 
         history.setStatus(ApprovalStatus.APPROVED);
         history.setApprovedBy(user);
@@ -391,14 +404,20 @@ public class NotificationServiceImpl implements NotificationService {
         log.info("[Notification] Reject request {} by user {}", historyId, userId);
 
         ApprovalHistory history = approvalHistoryRepository.findById(historyId)
-                .orElseThrow(() -> new RuntimeException("Approval history not found: " + historyId));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy lịch sử phê duyệt: " + historyId));
 
         if (history.getStatus() != ApprovalStatus.PENDING) {
-            throw new RuntimeException("Request already processed");
+            throw new RuntimeException("Yêu cầu đã được xử lý");
         }
 
         Users user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng: " + userId));
+
+        // Coordinator chỉ được từ chối nghỉ phép (DRIVER_DAY_OFF)
+        String userRole = user.getRole() != null ? user.getRole().getRoleName().toUpperCase() : "";
+        if ("COORDINATOR".equals(userRole) && history.getApprovalType() != ApprovalType.DRIVER_DAY_OFF) {
+            throw new RuntimeException("Coordinator chỉ được từ chối yêu cầu nghỉ phép tài xế");
+        }
 
         history.setStatus(ApprovalStatus.REJECTED);
         history.setApprovedBy(user);
@@ -480,6 +499,11 @@ public class NotificationServiceImpl implements NotificationService {
                 DriverDayOff dayOff = driverDayOffRepository.findById(history.getRelatedEntityId())
                         .orElse(null);
                 if (dayOff != null) {
+                    // KIỂM TRA CONFLICT VỚI LỊCH TRÌNH KHI APPROVE
+                    if (approved) {
+                        checkDriverScheduleConflict(dayOff);
+                    }
+
                     dayOff.setStatus(approved ? DriverDayOffStatus.APPROVED : DriverDayOffStatus.REJECTED);
                     // ApprovedBy trong DriverDayOff là Employees, cần tìm employee từ user
                     if (history.getApprovedBy() != null) {
@@ -835,14 +859,68 @@ public class NotificationServiceImpl implements NotificationService {
         log.info("[Notification] Delete notification {} for user {}", notificationId, userId);
 
         Notifications notification = notificationRepository.findById(notificationId)
-                .orElseThrow(() -> new RuntimeException("Notification not found: " + notificationId));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thông báo: " + notificationId));
 
         // Verify ownership
         if (!notification.getUser().getId().equals(userId)) {
-            throw new RuntimeException("Notification does not belong to user: " + userId);
+            throw new RuntimeException("Thông báo không thuộc về người dùng: " + userId);
         }
 
         notificationRepository.delete(notification);
         log.info("[Notification] Deleted notification {} for user {}", notificationId, userId);
+    }
+
+    /**
+     * Kiểm tra xem tài xế có lịch trình trong khoảng thời gian nghỉ không
+     * Nếu có, throw exception để yêu cầu xếp tài xế thay thế
+     */
+    private void checkDriverScheduleConflict(DriverDayOff dayOff) {
+        if (dayOff.getDriver() == null) {
+            return;
+        }
+
+        Integer driverId = dayOff.getDriver().getId();
+        java.time.LocalDate startDate = dayOff.getStartDate();
+        java.time.LocalDate endDate = dayOff.getEndDate();
+
+        log.info("[DayOff] Checking schedule conflict for driver {} from {} to {}",
+                driverId, startDate, endDate);
+
+        // Chuyển LocalDate sang Instant để query
+        java.time.Instant startInstant = startDate.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant();
+        java.time.Instant endInstant = endDate.plusDays(1).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant();
+
+        // Tìm các chuyến đi của tài xế trong khoảng thời gian nghỉ
+        List<org.example.ptcmssbackend.entity.TripDrivers> conflictTrips =
+                tripDriverRepository.findConflictingTrips(driverId, startInstant, endInstant);
+
+        if (!conflictTrips.isEmpty()) {
+            StringBuilder message = new StringBuilder();
+            message.append(String.format(
+                    "⚠️ CẢNH BÁO: Tài xế đã được lên lịch %d chuyến trong thời gian nghỉ (%s đến %s).\n\n",
+                    conflictTrips.size(), startDate, endDate
+            ));
+
+            message.append("Danh sách chuyến bị conflict:\n");
+            for (org.example.ptcmssbackend.entity.TripDrivers td : conflictTrips) {
+                if (td.getTrip() != null) {
+                    message.append(String.format(
+                            "- Chuyến #%d: %s → %s (Ngày: %s)\n",
+                            td.getTrip().getId(),
+                            td.getTrip().getStartLocation(),
+                            td.getTrip().getEndLocation(),
+                            td.getTrip().getStartTime() != null
+                                    ? td.getTrip().getStartTime().toString().substring(0, 10)
+                                    : "N/A"
+                    ));
+                }
+            }
+
+            message.append("\n❌ Vui lòng xếp tài xế thay thế trước khi phê duyệt nghỉ phép!");
+
+            throw new RuntimeException(message.toString());
+        }
+
+        log.info("[DayOff] No schedule conflict found for driver {}", driverId);
     }
 }

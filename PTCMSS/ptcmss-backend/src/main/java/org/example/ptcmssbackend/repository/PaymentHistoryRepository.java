@@ -25,4 +25,31 @@ public interface PaymentHistoryRepository extends JpaRepository<PaymentHistory, 
 
     @Query("SELECT ph FROM PaymentHistory ph WHERE ph.invoice.id = :invoiceId ORDER BY ph.paymentDate DESC")
     List<PaymentHistory> findAllByInvoiceId(@Param("invoiceId") Integer invoiceId);
+
+    /**
+     * Lấy tất cả payment requests đang chờ xác nhận (PENDING)
+     * Dùng cho kế toán để xác nhận thanh toán từ tài xế/tư vấn viên
+     */
+    @Query("SELECT ph FROM PaymentHistory ph " +
+            "WHERE ph.confirmationStatus = org.example.ptcmssbackend.enums.PaymentConfirmationStatus.PENDING " +
+            "AND (:branchId IS NULL OR ph.invoice.branch.id = :branchId) " +
+            "ORDER BY ph.paymentDate ASC")
+    List<PaymentHistory> findPendingPayments(@Param("branchId") Integer branchId);
+
+    /**
+     * Đếm số payment requests đang chờ xác nhận theo branch
+     */
+    @Query("SELECT COUNT(ph) FROM PaymentHistory ph " +
+            "WHERE ph.confirmationStatus = org.example.ptcmssbackend.enums.PaymentConfirmationStatus.PENDING " +
+            "AND (:branchId IS NULL OR ph.invoice.branch.id = :branchId)")
+    Long countPendingPayments(@Param("branchId") Integer branchId);
+
+    /**
+     * Đếm số payment requests đang chờ xác nhận cho một invoice cụ thể
+     */
+    @Query("SELECT COUNT(ph) FROM PaymentHistory ph " +
+            "WHERE ph.invoice.id = :invoiceId " +
+            "AND ph.confirmationStatus = org.example.ptcmssbackend.enums.PaymentConfirmationStatus.PENDING")
+    Integer countPendingPaymentsByInvoiceId(@Param("invoiceId") Integer invoiceId);
 }
+

@@ -10,10 +10,13 @@ import org.example.ptcmssbackend.dto.response.Invoice.InvoiceListResponse;
 import org.example.ptcmssbackend.dto.response.Invoice.InvoiceResponse;
 import org.example.ptcmssbackend.dto.response.Invoice.PaymentHistoryResponse;
 import org.example.ptcmssbackend.entity.*;
+import org.example.ptcmssbackend.enums.BookingStatus;
 import org.example.ptcmssbackend.enums.InvoiceStatus;
 import org.example.ptcmssbackend.enums.InvoiceType;
 import org.example.ptcmssbackend.enums.PaymentStatus;
 import org.example.ptcmssbackend.enums.PaymentConfirmationStatus;
+import org.example.ptcmssbackend.exception.InvoiceException;
+import org.example.ptcmssbackend.exception.PaymentException;
 import org.example.ptcmssbackend.exception.ResourceNotFoundException;
 import org.example.ptcmssbackend.repository.*;
 import org.example.ptcmssbackend.service.InvoiceService;
@@ -42,6 +45,10 @@ public class InvoiceServiceImpl implements InvoiceService {
     private final EmployeeRepository employeeRepository;
     private final PaymentHistoryRepository paymentHistoryRepository;
     private final org.example.ptcmssbackend.service.EmailService emailService;
+    private final org.example.ptcmssbackend.repository.NotificationRepository notificationRepository;
+    private final org.example.ptcmssbackend.service.WebSocketNotificationService webSocketNotificationService;
+    private final TripRepository tripRepository;
+    private final TripDriverRepository tripDriverRepository;
 
     @Override
     @Transactional
@@ -74,7 +81,7 @@ public class InvoiceServiceImpl implements InvoiceService {
         try {
             invoiceType = InvoiceType.valueOf(request.getType().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new RuntimeException("Invalid invoice type: " + request.getType());
+            throw new RuntimeException("Loại hóa đơn không hợp lệ: " + request.getType());
         }
         invoice.setType(invoiceType);
         invoice.setCostType(request.getCostType());
@@ -166,7 +173,7 @@ public class InvoiceServiceImpl implements InvoiceService {
 
         // Don't allow update if already paid
         if (invoice.getPaymentStatus() == PaymentStatus.PAID) {
-            throw new org.example.ptcmssbackend.exception.InvoiceException("Cannot update paid invoice");
+            throw new InvoiceException("Cannot update paid invoice");
         }
 
         // Update fields
@@ -235,7 +242,7 @@ public class InvoiceServiceImpl implements InvoiceService {
 
         BigDecimal balance = calculateBalance(invoiceId);
         if (request.getAmount().compareTo(balance) > 0) {
-            throw new org.example.ptcmssbackend.exception.PaymentException(
+            throw new PaymentException(
                     "Payment amount (" + request.getAmount() + ") exceeds balance (" + balance + ")");
         }
 
@@ -268,6 +275,11 @@ public class InvoiceServiceImpl implements InvoiceService {
         }
 
         payment = paymentHistoryRepository.save(payment);
+
+        // Gửi thông báo cho Accountant nếu payment có status PENDING (cần xác nhận)
+        if (payment.getConfirmationStatus() == PaymentConfirmationStatus.PENDING) {
+            notifyAccountantsAboutPendingPayment(invoice, payment);
+        }
 
         // Update invoice payment status
         BigDecimal newBalance = calculateBalance(invoiceId);
@@ -431,6 +443,10 @@ public class InvoiceServiceImpl implements InvoiceService {
             }
         }
 
+        // Đếm số payment requests đang chờ xác nhận
+        Integer pendingCount = paymentHistoryRepository.countPendingPaymentsByInvoiceId(invoice.getId());
+        response.setPendingPaymentCount(pendingCount != null ? pendingCount : 0);
+
         return response;
     }
 
@@ -502,7 +518,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     @Override
     public PaymentHistoryResponse confirmPayment(Integer paymentId, String status) {
         PaymentHistory payment = paymentHistoryRepository.findById(paymentId)
-                .orElseThrow(() -> new RuntimeException("Payment not found: " + paymentId));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thanh toán: " + paymentId));
 
         try {
             PaymentConfirmationStatus confirmationStatus = PaymentConfirmationStatus.valueOf(status.toUpperCase());
@@ -515,6 +531,16 @@ public class InvoiceServiceImpl implements InvoiceService {
                 BigDecimal newBalance = calculateBalance(invoice.getId());
                 if (newBalance.compareTo(BigDecimal.ZERO) <= 0) {
                     invoice.setPaymentStatus(PaymentStatus.PAID);
+
+                    // Khi invoice được thanh toán đủ → Booking chuyển sang COMPLETED
+                    if (invoice.getBooking() != null) {
+                        Bookings booking = invoice.getBooking();
+                        if (booking.getStatus() != BookingStatus.COMPLETED && booking.getStatus() != BookingStatus.CANCELLED) {
+                            booking.setStatus(BookingStatus.COMPLETED);
+                            bookingRepository.save(booking);
+                            log.info("[InvoiceService] Booking {} marked as COMPLETED after full payment", booking.getId());
+                        }
+                    }
                 } else {
                     // Nếu có payment bị reject, có thể cần update lại status
                     if (invoice.getPaymentStatus() == PaymentStatus.PAID && newBalance.compareTo(BigDecimal.ZERO) > 0) {
@@ -524,9 +550,116 @@ public class InvoiceServiceImpl implements InvoiceService {
                 invoiceRepository.save(invoice);
             }
 
+            // Send WebSocket notifications to Driver (người tạo payment request)
+            try {
+                Integer bookingId = invoice != null && invoice.getBooking() != null ? invoice.getBooking().getId() : null;
+                String amountFormatted = formatAmount(payment.getAmount());
+                String statusText = confirmationStatus == PaymentConfirmationStatus.CONFIRMED ? "đã được duyệt" : "đã bị từ chối";
+                String notificationType = confirmationStatus == PaymentConfirmationStatus.CONFIRMED ? "PAYMENT_APPROVED" : "PAYMENT_REJECTED";
+                String notificationTitle = confirmationStatus == PaymentConfirmationStatus.CONFIRMED
+                        ? "Thanh toán đã được duyệt"
+                        : "Thanh toán đã bị từ chối";
+
+                // Gửi notification đến Driver (người tạo payment request)
+                // Ưu tiên: invoice.getRequestedBy() (driver) > driver từ booking > payment.getCreatedBy() (employee)
+                Integer driverUserId = null;
+
+                // Cách 1: Từ invoice.requestedBy (nếu có)
+                if (invoice != null && invoice.getRequestedBy() != null && invoice.getRequestedBy().getEmployee() != null
+                        && invoice.getRequestedBy().getEmployee().getUser() != null) {
+                    driverUserId = invoice.getRequestedBy().getEmployee().getUser().getId();
+                }
+                // Cách 2: Tìm driver từ booking (driver được assign cho trip của booking)
+                else if (bookingId != null && invoice != null && invoice.getBooking() != null) {
+                    try {
+                        // Tìm trips của booking
+                        List<Trips> trips = tripRepository.findByBooking_Id(bookingId);
+                        if (trips != null && !trips.isEmpty()) {
+                            // Lấy trip đầu tiên và tìm driver
+                            Trips firstTrip = trips.get(0);
+                            List<TripDrivers> tripDrivers = tripDriverRepository.findByTripId(firstTrip.getId());
+                            if (tripDrivers != null && !tripDrivers.isEmpty()) {
+                                TripDrivers tripDriver = tripDrivers.get(0);
+                                if (tripDriver.getDriver() != null && tripDriver.getDriver().getEmployee() != null
+                                        && tripDriver.getDriver().getEmployee().getUser() != null) {
+                                    driverUserId = tripDriver.getDriver().getEmployee().getUser().getId();
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        log.warn("[InvoiceService] Could not find driver from booking: {}", e.getMessage());
+                    }
+                }
+                // Cách 3: Fallback - từ payment.getCreatedBy() (employee)
+                if (driverUserId == null && payment.getCreatedBy() != null && payment.getCreatedBy().getUser() != null) {
+                    driverUserId = payment.getCreatedBy().getUser().getId();
+                }
+
+                if (driverUserId != null) {
+                    String notificationMessage = String.format("Yêu cầu thanh toán %s cho đơn #%d %s",
+                            amountFormatted,
+                            bookingId != null ? bookingId : "N/A",
+                            statusText);
+
+                    webSocketNotificationService.sendUserNotification(
+                            driverUserId,
+                            notificationTitle,
+                            notificationMessage,
+                            notificationType
+                    );
+                    log.info("[InvoiceService] Sent payment confirmation notification to driver/employee userId: {}", driverUserId);
+                } else {
+                    log.warn("[InvoiceService] Could not find driver/user to send payment confirmation notification for paymentId: {}", payment.getId());
+                }
+
+                // Gửi payment update qua global channel (cho các role khác như Coordinator, Manager)
+                if (invoice != null) {
+                    String paymentUpdateMessage = String.format("Thanh toán %s đã %s",
+                            amountFormatted,
+                            statusText);
+
+                    webSocketNotificationService.sendPaymentUpdate(
+                            invoice.getId(),
+                            bookingId,
+                            confirmationStatus.name(),
+                            paymentUpdateMessage
+                    );
+                    log.info("[InvoiceService] Sent payment update notification for invoice: {}", invoice.getId());
+                }
+            } catch (Exception e) {
+                log.warn("[InvoiceService] Failed to send WebSocket notification for payment confirmation", e);
+                // Không throw exception để không ảnh hưởng đến flow chính
+            }
+
             return mapToPaymentHistoryResponse(payment);
         } catch (IllegalArgumentException e) {
-            throw new RuntimeException("Invalid confirmation status: " + status + ". Must be CONFIRMED or REJECTED");
+            throw new RuntimeException("Trạng thái xác nhận không hợp lệ: " + status + ". Phải là CONFIRMED hoặc REJECTED");
+        }
+    }
+
+    @Override
+    public void deletePayment(Integer paymentId) {
+        PaymentHistory payment = paymentHistoryRepository.findById(paymentId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thanh toán: " + paymentId));
+
+        // Chỉ cho phép xóa payment có status PENDING
+        if (payment.getConfirmationStatus() != PaymentConfirmationStatus.PENDING) {
+            throw new RuntimeException("Chỉ được xóa payment request có trạng thái PENDING. Payment này đã " +
+                    (payment.getConfirmationStatus() == PaymentConfirmationStatus.CONFIRMED ? "được xác nhận" : "bị từ chối"));
+        }
+
+        // Xóa payment
+        paymentHistoryRepository.delete(payment);
+
+        // Update invoice payment status nếu cần
+        Invoices invoice = payment.getInvoice();
+        if (invoice != null) {
+            BigDecimal newBalance = calculateBalance(invoice.getId());
+            if (newBalance.compareTo(invoice.getAmount()) >= 0) {
+                // Nếu chưa có payment nào hoặc tất cả đã bị xóa
+                invoice.setPaymentStatus(PaymentStatus.UNPAID);
+            }
+            invoiceRepository.save(invoice);
         }
     }
 
@@ -540,4 +673,109 @@ public class InvoiceServiceImpl implements InvoiceService {
             default: return 7;
         }
     }
+
+    private String formatAmount(BigDecimal amount) {
+        if (amount == null) return "0đ";
+        return String.format("%,dđ", amount.longValue());
+    }
+
+    @Override
+    public List<PaymentHistoryResponse> getPendingPayments(Integer branchId) {
+        log.info("[InvoiceService] Getting pending payments for branch: {}", branchId);
+        List<PaymentHistory> payments = paymentHistoryRepository.findPendingPayments(branchId);
+        return payments.stream()
+                .map(this::mapToPaymentHistoryResponseWithInvoice)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public Long countPendingPayments(Integer branchId) {
+        return paymentHistoryRepository.countPendingPayments(branchId);
+    }
+
+    private PaymentHistoryResponse mapToPaymentHistoryResponseWithInvoice(PaymentHistory payment) {
+        PaymentHistoryResponse response = mapToPaymentHistoryResponse(payment);
+        // Add invoice info for context
+        if (payment.getInvoice() != null) {
+            Invoices invoice = payment.getInvoice();
+            response.setInvoiceId(invoice.getId());
+            response.setInvoiceNumber(invoice.getInvoiceNumber());
+            if (invoice.getCustomer() != null) {
+                response.setCustomerName(invoice.getCustomer().getFullName());
+            }
+            if (invoice.getBooking() != null) {
+                response.setBookingId(invoice.getBooking().getId());
+                response.setBookingCode("ORD-" + invoice.getBooking().getId());
+            }
+        }
+        return response;
+    }
+
+    @Override
+    @Transactional
+    public void checkAndUpdateOverdueInvoicesAfter48h() {
+        // Tí   nh thời điểm cutoff: 48h trước hiện tại
+        Instant cutoffTime = Instant.now().minus(48, java.time.temporal.ChronoUnit.HOURS);
+
+        log.info("[InvoiceService] Checking invoices with completed trips older than 48h (cutoff: {})", cutoffTime);
+
+        // Tìm invoices chưa thanh toán đủ mà trip đã hoàn thành quá 48h
+        List<Invoices> overdueInvoices = invoiceRepository.findUnpaidInvoicesWithCompletedTripsOlderThan(cutoffTime, null);
+
+        int count = 0;
+        for (Invoices invoice : overdueInvoices) {
+            // Kiểm tra xem invoice có còn nợ không (tính payment đã CONFIRMED)
+            BigDecimal balance = calculateBalance(invoice.getId());
+            if (balance.compareTo(BigDecimal.ZERO) > 0) {
+                // Còn nợ → đánh dấu OVERDUE (vào bảng công nợ)
+                invoice.setPaymentStatus(PaymentStatus.OVERDUE);
+                invoiceRepository.save(invoice);
+                count++;
+                log.info("[InvoiceService] Marked invoice {} as OVERDUE (48h after trip completion, balance: {})",
+                        invoice.getInvoiceNumber(), balance);
+            }
+        }
+
+        log.info("[InvoiceService] Marked {} invoices as OVERDUE after 48h check", count);
+    }
+
+    /**
+     * Gửi thông báo cho tất cả Accountants trong chi nhánh khi có payment request mới cần xác nhận
+     */
+    private void notifyAccountantsAboutPendingPayment(Invoices invoice, PaymentHistory payment) {
+        try {
+            Integer branchId = invoice.getBranch().getId();
+            String customerName = invoice.getCustomer() != null ? invoice.getCustomer().getFullName() : "Khách hàng";
+            String amountStr = new java.text.DecimalFormat("#,###").format(payment.getAmount()) + " đ";
+
+            // Tìm tất cả Accountants trong chi nhánh
+            List<Employees> accountants = employeeRepository.findByRoleNameAndBranchId("Accountant", branchId);
+
+            for (Employees accountant : accountants) {
+                if (accountant.getUser() != null) {
+                    org.example.ptcmssbackend.entity.Notifications notification = new org.example.ptcmssbackend.entity.Notifications();
+                    notification.setUser(accountant.getUser());
+                    notification.setTitle("Yêu cầu thanh toán mới");
+                    notification.setMessage(String.format(
+                            "Có yêu cầu thanh toán %s từ %s cho hóa đơn %s cần xác nhận.",
+                            amountStr,
+                            customerName,
+                            invoice.getInvoiceNumber()
+                    ));
+                    notification.setIsRead(false);
+                    notificationRepository.save(notification);
+                    log.debug("[InvoiceService] Sent notification to accountant: {}", accountant.getUser().getUsername());
+                }
+            }
+
+            if (!accountants.isEmpty()) {
+                log.info("[InvoiceService] Notified {} accountants about pending payment for invoice {}",
+                        accountants.size(), invoice.getInvoiceNumber());
+            }
+        } catch (Exception e) {
+            // Không throw exception để không ảnh hưởng đến flow chính
+            log.error("[InvoiceService] Error sending notifications to accountants: {}", e.getMessage());
+        }
+    }
 }
+

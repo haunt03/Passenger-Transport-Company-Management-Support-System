@@ -26,7 +26,7 @@ public class CustomerController {
 
     private final CustomerService customerService;
 
-    @Operation(summary = "Lấy danh sách khách hàng", description = "Danh sách khách hàng với filter theo keyword, chi nhánh, thời gian tạo")
+    @Operation(summary = "Lấy danh sách khách hàng", description = "Danh sách khách hàng với filter theo keyword, chi nhánh, thời gian tạo. Manager chỉ xem khách hàng của chi nhánh mình quản lý.")
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'CONSULTANT', 'COORDINATOR', 'ACCOUNTANT')")
     public ResponseData<?> listCustomers(
@@ -34,13 +34,14 @@ public class CustomerController {
             @RequestParam(required = false) Integer branchId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+            @RequestParam(required = false) Integer userId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         try {
-            log.info("[Customer] List customers - keyword={}, branchId={}, from={}, to={}, page={}, size={}",
-                    keyword, branchId, fromDate, toDate, page, size);
+            log.info("[Customer] List customers - keyword={}, branchId={}, userId={}, from={}, to={}, page={}, size={}",
+                    keyword, branchId, userId, fromDate, toDate, page, size);
 
-            Page<CustomerResponse> result = customerService.listCustomers(keyword, branchId, fromDate, toDate, page, size);
+            Page<CustomerResponse> result = customerService.listCustomers(keyword, branchId, userId, fromDate, toDate, page, size);
 
             return new ResponseData<>(HttpStatus.OK.value(), "Success", Map.of(
                     "content", result.getContent(),

@@ -32,6 +32,8 @@ public interface CustomerService {
 
     /**
      * Danh sách customer với filter và phân trang
+     * Nếu userId được cung cấp và user là MANAGER, tự động filter theo chi nhánh của manager
      */
-    Page<CustomerResponse> listCustomers(String keyword, Integer branchId, LocalDate fromDate, LocalDate toDate, int page, int size);
+    Page<CustomerResponse> listCustomers(String keyword, Integer branchId, Integer userId, LocalDate fromDate, LocalDate toDate, int page, int size);
 }
+
