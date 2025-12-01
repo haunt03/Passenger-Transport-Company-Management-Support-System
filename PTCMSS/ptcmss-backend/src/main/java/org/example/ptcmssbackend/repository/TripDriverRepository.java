@@ -45,6 +45,20 @@ public interface TripDriverRepository extends JpaRepository<TripDrivers, TripDri
      */
     List<TripDrivers> findByTrip_Id(Integer tripId);
 
+    /**
+     * Tìm các chuyến đi của tài xế trong khoảng thời gian (để kiểm tra conflict với nghỉ phép)
+     */
+    @Query("SELECT td FROM TripDrivers td JOIN FETCH td.trip t " +
+            "WHERE td.driver.id = :driverId " +
+            "AND t.startTime >= :startDate " +
+            "AND t.startTime < :endDate " +
+            "AND t.status NOT IN ('CANCELLED', 'COMPLETED') " +
+            "ORDER BY t.startTime ASC")
+    List<TripDrivers> findConflictingTrips(
+            @Param("driverId") Integer driverId,
+            @Param("startDate") Instant startDate,
+            @Param("endDate") Instant endDate);
+
     @Query("SELECT td FROM TripDrivers td WHERE td.trip.id = :tripId AND td.driverRole = 'Main Driver'")
     Optional<TripDrivers> findMainDriverByTripId(@Param("tripId") Integer tripId);
 }

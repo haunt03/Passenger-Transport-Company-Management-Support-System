@@ -76,4 +76,17 @@ public interface EmployeeRepository extends JpaRepository<Employees, Integer> {
             "GROUP BY e.branch.id")
     List<Object[]> countActiveByBranchIds(@Param("branchIds") List<Integer> branchIds,
                                           @Param("inactiveStatus") EmployeeStatus inactiveStatus);
+
+    /**
+     * Tìm employees theo role name và branch ID
+     * Dùng để tìm accountants trong một chi nhánh
+     */
+    @Query("SELECT e FROM Employees e " +
+            "LEFT JOIN FETCH e.user " +
+            "LEFT JOIN FETCH e.branch " +
+            "LEFT JOIN FETCH e.role " +
+            "WHERE e.role.roleName = :roleName " +
+            "AND e.branch.id = :branchId " +
+            "AND (e.status IS NULL OR e.status <> 'INACTIVE')")
+    List<Employees> findByRoleNameAndBranchId(@Param("roleName") String roleName, @Param("branchId") Integer branchId);
 }
