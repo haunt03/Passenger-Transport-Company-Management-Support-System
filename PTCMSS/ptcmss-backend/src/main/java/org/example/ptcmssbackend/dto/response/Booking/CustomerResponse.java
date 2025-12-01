@@ -16,4 +16,7 @@ public class CustomerResponse {
     private String note;
     private String status;
     private Instant createdAt;
+    private Integer branchId;
+    private String branchName;
 }
+

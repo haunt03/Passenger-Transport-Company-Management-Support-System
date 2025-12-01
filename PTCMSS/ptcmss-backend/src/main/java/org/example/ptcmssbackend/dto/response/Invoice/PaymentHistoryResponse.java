@@ -26,4 +26,11 @@ public class PaymentHistoryResponse {
     private String note;
     private String createdByName;
     private Instant createdAt;
+
+    // Invoice context (for pending payments list)
+    private String invoiceNumber;
+    private String customerName;
+    private Integer bookingId;
+    private String bookingCode;
 }
+
