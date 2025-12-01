@@ -17,7 +17,7 @@ public interface NotificationService {
 
     // Approvals
     List<ApprovalItemResponse> getPendingApprovals(Integer branchId);
-    List<ApprovalItemResponse> getProcessedApprovals(Integer branchId, Integer limit); // Lấy các yêu cầu đã xử lý (APPROVED + REJECTED)
+    List<ApprovalItemResponse> getProcessedApprovals(Integer branchId, Integer processedByUserId, Integer limit); // Lấy các yêu cầu đã xử lý (APPROVED + REJECTED)
     ApprovalItemResponse approveRequest(Integer historyId, Integer userId, String note);
     ApprovalItemResponse rejectRequest(Integer historyId, Integer userId, String note);
 

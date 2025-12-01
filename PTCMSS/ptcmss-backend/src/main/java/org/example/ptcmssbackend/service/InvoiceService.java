@@ -51,4 +51,15 @@ public interface InvoiceService {
 
     // Payment confirmation
     PaymentHistoryResponse confirmPayment(Integer paymentId, String status);
+
+    // Delete payment (only PENDING)
+    void deletePayment(Integer paymentId);
+
+    // Get pending payment requests (for accountant to confirm)
+    List<PaymentHistoryResponse> getPendingPayments(Integer branchId);
+    Long countPendingPayments(Integer branchId);
+
+    // Check invoices with completed trips > 48h and mark as overdue (công nợ)
+    void checkAndUpdateOverdueInvoicesAfter48h();
 }
+

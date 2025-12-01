@@ -90,3 +90,4 @@ public interface BookingService {
     /** Kiểm tra khả dụng xe theo branch/category/thời gian */
     CheckAvailabilityResponse checkAvailability(CheckAvailabilityRequest request);
 }
+
