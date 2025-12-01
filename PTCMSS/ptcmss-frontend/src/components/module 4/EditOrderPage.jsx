@@ -289,10 +289,12 @@ export default function EditOrderPage() {
             try {
                 const br = await listBranches({ page: 0 });
                 const items = Array.isArray(br?.items) ? br.items : (Array.isArray(br) ? br : []);
-                if (items.length > 0) {
-                    setBranches(items);
+                // Filter chỉ lấy branches ACTIVE
+                const activeItems = items.filter(b => !b.status || b.status === "ACTIVE");
+                if (activeItems.length > 0) {
+                    setBranches(activeItems);
                 } else {
-                    pushToast("Không thể tải chi nhánh: Dữ liệu trống", "error");
+                    pushToast("Không thể tải chi nhánh: Không có chi nhánh hoạt động", "error");
                 }
             } catch (err) {
                 console.error("Failed to load branches:", err);

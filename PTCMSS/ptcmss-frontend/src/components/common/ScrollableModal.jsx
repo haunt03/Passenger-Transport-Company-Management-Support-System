@@ -3,7 +3,7 @@ import { X } from "lucide-react";
 
 /**
  * ScrollableModal - Modal component với scrollbar tự động
- * 
+ *
  * Props:
  * - isOpen: boolean - Trạng thái mở/đóng modal
  * - onClose: function - Callback khi đóng modal
@@ -13,14 +13,14 @@ import { X } from "lucide-react";
  * - maxHeight: string - Chiều cao tối đa (default: "max-h-[85vh]")
  */
 export default function ScrollableModal({
-    isOpen,
-    onClose,
-    title,
-    children,
-    maxWidth = "max-w-2xl",
-    maxHeight = "max-h-[85vh]",
-    footer = null,
-}) {
+                                            isOpen,
+                                            onClose,
+                                            title,
+                                            children,
+                                            maxWidth = "max-w-2xl",
+                                            maxHeight = "max-h-[85vh]",
+                                            footer = null,
+                                        }) {
     if (!isOpen) return null;
 
     return (

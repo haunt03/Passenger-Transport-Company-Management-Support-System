@@ -336,11 +336,15 @@ export default function SystemSettingsPage() {
         }
 
         try {
-            // Map frontend format to backend format
+            // Map frontend format to backend format - include all required fields
             const newSetting = {
                 settingKey: draftNew.key.trim(),
                 settingValue: draftNew.value.trim(),
                 description: draftNew.description.trim(),
+                effectiveStartDate: new Date().toISOString().split('T')[0],
+                effectiveEndDate: null,
+                valueType: 'STRING',
+                category: null,
             };
 
             const created = await createSystemSetting(newSetting);
@@ -432,11 +436,16 @@ export default function SystemSettingsPage() {
                 })
                 .map((item) => {
                     const existing = settings.find((s) => s.key === item.key);
-                    // Map frontend format to backend format
+                    // Map frontend format to backend format - include all required fields
                     return updateSystemSetting(existing.id, {
                         settingKey: item.key,
                         settingValue: item.value,
                         description: item.description,
+                        // Keep existing values for required fields
+                        effectiveStartDate: existing.effectiveStartDate || new Date().toISOString().split('T')[0],
+                        effectiveEndDate: existing.effectiveEndDate || null,
+                        valueType: existing.valueType || 'STRING',
+                        category: existing.category || null,
                     });
                 });
 
@@ -447,11 +456,15 @@ export default function SystemSettingsPage() {
                     return !existing || !existing.id;
                 })
                 .map((item) =>
-                    // Map frontend format to backend format
+                    // Map frontend format to backend format - include all required fields
                     createSystemSetting({
                         settingKey: item.key,
                         settingValue: item.value,
                         description: item.description,
+                        effectiveStartDate: new Date().toISOString().split('T')[0],
+                        effectiveEndDate: null,
+                        valueType: 'STRING',
+                        category: null,
                     })
                 );
 
@@ -517,17 +530,6 @@ export default function SystemSettingsPage() {
                             />
                             <span>Làm mới</span>
                         </button>
-
-                        {/* nút thêm tham số */}
-                        {/* <button
-                            onClick={startAdd}
-                            disabled={adding}
-                            className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-lg disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-xl transition-all active:scale-[0.98]"
-                            style={{ backgroundColor: BRAND_COLOR }}
-                        >
-                            <Plus className="h-4 w-4" />
-                            <span>Thêm tham số</span>
-                        </button> */}
                     </div>
                 </div>
 

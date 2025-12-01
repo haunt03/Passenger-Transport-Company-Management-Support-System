@@ -171,73 +171,91 @@ export const WebSocketProvider = ({ children }) => {
                 }
 
                 // Subscribe to booking updates (separate channel for real-time updates)
-                const sub2 = client.subscribe('/topic/bookings', (message) => {
-                    const update = JSON.parse(message.body);
-                    console.log('[WebSocket] Received booking update:', update);
+                // Driver should NOT receive booking updates (they are for admin/coordinator)
+                let sub2 = null;
+                if (!isDriver) {
+                    sub2 = client.subscribe('/topic/bookings', (message) => {
+                        const update = JSON.parse(message.body);
+                        console.log('[WebSocket] Received booking update:', update);
 
-                    // Only add if not already in notifications
-                    setNotifications((prev) => {
-                        const exists = prev.some(n =>
-                            n.data?.bookingId === update.bookingId &&
-                            n.timestamp === update.timestamp
-                        );
-                        if (exists) {
-                            console.log('[WebSocket] Duplicate booking notification ignored');
-                            return prev;
-                        }
-                        return [
+                        // Only add if not already in notifications
+                        setNotifications((prev) => {
+                            const exists = prev.some(n =>
+                                n.data?.bookingId === update.bookingId &&
+                                n.timestamp === update.timestamp
+                            );
+                            if (exists) {
+                                console.log('[WebSocket] Duplicate booking notification ignored');
+                                return prev;
+                            }
+                            return [
+                                {
+                                    id: Date.now(),
+                                    title: 'Cập nhật đơn hàng',
+                                    message: update.message,
+                                    type: 'BOOKING_UPDATE',
+                                    timestamp: update.timestamp,
+                                    read: false,
+                                    data: update,
+                                    showToast: true, // Realtime notification - show popup toast
+                                },
+                                ...prev
+                            ];
+                        });
+                    });
+                } else {
+                    console.log('[WebSocket] Driver role - skipping booking updates channel');
+                }
+
+                // Subscribe to payment updates
+                // Driver should NOT receive general payment updates (they get specific notifications via /topic/notifications/{userId})
+                let sub3 = null;
+                if (!isDriver) {
+                    sub3 = client.subscribe('/topic/payments', (message) => {
+                        const update = JSON.parse(message.body);
+                        console.log('[WebSocket] Received payment update:', update);
+                        setNotifications((prev) => [
                             {
                                 id: Date.now(),
-                                title: 'Cập nhật đơn hàng',
+                                title: 'Cập nhật thanh toán',
                                 message: update.message,
-                                type: 'BOOKING_UPDATE',
+                                type: 'PAYMENT_UPDATE',
                                 timestamp: update.timestamp,
                                 read: false,
                                 data: update,
                                 showToast: true, // Realtime notification - show popup toast
                             },
                             ...prev
-                        ];
+                        ]);
                     });
-                });
-
-                // Subscribe to payment updates
-                const sub3 = client.subscribe('/topic/payments', (message) => {
-                    const update = JSON.parse(message.body);
-                    console.log('[WebSocket] Received payment update:', update);
-                    setNotifications((prev) => [
-                        {
-                            id: Date.now(),
-                            title: 'Cập nhật thanh toán',
-                            message: update.message,
-                            type: 'PAYMENT_UPDATE',
-                            timestamp: update.timestamp,
-                            read: false,
-                            data: update,
-                            showToast: true, // Realtime notification - show popup toast
-                        },
-                        ...prev
-                    ]);
-                });
+                } else {
+                    console.log('[WebSocket] Driver role - skipping payment updates channel');
+                }
 
                 // Subscribe to dispatch updates
-                const sub4 = client.subscribe('/topic/dispatches', (message) => {
-                    const update = JSON.parse(message.body);
-                    console.log('[WebSocket] Received dispatch update:', update);
-                    setNotifications((prev) => [
-                        {
-                            id: Date.now(),
-                            title: 'Cập nhật điều phối',
-                            message: update.message,
-                            type: 'DISPATCH_UPDATE',
-                            timestamp: update.timestamp,
-                            read: false,
-                            data: update,
-                            showToast: true, // Realtime notification - show popup toast
-                        },
-                        ...prev
-                    ]);
-                });
+                // Driver should NOT receive general dispatch updates (they get trip assignments via /topic/notifications/{userId})
+                let sub4 = null;
+                if (!isDriver) {
+                    sub4 = client.subscribe('/topic/dispatches', (message) => {
+                        const update = JSON.parse(message.body);
+                        console.log('[WebSocket] Received dispatch update:', update);
+                        setNotifications((prev) => [
+                            {
+                                id: Date.now(),
+                                title: 'Cập nhật điều phối',
+                                message: update.message,
+                                type: 'DISPATCH_UPDATE',
+                                timestamp: update.timestamp,
+                                read: false,
+                                data: update,
+                                showToast: true, // Realtime notification - show popup toast
+                            },
+                            ...prev
+                        ]);
+                    });
+                } else {
+                    console.log('[WebSocket] Driver role - skipping dispatch updates channel');
+                }
 
                 // Store subscriptions (filter out null values for driver role)
                 subscriptionsRef.current = [sub1, sub2, sub3, sub4].filter(Boolean);

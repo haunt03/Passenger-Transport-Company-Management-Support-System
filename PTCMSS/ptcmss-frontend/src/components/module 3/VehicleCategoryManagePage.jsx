@@ -128,7 +128,7 @@ function StatusPill({ status }) {
             cls: "bg-green-50 text-green-700 border-green-200",
         },
         INACTIVE: {
-            label: "Ngưng",
+            label: "Chưa hoạt động",
             cls: "bg-slate-100 text-slate-600 border-slate-300",
         },
     };
@@ -146,8 +146,8 @@ function StatusPill({ status }) {
 }
 
 /* ---------------------- Modal Create Category ------------------------ */
-function VehicleCategoryCreateModal({ open, onClose, onCreated }) {
-    const [name, setName] = React.useState("");
+function VehicleCategoryCreateModal({ open, onClose, onCreated, existingCategories = [] }) {
+    const [name, setName] = React.useState("Xe ");
     const [seats, setSeats] = React.useState("");
     const [baseFee, setBaseFee] = React.useState("");
     const [sameDayFixedPrice, setSameDayFixedPrice] = React.useState("");
@@ -156,11 +156,24 @@ function VehicleCategoryCreateModal({ open, onClose, onCreated }) {
     const [loading, setLoading] = React.useState(false);
     const [touchedName, setTouchedName] = React.useState(false);
     const [touchedSeats, setTouchedSeats] = React.useState(false);
+    const [showSuggestions, setShowSuggestions] = React.useState(false);
+
+    const cleanDigits = (s) => s.replace(/[^0-9]/g, "");
+    const trimmedName = name.trim();
+
+    // Gợi ý danh mục tương tự để tránh trùng - PHẢI đặt trước if (!open)
+    const suggestions = React.useMemo(() => {
+        if (trimmedName.length < 3) return [];
+        const searchTerm = trimmedName.toLowerCase();
+        return existingCategories
+            .filter((cat) => cat.name?.toLowerCase().includes(searchTerm.replace("xe ", "")))
+            .slice(0, 5);
+    }, [trimmedName, existingCategories]);
 
     // Reset touched states when modal opens/closes
     React.useEffect(() => {
         if (open) {
-            setName("");
+            setName("Xe ");
             setSeats("");
             setBaseFee("");
             setSameDayFixedPrice("");
@@ -168,20 +181,40 @@ function VehicleCategoryCreateModal({ open, onClose, onCreated }) {
             setStatus("ACTIVE");
             setTouchedName(false);
             setTouchedSeats(false);
+            setShowSuggestions(false);
         }
     }, [open]);
 
+    // Early return PHẢI sau tất cả hooks
     if (!open) return null;
 
-    const cleanDigits = (s) => s.replace(/[^0-9]/g, "");
     const seatsNum = Number(cleanDigits(seats));
     const baseFeeNum = baseFee ? Number(cleanDigits(baseFee)) : null;
     const sameDayFixedPriceNum = sameDayFixedPrice ? Number(cleanDigits(sameDayFixedPrice)) : null;
     const pricePerKmNum = pricePerKm ? Number(cleanDigits(pricePerKm)) : null;
 
-    const nameError = name.trim().length === 0;
+    // Validation
+    const nameEmpty = trimmedName.length === 0 || trimmedName === "Xe";
+    const nameNotStartWithXe = !trimmedName.toLowerCase().startsWith("xe ");
+    const nameDuplicate = existingCategories.some(
+        (cat) => cat.name?.toLowerCase() === trimmedName.toLowerCase()
+    );
+    const nameError = nameEmpty || nameNotStartWithXe || nameDuplicate;
     const seatsError = isNaN(seatsNum) || seatsNum <= 0;
     const valid = !nameError && !seatsError;
+
+    // Handler cho input name - đảm bảo luôn bắt đầu bằng "Xe "
+    const handleNameChange = (e) => {
+        let value = e.target.value;
+        // Nếu user xóa hết hoặc xóa "Xe ", tự động thêm lại
+        if (!value.startsWith("Xe ") && !value.startsWith("Xe")) {
+            value = "Xe " + value;
+        } else if (value === "Xe" || value === "X" || value === "") {
+            value = "Xe ";
+        }
+        setName(value);
+        setShowSuggestions(true);
+    };
 
     async function handleSave() {
         if (!valid) return;
@@ -241,14 +274,19 @@ function VehicleCategoryCreateModal({ open, onClose, onCreated }) {
                     {/* Name & Seats - 2 columns */}
                     <div className="grid grid-cols-2 gap-3">
                         {/* Name */}
-                        <div>
+                        <div className="relative">
                             <div className="text-[12px] text-slate-600 mb-1">
                                 Tên danh mục <span className="text-red-500">*</span>
                             </div>
                             <input
                                 value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                onBlur={() => setTouchedName(true)}
+                                onChange={handleNameChange}
+                                onBlur={() => {
+                                    setTouchedName(true);
+                                    // Delay hide để cho phép click vào suggestion
+                                    setTimeout(() => setShowSuggestions(false), 200);
+                                }}
+                                onFocus={() => setShowSuggestions(true)}
                                 className={cls(
                                     "w-full rounded-md border px-3 py-2 text-[13px]",
                                     touchedName && nameError
@@ -258,9 +296,42 @@ function VehicleCategoryCreateModal({ open, onClose, onCreated }) {
                                 )}
                                 placeholder="Xe 7 chỗ"
                             />
-                            {touchedName && nameError && (
+                            {/* Error messages */}
+                            {touchedName && nameEmpty && (
                                 <div className="text-[11px] text-red-500 mt-1">
                                     Tên danh mục không được để trống.
+                                </div>
+                            )}
+                            {touchedName && !nameEmpty && nameDuplicate && (
+                                <div className="text-[11px] text-red-500 mt-1 flex items-center gap-1">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    Tên danh mục đã tồn tại trong hệ thống.
+                                </div>
+                            )}
+                            {touchedName && !nameEmpty && nameNotStartWithXe && !nameDuplicate && (
+                                <div className="text-[11px] text-red-500 mt-1">
+                                    Tên danh mục phải bắt đầu bằng "Xe ".
+                                </div>
+                            )}
+                            {/* Suggestions dropdown */}
+                            {showSuggestions && suggestions.length > 0 && (
+                                <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-40 overflow-y-auto">
+                                    <div className="px-3 py-1.5 text-[10px] text-slate-500 bg-slate-50 border-b border-slate-100">
+                                        Danh mục tương tự đã có:
+                                    </div>
+                                    {suggestions.map((cat) => (
+                                        <div
+                                            key={cat.id}
+                                            className="px-3 py-2 text-[12px] text-slate-700 hover:bg-amber-50 cursor-pointer flex items-center gap-2"
+                                            onClick={() => {
+                                                // Không cho chọn vì đã tồn tại
+                                            }}
+                                        >
+                                            <AlertTriangle className="h-3 w-3 text-amber-500" />
+                                            <span className="font-medium">{cat.name}</span>
+                                            <span className="text-slate-400">({cat.seats} ghế)</span>
+                                        </div>
+                                    ))}
                                 </div>
                             )}
                         </div>
@@ -350,7 +421,7 @@ function VehicleCategoryCreateModal({ open, onClose, onCreated }) {
                                 className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition"
                             >
                                 <option value="ACTIVE">Đang hoạt động</option>
-                                <option value="INACTIVE">Ngưng hoạt động</option>
+                                <option value="INACTIVE">Chưa hoạt động</option>
                             </select>
                         </div>
                     </div>
@@ -519,7 +590,7 @@ function VehicleCategoryEditModal({
                             className="w-full rounded-md border px-3 py-2 text-[13px] border-slate-300 bg-white shadow-sm focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition"
                         >
                             <option value="ACTIVE">Đang hoạt động</option>
-                            <option value="INACTIVE">Ngưng sử dụng</option>
+                            <option value="INACTIVE">Chưa hoạt động</option>
                         </select>
                     </div>
                 </div>
@@ -835,15 +906,28 @@ export default function VehicleCategoryManagePage() {
     const [editData, setEditData] = React.useState(null);
     const [customerListOpen, setCustomerListOpen] = React.useState(false);
 
+    // Pagination cho danh mục
+    const [catPage, setCatPage] = React.useState(1);
+    const catPageSize = 10;
+    const catTotalPages = Math.ceil(categories.length / catPageSize) || 1;
+    const pagedCategories = React.useMemo(() => {
+        const start = (catPage - 1) * catPageSize;
+        return categories.slice(start, start + catPageSize);
+    }, [categories, catPage, catPageSize]);
+
     async function handleCreated(cat) {
         try {
             const result = await createVehicleCategory({
                 categoryName: cat.name,
                 seats: cat.seats,
-                status: "ACTIVE",
+                baseFee: cat.baseFee,
+                sameDayFixedPrice: cat.sameDayFixedPrice,
+                pricePerKm: cat.pricePerKm,
+                status: cat.status || "ACTIVE",
             });
 
             setCategories((arr) => [mapCat(result), ...arr]);
+            setCatPage(1); // Reset về trang đầu để thấy danh mục mới
             pushToast("Tạo danh mục thành công", "success");
         } catch (e) {
             pushToast("Tạo danh mục thất bại", "error");
@@ -876,7 +960,7 @@ export default function VehicleCategoryManagePage() {
             pushToast("Cập nhật thành công", "success");
         } catch (e) {
             console.error("[UPDATE] Error:", e);
-            pushToast("Cập nhật thất bại: " + (e.message || "Unknown error"), "error");
+            pushToast("Cập nhật thất bại: " + (e.message || "Lỗi không xác định"), "error");
         }
     }
 
@@ -934,7 +1018,7 @@ export default function VehicleCategoryManagePage() {
                         </thead>
 
                         <tbody>
-                        {categories.map((cat) => (
+                        {pagedCategories.map((cat) => (
                             <tr
                                 key={cat.id}
                                 className="hover:bg-slate-50 transition border-b border-slate-200 last:border-none"
@@ -942,9 +1026,6 @@ export default function VehicleCategoryManagePage() {
                                 <td className="px-4 py-3 align-top">
                                     <div className="font-medium text-slate-900">
                                         {cat.name}
-                                    </div>
-                                    <div className="text-[11px] text-slate-500">
-                                        ID: {cat.id}
                                     </div>
                                 </td>
 
@@ -976,30 +1057,21 @@ export default function VehicleCategoryManagePage() {
                                 </td>
 
                                 <td className="px-4 py-3 align-top">
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            onClick={() => {
-                                                setEditData(cat);
-                                                setEditOpen(true);
-                                            }}
-                                            className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] hover:bg-slate-100 text-slate-700 shadow-sm flex items-center gap-1"
-                                        >
-                                            <Pencil className="h-3.5 w-3.5" />
-                                            Sửa
-                                        </button>
-                                        <button
-                                            onClick={() => setCustomerListOpen(true)}
-                                            className="rounded-md border border-sky-300 bg-sky-50 px-2.5 py-1.5 text-[11px] hover:bg-sky-100 text-sky-700 shadow-sm flex items-center gap-1"
-                                        >
-                                            <Users className="h-3.5 w-3.5" />
-                                            DS khách hàng
-                                        </button>
-                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            setEditData(cat);
+                                            setEditOpen(true);
+                                        }}
+                                        className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] hover:bg-slate-100 text-slate-700 shadow-sm flex items-center gap-1"
+                                    >
+                                        <Pencil className="h-3.5 w-3.5" />
+                                        Sửa
+                                    </button>
                                 </td>
                             </tr>
                         ))}
 
-                        {categories.length === 0 && (
+                        {pagedCategories.length === 0 && (
                             <tr>
                                 <td
                                     colSpan={8}
@@ -1012,6 +1084,36 @@ export default function VehicleCategoryManagePage() {
                         </tbody>
                     </table>
                 </div>
+
+                {/* Pagination */}
+                {categories.length > 0 && (
+                    <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-3">
+                        <div className="text-[12px] text-slate-500">
+                            Hiển thị {(catPage - 1) * catPageSize + 1} - {Math.min(catPage * catPageSize, categories.length)} / {categories.length} danh mục
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setCatPage((p) => Math.max(1, p - 1))}
+                                disabled={catPage <= 1}
+                                className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[12px] text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                            >
+                                <ChevronLeft className="h-4 w-4" />
+                                Trước
+                            </button>
+                            <span className="text-[12px] text-slate-600 px-2">
+                                Trang {catPage} / {catTotalPages}
+                            </span>
+                            <button
+                                onClick={() => setCatPage((p) => Math.min(catTotalPages, p + 1))}
+                                disabled={catPage >= catTotalPages}
+                                className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[12px] text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                            >
+                                Sau
+                                <ChevronRight className="h-4 w-4" />
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* MODALS */}
@@ -1019,6 +1121,7 @@ export default function VehicleCategoryManagePage() {
                 open={createOpen}
                 onClose={() => setCreateOpen(false)}
                 onCreated={handleCreated}
+                existingCategories={categories}
             />
 
             <VehicleCategoryEditModal

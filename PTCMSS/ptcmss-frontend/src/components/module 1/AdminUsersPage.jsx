@@ -1,7 +1,7 @@
 ﻿import React from "react";
 import { useNavigate } from "react-router-dom";
 import { listUsers, listUsersByBranch, listRoles, toggleUserStatus } from "../../api/users";
-import { listEmployeesByRole } from "../../api/employees";
+import { listEmployeesByRole, listEmployees } from "../../api/employees";
 import { RefreshCw, Edit2, ShieldCheck, Users, Search, Filter, Mail, Phone, Shield, UserPlus } from "lucide-react";
 import { getCurrentRole, getStoredUserId, ROLES } from "../../utils/session";
 import Pagination from "../common/Pagination";
@@ -35,14 +35,15 @@ export default function AdminUsersPage() {
   const currentRole = React.useMemo(() => getCurrentRole(), []);
   const currentUserId = React.useMemo(() => getStoredUserId(), []);
   const isManagerView = currentRole === ROLES.MANAGER;
+  const isAccountantView = currentRole === ROLES.ACCOUNTANT;
   const [managerBranchInfo, setManagerBranchInfo] = React.useState({ id: null, name: "" });
-  const [managerBranchLoading, setManagerBranchLoading] = React.useState(isManagerView);
+  const [managerBranchLoading, setManagerBranchLoading] = React.useState(isManagerView || isAccountantView);
   const [managerBranchError, setManagerBranchError] = React.useState("");
   const [branches, setBranches] = React.useState([]);
   const [selectedBranchId, setSelectedBranchId] = React.useState("");
 
   React.useEffect(() => {
-    if (!isManagerView) {
+    if (!isManagerView && !isAccountantView) {
       setManagerBranchInfo({ id: null, name: "" });
       setManagerBranchError("");
       setManagerBranchLoading(false);
@@ -59,16 +60,20 @@ export default function AdminUsersPage() {
       setManagerBranchLoading(true);
       setManagerBranchError("");
       try {
-        const managers = await listEmployeesByRole("Manager");
+        // Load employees to find current user's branch
+        const { getEmployeeByUserId } = await import("../../api/employees");
+        const emp = await getEmployeeByUserId(currentUserId);
         if (cancelled) return;
-        const mine = (managers || []).find((emp) => String(emp.userId) === String(currentUserId));
-        if (mine?.branchId) {
-          setManagerBranchInfo({ id: mine.branchId, name: mine.branchName || "" });
+
+        const empData = emp?.data || emp;
+        if (empData?.branchId) {
+          setManagerBranchInfo({ id: empData.branchId, name: empData.branchName || "" });
         } else {
           setManagerBranchInfo({ id: null, name: "" });
           setManagerBranchError("Không xác định được chi nhánh của bạn.");
         }
-      } catch {
+      } catch (error) {
+        console.error("Failed to load branch:", error);
         if (cancelled) return;
         setManagerBranchInfo({ id: null, name: "" });
         setManagerBranchError("Không tải được chi nhánh của bạn.");
@@ -80,9 +85,9 @@ export default function AdminUsersPage() {
     return () => {
       cancelled = true;
     };
-  }, [isManagerView, currentUserId]);
+  }, [isManagerView, isAccountantView, currentUserId]);
 
-  const branchFilterValue = isManagerView ? managerBranchInfo.id : undefined;
+  const branchFilterValue = (isManagerView || isAccountantView) ? managerBranchInfo.id : undefined;
   const normalizedKeyword = React.useMemo(() => keyword.trim().toLowerCase(), [keyword]);
   const normalizedStatus = React.useMemo(() => (status || "").trim().toUpperCase(), [status]);
   const selectedRoleName = React.useMemo(() => {
@@ -129,10 +134,16 @@ export default function AdminUsersPage() {
             if (userBranchId !== selectedBranchId) return false;
           }
 
+          // Manager branch filter - chỉ hiện nhân viên trong chi nhánh của Manager
+          if (isManagerView && branchFilterValue) {
+            const userBranchId = Number(u.branchId || 0);
+            if (userBranchId !== branchFilterValue) return false;
+          }
+
           return true;
         });
       },
-      [normalizedKeyword, selectedRoleName, normalizedStatus, isManagerView, selectedBranchId]
+      [normalizedKeyword, selectedRoleName, normalizedStatus, isManagerView, selectedBranchId, branchFilterValue]
   );
 
   const [allUsers, setAllUsers] = React.useState([]);
@@ -148,15 +159,28 @@ export default function AdminUsersPage() {
     }
     setLoading(true);
     try {
-      let data;
-      if (isManagerView) {
-        data = await listUsersByBranch(branchFilterValue);
-      } else {
-        // Load tất cả users, không filter ở API level
-        data = await listUsers();
+      // Dùng employees API vì có branchId
+      const data = await listEmployees();
+      let arr = [];
+      if (Array.isArray(data?.data)) {
+        arr = data.data;
+      } else if (Array.isArray(data)) {
+        arr = data;
       }
-      const arr = Array.isArray(data) ? data : data?.items || data?.data?.items || data?.data?.content || [];
-      setAllUsers(arr);
+      // Map employee data to user-like structure
+      const mapped = arr.map(emp => ({
+        id: emp.userId || emp.id,
+        empId: emp.id,
+        fullName: emp.userFullName,
+        email: emp.userEmail,
+        phone: emp.userPhone,
+        roleName: emp.roleName,
+        roleId: emp.roleId,
+        branchId: emp.branchId,
+        branchName: emp.branchName,
+        status: emp.status,
+      }));
+      setAllUsers(mapped);
     } finally {
       setLoading(false);
     }
@@ -219,7 +243,20 @@ export default function AdminUsersPage() {
       try {
         const { listBranches } = await import("../../api/branches");
         const data = await listBranches({ page: 0, size: 100 });
-        const arr = Array.isArray(data) ? data : data?.items || data?.content || [];
+        let arr = [];
+        if (Array.isArray(data)) {
+          arr = data;
+        } else if (data?.data?.items) {
+          arr = data.data.items;
+        } else if (data?.data?.content) {
+          arr = data.data.content;
+        } else if (data?.items) {
+          arr = data.items;
+        } else if (data?.content) {
+          arr = data.content;
+        } else if (Array.isArray(data?.data)) {
+          arr = data.data;
+        }
         setBranches(arr);
       } catch (error) {
         console.error("Failed to load branches:", error);
@@ -260,14 +297,17 @@ export default function AdminUsersPage() {
             </div>
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-              <button
-                  onClick={() => navigate('/admin/employees/create-with-user')}
-                  className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-lg hover:shadow-xl transition-all active:scale-[0.98]"
-                  style={{ backgroundColor: BRAND_COLOR }}
-              >
-                <UserPlus className="h-4 w-4" />
-                <span>Thêm nhân viên</span>
-              </button>
+              {/* Chỉ Admin và Manager mới có nút thêm nhân viên, Accountant chỉ xem */}
+              {!isAccountantView && (
+                  <button
+                      onClick={() => navigate('/admin/users/new')}
+                      className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-lg hover:shadow-xl transition-all active:scale-[0.98]"
+                      style={{ backgroundColor: BRAND_COLOR }}
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    <span>Thêm nhân viên</span>
+                  </button>
+              )}
               <button
                   onClick={onRefresh}
                   disabled={loading || (isManagerView && (managerBranchLoading || !branchFilterValue))}
@@ -305,7 +345,7 @@ export default function AdminUsersPage() {
                 <Search className="h-4 w-4 text-slate-400" />
                 <input
                     value={keyword}
-                    onChange={(e)=>setKeyword(e.target.value)}
+                    onChange={(e) => setKeyword(e.target.value)}
                     placeholder="Tìm theo tên hoặc email"
                     className="flex-1 bg-transparent outline-none text-sm text-slate-900 placeholder:text-slate-400"
                 />
@@ -315,7 +355,7 @@ export default function AdminUsersPage() {
                 <Shield className="h-4 w-4 text-slate-400" />
                 <select
                     value={roleId}
-                    onChange={(e)=>setRoleId(e.target.value)}
+                    onChange={(e) => setRoleId(e.target.value)}
                     className="bg-transparent outline-none text-sm text-slate-900 border-none cursor-pointer"
                 >
                   <option value="">-- Vai trò --</option>
@@ -327,7 +367,7 @@ export default function AdminUsersPage() {
                 <ShieldCheck className="h-4 w-4 text-slate-400" />
                 <select
                     value={status}
-                    onChange={(e)=>setStatus(e.target.value)}
+                    onChange={(e) => setStatus(e.target.value)}
                     className="bg-transparent outline-none text-sm text-slate-900 border-none cursor-pointer"
                 >
                   <option value="">-- Trạng thái --</option>
@@ -341,7 +381,7 @@ export default function AdminUsersPage() {
                     <Filter className="h-4 w-4 text-slate-400" />
                     <select
                         value={selectedBranchId}
-                        onChange={(e)=>setSelectedBranchId(e.target.value)}
+                        onChange={(e) => setSelectedBranchId(e.target.value)}
                         className="bg-transparent outline-none text-sm text-slate-900 border-none cursor-pointer"
                     >
                       <option value="">-- Tất cả chi nhánh --</option>
@@ -393,6 +433,9 @@ export default function AdminUsersPage() {
                     Vai trò
                   </th>
                   <th className="text-left font-semibold px-6 py-3.5 text-xs text-slate-700 uppercase tracking-wider">
+                    Chi nhánh
+                  </th>
+                  <th className="text-left font-semibold px-6 py-3.5 text-xs text-slate-700 uppercase tracking-wider">
                     Trạng thái
                   </th>
                   <th className="text-right font-semibold px-6 py-3.5 text-xs text-slate-700 uppercase tracking-wider">
@@ -403,7 +446,7 @@ export default function AdminUsersPage() {
                 <tbody className="divide-y divide-slate-100">
                 {currentUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center">
+                      <td colSpan={7} className="px-6 py-12 text-center">
                         <div className="flex flex-col items-center gap-3">
                           <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center">
                             <Users className="h-8 w-8 text-slate-400" />
@@ -437,27 +480,36 @@ export default function AdminUsersPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
+                        <span className="text-sm text-slate-700">{u.branchName || "—"}</span>
+                      </td>
+                      <td className="px-6 py-4">
                         <StatusBadge value={u.status} />
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <button
-                              onClick={() => navigate(`/admin/users/${u.id}`)}
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 hover:border-[#0079BC]/50 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition-all active:scale-[0.98] group-hover:shadow-md"
-                          >
-                            <Edit2 className="h-3.5 w-3.5" />
-                            Chỉnh sửa
-                          </button>
-                          <button
-                              onClick={() => onToggle(u.id)}
-                              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium shadow-sm transition-all active:scale-[0.98] ${
-                                  u.status === "ACTIVE"
-                                      ? "border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
-                                      : "border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
-                              }`}
-                          >
-                            {u.status === "ACTIVE" ? "Vô hiệu hóa" : "Kích hoạt"}
-                          </button>
+                          {/* Chỉ Admin và Manager mới có nút Chỉnh sửa và Vô hiệu hóa */}
+                          {!isAccountantView ? (
+                              <>
+                                <button
+                                    onClick={() => navigate(`/admin/users/${u.id}`)}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 hover:border-[#0079BC]/50 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition-all active:scale-[0.98] group-hover:shadow-md"
+                                >
+                                  <Edit2 className="h-3.5 w-3.5" />
+                                  Chỉnh sửa
+                                </button>
+                                <button
+                                    onClick={() => onToggle(u.id)}
+                                    className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium shadow-sm transition-all active:scale-[0.98] ${u.status === "ACTIVE"
+                                        ? "border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                                        : "border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                                    }`}
+                                >
+                                  {u.status === "ACTIVE" ? "Vô hiệu hóa" : "Kích hoạt"}
+                                </button>
+                              </>
+                          ) : (
+                              <span className="text-xs text-slate-400 italic">Chỉ xem</span>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -487,6 +539,7 @@ export default function AdminUsersPage() {
       </div>
   );
 }
+
 
 
 

@@ -128,7 +128,8 @@ export default function LoginPage() {
             } else if (role === "DRIVER") {
                 navigate("/driver/dashboard", { replace: true });
             } else if (role === "CONSULTANT") {
-                navigate("/orders/dashboard", { replace: true });
+                // Tư vấn viên vào thẳng Báo cáo doanh thu
+                navigate("/accounting/revenue-report", { replace: true });
             } else if (role === "COORDINATOR") {
                 navigate("/dispatch", { replace: true });
             } else if (role === "ACCOUNTANT") {

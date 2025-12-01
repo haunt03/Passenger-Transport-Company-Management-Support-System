@@ -169,15 +169,15 @@ export default function EditEmployeePage() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
                         <div>
                             <span className="text-slate-500">Họ tên:</span>
-                            <span className="ml-2 font-medium">{employeeInfo.userFullName || "N/A"}</span>
+                            <span className="ml-2 font-medium">{employeeInfo.userFullName || "Không có"}</span>
                         </div>
                         <div>
                             <span className="text-slate-500">Email:</span>
-                            <span className="ml-2 font-medium">{employeeInfo.userEmail || "N/A"}</span>
+                            <span className="ml-2 font-medium">{employeeInfo.userEmail || "Không có"}</span>
                         </div>
                         <div>
                             <span className="text-slate-500">Số điện thoại:</span>
-                            <span className="ml-2 font-medium">{employeeInfo.userPhone || "N/A"}</span>
+                            <span className="ml-2 font-medium">{employeeInfo.userPhone || "Không có"}</span>
                         </div>
                     </div>
                 </div>

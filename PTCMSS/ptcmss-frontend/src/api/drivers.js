@@ -57,3 +57,4 @@ export function listDriversByBranch(branchId) {
     if (branchId == null || branchId === "") throw new Error("BRANCH_ID_REQUIRED");
     return apiFetch(`/api/drivers/branch/${branchId}`);
 }
+

@@ -48,6 +48,7 @@ export default function TripPaymentRequestModal({
     const [notes, setNotes] = React.useState("");
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState("");
+    const [successMsg, setSuccessMsg] = React.useState("");
 
     // Payment history state
     const [paymentHistory, setPaymentHistory] = React.useState([]);
@@ -61,24 +62,53 @@ export default function TripPaymentRequestModal({
         }
     }, [open, bookingId]);
 
+    // Tính lại remaining amount dựa trên payment history (trừ đi các payment requests PENDING)
+    const calculatedRemainingAmount = React.useMemo(() => {
+        const originalRemaining = remainingAmount || 0;
+
+        if (!paymentHistory || paymentHistory.length === 0) {
+            return {
+                amount: originalRemaining,
+                pendingTotal: 0,
+                isOverLimit: false,
+                originalRemaining: originalRemaining
+            };
+        }
+
+        // Tính tổng các payment requests PENDING
+        const pendingTotal = paymentHistory
+            .filter(ph => ph.confirmationStatus === 'PENDING')
+            .reduce((sum, ph) => sum + (Number(ph.amount) || 0), 0);
+
+        // Remaining amount = original remaining - pending payments
+        const remaining = originalRemaining - pendingTotal;
+
+        return {
+            amount: Math.max(0, remaining),
+            pendingTotal: pendingTotal,
+            isOverLimit: remaining < 0,
+            originalRemaining: originalRemaining
+        };
+    }, [remainingAmount, paymentHistory]);
+
     // Reset form khi modal mở
     React.useEffect(() => {
         if (open) {
             setPaymentMethod("CASH");
-            setAmountStr(String(remainingAmount || 0));
+            setAmountStr(String(calculatedRemainingAmount.amount || 0));
             setNotes("");
             setLoading(false);
             setError("");
+            setSuccessMsg("");
         }
-    }, [open, remainingAmount]);
+    }, [open, calculatedRemainingAmount]);
 
     async function loadPaymentHistory() {
         setHistoryLoading(true);
         try {
-            const { getPaymentHistory } = await import("../../api/invoices");
-            // Assuming we need to get invoice by bookingId first
-            // For now, we'll try to get payment history directly with bookingId as invoiceId
-            const history = await getPaymentHistory(bookingId);
+            // Dùng endpoint booking payments thay vì invoice payments
+            const { listBookingPayments } = await import("../../api/bookings");
+            const history = await listBookingPayments(bookingId);
             setPaymentHistory(Array.isArray(history) ? history : []);
         } catch (err) {
             console.error("Error loading payment history:", err);
@@ -116,16 +146,23 @@ export default function TripPaymentRequestModal({
 
     const cleanDigits = (s) => String(s || "").replace(/[^0-9]/g, "");
     const amount = Number(cleanDigits(amountStr || ""));
-    const valid = amount > 0 && paymentMethod;
+    const valid = amount > 0 && amount <= calculatedRemainingAmount.amount && paymentMethod && !calculatedRemainingAmount.isOverLimit;
 
     async function handleSubmit() {
         if (!valid) {
-            setError("Vui lòng nhập số tiền hợp lệ.");
+            if (calculatedRemainingAmount.isOverLimit) {
+                setError(`Đã có ${fmtVND(calculatedRemainingAmount.pendingTotal)}đ đang chờ duyệt, vượt quá số tiền còn lại (${fmtVND(calculatedRemainingAmount.originalRemaining)}đ). Vui lòng đợi kế toán xác nhận các yêu cầu trước.`);
+            } else if (amount > calculatedRemainingAmount.amount) {
+                setError(`Số tiền vượt quá số tiền còn lại (${fmtVND(calculatedRemainingAmount.amount)}đ). Đã có ${paymentHistory.filter(ph => ph.confirmationStatus === 'PENDING').length} yêu cầu đang chờ duyệt.`);
+            } else {
+                setError("Vui lòng nhập số tiền hợp lệ.");
+            }
             return;
         }
 
         setLoading(true);
         setError("");
+        setSuccessMsg("");
 
         try {
             // Import API
@@ -152,8 +189,11 @@ export default function TripPaymentRequestModal({
                 });
             }
 
-            // Reset form nhưng không đóng modal để user thấy request vừa tạo
-            setAmountStr(String(remainingAmount || 0));
+            // Hiển thị thông báo thành công
+            setSuccessMsg(`Đã gửi yêu cầu thanh toán ${fmtVND(amount)}đ. Đang chờ kế toán xác nhận.`);
+
+            // Reset form với remaining amount mới (sẽ được tính lại bởi useEffect khi paymentHistory thay đổi)
+            // calculatedRemainingAmount sẽ tự động cập nhật sau khi loadPaymentHistory() hoàn thành
             setNotes("");
             setError("");
         } catch (err) {
@@ -217,13 +257,13 @@ export default function TripPaymentRequestModal({
                                         Đang tải...
                                     </div>
                                 ) : (
-                                    paymentHistory.map((payment) => {
+                                    paymentHistory.map((payment, idx) => {
                                         const isPending = payment.confirmationStatus === "PENDING";
                                         const isConfirmed = payment.confirmationStatus === "CONFIRMED";
                                         const isRejected = payment.confirmationStatus === "REJECTED";
 
                                         return (
-                                            <div key={payment.id} className="px-4 py-3 hover:bg-slate-50">
+                                            <div key={payment.paymentId || payment.id || idx} className="px-4 py-3 hover:bg-slate-50">
                                                 <div className="flex items-start justify-between gap-3">
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2 mb-1">
@@ -264,12 +304,12 @@ export default function TripPaymentRequestModal({
                                                     {/* Nút xóa - chỉ hiện với PENDING */}
                                                     {isPending && (
                                                         <button
-                                                            onClick={() => handleDeletePayment(payment.id)}
-                                                            disabled={deleteLoading === payment.id}
+                                                            onClick={() => handleDeletePayment(payment.paymentId || payment.id)}
+                                                            disabled={deleteLoading === (payment.paymentId || payment.id)}
                                                             className="flex-shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 border border-rose-200 hover:border-rose-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                                                             title="Xóa yêu cầu"
                                                         >
-                                                            {deleteLoading === payment.id ? (
+                                                            {deleteLoading === (payment.paymentId || payment.id) ? (
                                                                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                                             ) : (
                                                                 <Trash2 className="h-3.5 w-3.5" />
@@ -296,9 +336,23 @@ export default function TripPaymentRequestModal({
                             <span className="text-slate-500">Đã đặt cọc:</span>
                             <span className="font-semibold text-emerald-600">{fmtVND(depositAmount)} đ</span>
                         </div>
-                        <div className="border-t border-slate-200 pt-2 flex justify-between text-[14px]">
-                            <span className="text-slate-700 font-medium">Còn lại cần thu:</span>
-                            <span className="font-bold text-amber-600">{fmtVND(remainingAmount)} đ</span>
+                        <div className="border-t border-slate-200 pt-2">
+                            <div className="flex justify-between text-[14px] mb-1">
+                                <span className="text-slate-700 font-medium">Còn lại cần thu:</span>
+                                <span className={calculatedRemainingAmount.isOverLimit ? "font-bold text-rose-600" : "font-bold text-amber-600"}>
+                  {fmtVND(calculatedRemainingAmount.amount)} đ
+                </span>
+                            </div>
+                            {calculatedRemainingAmount.isOverLimit && (
+                                <div className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded px-2 py-1 mt-1">
+                                    ⚠️ Đã có {fmtVND(calculatedRemainingAmount.pendingTotal)}đ đang chờ duyệt, vượt quá số tiền còn lại ({fmtVND(calculatedRemainingAmount.originalRemaining)}đ)
+                                </div>
+                            )}
+                            {calculatedRemainingAmount.pendingTotal > 0 && !calculatedRemainingAmount.isOverLimit && (
+                                <div className="text-xs text-amber-600 mt-1">
+                                    (Đã có {fmtVND(calculatedRemainingAmount.pendingTotal)}đ đang chờ duyệt)
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -392,9 +446,19 @@ export default function TripPaymentRequestModal({
                         </div>
                     </div>
 
+                    {/* Success message */}
+                    {successMsg && (
+                        <div className="flex items-start gap-2 text-[11px] leading-relaxed bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                            <CheckCircle className="h-4 w-4 mt-0.5 text-emerald-500 shrink-0" />
+                            <div className="text-emerald-700 font-medium">{successMsg}</div>
+                        </div>
+                    )}
+
+                    {/* Error message */}
                     {error && (
-                        <div className="text-rose-600 text-[11px] leading-relaxed">
-                            {error}
+                        <div className="flex items-start gap-2 text-[11px] leading-relaxed bg-rose-50 border border-rose-200 rounded-lg p-3">
+                            <XCircle className="h-4 w-4 mt-0.5 text-rose-500 shrink-0" />
+                            <div className="text-rose-600">{error}</div>
                         </div>
                     )}
                 </div>

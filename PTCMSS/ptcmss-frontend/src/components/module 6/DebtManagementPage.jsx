@@ -160,7 +160,7 @@ export default function DebtManagementPage() {
             loadData();
         } catch (err) {
             console.error("Error sending reminder:", err);
-            push("Lỗi khi gửi nhắc nợ: " + (err.message || "Unknown error"), "error");
+            push("Lỗi khi gửi nhắc nợ: " + (err.message || "Lỗi không xác định"), "error");
         }
     };
 
@@ -174,7 +174,7 @@ export default function DebtManagementPage() {
             loadData();
         } catch (err) {
             console.error("Error setting promise:", err);
-            push("Lỗi khi cập nhật hẹn thanh toán: " + (err.message || "Unknown error"), "error");
+            push("Lỗi khi cập nhật hẹn thanh toán: " + (err.message || "Lỗi không xác định"), "error");
         }
     };
 
@@ -188,7 +188,7 @@ export default function DebtManagementPage() {
             loadData();
         } catch (err) {
             console.error("Error setting label:", err);
-            push("Lỗi khi gắn nhãn: " + (err.message || "Unknown error"), "error");
+            push("Lỗi khi gắn nhãn: " + (err.message || "Lỗi không xác định"), "error");
         }
     };
 
@@ -201,7 +201,7 @@ export default function DebtManagementPage() {
             push("Đã xuất danh sách công nợ (Excel)", "success");
         } catch (err) {
             console.error("Export error:", err);
-            push("Lỗi khi xuất Excel: " + (err.message || "Unknown error"), "error");
+            push("Lỗi khi xuất Excel: " + (err.message || "Lỗi không xác định"), "error");
         }
     };
 

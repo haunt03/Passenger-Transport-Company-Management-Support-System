@@ -129,3 +129,4 @@ export function deleteNotification(notificationId, userId) {
         method: "DELETE",
     });
 }
+

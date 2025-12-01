@@ -2,6 +2,7 @@ import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getUser, updateUser, listRoles } from "../../api/users";
 import { listBranches } from "../../api/branches";
+import { getEmployeeByUserId } from "../../api/employees";
 import { Save, ArrowLeft, XCircle, CheckCircle, User, Mail, Phone, MapPin, Shield, Info, AlertCircle, Building2 } from "lucide-react";
 
 export default function UserDetailPage() {
@@ -14,6 +15,7 @@ export default function UserDetailPage() {
   const [branches, setBranches] = React.useState([]);
   const [currentUserId, setCurrentUserId] = React.useState(null);
   const [isCurrentUserAdmin, setIsCurrentUserAdmin] = React.useState(false);
+  const [isCurrentUserManager, setIsCurrentUserManager] = React.useState(false);
   const [canEditTarget, setCanEditTarget] = React.useState(true);
   const [targetRoleName, setTargetRoleName] = React.useState("");
 
@@ -44,8 +46,11 @@ export default function UserDetailPage() {
         }
         const currentUserRole = (localStorage.getItem("roleName") || "").toUpperCase();
         const isAdminLocal = currentUserRole === "ADMIN";
+        const isManagerLocal = currentUserRole === "MANAGER";
         setIsCurrentUserAdmin(isAdminLocal);
+        setIsCurrentUserManager(isManagerLocal);
 
+        // Load target user info
         const response = await getUser(userId);
         const u = response?.data || response;
         setFullName(u.fullName || "");
@@ -54,8 +59,9 @@ export default function UserDetailPage() {
         setAddress(u.address || "");
         setStatus(u.status || "ACTIVE");
         setRoleId(u.roleId ? String(u.roleId) : "");
-        if (u.branchId != null) {
-          setBranchId(String(u.branchId));
+        const targetBranchId = u.branchId != null ? Number(u.branchId) : null;
+        if (targetBranchId != null) {
+          setBranchId(String(targetBranchId));
         } else {
           setBranchId("");
         }
@@ -63,9 +69,34 @@ export default function UserDetailPage() {
         setTargetRoleName(targetRole);
 
         const editingSelf = numericUserId != null && numericUserId === Number(userId);
-        const basePermission = isAdminLocal || editingSelf;
         const isTargetAdmin = targetRole === "ADMIN";
-        const finalPermission = basePermission && (!isTargetAdmin || isAdminLocal);
+        const isTargetManager = targetRole === "MANAGER";
+
+        // Check permission
+        let finalPermission = false;
+
+        if (isAdminLocal) {
+          // Admin có thể sửa tất cả
+          finalPermission = true;
+        } else if (editingSelf) {
+          // Tự sửa mình (trừ Admin)
+          finalPermission = !isTargetAdmin;
+        } else if (isManagerLocal && numericUserId) {
+          // Manager có thể sửa nhân viên cùng chi nhánh (trừ Manager/Admin khác)
+          if (!isTargetAdmin && !isTargetManager) {
+            try {
+              const empResp = await getEmployeeByUserId(numericUserId);
+              const emp = empResp?.data || empResp;
+              const managerBranchId = emp?.branchId ? Number(emp.branchId) : null;
+              if (managerBranchId && targetBranchId && managerBranchId === targetBranchId) {
+                finalPermission = true;
+              }
+            } catch (err) {
+              console.error("Error checking manager branch:", err);
+            }
+          }
+        }
+
         setCanEditTarget(Boolean(finalPermission));
         if (!finalPermission) {
           setGeneralError("Bạn không có quyền chỉnh sửa tài khoản này. Vui lòng liên hệ Admin.");
@@ -89,6 +120,36 @@ export default function UserDetailPage() {
       } catch {}
     })();
   }, []);
+
+  // Filter roles dựa trên quyền của current user
+  const filteredRoles = React.useMemo(() => {
+    if (!roles.length) return [];
+
+    const editingSelf = currentUserId != null && currentUserId === Number(userId);
+
+    return roles.filter(r => {
+      const roleName = (r.roleName || r.name || "").toUpperCase();
+
+      // Nếu đang edit chính mình và là Admin, cho phép giữ nguyên Admin
+      if (editingSelf && isCurrentUserAdmin && roleName === "ADMIN") {
+        return true;
+      }
+
+      // Admin không được đổi người khác sang Admin
+      if (isCurrentUserAdmin && !editingSelf && roleName === "ADMIN") {
+        return false;
+      }
+
+      // Manager không được chọn Admin hoặc Manager
+      if (!isCurrentUserAdmin) {
+        if (roleName === "ADMIN" || roleName === "MANAGER" || roleName === "QUẢN LÝ") {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [roles, isCurrentUserAdmin, currentUserId, userId]);
 
   React.useEffect(() => {
     (async () => {
@@ -300,7 +361,7 @@ export default function UserDetailPage() {
                     disabled={!canEditTarget}
                 >
                   <option value="">-- Chọn vai trò --</option>
-                  {roles.map((r) => (
+                  {filteredRoles.map((r) => (
                       <option key={r.id} value={r.id}>
                         {r.roleName || r.name}
                       </option>
@@ -314,17 +375,20 @@ export default function UserDetailPage() {
                 )}
               </div>
 
-              {/* Branch */}
+              {/* Branch - Manager không được đổi chi nhánh */}
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
                   <Building2 className="h-4 w-4 text-slate-400" />
                   <span>Chi nhánh</span>
+                  {isCurrentUserManager && (
+                      <span className="text-xs text-amber-600">(Không thể thay đổi)</span>
+                  )}
                 </label>
                 <select
-                    className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:border-[#0079BC]/50 focus:ring-[#0079BC]/20"
+                    className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:border-[#0079BC]/50 focus:ring-[#0079BC]/20 disabled:bg-slate-100 disabled:text-slate-500"
                     value={branchId}
                     onChange={(e) => setBranchId(e.target.value)}
-                    disabled={!canEditTarget}
+                    disabled={!canEditTarget || isCurrentUserManager}
                 >
                   <option value="">Chọn chi nhánh</option>
                   {branches.map((b) => (
@@ -335,17 +399,20 @@ export default function UserDetailPage() {
                 </select>
               </div>
 
-              {/* Status */}
+              {/* Status - Manager không được đổi trạng thái */}
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
                   <Info className="h-4 w-4 text-slate-400" />
                   <span>Trạng thái</span>
+                  {isCurrentUserManager && (
+                      <span className="text-xs text-amber-600">(Không thể thay đổi)</span>
+                  )}
                 </label>
                 <select
-                    className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:border-[#0079BC]/50 focus:ring-[#0079BC]/20"
+                    className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:border-[#0079BC]/50 focus:ring-[#0079BC]/20 disabled:bg-slate-100 disabled:text-slate-500"
                     value={status}
                     onChange={(e) => setStatus(e.target.value)}
-                    disabled={!canEditTarget}
+                    disabled={!canEditTarget || isCurrentUserManager}
                 >
                   <option value="ACTIVE">ACTIVE</option>
                   <option value="INACTIVE">INACTIVE</option>

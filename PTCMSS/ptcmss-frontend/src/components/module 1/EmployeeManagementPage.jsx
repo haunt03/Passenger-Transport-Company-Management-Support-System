@@ -1,53 +1,73 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { listEmployees, updateEmployee, listEmployeesByBranch } from "../../api/employees";
+import { listEmployees, updateEmployee, listEmployeesByBranch, getEmployeeByUserId } from "../../api/employees";
 import { listBranches } from "../../api/branches";
 import { listRoles } from "../../api/users";
-import { getCurrentRole, ROLES } from "../../utils/session";
-import { Users, Plus, Search, Filter, Building2, UserCog, Edit, Ban, CheckCircle } from "lucide-react";
+import { getCurrentRole, getStoredUserId, ROLES } from "../../utils/session";
+import { Users, Plus, Search, Filter, Building2, UserCog, Edit, Ban, CheckCircle, ChevronLeft, ChevronRight } from "lucide-react";
 
 export default function EmployeeManagementPage() {
     const navigate = useNavigate();
     const currentRole = React.useMemo(() => getCurrentRole(), []);
+    const currentUserId = React.useMemo(() => getStoredUserId(), []);
     const isAdmin = currentRole === ROLES.ADMIN;
+    const isManager = currentRole === ROLES.MANAGER;
+    const isAccountant = currentRole === ROLES.ACCOUNTANT;
 
-    const [employees, setEmployees] = React.useState([]);
+    const [allEmployees, setAllEmployees] = React.useState([]); // Tất cả nhân viên từ API
     const [branches, setBranches] = React.useState([]);
     const [roles, setRoles] = React.useState([]);
     const [loading, setLoading] = React.useState(true);
+
+    // Manager's branch info
+    const [managerBranchId, setManagerBranchId] = React.useState(null);
+    const [managerBranchName, setManagerBranchName] = React.useState("");
 
     // Filters
     const [searchTerm, setSearchTerm] = React.useState("");
     const [filterBranch, setFilterBranch] = React.useState("");
     const [filterRole, setFilterRole] = React.useState("");
 
+    // Pagination
+    const [currentPage, setCurrentPage] = React.useState(1);
+    const pageSize = 10;
+
+    // Load Manager/Accountant's branch
+    React.useEffect(() => {
+        if ((!isManager && !isAccountant) || !currentUserId) return;
+
+        (async () => {
+            try {
+                const resp = await getEmployeeByUserId(currentUserId);
+                const emp = resp?.data || resp;
+                if (emp?.branchId) {
+                    setManagerBranchId(emp.branchId);
+                    setManagerBranchName(emp.branchName || "");
+                    setFilterBranch(String(emp.branchId)); // Auto filter by user's branch
+                }
+            } catch (err) {
+                console.error("Error loading user branch:", err);
+            }
+        })();
+    }, [isManager, isAccountant, currentUserId]);
+
     // Load data
     React.useEffect(() => {
         loadData();
     }, []);
 
-    const loadData = async (branchId = null) => {
+    const loadData = async () => {
         setLoading(true);
         try {
-            // Nếu có branchId thì lọc theo chi nhánh, không thì lấy tất cả
-            const empPromise = branchId ? listEmployeesByBranch(branchId) : listEmployees();
-
             const [empData, branchData, roleData] = await Promise.all([
-                empPromise,
-                listBranches({ size: 100 }), // Lấy nhiều branches hơn
+                listEmployees(),
+                listBranches({ size: 100 }),
                 listRoles(),
             ]);
 
-            console.log("Employee data:", empData);
-            console.log("Branch data:", branchData);
-            console.log("Branch data.data:", branchData?.data);
-            console.log("Branch data.data.content:", branchData?.data?.content);
-            console.log("Role data:", roleData);
-
             // Xử lý employees data - ResponseData { status, message, data: [] }
             const employeesList = Array.isArray(empData?.data) ? empData.data : (Array.isArray(empData) ? empData : []);
-            setEmployees(employeesList);
-            console.log("Employees list set:", employeesList.length);
+            setAllEmployees(employeesList);
 
             // Xử lý branches data - Có thể là { items: [] } hoặc { content: [] }
             let branchesList = [];
@@ -64,12 +84,10 @@ export default function EmployeeManagementPage() {
             } else if (Array.isArray(branchData)) {
                 branchesList = branchData;
             }
-            console.log("Branches list set:", branchesList.length, branchesList);
             setBranches(branchesList);
 
             // Xử lý roles data - ResponseData { status, message, data: [] }
             const rolesList = Array.isArray(roleData?.data) ? roleData.data : (Array.isArray(roleData) ? roleData : []);
-            console.log("Roles list set:", rolesList.length);
             setRoles(rolesList);
         } catch (error) {
             console.error("Load data error:", error);
@@ -96,23 +114,40 @@ export default function EmployeeManagementPage() {
         }
     };
 
-    // Filter logic - Chỉ lọc search và role ở frontend (branch đã lọc ở backend)
+    // Filter logic - Lọc tất cả ở frontend
     // QUAN TRỌNG: Loại bỏ Admin khỏi danh sách vì Admin không phải employee
     const filteredEmployees = React.useMemo(() => {
-        return employees.filter((emp) => {
+        return allEmployees.filter((emp) => {
             const userName = emp.userFullName?.toLowerCase() || "";
+            const userEmail = emp.userEmail?.toLowerCase() || "";
             const roleName = emp.roleName?.toLowerCase() || "";
             const search = searchTerm.toLowerCase();
 
             // Loại bỏ Admin
             if (roleName === "admin") return false;
 
-            const matchSearch = !searchTerm || userName.includes(search);
+            // Manager và Accountant chỉ xem nhân viên trong chi nhánh của mình
+            if ((isManager || isAccountant) && managerBranchId && emp.branchId !== managerBranchId) return false;
+
+            const matchSearch = !searchTerm || userName.includes(search) || userEmail.includes(search);
+            const matchBranch = !filterBranch || emp.branchId === Number(filterBranch);
             const matchRole = !filterRole || emp.roleId === Number(filterRole);
 
-            return matchSearch && matchRole;
+            return matchSearch && matchBranch && matchRole;
         });
-    }, [employees, searchTerm, filterRole]);
+    }, [allEmployees, searchTerm, filterBranch, filterRole, isManager, isAccountant, managerBranchId]);
+
+    // Pagination
+    const totalPages = Math.ceil(filteredEmployees.length / pageSize) || 1;
+    const paginatedEmployees = React.useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filteredEmployees.slice(start, start + pageSize);
+    }, [filteredEmployees, currentPage, pageSize]);
+
+    // Reset page khi filter thay đổi
+    React.useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, filterBranch, filterRole]);
 
     return (
         <div className="min-h-screen bg-slate-50 p-5">
@@ -120,8 +155,14 @@ export default function EmployeeManagementPage() {
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                     <Users className="text-sky-600" size={28} />
-                    <h1 className="text-2xl font-bold text-slate-800">Quản lý nhân viên</h1>
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-800">Quản lý nhân viên</h1>
+                        {(isManager || isAccountant) && managerBranchName && (
+                            <p className="text-sm text-slate-500">Chi nhánh: {managerBranchName}</p>
+                        )}
+                    </div>
                 </div>
+                {/* Chỉ Admin mới có nút thêm nhân viên */}
                 {isAdmin && (
                     <button
                         onClick={() => navigate("/admin/users/new")}
@@ -149,29 +190,27 @@ export default function EmployeeManagementPage() {
                     />
                 </div>
 
-                <div>
-                    <label className="text-xs text-slate-600 mb-1 block">
-                        <Building2 size={14} className="inline mr-1" />
-                        Chi nhánh
-                    </label>
-                    <select
-                        value={filterBranch}
-                        onChange={(e) => {
-                            const branchId = e.target.value;
-                            setFilterBranch(branchId);
-                            // Gọi API lọc theo chi nhánh
-                            loadData(branchId || null);
-                        }}
-                        className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"
-                    >
-                        <option value="">Tất cả chi nhánh</option>
-                        {branches.map((b, index) => (
-                            <option key={b.id || `branch-${index}`} value={b.id}>
-                                {b.branchName}
-                            </option>
-                        ))}
-                    </select>
-                </div>
+                {/* Chi nhánh - Ẩn với Manager và Accountant vì đã lock theo chi nhánh */}
+                {!isManager && !isAccountant && (
+                    <div>
+                        <label className="text-xs text-slate-600 mb-1 block">
+                            <Building2 size={14} className="inline mr-1" />
+                            Chi nhánh
+                        </label>
+                        <select
+                            value={filterBranch}
+                            onChange={(e) => setFilterBranch(e.target.value)}
+                            className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"
+                        >
+                            <option value="">Tất cả chi nhánh</option>
+                            {branches.map((b, index) => (
+                                <option key={b.id || `branch-${index}`} value={b.id}>
+                                    {b.branchName}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
 
                 <div>
                     <label className="text-xs text-slate-600 mb-1 block">
@@ -202,66 +241,103 @@ export default function EmployeeManagementPage() {
                 ) : filteredEmployees.length === 0 ? (
                     <div className="p-8 text-center text-slate-500">Không có nhân viên nào</div>
                 ) : (
-                    <table className="w-full">
-                        <thead className="bg-slate-100 border-b">
-                        <tr>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700">ID</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700">Họ tên</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700">Email</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700">Số điện thoại</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700">Vai trò</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700">Chi nhánh</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700">Trạng thái</th>
-                            <th className="px-4 py-3 text-center text-xs font-semibold text-slate-700">Thao tác</th>
-                        </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                        {filteredEmployees.map((emp, index) => (
-                            <tr key={emp.id || `emp-${index}`} className="hover:bg-slate-50">
-                                <td className="px-4 py-3 text-sm">{emp.id}</td>
-                                <td className="px-4 py-3 text-sm font-medium">{emp.userFullName || "N/A"}</td>
-                                <td className="px-4 py-3 text-sm text-slate-600">{emp.userEmail || "N/A"}</td>
-                                <td className="px-4 py-3 text-sm text-slate-600">{emp.userPhone || "N/A"}</td>
-                                <td className="px-4 py-3 text-sm">
-                                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
-                                            {emp.roleName || "N/A"}
-                                        </span>
-                                </td>
-                                <td className="px-4 py-3 text-sm">{emp.branchName || "N/A"}</td>
-                                <td className="px-4 py-3 text-sm">
-                                        <span
-                                            className={`px-2 py-1 rounded text-xs ${emp.status === "ACTIVE"
-                                                ? "bg-green-100 text-green-700"
-                                                : "bg-gray-100 text-gray-700"
-                                            }`}
-                                        >
-                                            {emp.status}
-                                        </span>
-                                </td>
-                                <td className="px-4 py-3 text-center">
-                                    <div className="flex items-center justify-center gap-2">
-                                        <button
-                                            onClick={() => navigate(`/admin/employees/edit/${emp.id}`)}
-                                            className="text-blue-600 hover:text-blue-800"
-                                            title="Chỉnh sửa"
-                                        >
-                                            <Edit size={16} />
-                                        </button>
-                                        <button
-                                            onClick={() => handleToggleStatus(emp)}
-                                            className={emp.status === "ACTIVE"
-                                                ? "text-orange-600 hover:text-orange-800"
-                                                : "text-green-600 hover:text-green-800"}
-                                            title={emp.status === "ACTIVE" ? "Vô hiệu hóa" : "Kích hoạt"}
-                                        >
-                                            {emp.status === "ACTIVE" ? <Ban size={16} /> : <CheckCircle size={16} />}
-                                        </button>
-                                    </div>
-                                </td>
+                    <>
+                        <table className="w-full">
+                            <thead className="bg-slate-100 border-b">
+                            <tr>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700">ID</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700">Họ tên</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700">Email</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700">Số điện thoại</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700">Vai trò</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700">Chi nhánh</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700">Trạng thái</th>
+                                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-700">Thao tác</th>
                             </tr>
-                        ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="divide-y">
+                            {paginatedEmployees.map((emp, index) => (
+                                <tr key={emp.id || `emp-${index}`} className="hover:bg-slate-50">
+                                    <td className="px-4 py-3 text-sm">{emp.id}</td>
+                                    <td className="px-4 py-3 text-sm font-medium">{emp.userFullName || "Không có"}</td>
+                                    <td className="px-4 py-3 text-sm text-slate-600">{emp.userEmail || "Không có"}</td>
+                                    <td className="px-4 py-3 text-sm text-slate-600">{emp.userPhone || "Không có"}</td>
+                                    <td className="px-4 py-3 text-sm">
+                                            <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
+                                                {emp.roleName || "Không có"}
+                                            </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-sm">{emp.branchName || "Không có"}</td>
+                                    <td className="px-4 py-3 text-sm">
+                                            <span
+                                                className={`px-2 py-1 rounded text-xs ${emp.status === "ACTIVE"
+                                                    ? "bg-green-100 text-green-700"
+                                                    : "bg-gray-100 text-gray-700"
+                                                }`}
+                                            >
+                                                {emp.status}
+                                            </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                        <div className="flex items-center justify-center gap-2">
+                                            {/* Admin có thể sửa tất cả, Manager có thể sửa nhân viên trong chi nhánh (trừ Manager khác), Accountant chỉ xem */}
+                                            {(isAdmin || (isManager && emp.roleName?.toLowerCase() !== "manager")) && (
+                                                <button
+                                                    onClick={() => navigate(`/admin/employees/edit/${emp.id}`)}
+                                                    className="text-blue-600 hover:text-blue-800"
+                                                    title="Chỉnh sửa"
+                                                >
+                                                    <Edit size={16} />
+                                                </button>
+                                            )}
+                                            {/* Chỉ Admin mới có thể vô hiệu hóa/kích hoạt */}
+                                            {isAdmin && (
+                                                <button
+                                                    onClick={() => handleToggleStatus(emp)}
+                                                    className={emp.status === "ACTIVE"
+                                                        ? "text-orange-600 hover:text-orange-800"
+                                                        : "text-green-600 hover:text-green-800"}
+                                                    title={emp.status === "ACTIVE" ? "Vô hiệu hóa" : "Kích hoạt"}
+                                                >
+                                                    {emp.status === "ACTIVE" ? <Ban size={16} /> : <CheckCircle size={16} />}
+                                                </button>
+                                            )}
+                                            {/* Accountant chỉ xem, không có nút thao tác */}
+                                            {isAccountant && !isAdmin && !isManager && (
+                                                <span className="text-xs text-slate-400">Chỉ xem</span>
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                            </tbody>
+                        </table>
+                        {/* Pagination */}
+                        <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-3">
+                            <div className="text-sm text-slate-600">
+                                Hiển thị {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, filteredEmployees.length)} / {filteredEmployees.length} nhân viên
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                    disabled={currentPage <= 1}
+                                    className="flex items-center gap-1 px-3 py-1 border border-slate-300 rounded-md text-sm bg-white hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <ChevronLeft size={16} /> Trước
+                                </button>
+                                <span className="text-sm text-slate-600 px-2">
+                                    Trang {currentPage} / {totalPages}
+                                </span>
+                                <button
+                                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                    disabled={currentPage >= totalPages}
+                                    className="flex items-center gap-1 px-3 py-1 border border-slate-300 rounded-md text-sm bg-white hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Sau <ChevronRight size={16} />
+                                </button>
+                            </div>
+                        </div>
+                    </>
                 )}
             </div>
         </div>

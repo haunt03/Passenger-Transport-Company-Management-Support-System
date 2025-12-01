@@ -18,6 +18,7 @@ import {
   getDriverProfileByUser,
   getDriverDashboard,
   getDriverSchedule,
+  getDayOffHistory,
   startTrip as apiStartTrip,
   completeTrip as apiCompleteTrip,
 } from "../../api/drivers";
@@ -564,6 +565,7 @@ export default function DriverDashboard() {
         console.warn("Could not load upcoming trips:", err);
         setUpcomingTrips([]);
       }
+
     } catch (err) {
       setTrip(null);
       setError(
@@ -608,6 +610,76 @@ export default function DriverDashboard() {
       mounted = false;
     };
   }, [fetchDashboard]);
+
+  // Load days off for current month
+  React.useEffect(() => {
+    if (!driver?.driverId) return;
+
+    async function loadDaysOff() {
+      try {
+        const dayOffList = await getDayOffHistory(driver.driverId);
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+
+        // Filter approved day-offs in current month
+        const approvedDayOffs = Array.isArray(dayOffList)
+            ? dayOffList.filter((dayOff) => {
+              if (dayOff.status !== "APPROVED") return false;
+
+              // Get date from various possible fields
+              const leaveDate = dayOff.date || dayOff.leaveDate || dayOff.startDate;
+              if (!leaveDate) return false;
+
+              const date = new Date(leaveDate);
+              if (isNaN(date.getTime())) return false;
+
+              // Check if in current month
+              return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+            })
+            : [];
+
+        // Count days (handle range: startDate to endDate)
+        let daysOffUsed = 0;
+        approvedDayOffs.forEach((dayOff) => {
+          const startDate = new Date(dayOff.startDate || dayOff.date || dayOff.leaveDate);
+          const endDate = dayOff.endDate ? new Date(dayOff.endDate) : startDate;
+
+          if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+            // Calculate days in range, but only count days in current month
+            const monthStart = new Date(currentYear, currentMonth, 1);
+            const monthEnd = new Date(currentYear, currentMonth + 1, 0);
+
+            const start = new Date(Math.max(startDate.getTime(), monthStart.getTime()));
+            const end = new Date(Math.min(endDate.getTime(), monthEnd.getTime()));
+
+            if (end >= start) {
+              const diffTime = Math.abs(end - start);
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end
+              daysOffUsed += diffDays;
+            }
+          } else {
+            // Single day
+            daysOffUsed += 1;
+          }
+        });
+
+        // Get days off allowed (default to 2, or from profile/config if available)
+        const daysOffAllowed = driver?.daysOffAllowed || 2;
+
+        setStats((prev) => ({
+          ...prev,
+          daysOffUsed,
+          daysOffAllowed,
+        }));
+      } catch (err) {
+        console.warn("Could not load days off history:", err);
+        // Keep default values on error
+      }
+    }
+
+    loadDaysOff();
+  }, [driver?.driverId]);
 
   // sync phase theo backend status
   React.useEffect(() => {

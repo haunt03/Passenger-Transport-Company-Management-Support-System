@@ -20,6 +20,8 @@ import {
 import { getCurrentRole, getStoredUserId, ROLES } from "../../utils/session";
 import { getBranchByUserId, listBranches } from "../../api/branches";
 import { apiFetch } from "../../api/http";
+import { getDriverSchedule } from "../../api/drivers";
+import { unassignTrip } from "../../api/dispatch";
 
 /**
  * NotificationsDashboard - Dashboard cảnh báo & phê duyệt
@@ -52,9 +54,23 @@ export default function NotificationsDashboard() {
     // Local state để lưu note sau khi duyệt (hiển thị trên card)
     const [approvalNotes, setApprovalNotes] = React.useState({});
 
+    // State for checking driver trips before approval
+    const [checkingTrips, setCheckingTrips] = React.useState(false);
+    const [conflictingTrips, setConflictingTrips] = React.useState([]);
+    const [showConflictDialog, setShowConflictDialog] = React.useState(false);
+
     const role = getCurrentRole();
     const userId = getStoredUserId();
     const isAdmin = role === ROLES.ADMIN;
+    const isCoordinator = role === ROLES.COORDINATOR;
+    const isManager = role === ROLES.MANAGER;
+
+    // Coordinator chỉ được duyệt nghỉ phép, không được duyệt chi phí
+    const canApproveType = (approvalType) => {
+        if (isAdmin || isManager) return true;
+        if (isCoordinator && approvalType === "DRIVER_DAY_OFF") return true;
+        return false;
+    };
 
     // Load user's branch
     React.useEffect(() => {
@@ -119,7 +135,7 @@ export default function NotificationsDashboard() {
         loadDashboard();
     }, [selectedBranchId, isAdmin]);
 
-    // Load processed approvals (đã duyệt/từ chối)
+    // Load processed approvals (đã duyệt/từ chối) - chỉ lấy những yêu cầu do mình duyệt
     React.useEffect(() => {
         if (!selectedBranchId && !isAdmin) return;
 
@@ -129,6 +145,8 @@ export default function NotificationsDashboard() {
                 const params = new URLSearchParams();
                 if (selectedBranchId) params.append("branchId", selectedBranchId);
                 params.append("limit", "50"); // Lấy 50 mục gần nhất
+                // Chỉ lấy những yêu cầu do current user duyệt
+                if (userId) params.append("processedByUserId", userId);
 
                 const data = await apiFetch(`/api/notifications/approvals/processed?${params}`);
                 setProcessedApprovals(Array.isArray(data) ? data : []);
@@ -141,7 +159,7 @@ export default function NotificationsDashboard() {
         }
 
         loadProcessedApprovals();
-    }, [selectedBranchId, isAdmin]);
+    }, [selectedBranchId, isAdmin, userId]);
 
     const handleRefresh = () => {
         setSelectedBranchId(selectedBranchId); // Trigger reload
@@ -152,6 +170,8 @@ export default function NotificationsDashboard() {
                 const params = new URLSearchParams();
                 if (selectedBranchId) params.append("branchId", selectedBranchId);
                 params.append("limit", "50");
+                // Chỉ lấy những yêu cầu do current user duyệt
+                if (userId) params.append("processedByUserId", userId);
                 const data = await apiFetch(`/api/notifications/approvals/processed?${params}`);
                 setProcessedApprovals(Array.isArray(data) ? data : []);
             } catch (err) {
@@ -175,8 +195,98 @@ export default function NotificationsDashboard() {
         }
     };
 
-    const handleApproveClick = (historyId, e) => {
+    const handleApproveClick = async (historyId, e) => {
         e?.stopPropagation(); // Prevent triggering detail dialog
+
+        // Find the approval to check if it's a day off request
+        const approval = dashboard?.pendingApprovals?.find(a => a.id === historyId);
+
+        // If it's a driver day off request, check for conflicting trips first
+        if (approval?.approvalType === "DRIVER_DAY_OFF" && approval?.details) {
+            // Try to get driverId from various possible fields
+            const driverId = approval.details.driverId || approval.driverId || approval.requestedByUserId;
+            const startDate = approval.details.startDate;
+            const endDate = approval.details.endDate || startDate;
+
+            console.log("🔍 [TEST] Checking day off approval:", {
+                approvalType: approval.approvalType,
+                driverId,
+                startDate,
+                endDate,
+                approvalDetails: approval.details
+            });
+
+            if (driverId && startDate) {
+                setCheckingTrips(true);
+                try {
+                    console.log("📅 [TEST] Fetching driver schedule for driverId:", driverId);
+                    // Get driver schedule
+                    const schedule = await getDriverSchedule(driverId);
+                    const scheduleList = Array.isArray(schedule) ? schedule : [];
+                    console.log("📋 [TEST] Driver schedule received:", scheduleList.length, "trips");
+
+                    // Parse date range
+                    const leaveStart = new Date(startDate);
+                    const leaveEnd = new Date(endDate);
+                    leaveStart.setHours(0, 0, 0, 0);
+                    leaveEnd.setHours(23, 59, 59, 999);
+
+                    console.log("📆 [TEST] Leave period:", {
+                        start: leaveStart.toISOString(),
+                        end: leaveEnd.toISOString()
+                    });
+
+                    // Find conflicting trips (trips that overlap with leave period)
+                    const conflicts = scheduleList.filter(trip => {
+                        const tripDate = new Date(trip.startTime || trip.start_time);
+                        if (isNaN(tripDate.getTime())) return false;
+
+                        // Check if trip is scheduled (not completed/cancelled)
+                        const status = trip.status || trip.tripStatus;
+                        if (status === "COMPLETED" || status === "CANCELLED") return false;
+
+                        // Check if trip date is within leave period
+                        const isConflict = tripDate >= leaveStart && tripDate <= leaveEnd;
+
+                        if (isConflict) {
+                            console.log("⚠️ [TEST] Found conflicting trip:", {
+                                tripId: trip.tripId || trip.trip_id || trip.id,
+                                tripDate: tripDate.toISOString(),
+                                status: status,
+                                startTime: trip.startTime || trip.start_time
+                            });
+                        }
+
+                        return isConflict;
+                    });
+
+                    console.log("✅ [TEST] Total conflicts found:", conflicts.length);
+
+                    if (conflicts.length > 0) {
+                        console.log("🚨 [TEST] Showing conflict dialog with", conflicts.length, "conflicting trips");
+                        // Show conflict dialog
+                        setConflictingTrips(conflicts);
+                        setSelectedApprovalId(historyId);
+                        setShowConflictDialog(true);
+                        setCheckingTrips(false);
+                        return;
+                    } else {
+                        console.log("✅ [TEST] No conflicts found, proceeding with normal approval");
+                    }
+                } catch (err) {
+                    console.error("❌ [TEST] Failed to check driver trips:", err);
+                    // Continue with approval even if check fails (don't block user)
+                } finally {
+                    setCheckingTrips(false);
+                }
+            } else {
+                console.warn("⚠️ [TEST] Missing driverId or startDate:", { driverId, startDate });
+            }
+        } else {
+            console.log("ℹ️ [TEST] Not a DRIVER_DAY_OFF request, skipping check");
+        }
+
+        // No conflicts or not a day off request, proceed with normal approval dialog
         setSelectedApprovalId(historyId);
         setDialogType("approve");
         setDialogNote("");
@@ -213,10 +323,45 @@ export default function NotificationsDashboard() {
             }));
 
             setDialogOpen(false);
+            setShowConflictDialog(false);
+            setConflictingTrips([]);
             handleRefresh();
         } catch (err) {
             console.error("Failed to approve:", err);
             alert("Không thể phê duyệt");
+        }
+    };
+
+    // Handle unassigning conflicting trips before approval
+    const handleUnassignConflictingTrips = async () => {
+        if (conflictingTrips.length === 0) return;
+
+        const unassignNote = `Hủy gán do tài xế nghỉ phép từ ${dashboard?.pendingApprovals?.find(a => a.id === selectedApprovalId)?.details?.startDate} đến ${dashboard?.pendingApprovals?.find(a => a.id === selectedApprovalId)?.details?.endDate}`;
+
+        try {
+            // Unassign all conflicting trips
+            const unassignPromises = conflictingTrips.map(trip => {
+                const tripId = trip.tripId || trip.trip_id || trip.id;
+                if (!tripId) return Promise.resolve();
+                return unassignTrip(tripId, unassignNote).catch(err => {
+                    console.error(`Failed to unassign trip ${tripId}:`, err);
+                    return null; // Continue with other trips even if one fails
+                });
+            });
+
+            await Promise.all(unassignPromises);
+
+            // Clear conflicts and proceed with approval
+            setConflictingTrips([]);
+            setShowConflictDialog(false);
+
+            // Now show approval dialog
+            setDialogType("approve");
+            setDialogNote(`Đã hủy gán ${conflictingTrips.length} chuyến xung đột. ${unassignNote}`);
+            setDialogOpen(true);
+        } catch (err) {
+            console.error("Failed to unassign trips:", err);
+            alert("Không thể hủy gán một số chuyến. Vui lòng thử lại hoặc từ chối yêu cầu nghỉ phép.");
         }
     };
 
@@ -357,7 +502,7 @@ export default function NotificationsDashboard() {
                                                     approval={approval}
                                                     onApprove={handleApproveClick}
                                                     onReject={handleRejectClick}
-                                                    canApprove={isAdmin || role === ROLES.MANAGER}
+                                                    canApprove={canApproveType(approval.approvalType)}
                                                     approvalNote={approvalNotes[approval.id]}
                                                     onClick={() => handleViewDetail(approval, "pending")}
                                                 />
@@ -405,6 +550,84 @@ export default function NotificationsDashboard() {
                     </>
                 ) : null}
             </div>
+
+            {/* Conflict Dialog - Show when driver has trips during leave period */}
+            {showConflictDialog && conflictingTrips.length > 0 && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowConflictDialog(false)}>
+                    <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+                        <div className="px-6 py-4 border-b border-slate-200 bg-amber-50">
+                            <div className="flex items-start gap-3">
+                                <AlertTriangle className="h-6 w-6 text-amber-600 shrink-0 mt-0.5" />
+                                <div className="flex-1">
+                                    <h3 className="text-lg font-semibold text-slate-900">Cảnh báo: Tài xế có chuyến trong ngày nghỉ</h3>
+                                    <p className="text-sm text-slate-600 mt-1">
+                                        Tài xế đã được lên lịch {conflictingTrips.length} chuyến trong khoảng thời gian nghỉ phép.
+                                        Bạn cần hủy gán các chuyến này trước khi duyệt nghỉ phép.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="px-6 py-4 overflow-y-auto flex-1">
+                            <div className="space-y-3">
+                                {conflictingTrips.map((trip, idx) => {
+                                    const tripId = trip.tripId || trip.trip_id || trip.id;
+                                    const startTime = trip.startTime || trip.start_time;
+                                    const startLocation = trip.startLocation || trip.start_location || "—";
+                                    const endLocation = trip.endLocation || trip.end_location || "—";
+                                    const customerName = trip.customerName || trip.customer_name || "—";
+
+                                    return (
+                                        <div key={tripId || idx} className="border border-amber-200 bg-amber-50 rounded-lg p-3">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <Car className="h-4 w-4 text-amber-600" />
+                                                        <span className="font-semibold text-slate-900">Chuyến #{tripId}</span>
+                                                    </div>
+                                                    <div className="text-sm text-slate-700 space-y-1">
+                                                        <div><strong>Khách hàng:</strong> {customerName}</div>
+                                                        <div><strong>Lộ trình:</strong> {startLocation} → {endLocation}</div>
+                                                        <div><strong>Thời gian:</strong> {startTime ? new Date(startTime).toLocaleString('vi-VN') : "—"}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-3">
+                            <button
+                                onClick={() => {
+                                    setShowConflictDialog(false);
+                                    setConflictingTrips([]);
+                                }}
+                                className="px-4 py-2 border border-slate-300 rounded-lg bg-white text-slate-700 hover:bg-slate-50 text-sm font-medium"
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                onClick={handleUnassignConflictingTrips}
+                                disabled={checkingTrips}
+                                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            >
+                                {checkingTrips ? (
+                                    <>
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        Đang xử lý...
+                                    </>
+                                ) : (
+                                    <>
+                                        Hủy gán {conflictingTrips.length} chuyến và duyệt nghỉ phép
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Approval Dialog */}
             {dialogOpen && (
@@ -461,7 +684,7 @@ export default function NotificationsDashboard() {
                     onAcknowledge={selectedItemType === "alert" ? handleAcknowledgeAlert : undefined}
                     onApprove={selectedItemType === "pending" ? handleApproveClick : undefined}
                     onReject={selectedItemType === "pending" ? handleRejectClick : undefined}
-                    canApprove={selectedItemType === "pending" && (isAdmin || role === ROLES.MANAGER)}
+                    canApprove={selectedItemType === "pending" && canApproveType(selectedItem.approvalType)}
                 />
             )}
         </div>

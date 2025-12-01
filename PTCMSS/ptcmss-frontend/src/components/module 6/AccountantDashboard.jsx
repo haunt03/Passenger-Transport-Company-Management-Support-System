@@ -18,6 +18,10 @@ import {
     CalendarRange,
     Building2,
     Info,
+    Clock,
+    CheckCircle,
+    XCircle,
+    CreditCard,
 } from "lucide-react";
 import { getAccountingDashboard } from "../../api/accounting";
 import { listBranches } from "../../api/branches";
@@ -26,6 +30,7 @@ import {
     approveApprovalRequest,
     rejectApprovalRequest,
 } from "../../api/notifications";
+import { getPendingPayments, confirmPayment } from "../../api/invoices";
 import { getEmployeeByUserId } from "../../api/employees";
 import { getCurrentRole, getStoredUserId, ROLES } from "../../utils/session";
 
@@ -466,7 +471,7 @@ function RevExpChart({ data = [] }) {
                 />
                 <LegendSwatchLine
                     x={180}
-                    label="Net (Rev-Exp)"
+                    label="Lợi nhuận ròng"
                 />
             </g>
         </svg>
@@ -1269,6 +1274,11 @@ export default function AccountantDashboard() {
     const [queueLoading, setQueueLoading] = React.useState(false);
     const [queueError, setQueueError] = React.useState("");
 
+    // Pending payment requests from drivers/consultants
+    const [pendingPayments, setPendingPayments] = React.useState([]);
+    const [pendingPaymentsLoading, setPendingPaymentsLoading] = React.useState(false);
+    const [pendingPaymentsError, setPendingPaymentsError] = React.useState("");
+
     const [branchId, setBranchId] = React.useState(null);
     const [branches, setBranches] = React.useState([]);
     const [period, setPeriod] = React.useState("THIS_MONTH");
@@ -1434,6 +1444,22 @@ export default function AccountantDashboard() {
         }
     }, [branchId]);
 
+    // Load pending payment requests from drivers/consultants
+    const loadPendingPayments = React.useCallback(async () => {
+        setPendingPaymentsLoading(true);
+        setPendingPaymentsError("");
+        try {
+            const payments = await getPendingPayments(branchId || undefined);
+            setPendingPayments(Array.isArray(payments) ? payments : []);
+        } catch (err) {
+            console.error("Error loading pending payments:", err);
+            setPendingPaymentsError(err.message || "Không tải được yêu cầu thanh toán.");
+            setPendingPayments([]);
+        } finally {
+            setPendingPaymentsLoading(false);
+        }
+    }, [branchId]);
+
     // Load dashboard on mount and when filters change
     React.useEffect(() => {
         loadDashboard();
@@ -1442,6 +1468,10 @@ export default function AccountantDashboard() {
     React.useEffect(() => {
         loadApprovalQueue();
     }, [loadApprovalQueue]);
+
+    React.useEffect(() => {
+        loadPendingPayments();
+    }, [loadPendingPayments]);
 
     // Filter pending approvals
     const filteredQueue = React.useMemo(() => {
@@ -1500,6 +1530,25 @@ export default function AccountantDashboard() {
             }
         },
         [loadApprovalQueue, loadDashboard, push]
+    );
+
+    // Confirm/Reject payment request from driver/consultant
+    const confirmPaymentRequest = React.useCallback(
+        async (paymentId, status) => {
+            try {
+                console.log("[AccountantDashboard] Confirming payment:", paymentId, status);
+                await confirmPayment(paymentId, status);
+                push(`${status === "CONFIRMED" ? "Đã xác nhận nhận tiền" : "Đã đánh dấu chưa nhận được tiền"}`, "success");
+                // Reload pending payments and dashboard
+                loadPendingPayments();
+                loadDashboard();
+            } catch (err) {
+                console.error("Confirm payment failed:", err);
+                const errorMsg = err?.response?.data?.message || err.message || "Không thể xử lý yêu cầu thanh toán";
+                push(errorMsg, "error");
+            }
+        },
+        [loadPendingPayments, loadDashboard, push]
     );
 
     // Transform chart data from API
@@ -1678,7 +1727,7 @@ export default function AccountantDashboard() {
                         up={false}
                     />
                     <KpiCard
-                        title="Net (Rev - Exp)"
+                        title="Lợi nhuận ròng"
                         value={Number(dashboardData.netProfit || 0)}
                         delta={dashboardData.expenseToRevenueRatio ? Number(dashboardData.expenseToRevenueRatio) : 0}
                         up={Number(dashboardData.netProfit || 0) >= 0}
@@ -1812,9 +1861,132 @@ export default function AccountantDashboard() {
 
                 {/* footer note */}
                 <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 text-[11px] text-slate-500 leading-relaxed">
-                    Dữ liệu được tải từ API. Yêu cầu chi phí chờ duyệt: {approvalQueue.length} mục.
+                    Yêu cầu chi phí chờ duyệt: {approvalQueue.length} mục.
                     HĐ đến hạn 7 ngày: {dashboardData.invoicesDueIn7Days || 0}.
                     HĐ quá hạn: {dashboardData.overdueInvoices || 0}.
+                </div>
+            </div>
+
+            {/* PENDING PAYMENT REQUESTS CARD */}
+            <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden mt-5">
+                {/* header */}
+                <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 text-sm text-slate-600 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                        <CreditCard className="h-4 w-4 text-sky-600" />
+                        <div className="font-medium text-slate-700">
+                            Yêu cầu thanh toán chờ xác nhận
+                        </div>
+                        {pendingPayments.length > 0 && (
+                            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-500 text-white">
+                                {pendingPayments.length}
+                            </span>
+                        )}
+                    </div>
+                    <button
+                        onClick={loadPendingPayments}
+                        disabled={pendingPaymentsLoading}
+                        className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 shadow-sm transition-colors disabled:opacity-50"
+                    >
+                        <RefreshCw className={cls("h-3.5 w-3.5", pendingPaymentsLoading ? "animate-spin" : "")} />
+                        Làm mới
+                    </button>
+                </div>
+
+                {/* content */}
+                {pendingPaymentsLoading ? (
+                    <div className="px-4 py-8 text-center text-slate-500 text-sm">
+                        <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2" />
+                        Đang tải...
+                    </div>
+                ) : pendingPaymentsError ? (
+                    <div className="px-4 py-8 text-center text-rose-600 text-sm">
+                        {pendingPaymentsError}
+                        <button
+                            onClick={loadPendingPayments}
+                            className="ml-2 text-sky-600 hover:underline"
+                        >
+                            Thử lại
+                        </button>
+                    </div>
+                ) : pendingPayments.length === 0 ? (
+                    <div className="px-4 py-8 text-center">
+                        <CheckCircle className="h-10 w-10 text-emerald-400 mx-auto mb-2" />
+                        <div className="text-sm font-medium text-slate-700">Không có yêu cầu thanh toán nào đang chờ</div>
+                        <div className="text-xs text-slate-500 mt-1">Tất cả yêu cầu đã được xử lý</div>
+                    </div>
+                ) : (
+                    <div className="divide-y divide-slate-200">
+                        {pendingPayments.map((payment, idx) => (
+                            <div key={`pending-payment-${payment.paymentId}-${idx}`} className="p-4 hover:bg-slate-50 transition-colors">
+                                <div className="flex items-start justify-between gap-4">
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-3 mb-2">
+                                            <span className="text-lg font-bold text-slate-900 tabular-nums">
+                                                {fmtVND(payment.amount || 0)} đ
+                                            </span>
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] bg-amber-50 text-amber-700 border border-amber-300">
+                                                <Clock className="h-3 w-3" />
+                                                Chờ xác nhận
+                                            </span>
+                                        </div>
+                                        <div className="text-sm text-slate-600 space-y-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-medium text-slate-500">Hóa đơn:</span>
+                                                <span className="text-slate-900">{payment.invoiceNumber || `INV-${payment.invoiceId}`}</span>
+                                                {payment.customerName && (
+                                                    <span className="text-slate-500">· {payment.customerName}</span>
+                                                )}
+                                            </div>
+                                            {payment.bookingCode && (
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-medium text-slate-500">Mã đơn:</span>
+                                                    <span>{payment.bookingCode}</span>
+                                                </div>
+                                            )}
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-medium text-slate-500">Phương thức:</span>
+                                                <span>{payment.paymentMethod === "CASH" ? "Tiền mặt" : payment.paymentMethod === "TRANSFER" ? "Chuyển khoản" : payment.paymentMethod || "—"}</span>
+                                            </div>
+                                            {payment.paymentDate && (
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-medium text-slate-500">Thời gian:</span>
+                                                    <span>{fmtDateTime(payment.paymentDate)}</span>
+                                                </div>
+                                            )}
+                                            {payment.note && (
+                                                <div className="mt-1 text-xs text-slate-500 italic">
+                                                    "{payment.note}"
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Action buttons */}
+                                    <div className="flex flex-col gap-2">
+                                        <button
+                                            onClick={() => confirmPaymentRequest(payment.paymentId, "CONFIRMED")}
+                                            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm"
+                                        >
+                                            <CheckCircle className="h-3.5 w-3.5" />
+                                            Đã nhận
+                                        </button>
+                                        <button
+                                            onClick={() => confirmPaymentRequest(payment.paymentId, "REJECTED")}
+                                            className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm"
+                                        >
+                                            <XCircle className="h-3.5 w-3.5" />
+                                            Chưa nhận được
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* footer note */}
+                <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 text-[11px] text-slate-500 leading-relaxed">
+                    Xác thực tiền đã nhận từ tài xế/tư vấn viên. Chọn "Đã nhận" để ghi nhận số tiền vào hóa đơn.
                 </div>
             </div>
         </div>

@@ -200,7 +200,7 @@ export default function AdminManagersPage() {
             <div className="space-y-2">
               <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
                 <User className="h-4 w-4 text-slate-400" />
-                <span>Username</span>
+                <span>Tên đăng nhập</span>
                 <span className="text-red-500">*</span>
               </label>
               <input
@@ -210,7 +210,7 @@ export default function AdminManagersPage() {
                           : "border-slate-300 focus:border-[#0079BC]/50 focus:ring-[#0079BC]/20"
                   }`}
                   value={form.username}
-                  placeholder="Nhập username"
+                  placeholder="Nhập tên đăng nhập"
                   onChange={(e) => updateField("username", e.target.value)}
               />
               {errors.username && (

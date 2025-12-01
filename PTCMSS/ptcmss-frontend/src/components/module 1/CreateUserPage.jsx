@@ -64,14 +64,14 @@ export default function CreateUserPage() {
       try {
         const rs = await listRoles();
         const list = Array.isArray(rs?.data)
-          ? rs.data
-          : Array.isArray(rs?.items)
-            ? rs.items
-            : Array.isArray(rs?.content)
-              ? rs.content
-              : Array.isArray(rs)
-                ? rs
-                : [];
+            ? rs.data
+            : Array.isArray(rs?.items)
+                ? rs.items
+                : Array.isArray(rs?.content)
+                    ? rs.content
+                    : Array.isArray(rs)
+                        ? rs
+                        : [];
         if (!mounted) return;
         setRoles(list);
       } catch (error) {
@@ -92,10 +92,10 @@ export default function CreateUserPage() {
         const rs = await getAllBranchesForSelection();
         console.log("Branches API response:", rs);
         const list = Array.isArray(rs?.data)
-          ? rs.data
-          : Array.isArray(rs)
-            ? rs
-            : [];
+            ? rs.data
+            : Array.isArray(rs)
+                ? rs
+                : [];
         console.log("Branches list:", list);
         if (mounted) setBranches(list);
       } catch (error) {
@@ -223,10 +223,10 @@ export default function CreateUserPage() {
       setTimeout(() => navigate("/admin/users"), 1500);
     } catch (error) {
       const message =
-        error?.data?.message ||
-        error?.response?.data?.message ||
-        error?.message ||
-        "Không thể tạo tài khoản. Vui lòng thử lại.";
+          error?.data?.message ||
+          error?.response?.data?.message ||
+          error?.message ||
+          "Không thể tạo tài khoản. Vui lòng thử lại.";
       setGeneralError(message);
     } finally {
       setSaving(false);
@@ -234,224 +234,224 @@ export default function CreateUserPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 text-slate-900 p-5">
-      {success && (
-        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 duration-300">
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 shadow-xl rounded-xl p-4 flex gap-3 items-center min-w-[320px]">
-            <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-              <UserPlus className="text-green-600" size={20} />
-            </div>
-            <div className="flex-1">
-              <div className="font-semibold text-green-800 text-sm">Đã tạo tài khoản!</div>
-              <div className="text-xs text-green-700">Hệ thống đã gửi email xác thực cho nhân viên.</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="max-w-4xl mx-auto space-y-5">
-        <div className="flex items-center gap-4 mb-6">
-          <button
-            onClick={() => navigate(-1)}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm hover:bg-slate-50 hover:border-slate-400 transition-all active:scale-[0.98]"
-          >
-            <ArrowLeft className="h-4 w-4 text-slate-600" />
-          </button>
-          <div className="flex items-center gap-3 flex-1">
-            <div className="h-12 w-12 rounded-xl flex items-center justify-center text-white shadow-lg" style={{ backgroundColor: BRAND_COLOR }}>
-              <UserPlus className="h-6 w-6" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-slate-900">Tạo tài khoản mới</h1>
-              <p className="text-xs text-slate-500 mt-0.5">Sử dụng chung cho Admin và Manager</p>
-            </div>
-          </div>
-          <button
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-            className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-lg disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-xl transition-all active:scale-[0.98]"
-            style={{ backgroundColor: BRAND_COLOR }}
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            <span>{saving ? "Đang lưu..." : "Lưu"}</span>
-          </button>
-        </div>
-
-        {isManager && (
-          <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-3">
-            <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
-              <Info className="h-4 w-4 text-amber-700" />
-            </div>
-            <div className="flex-1 text-sm text-amber-700">
-              {managerBranchLoading
-                ? "Đang xác định chi nhánh phụ trách..."
-                : managerBranchInfo.id
-                  ? `Manager chỉ được tạo tài khoản thuộc chi nhánh ${managerBranchInfo.name || "#" + managerBranchInfo.id}.`
-                  : managerBranchError || "Không xác định được chi nhánh của bạn. Liên hệ Admin trước khi tạo tài khoản."}
-            </div>
-          </div>
-        )}
-
-        {generalError && (
-          <div className="bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 rounded-xl p-4 flex gap-3 shadow-sm">
-            <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-              <AlertCircle className="text-red-600" size={20} />
-            </div>
-            <div className="flex-1">
-              <div className="font-semibold text-red-800 text-sm mb-1">Không thể tạo</div>
-              <div className="text-sm text-red-700">{generalError}</div>
-            </div>
-          </div>
-        )}
-
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-lg p-6 space-y-5">
-          <div className="grid grid-cols-1 gap-5">
-            {[
-              {
-                field: "fullName",
-                label: "Họ và tên",
-                icon: <User className="h-4 w-4 text-slate-400" />,
-                required: true,
-                placeholder: "Nguyễn Văn A",
-              },
-              {
-                field: "username",
-                label: "Username",
-                icon: <User className="h-4 w-4 text-slate-400" />,
-                required: true,
-                placeholder: "nguyen.van.a",
-              },
-              {
-                field: "email",
-                label: "Email",
-                icon: <Mail className="h-4 w-4 text-slate-400" />,
-                required: true,
-                placeholder: "example@domain.com",
-                type: "email",
-              },
-              {
-                field: "phone",
-                label: "Số điện thoại",
-                icon: <Phone className="h-4 w-4 text-slate-400" />,
-                required: true,
-                placeholder: "0900000000",
-                type: "tel",
-              },
-            ].map(({ field, label, icon, required, placeholder, type = "text" }) => (
-              <div key={field} className="space-y-2">
-                <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                  {icon}
-                  <span>{label}</span>
-                  {required && <span className="text-red-500">*</span>}
-                </label>
-                <input
-                  type={type}
-                  value={form[field]}
-                  onChange={(e) => updateField(field, e.target.value)}
-                  placeholder={placeholder}
-                  className={`w-full border rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 ${errors[field]
-                    ? "border-red-400 focus:border-red-500 focus:ring-red-200"
-                    : "border-slate-300 focus:border-[#EDC531]/50 focus:ring-[#EDC531]/20"
-                    }`}
-                />
-                {errors[field] && (
-                  <div className="text-xs text-red-600 mt-1.5 flex items-center gap-1.5">
-                    <AlertCircle className="h-3.5 w-3.5" />
-                    <span>{errors[field]}</span>
-                  </div>
-                )}
-              </div>
-            ))}
-
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                <MapPin className="h-4 w-4 text-slate-400" />
-                <span>Địa chỉ</span>
-              </label>
-              <textarea
-                value={form.address}
-                onChange={(e) => updateField("address", e.target.value)}
-                rows={3}
-                placeholder="Số nhà, đường, phường/xã..."
-                className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:border-[#EDC531]/50 focus:ring-[#EDC531]/20 resize-none"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                <Building2 className="h-4 w-4 text-slate-400" />
-                <span>Chi nhánh</span>
-                <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={form.branchId}
-                onChange={(e) => updateField("branchId", e.target.value)}
-                disabled={isManager}
-                className={`w-full border rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 ${errors.branchId
-                  ? "border-red-400 focus:border-red-500 focus:ring-red-200"
-                  : "border-slate-300 focus:border-[#EDC531]/50 focus:ring-[#EDC531]/20"
-                  } ${isManager ? "bg-slate-50 text-slate-500 cursor-not-allowed" : ""}`}
-              >
-                <option value="">-- Chọn chi nhánh --</option>
-                {branchOptions.map((branch) => (
-                  <option key={branch.id} value={branch.id}>
-                    {branch.branchName || branch.name || `Chi nhánh #${branch.id}`}
-                  </option>
-                ))}
-              </select>
-              {errors.branchId && (
-                <div className="text-xs text-red-600 mt-1.5 flex items-center gap-1.5">
-                  <AlertCircle className="h-3.5 w-3.5" />
-                  <span>{errors.branchId}</span>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 text-slate-900 p-5">
+        {success && (
+            <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 duration-300">
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 shadow-xl rounded-xl p-4 flex gap-3 items-center min-w-[320px]">
+                <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                  <UserPlus className="text-green-600" size={20} />
                 </div>
-              )}
+                <div className="flex-1">
+                  <div className="font-semibold text-green-800 text-sm">Đã tạo tài khoản!</div>
+                  <div className="text-xs text-green-700">Hệ thống đã gửi email xác thực cho nhân viên.</div>
+                </div>
+              </div>
             </div>
+        )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="max-w-4xl mx-auto space-y-5">
+          <div className="flex items-center gap-4 mb-6">
+            <button
+                onClick={() => navigate(-1)}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm hover:bg-slate-50 hover:border-slate-400 transition-all active:scale-[0.98]"
+            >
+              <ArrowLeft className="h-4 w-4 text-slate-600" />
+            </button>
+            <div className="flex items-center gap-3 flex-1">
+              <div className="h-12 w-12 rounded-xl flex items-center justify-center text-white shadow-lg" style={{ backgroundColor: BRAND_COLOR }}>
+                <UserPlus className="h-6 w-6" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-slate-900">Tạo tài khoản mới</h1>
+                <p className="text-xs text-slate-500 mt-0.5">Sử dụng chung cho Admin và Manager</p>
+              </div>
+            </div>
+            <button
+                onClick={handleSubmit}
+                disabled={!canSubmit}
+                className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-lg disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-xl transition-all active:scale-[0.98]"
+                style={{ backgroundColor: BRAND_COLOR }}
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              <span>{saving ? "Đang lưu..." : "Lưu"}</span>
+            </button>
+          </div>
+
+          {isManager && (
+              <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-3">
+                <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+                  <Info className="h-4 w-4 text-amber-700" />
+                </div>
+                <div className="flex-1 text-sm text-amber-700">
+                  {managerBranchLoading
+                      ? "Đang xác định chi nhánh phụ trách..."
+                      : managerBranchInfo.id
+                          ? `Manager chỉ được tạo tài khoản thuộc chi nhánh ${managerBranchInfo.name || "#" + managerBranchInfo.id}.`
+                          : managerBranchError || "Không xác định được chi nhánh của bạn. Liên hệ Admin trước khi tạo tài khoản."}
+                </div>
+              </div>
+          )}
+
+          {generalError && (
+              <div className="bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 rounded-xl p-4 flex gap-3 shadow-sm">
+                <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                  <AlertCircle className="text-red-600" size={20} />
+                </div>
+                <div className="flex-1">
+                  <div className="font-semibold text-red-800 text-sm mb-1">Không thể tạo</div>
+                  <div className="text-sm text-red-700">{generalError}</div>
+                </div>
+              </div>
+          )}
+
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-lg p-6 space-y-5">
+            <div className="grid grid-cols-1 gap-5">
+              {[
+                {
+                  field: "fullName",
+                  label: "Họ và tên",
+                  icon: <User className="h-4 w-4 text-slate-400" />,
+                  required: true,
+                  placeholder: "Nguyễn Văn A",
+                },
+                {
+                  field: "username",
+                  label: "Tên đăng nhập",
+                  icon: <User className="h-4 w-4 text-slate-400" />,
+                  required: true,
+                  placeholder: "nguyen.van.a",
+                },
+                {
+                  field: "email",
+                  label: "Email",
+                  icon: <Mail className="h-4 w-4 text-slate-400" />,
+                  required: true,
+                  placeholder: "example@domain.com",
+                  type: "email",
+                },
+                {
+                  field: "phone",
+                  label: "Số điện thoại",
+                  icon: <Phone className="h-4 w-4 text-slate-400" />,
+                  required: true,
+                  placeholder: "0900000000",
+                  type: "tel",
+                },
+              ].map(({ field, label, icon, required, placeholder, type = "text" }) => (
+                  <div key={field} className="space-y-2">
+                    <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                      {icon}
+                      <span>{label}</span>
+                      {required && <span className="text-red-500">*</span>}
+                    </label>
+                    <input
+                        type={type}
+                        value={form[field]}
+                        onChange={(e) => updateField(field, e.target.value)}
+                        placeholder={placeholder}
+                        className={`w-full border rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 ${errors[field]
+                            ? "border-red-400 focus:border-red-500 focus:ring-red-200"
+                            : "border-slate-300 focus:border-[#EDC531]/50 focus:ring-[#EDC531]/20"
+                        }`}
+                    />
+                    {errors[field] && (
+                        <div className="text-xs text-red-600 mt-1.5 flex items-center gap-1.5">
+                          <AlertCircle className="h-3.5 w-3.5" />
+                          <span>{errors[field]}</span>
+                        </div>
+                    )}
+                  </div>
+              ))}
+
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                  <Shield className="h-4 w-4 text-slate-400" />
-                  <span>Vai trò</span>
+                  <MapPin className="h-4 w-4 text-slate-400" />
+                  <span>Địa chỉ</span>
+                </label>
+                <textarea
+                    value={form.address}
+                    onChange={(e) => updateField("address", e.target.value)}
+                    rows={3}
+                    placeholder="Số nhà, đường, phường/xã..."
+                    className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:border-[#EDC531]/50 focus:ring-[#EDC531]/20 resize-none"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                  <Building2 className="h-4 w-4 text-slate-400" />
+                  <span>Chi nhánh</span>
                   <span className="text-red-500">*</span>
                 </label>
                 <select
-                  value={form.roleId}
-                  onChange={(e) => updateField("roleId", e.target.value)}
-                  className={`w-full border rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 ${errors.roleId
-                    ? "border-red-400 focus:border-red-500 focus:ring-red-200"
-                    : "border-slate-300 focus:border-[#EDC531]/50 focus:ring-[#EDC531]/20"
-                    }`}
+                    value={form.branchId}
+                    onChange={(e) => updateField("branchId", e.target.value)}
+                    disabled={isManager}
+                    className={`w-full border rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 ${errors.branchId
+                        ? "border-red-400 focus:border-red-500 focus:ring-red-200"
+                        : "border-slate-300 focus:border-[#EDC531]/50 focus:ring-[#EDC531]/20"
+                    } ${isManager ? "bg-slate-50 text-slate-500 cursor-not-allowed" : ""}`}
                 >
-                  <option value="">-- Chọn vai trò --</option>
-                  {filteredRoles.map((role) => (
-                    <option key={role.id} value={role.id}>
-                      {role.roleName || role.name}
-                    </option>
+                  <option value="">-- Chọn chi nhánh --</option>
+                  {branchOptions.map((branch) => (
+                      <option key={branch.id} value={branch.id}>
+                        {branch.branchName || branch.name || `Chi nhánh #${branch.id}`}
+                      </option>
                   ))}
                 </select>
-                {errors.roleId && (
-                  <div className="text-xs text-red-600 mt-1.5 flex items-center gap-1.5">
-                    <AlertCircle className="h-3.5 w-3.5" />
-                    <span>{errors.roleId}</span>
-                  </div>
+                {errors.branchId && (
+                    <div className="text-xs text-red-600 mt-1.5 flex items-center gap-1.5">
+                      <AlertCircle className="h-3.5 w-3.5" />
+                      <span>{errors.branchId}</span>
+                    </div>
                 )}
               </div>
 
-            </div>
-          </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                    <Shield className="h-4 w-4 text-slate-400" />
+                    <span>Vai trò</span>
+                    <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                      value={form.roleId}
+                      onChange={(e) => updateField("roleId", e.target.value)}
+                      className={`w-full border rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 ${errors.roleId
+                          ? "border-red-400 focus:border-red-500 focus:ring-red-200"
+                          : "border-slate-300 focus:border-[#EDC531]/50 focus:ring-[#EDC531]/20"
+                      }`}
+                  >
+                    <option value="">-- Chọn vai trò --</option>
+                    {filteredRoles.map((role) => (
+                        <option key={role.id} value={role.id}>
+                          {role.roleName || role.name}
+                        </option>
+                    ))}
+                  </select>
+                  {errors.roleId && (
+                      <div className="text-xs text-red-600 mt-1.5 flex items-center gap-1.5">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        <span>{errors.roleId}</span>
+                      </div>
+                  )}
+                </div>
 
-          <div className="bg-gradient-to-r from-sky-50 to-blue-50 border border-sky-200 rounded-xl p-4 flex items-start gap-3">
-            <div className="h-8 w-8 rounded-lg bg-sky-100 flex items-center justify-center flex-shrink-0">
-              <Info className="h-4 w-4 text-sky-700" />
+              </div>
             </div>
-            <div className="text-sm text-slate-700 space-y-1">
-              <p>Sau khi tạo, hệ thống sẽ tự tạo Employee và gửi email để thiết lập mật khẩu lần đầu.</p>
-              <p>Thông tin đăng nhập được gửi tới email của nhân viên.</p>
+
+            <div className="bg-gradient-to-r from-sky-50 to-blue-50 border border-sky-200 rounded-xl p-4 flex items-start gap-3">
+              <div className="h-8 w-8 rounded-lg bg-sky-100 flex items-center justify-center flex-shrink-0">
+                <Info className="h-4 w-4 text-sky-700" />
+              </div>
+              <div className="text-sm text-slate-700 space-y-1">
+                <p>Sau khi tạo, hệ thống sẽ tự tạo Employee và gửi email để thiết lập mật khẩu lần đầu.</p>
+                <p>Thông tin đăng nhập được gửi tới email của nhân viên.</p>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
   );
 }
 

@@ -1,32 +1,36 @@
-import axios from "./axios";
+import axios from "./axiosInstance";
 
 /**
- * Tạo yêu cầu thanh toán (ghi nhận thanh toán cho invoice/booking)
+ * Tạo yêu cầu thanh toán (ghi nhận thanh toán cho booking)
+ * Sử dụng endpoint /api/deposits/bookings/{bookingId} thay vì invoices
  * @param {Object} payload - { bookingId, amount, paymentMethod, note, status }
  */
 export async function createPayment(payload) {
-    // Tìm invoice theo bookingId trước
-    const invoicesRes = await axios.get("/api/invoices", {
-        params: {
-            customerId: null, // sẽ filter sau
-            page: 0,
-            size: 100
-        }
-    });
-
-    // Tìm invoice liên quan đến booking này (có thể cần endpoint khác)
-    // Tạm thời gọi recordPayment với invoiceId = bookingId
-    // Cần điều chỉnh tùy theo cấu trúc backend thực tế
-
     const { bookingId, amount, paymentMethod, note } = payload;
 
-    // Gọi API record payment
-    const res = await axios.post(`/api/invoices/${bookingId}/payments`, {
+    // Lấy branchId từ booking info nếu có
+    let branchId = payload.branchId;
+    if (!branchId) {
+        try {
+            // Lấy thông tin booking để có branchId
+            const bookingRes = await axios.get(`/api/bookings/${bookingId}`);
+            branchId = bookingRes.data?.data?.branchId || bookingRes.data?.branchId;
+        } catch (e) {
+            console.warn("[createPayment] Could not fetch booking info:", e);
+        }
+    }
+
+    // Gọi API deposit endpoint (cho phép DRIVER)
+    const res = await axios.post(`/api/deposits/bookings/${bookingId}`, {
+        branchId: branchId,
+        bookingId: bookingId,
+        type: "INCOME", // Required field
         amount: amount,
-        paymentMethod: paymentMethod || "CASH",
-        paymentDate: new Date().toISOString().split("T")[0],
-        note: note || "",
-        reference: `DRIVER-COLLECT-${Date.now()}`,
+        paymentMethod: paymentMethod === "TRANSFER" ? "BANK_TRANSFER" : (paymentMethod || "CASH"),
+        isDeposit: false, // Đây là thanh toán, không phải cọc
+        note: note || `Thu tiền từ khách - Booking #${bookingId}`,
+        paymentTerms: "NET_0",
+        dueDate: new Date().toISOString().split("T")[0],
     });
 
     return res.data?.data || res.data;

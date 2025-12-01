@@ -42,8 +42,15 @@ export function pageBookings({ status, branchId, consultantId, startDate, endDat
     if (status) params.append("status", status);
     if (branchId != null) params.append("branchId", String(branchId));
     if (consultantId != null) params.append("consultantId", String(consultantId));
-    if (startDate) params.append("startDate", startDate);
-    if (endDate) params.append("endDate", endDate);
+    // Convert date to ISO format (start of day / end of day)
+    if (startDate) {
+        const isoStart = new Date(startDate + "T00:00:00").toISOString();
+        params.append("startDate", isoStart);
+    }
+    if (endDate) {
+        const isoEnd = new Date(endDate + "T23:59:59").toISOString();
+        params.append("endDate", isoEnd);
+    }
     if (keyword) params.append("keyword", keyword);
     if (page != null) params.append("page", String(page));
     if (size != null) params.append("size", String(size));

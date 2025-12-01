@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import {
     UserRound,
     Car,
@@ -37,11 +37,11 @@ import { getAssignmentSuggestions, assignTrips, reassignTrips } from "../../api/
 // Endpoints đã được chuyển sang sử dụng API functions từ dispatch.js
 
 export default function AssignDriverDialog({
-                                               open,
-                                               order,
-                                               onClose,
-                                               onAssigned,
-                                           }) {
+    open,
+    order,
+    onClose,
+    onAssigned,
+}) {
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState("");
     const [suggestions, setSuggestions] = React.useState([]); // [{driver, vehicle, score, reasons[]}]
@@ -151,7 +151,7 @@ export default function AssignDriverDialog({
         try {
             // Check if trip already has assignment (reassign) or new assignment
             const isReassign = order?.driverId || order?.vehicleId;
-
+            
             if (isReassign && tripId) {
                 // Use reassign API
                 const result = await reassignTrips({
@@ -320,7 +320,7 @@ export default function AssignDriverDialog({
                                 Đang tải gợi ý…
                             </div>
                         ) : suggestions.length ===
-                        0 ? (
+                            0 ? (
                             <div className="px-3 py-6 text-[13px] text-slate-500 flex items-center gap-2">
                                 <AlertTriangle className="h-4 w-4 text-amber-600" />
                                 <span>
@@ -364,22 +364,22 @@ export default function AssignDriverDialog({
                                                                 }
                                                             >
                                                                 {s
-                                                                        ?.driver
-                                                                        ?.name ||
+                                                                    ?.driver
+                                                                    ?.name ||
                                                                     "—"}
                                                             </span>
                                                             {s
                                                                 ?.driver
                                                                 ?.id && (
-                                                                <span className="text-[11px] text-slate-500 font-normal">
+                                                                    <span className="text-[11px] text-slate-500 font-normal">
                                                                         #
-                                                                    {
-                                                                        s
-                                                                            .driver
-                                                                            .id
-                                                                    }
+                                                                        {
+                                                                            s
+                                                                                .driver
+                                                                                .id
+                                                                        }
                                                                     </span>
-                                                            )}
+                                                                )}
                                                         </div>
 
                                                         {/* vehicle */}
@@ -394,22 +394,22 @@ export default function AssignDriverDialog({
                                                                 }
                                                             >
                                                                 {s
-                                                                        ?.vehicle
-                                                                        ?.plate ||
+                                                                    ?.vehicle
+                                                                    ?.plate ||
                                                                     "—"}
                                                             </span>
                                                             {s
                                                                 ?.vehicle
                                                                 ?.type && (
-                                                                <span className="text-[11px] text-slate-500 font-normal">
+                                                                    <span className="text-[11px] text-slate-500 font-normal">
                                                                         ·{" "}
-                                                                    {
-                                                                        s
-                                                                            .vehicle
-                                                                            .type
-                                                                    }
+                                                                        {
+                                                                            s
+                                                                                .vehicle
+                                                                                .type
+                                                                        }
                                                                     </span>
-                                                            )}
+                                                                )}
                                                         </div>
 
                                                         {/* score */}
@@ -429,8 +429,8 @@ export default function AssignDriverDialog({
 
                                                     {/* reasons */}
                                                     {Array.isArray(
-                                                            s?.reasons
-                                                        ) &&
+                                                        s?.reasons
+                                                    ) &&
                                                         s
                                                             .reasons
                                                             .length >
@@ -573,9 +573,9 @@ export default function AssignDriverDialog({
                         className={`
                             rounded-md px-3 py-2 border text-[13px] font-medium flex items-center gap-1
                             ${autoPosting
-                            ? "opacity-60 cursor-not-allowed border-amber-300 text-amber-400 bg-white"
-                            : "border-[#EDC531] text-amber-700 bg-white hover:bg-amber-50"
-                        }
+                                ? "opacity-60 cursor-not-allowed border-amber-300 text-amber-400 bg-white"
+                                : "border-[#EDC531] text-amber-700 bg-white hover:bg-amber-50"
+                            }
                         `}
                     >
                         {autoPosting ? (
@@ -600,9 +600,9 @@ export default function AssignDriverDialog({
                         className={`
                             rounded-md px-3 py-2 border text-[13px] font-medium flex items-center gap-1
                             ${canConfirm
-                            ? "border-sky-600 text-sky-700 bg-white hover:bg-sky-50"
-                            : "opacity-60 cursor-not-allowed border-slate-300 text-slate-400 bg-white"
-                        }
+                                ? "border-sky-600 text-sky-700 bg-white hover:bg-sky-50"
+                                : "opacity-60 cursor-not-allowed border-slate-300 text-slate-400 bg-white"
+                            }
                         `}
                     >
                         <Check className="h-4 w-4 text-sky-600" />

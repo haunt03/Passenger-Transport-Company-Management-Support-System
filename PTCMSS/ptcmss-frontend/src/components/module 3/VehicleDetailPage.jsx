@@ -66,8 +66,9 @@ const fmtDateTimeShort = (isoLike) => {
 /* ---------------- status badge ---------------- */
 const STATUS_LABEL = {
     AVAILABLE: "Sẵn sàng",
+    INUSE: "Đang sử dụng",
     MAINTENANCE: "Bảo trì",
-    INACTIVE: "Ngưng sử dụng",
+    INACTIVE: "Không hoạt động",
 };
 
 function VehicleStatusBadge({ status }) {
@@ -81,11 +82,23 @@ function VehicleStatusBadge({ status }) {
         IconEl = (
             <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
         );
+    } else if (status === "INUSE") {
+        classes =
+            "bg-sky-50 text-sky-700 border-sky-200";
+        IconEl = (
+            <CarFront className="h-3.5 w-3.5 text-sky-600" />
+        );
     } else if (status === "MAINTENANCE") {
         classes =
             "bg-amber-50 text-amber-700 border-amber-200";
         IconEl = (
             <Wrench className="h-3.5 w-3.5 text-amber-600" />
+        );
+    } else if (status === "INACTIVE") {
+        classes =
+            "bg-gray-50 text-gray-700 border-gray-200";
+        IconEl = (
+            <X className="h-3.5 w-3.5 text-gray-600" />
         );
     } else {
         classes =
@@ -898,17 +911,8 @@ export default function VehicleDetailPage() {
                 }
             }
 
-            // Validation: Nếu xe đang "ON_TRIP", không cho phép đổi trạng thái
-            if (savedVehicle.status === "ON_TRIP" && vehicleForm.status !== "ON_TRIP") {
-                push("Không thể thay đổi trạng thái khi xe đang trong chuyến đi", "error");
-                return;
-            }
-
-            // Validation: Nếu xe không phải "ON_TRIP", không cho phép đổi sang "ON_TRIP"
-            if (savedVehicle.status !== "ON_TRIP" && vehicleForm.status === "ON_TRIP") {
-                push("Trạng thái 'Đang chạy' chỉ được cập nhật tự động khi xe trong chuyến", "error");
-                return;
-            }
+            // Note: Removed validation for INUSE status to allow manual status changes
+            // Status can now be changed freely by authorized users (ADMIN, MANAGER, COORDINATOR)
 
             await updateVehicle(vehicleForm.id, {
                 license_plate: vehicleForm.license_plate,

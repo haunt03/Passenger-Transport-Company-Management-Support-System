@@ -114,13 +114,13 @@ function ConfirmModal({ open, title, message, onCancel, onConfirm }) {
                 onClick={onCancel}
                 className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 shadow-sm"
             >
-              Huy
+              Hủy
             </button>
             <button
                 onClick={onConfirm}
                 className="rounded-lg bg-[#EDC531] hover:bg-amber-500 px-3 py-2 text-sm font-medium text-white shadow-sm"
             >
-              Xac nhan
+              Xác nhận
             </button>
           </div>
         </div>
@@ -131,17 +131,17 @@ function ConfirmModal({ open, title, message, onCancel, onConfirm }) {
 function StatusChip({ status }) {
   const map = {
     NOT_STARTED: {
-      label: "Chua bat dau",
+      label: "Chưa bắt đầu",
       cls: "bg-slate-100 text-slate-700 border-slate-300",
       icon: <Flag className="h-3.5 w-3.5 text-slate-500" />,
     },
     IN_PROGRESS: {
-      label: "Dang di chuyen",
+      label: "Đang di chuyển",
       cls: "bg-sky-50 text-sky-700 border-sky-200",
       icon: <Navigation className="h-3.5 w-3.5 text-sky-500" />,
     },
     COMPLETED: {
-      label: "Hoan thanh",
+      label: "Hoàn thành",
       cls: "bg-amber-50 text-amber-700 border-amber-200",
       icon: <CheckCircle2 className="h-3.5 w-3.5 text-amber-500" />,
     },
@@ -157,9 +157,9 @@ function StatusChip({ status }) {
 
 function ProgressSteps({ status }) {
   const steps = [
-    { key: "NOT_STARTED", label: "Chua bat dau" },
-    { key: "IN_PROGRESS", label: "Dang chay" },
-    { key: "COMPLETED", label: "Hoan thanh" },
+    { key: "NOT_STARTED", label: "Chưa bắt đầu" },
+    { key: "IN_PROGRESS", label: "Đang chạy" },
+    { key: "COMPLETED", label: "Hoàn thành" },
   ];
   const idxActive = steps.findIndex((s) => s.key === status);
   return (
@@ -397,6 +397,14 @@ export default function DriverTripDetailPage() {
       else if (nextStatus === "COMPLETED") await apiCompleteTrip(driver.driverId, trip.id);
       pushToast("Đã cập nhật trạng thái chuyến.", "success");
       await loadTripDetail(trip.id, { silent: true });
+
+      // Sau khi hoàn thành chuyến, nếu còn tiền chưa thanh toán → tự động mở modal tạo payment request
+      if (nextStatus === "COMPLETED" && trip.remaining_amount > 0) {
+        setTimeout(() => {
+          setPaymentOpen(true);
+          pushToast("Vui lòng tạo yêu cầu thanh toán cho số tiền còn lại.", "info");
+        }, 500);
+      }
     } catch (err) {
       pushToast(err?.data?.message || err?.message || "Không thể cập nhật trạng thái chuyến.", "error");
     } finally {
@@ -499,8 +507,11 @@ export default function DriverTripDetailPage() {
                       </button>
                   )}
 
-                  {/* Nút Yêu cầu thanh toán - hiển thị khi IN_PROGRESS (trước khi hoàn thành) */}
-                  {canUpdateStatus && trip?.status === "IN_PROGRESS" && (
+                  {/* Nút Yêu cầu thanh toán - hiển thị khi:
+                  1. IN_PROGRESS (trước khi hoàn thành)
+                  2. COMPLETED nhưng còn tiền chưa thanh toán */}
+                  {(canUpdateStatus && trip?.status === "IN_PROGRESS") ||
+                  (trip?.status === "COMPLETED" && trip?.remaining_amount > 0) ? (
                       <button
                           onClick={() => setPaymentOpen(true)}
                           className="rounded-xl border border-[#0079BC] bg-[#0079BC] hover:bg-[#0079BC]/90 text-white text-sm font-semibold px-4 py-2 flex items-center justify-center gap-2 shadow-sm"
@@ -508,7 +519,7 @@ export default function DriverTripDetailPage() {
                         <BadgeDollarSign className="h-4 w-4" />
                         <span>Yêu cầu thanh toán</span>
                       </button>
-                  )}
+                  ) : null}
 
                   {/* Nút Báo cáo chi phí - chỉ khi HÔM NAY + chưa hoàn thành */}
                   {canUpdateStatus && (
@@ -581,8 +592,12 @@ export default function DriverTripDetailPage() {
                   remainingAmount={trip?.remaining_amount}
                   customerName={trip?.customer_name}
                   onClose={() => setPaymentOpen(false)}
-                  onSubmitted={({ amount, paymentMethod }) => {
+                  onSubmitted={async ({ amount, paymentMethod }) => {
                     pushToast(`Đã gửi yêu cầu thanh toán ${fmtVND(amount)}đ (${paymentMethod === "CASH" ? "Tiền mặt" : "Chuyển khoản"})`, "success");
+                    // Reload trip detail để cập nhật remaining amount
+                    if (trip?.id) {
+                      await loadTripDetail(trip.id, { silent: true });
+                    }
                   }}
               />
             </>
