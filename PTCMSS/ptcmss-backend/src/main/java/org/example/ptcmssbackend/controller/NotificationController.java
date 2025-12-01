@@ -102,15 +102,17 @@ public class NotificationController {
 
     @Operation(
             summary = "Lấy danh sách yêu cầu đã xử lý",
-            description = "Lấy các yêu cầu đã được duyệt hoặc từ chối (APPROVED + REJECTED)"
+            description = "Lấy các yêu cầu đã được duyệt hoặc từ chối (APPROVED + REJECTED). " +
+                    "Nếu có processedByUserId thì chỉ lấy những yêu cầu do user đó xử lý."
     )
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','COORDINATOR','ACCOUNTANT')")
     @GetMapping("/approvals/processed")
     public ResponseData<List<ApprovalItemResponse>> getProcessedApprovals(
             @RequestParam(required = false) Integer branchId,
+            @RequestParam(required = false) Integer processedByUserId,
             @RequestParam(required = false, defaultValue = "50") Integer limit) {
         try {
-            List<ApprovalItemResponse> data = notificationService.getProcessedApprovals(branchId, limit);
+            List<ApprovalItemResponse> data = notificationService.getProcessedApprovals(branchId, processedByUserId, limit);
             return new ResponseData<>(HttpStatus.OK.value(), "Success", data);
         } catch (Exception e) {
             log.error("[Notification] Failed to load processed approvals", e);
@@ -120,9 +122,10 @@ public class NotificationController {
 
     @Operation(
             summary = "Phê duyệt yêu cầu",
-            description = "Approve một yêu cầu (nghỉ phép, tạm ứng, etc.)"
+            description = "Approve một yêu cầu (nghỉ phép, tạm ứng, etc.). " +
+                    "Coordinator chỉ được duyệt nghỉ phép (DRIVER_DAY_OFF)"
     )
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT','COORDINATOR')")
     @PostMapping("/approvals/{historyId}/approve")
     public ResponseData<ApprovalItemResponse> approveRequest(
             @PathVariable Integer historyId,
@@ -145,9 +148,10 @@ public class NotificationController {
 
     @Operation(
             summary = "Từ chối yêu cầu",
-            description = "Reject một yêu cầu (nghỉ phép, tạm ứng, etc.)"
+            description = "Reject một yêu cầu (nghỉ phép, tạm ứng, etc.). " +
+                    "Coordinator chỉ được từ chối nghỉ phép (DRIVER_DAY_OFF)"
     )
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT','COORDINATOR')")
     @PostMapping("/approvals/{historyId}/reject")
     public ResponseData<ApprovalItemResponse> rejectRequest(
             @PathVariable Integer historyId,

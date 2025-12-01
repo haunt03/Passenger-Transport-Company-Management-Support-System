@@ -52,13 +52,11 @@ public class AnalyticsExportController {
     }
 
     private String formatCurrency(BigDecimal amount) {
-        if (amount == null) return "₫ 0.00";
-        // Format theo kiểu Việt Nam: ₫ ở đầu, dấu chấm phân cách hàng nghìn, dấu chấm cho phần thập phân
-        // Vì CSV dùng dấu phẩy để phân cách cột, ta dùng dấu chấm cho hàng nghìn để tránh conflict
+        if (amount == null) return "\"₫ 0\"";
+        // Format theo kiểu Việt Nam: ₫ ở đầu, dấu chấm phân cách hàng nghìn
+        // Wrap trong dấu ngoặc kép để CSV không hiểu nhầm dấu phẩy là phân cách cột
         String formatted = vietnameseCurrencyFormatter.format(amount);
-        // DecimalFormat với pattern "#,##0.00" sẽ format: 53981526.76 -> "53,981,526.76"
-        // Ta giữ nguyên format này và thêm ₫ ở đầu
-        return "₫ " + formatted;
+        return "\"₫ " + formatted + "\"";
     }
 
     private String formatPercent(Double value) {
@@ -69,9 +67,23 @@ public class AnalyticsExportController {
     private String formatNumber(Object value) {
         if (value == null) return "0";
         if (value instanceof Number) {
-            return NumberFormat.getNumberInstance(Locale.US).format((Number) value);
+            // Wrap trong dấu ngoặc kép nếu số lớn có dấu phẩy phân cách hàng nghìn
+            String formatted = NumberFormat.getNumberInstance(Locale.US).format((Number) value);
+            if (formatted.contains(",")) {
+                return "\"" + formatted + "\"";
+            }
+            return formatted;
         }
         return String.valueOf(value);
+    }
+
+    // Escape text fields cho CSV (wrap trong quotes nếu chứa dấu phẩy hoặc quotes)
+    private String escapeCSV(String value) {
+        if (value == null) return "";
+        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+            return "\"" + value.replace("\"", "\"\"") + "\"";
+        }
+        return value;
     }
 
     @Operation(summary = "Export dashboard report to Excel", description = "Export admin or manager dashboard data to Excel (CSV format)")
@@ -174,7 +186,7 @@ public class AnalyticsExportController {
         pw.println("Tên Chi Nhánh,Doanh Thu (đ),Chi Phí (đ),Lợi Nhuận (đ),Tổng Chuyến");
         List<org.example.ptcmssbackend.dto.analytics.BranchComparisonDTO> branches = analyticsService.getBranchComparison(period);
         for (var branch : branches) {
-            pw.println(branch.getBranchName() + "," +
+            pw.println(escapeCSV(branch.getBranchName()) + "," +
                     formatCurrency(branch.getRevenue()) + "," +
                     formatCurrency(branch.getExpense()) + "," +
                     formatCurrency(branch.getNetProfit()) + "," +
@@ -216,7 +228,7 @@ public class AnalyticsExportController {
         pw.println("Tên Tài Xế,Số Chuyến,KM Đã Chạy");
         List<Map<String, Object>> drivers = analyticsService.getDriverPerformance(branchId, 10, "THIS_MONTH");
         for (var driver : drivers) {
-            pw.println(driver.get("driverName") + "," +
+            pw.println(escapeCSV(String.valueOf(driver.get("driverName"))) + "," +
                     formatNumber(driver.get("trips")) + "," +
                     formatNumber(driver.get("kmDriven")));
         }
@@ -231,9 +243,10 @@ public class AnalyticsExportController {
             BigDecimal amountValue = amount instanceof BigDecimal ? (BigDecimal) amount :
                     amount instanceof Number ? BigDecimal.valueOf(((Number) amount).doubleValue()) :
                             BigDecimal.ZERO;
-            pw.println(expense.get("category") + "," +
+            pw.println(escapeCSV(String.valueOf(expense.get("category"))) + "," +
                     formatCurrency(amountValue) + "," +
                     formatNumber(expense.get("count")));
         }
     }
 }
+

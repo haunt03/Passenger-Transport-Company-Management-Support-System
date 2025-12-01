@@ -7,7 +7,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.ptcmssbackend.dto.request.Booking.CreateBookingRequest;
-import org.example.ptcmssbackend.dto.request.Booking.CreateDepositRequest;
 import org.example.ptcmssbackend.dto.request.Booking.CreatePaymentRequest;
 import org.example.ptcmssbackend.dto.request.Booking.AssignRequest;
 import org.example.ptcmssbackend.dto.request.Booking.CheckAvailabilityRequest;
@@ -16,7 +15,6 @@ import org.example.ptcmssbackend.dto.response.Booking.BookingListResponse;
 import org.example.ptcmssbackend.dto.response.Booking.BookingResponse;
 import org.example.ptcmssbackend.dto.response.Booking.ConsultantDashboardResponse;
 import org.example.ptcmssbackend.dto.response.Booking.PaymentResponse;
-import org.example.ptcmssbackend.dto.response.Booking.QRCodeResponse;
 import org.example.ptcmssbackend.dto.response.common.ApiResponse;
 import org.example.ptcmssbackend.dto.response.common.PageResponse;
 import org.example.ptcmssbackend.entity.Employees;
@@ -131,7 +129,7 @@ public class BookingController {
      */
     @Operation(summary = "Lấy danh sách đơn hàng", description = "Lấy danh sách đơn hàng với filter (status, branch, consultant, date, keyword) và pagination")
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT','ACCOUNTANT','COORDINATOR')")
     public ResponseEntity<ApiResponse<?>> getAll(
             @Parameter(description = "Lọc theo trạng thái (PENDING, QUOTATION_SENT, CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED)") @RequestParam(required = false) String status,
             @Parameter(description = "Lọc theo ID chi nhánh") @RequestParam(required = false) Integer branchId,
@@ -177,7 +175,7 @@ public class BookingController {
      */
     @Operation(summary = "Lấy chi tiết đơn hàng", description = "Lấy thông tin chi tiết của một đơn hàng (bao gồm trips, vehicles, payments)")
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT','ACCOUNTANT','COORDINATOR','DRIVER')")
     public ResponseEntity<ApiResponse<BookingResponse>> getById(
             @Parameter(description = "ID đơn hàng") @PathVariable Integer id
     ) {
@@ -249,7 +247,7 @@ public class BookingController {
     }
 
     @PostMapping("/{id}/payments/qr")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT','ACCOUNTANT','DRIVER')")
     public ResponseEntity<ApiResponse<org.example.ptcmssbackend.dto.response.Booking.PaymentResponse>> createQrPayment(
             @Parameter(description = "ID đơn hàng") @PathVariable Integer id,
             @Valid @RequestBody CreatePaymentRequest request
@@ -295,7 +293,7 @@ public class BookingController {
     }
 
     @GetMapping("/{id}/payments")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT','ACCOUNTANT','DRIVER')")
     public ResponseEntity<ApiResponse<java.util.List<PaymentResponse>>> listPayments(
             @PathVariable Integer id
     ) {
@@ -369,7 +367,7 @@ public class BookingController {
     /**
      * Tính giá tự động
      */
-    @Operation(summary = "Tính giá tự động", description = "Tính giá ước tính dựa trên loại xe, số lượng, khoảng cách, cao tốc, loại chuyến, ngày lễ/cuối tuần, điểm phát sinh và thời gian (để check chuyến trong ngày)")
+    @Operation(summary = "Tính giá tự động", description = "Tính giá ước tính dựa trên loại xe, số lượng, khoảng cách, cao tốc, loại chuyến, ngày lễ/cuối tuần và thời gian (để check chuyến trong ngày)")
     @PostMapping("/calculate-price")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT')")
     public ResponseEntity<ApiResponse<java.math.BigDecimal>> calculatePrice(
@@ -380,7 +378,6 @@ public class BookingController {
             @Parameter(description = "ID loại thuê (hireTypeId) - để xác định 1 chiều/2 chiều") @RequestParam(required = false) Integer hireTypeId,
             @Parameter(description = "Có phải ngày lễ không") @RequestParam(required = false, defaultValue = "false") Boolean isHoliday,
             @Parameter(description = "Có phải cuối tuần không") @RequestParam(required = false, defaultValue = "false") Boolean isWeekend,
-            @Parameter(description = "Tổng số điểm đón/trả thêm") @RequestParam(required = false, defaultValue = "0") Integer additionalPoints,
             @Parameter(description = "Thời gian khởi hành (ISO format) - để check chuyến trong ngày") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant startTime,
             @Parameter(description = "Thời gian kết thúc (ISO format) - để check chuyến trong ngày") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant endTime
     ) {
@@ -388,7 +385,7 @@ public class BookingController {
             // Sử dụng overloaded method với các tham số mới
             java.math.BigDecimal price = ((org.example.ptcmssbackend.service.impl.BookingServiceImpl) bookingService)
                     .calculatePrice(vehicleCategoryIds, quantities, distance, useHighway,
-                            hireTypeId, isHoliday, isWeekend, additionalPoints, startTime, endTime);
+                            hireTypeId, isHoliday, isWeekend, startTime, endTime);
             return ResponseEntity.ok(ApiResponse.<java.math.BigDecimal>builder()
                     .success(true)
                     .message("Tính giá thành công")
@@ -451,3 +448,4 @@ public class BookingController {
         return null;
     }
 }
+
