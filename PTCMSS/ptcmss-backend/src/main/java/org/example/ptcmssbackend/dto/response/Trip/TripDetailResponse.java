@@ -44,6 +44,10 @@ public class TripDetailResponse {
     private java.math.BigDecimal depositAmount;
     private java.math.BigDecimal remainingAmount;
 
+    // Rating từ DriverRatings
+    private java.math.BigDecimal rating;
+    private String ratingComment;
+
     private List<AssignmentHistoryItem> history;
 
     @Data
