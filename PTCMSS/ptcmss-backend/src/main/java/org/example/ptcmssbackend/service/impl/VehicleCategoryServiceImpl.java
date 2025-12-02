@@ -28,7 +28,7 @@ public class VehicleCategoryServiceImpl implements VehicleCategoryService {
     @Override
     public VehicleCategoryResponse getById(Integer id) {
         VehicleCategoryPricing c = categoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Category not found"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy loại xe"));
         return toResponse(c);
     }
 
@@ -42,7 +42,7 @@ public class VehicleCategoryServiceImpl implements VehicleCategoryService {
     @Override
     public VehicleCategoryResponse update(Integer id, VehicleCategoryRequest req) {
         VehicleCategoryPricing c = categoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Category not found"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy loại xe"));
         apply(c, req);
         return toResponse(categoryRepository.save(c));
     }
