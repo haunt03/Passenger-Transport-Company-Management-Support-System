@@ -501,7 +501,11 @@ public class NotificationServiceImpl implements NotificationService {
                 if (dayOff != null) {
                     // KIỂM TRA CONFLICT VỚI LỊCH TRÌNH KHI APPROVE
                     if (approved) {
+                        // Check schedule conflicts
                         checkDriverScheduleConflict(dayOff);
+
+                        // Check monthly day-off limit
+                        checkMonthlyDayOffLimit(dayOff);
                     }
 
                     dayOff.setStatus(approved ? DriverDayOffStatus.APPROVED : DriverDayOffStatus.REJECTED);
@@ -512,6 +516,30 @@ public class NotificationServiceImpl implements NotificationService {
                         dayOff.setApprovedBy(null);
                     }
                     driverDayOffRepository.save(dayOff);
+
+                    // GỬI THÔNG BÁO CHO TÀI XẾ
+                    if (dayOff.getDriver() != null && dayOff.getDriver().getEmployee() != null
+                            && dayOff.getDriver().getEmployee().getUser() != null) {
+                        Users driverUser = dayOff.getDriver().getEmployee().getUser();
+
+                        Notifications notification = new Notifications();
+                        notification.setUser(driverUser);
+                        notification.setTitle(approved ? "Đơn nghỉ phép được chấp nhận" : "Đơn nghỉ phép bị từ chối");
+                        notification.setMessage(String.format(
+                                approved
+                                        ? "✅ Đơn nghỉ phép của bạn từ %s đến %s đã được chấp nhận."
+                                        : "❌ Đơn nghỉ phép của bạn từ %s đến %s đã bị từ chối. Lý do: %s",
+                                dayOff.getStartDate(),
+                                dayOff.getEndDate(),
+                                approved ? "" : (history.getApprovalNote() != null ? history.getApprovalNote() : "Không có lý do")
+                        ));
+                        notification.setIsRead(false);
+                        notification.setCreatedAt(Instant.now());
+                        notificationRepository.save(notification);
+
+                        log.info("[Notification] Sent day-off {} notification to driver user {}",
+                                approved ? "approval" : "rejection", driverUser.getId());
+                    }
                 }
                 break;
 
@@ -692,7 +720,9 @@ public class NotificationServiceImpl implements NotificationService {
                 .filter(td -> {
                     Trips trip = td.getTrip();
                     if (trip.getStartTime() == null || trip.getEndTime() == null) return false;
-                    return (trip.getStatus() == TripStatus.ONGOING || trip.getStatus() == TripStatus.SCHEDULED)
+                    return (trip.getStatus() == TripStatus.ONGOING ||
+                            trip.getStatus() == TripStatus.SCHEDULED ||
+                            trip.getStatus() == TripStatus.ASSIGNED)
                             && trip.getStartTime().isBefore(now.plusSeconds(3600)) // Trong vòng 1h tới
                             && trip.getEndTime().isAfter(now.minusSeconds(3600)); // Hoặc đang diễn ra
                 })
@@ -895,16 +925,24 @@ public class NotificationServiceImpl implements NotificationService {
                 tripDriverRepository.findConflictingTrips(driverId, startInstant, endInstant);
 
         if (!conflictTrips.isEmpty()) {
-            StringBuilder message = new StringBuilder();
-            message.append(String.format(
-                    "⚠️ CẢNH BÁO: Tài xế đã được lên lịch %d chuyến trong thời gian nghỉ (%s đến %s).\n\n",
-                    conflictTrips.size(), startDate, endDate
+            log.warn("[DayOff] Found {} conflicting trips for driver {}. Removing driver from these trips...",
+                    conflictTrips.size(), driverId);
+
+            StringBuilder alertMessage = new StringBuilder();
+            alertMessage.append(String.format(
+                    "⚠️ Tài xế %s đã được duyệt nghỉ phép từ %s đến %s.\n\n",
+                    dayOff.getDriver().getEmployee() != null && dayOff.getDriver().getEmployee().getUser() != null
+                            ? dayOff.getDriver().getEmployee().getUser().getFullName()
+                            : "ID: " + driverId,
+                    startDate, endDate
             ));
 
-            message.append("Danh sách chuyến bị conflict:\n");
+            alertMessage.append(String.format("✅ Đã tự động xóa tài xế khỏi %d chuyến:\n", conflictTrips.size()));
+
+            // XÓA TÀI XẾ KHỎI CÁC CHUYẾN BỊ CONFLICT
             for (org.example.ptcmssbackend.entity.TripDrivers td : conflictTrips) {
                 if (td.getTrip() != null) {
-                    message.append(String.format(
+                    alertMessage.append(String.format(
                             "- Chuyến #%d: %s → %s (Ngày: %s)\n",
                             td.getTrip().getId(),
                             td.getTrip().getStartLocation(),
@@ -913,14 +951,175 @@ public class NotificationServiceImpl implements NotificationService {
                                     ? td.getTrip().getStartTime().toString().substring(0, 10)
                                     : "N/A"
                     ));
+
+                    // Xóa driver khỏi trip
+                    tripDriverRepository.delete(td);
                 }
             }
 
-            message.append("\n❌ Vui lòng xếp tài xế thay thế trước khi phê duyệt nghỉ phép!");
+            alertMessage.append("\n📋 Vui lòng sắp xếp tài xế thay thế cho các chuyến này!");
 
-            throw new RuntimeException(message.toString());
+            // TẠO ALERT ĐỂ THÔNG BÁO ĐIỀU PHỐI VIÊN
+            SystemAlerts alert = new SystemAlerts();
+            alert.setAlertType(AlertType.REASSIGNMENT_NEEDED);
+            alert.setSeverity(AlertSeverity.HIGH);
+            alert.setTitle("Cần sắp xếp lại tài xế cho " + conflictTrips.size() + " chuyến");
+            alert.setMessage(alertMessage.toString());
+            alert.setRelatedEntityType("DRIVER_DAY_OFF");
+            alert.setRelatedEntityId(dayOff.getId());
+
+            // Set branch từ driver
+            if (dayOff.getDriver().getBranch() != null) {
+                alert.setBranch(dayOff.getDriver().getBranch());
+            }
+
+            alert.setIsAcknowledged(false);
+            alert.setCreatedAt(Instant.now());
+            alertsRepository.save(alert);
+
+            log.info("[DayOff] Created alert for {} conflicting trips", conflictTrips.size());
+        } else {
+            log.info("[DayOff] No schedule conflict found for driver {}", driverId);
+        }
+    }
+
+    /**
+     * Kiểm tra giới hạn số ngày nghỉ trong tháng
+     * Cảnh báo nếu vượt quá nhưng vẫn cho duyệt (coordinator có quyền quyết định)
+     */
+    private void checkMonthlyDayOffLimit(DriverDayOff dayOff) {
+        if (dayOff.getDriver() == null) {
+            return;
         }
 
-        log.info("[DayOff] No schedule conflict found for driver {}", driverId);
+        Integer driverId = dayOff.getDriver().getId();
+        java.time.LocalDate startDate = dayOff.getStartDate();
+        java.time.LocalDate endDate = dayOff.getEndDate();
+
+        // Lấy tháng/năm từ startDate
+        int month = startDate.getMonthValue();
+        int year = startDate.getYear();
+
+        log.info("[DayOff] Checking monthly limit for driver {} in {}/{}", driverId, month, year);
+
+        // Tính số ngày nghỉ của đơn này
+        long requestDays = java.time.temporal.ChronoUnit.DAYS.between(startDate, endDate) + 1;
+
+        // Lấy tất cả đơn APPROVED trong tháng (không bao gồm đơn hiện tại)
+        java.time.LocalDate monthStart = java.time.LocalDate.of(year, month, 1);
+        java.time.LocalDate monthEnd = monthStart.plusMonths(1).minusDays(1);
+
+        List<DriverDayOff> approvedInMonth = driverDayOffRepository.findByDriver_Id(driverId).stream()
+                .filter(d -> d.getStatus() == DriverDayOffStatus.APPROVED)
+                .filter(d -> !d.getId().equals(dayOff.getId())) // Không tính đơn hiện tại
+                .filter(d -> {
+                    // Check if day off overlaps with current month
+                    java.time.LocalDate dStart = d.getStartDate();
+                    java.time.LocalDate dEnd = d.getEndDate();
+                    return !(dEnd.isBefore(monthStart) || dStart.isAfter(monthEnd));
+                })
+                .collect(java.util.stream.Collectors.toList());
+
+        // Tính tổng số ngày đã nghỉ trong tháng
+        long totalDaysOff = requestDays; // Bao gồm đơn hiện tại
+        for (DriverDayOff approved : approvedInMonth) {
+            java.time.LocalDate dStart = approved.getStartDate();
+            java.time.LocalDate dEnd = approved.getEndDate();
+
+            // Chỉ tính các ngày trong tháng hiện tại
+            java.time.LocalDate overlapStart = dStart.isBefore(monthStart) ? monthStart : dStart;
+            java.time.LocalDate overlapEnd = dEnd.isAfter(monthEnd) ? monthEnd : dEnd;
+
+            if (!overlapEnd.isBefore(overlapStart)) {
+                long days = java.time.temporal.ChronoUnit.DAYS.between(overlapStart, overlapEnd) + 1;
+                totalDaysOff += days;
+            }
+        }
+
+        // Lấy giới hạn (mặc định 2 ngày/tháng, hoặc từ system settings)
+        int maxDaysPerMonth = 2;
+        try {
+            var setting = systemSettingService.getByKey("MAX_DRIVER_LEAVE_DAYS");
+            if (setting != null && setting.getSettingValue() != null && !setting.getSettingValue().isEmpty()) {
+                maxDaysPerMonth = Integer.parseInt(setting.getSettingValue());
+            }
+        } catch (Exception e) {
+            log.warn("[DayOff] Cannot get MAX_DRIVER_LEAVE_DAYS setting, using default: 2");
+        }
+
+        log.info("[DayOff] Driver {} will have {} days off in {}/{} (limit: {})",
+                driverId, totalDaysOff, month, year, maxDaysPerMonth);
+
+        // Nếu vượt quá, tạo cảnh báo
+        if (totalDaysOff > maxDaysPerMonth) {
+            String driverName = dayOff.getDriver().getEmployee() != null
+                    && dayOff.getDriver().getEmployee().getUser() != null
+                    ? dayOff.getDriver().getEmployee().getUser().getFullName()
+                    : "ID: " + driverId;
+
+            StringBuilder alertMessage = new StringBuilder();
+            alertMessage.append(String.format(
+                    "⚠️ CẢNH BÁO: Tài xế %s vượt hạn mức nghỉ phép!\n\n",
+                    driverName
+            ));
+            alertMessage.append(String.format(
+                    "📊 Thống kê tháng %d/%d:\n",
+                    month, year
+            ));
+            alertMessage.append(String.format(
+                    "   • Tổng số ngày nghỉ: %d ngày\n",
+                    totalDaysOff
+            ));
+            alertMessage.append(String.format(
+                    "   • Hạn mức cho phép: %d ngày/tháng\n",
+                    maxDaysPerMonth
+            ));
+            alertMessage.append(String.format(
+                    "   • Vượt quá: %d ngày\n\n",
+                    totalDaysOff - maxDaysPerMonth
+            ));
+
+            alertMessage.append("📋 Danh sách nghỉ phép trong tháng:\n");
+            alertMessage.append(String.format(
+                    "   • Đơn mới duyệt: %s → %s (%d ngày)\n",
+                    startDate, endDate, requestDays
+            ));
+            for (DriverDayOff approved : approvedInMonth) {
+                java.time.LocalDate dStart = approved.getStartDate();
+                java.time.LocalDate dEnd = approved.getEndDate();
+                java.time.LocalDate overlapStart = dStart.isBefore(monthStart) ? monthStart : dStart;
+                java.time.LocalDate overlapEnd = dEnd.isAfter(monthEnd) ? monthEnd : dEnd;
+                long days = java.time.temporal.ChronoUnit.DAYS.between(overlapStart, overlapEnd) + 1;
+
+                alertMessage.append(String.format(
+                        "   • %s → %s (%d ngày)\n",
+                        dStart, dEnd, days
+                ));
+            }
+
+            alertMessage.append("\n💡 Lưu ý: Đơn đã được duyệt. Nếu cần điều chỉnh, vui lòng xem xét lại các đơn nghỉ phép của tài xế này.");
+
+            // Tạo alert cảnh báo
+            SystemAlerts alert = new SystemAlerts();
+            alert.setAlertType(AlertType.DRIVER_REST_REQUIRED); // Dùng type có sẵn
+            alert.setSeverity(AlertSeverity.MEDIUM);
+            alert.setTitle(String.format("Tài xế %s vượt %d ngày nghỉ phép trong tháng",
+                    driverName, totalDaysOff - maxDaysPerMonth));
+            alert.setMessage(alertMessage.toString());
+            alert.setRelatedEntityType("DRIVER_DAY_OFF");
+            alert.setRelatedEntityId(dayOff.getId());
+
+            // Set branch từ driver
+            if (dayOff.getDriver().getBranch() != null) {
+                alert.setBranch(dayOff.getDriver().getBranch());
+            }
+
+            alert.setIsAcknowledged(false);
+            alert.setCreatedAt(Instant.now());
+            alertsRepository.save(alert);
+
+            log.warn("[DayOff] Created alert for exceeding monthly limit: {} days (limit: {})",
+                    totalDaysOff, maxDaysPerMonth);
+        }
     }
 }

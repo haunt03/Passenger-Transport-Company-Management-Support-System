@@ -34,12 +34,12 @@ public class ExpenseRequestServiceImpl implements ExpenseRequestService {
     @Transactional
     public ExpenseRequestResponse createExpenseRequest(CreateExpenseRequest request) {
         Branches branch = branchesRepository.findById(request.getBranchId())
-                .orElseThrow(() -> new RuntimeException("Branch not found: " + request.getBranchId()));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy chi nhánh: " + request.getBranchId()));
 
         Vehicles vehicle = null;
         if (request.getVehicleId() != null) {
             vehicle = vehicleRepository.findById(request.getVehicleId())
-                    .orElseThrow(() -> new RuntimeException("Vehicle not found: " + request.getVehicleId()));
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy xe: " + request.getVehicleId()));
         }
 
         Users requester = null;
@@ -108,7 +108,7 @@ public class ExpenseRequestServiceImpl implements ExpenseRequestService {
     public ExpenseRequestResponse approveRequest(Integer id, String note) {
         log.info("[ExpenseRequest] approveRequest: {} with note: {}", id, note);
         ExpenseRequests entity = expenseRequestRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Expense request not found: " + id));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy yêu cầu chi phí: " + id));
 
         entity.setStatus(ExpenseRequestStatus.APPROVED);
         if (note != null && !note.isEmpty()) {
@@ -124,7 +124,7 @@ public class ExpenseRequestServiceImpl implements ExpenseRequestService {
     public ExpenseRequestResponse rejectRequest(Integer id, String note) {
         log.info("[ExpenseRequest] rejectRequest: {} with note: {}", id, note);
         ExpenseRequests entity = expenseRequestRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Expense request not found: " + id));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy yêu cầu chi phí: " + id));
 
         entity.setStatus(ExpenseRequestStatus.REJECTED);
         if (note != null && !note.isEmpty()) {
