@@ -14,6 +14,7 @@ import java.time.LocalDate;
 public class DriverResponse {
     private Integer id;
     private String fullName;
+    private String phone;
     private String branchName;
     private String licenseNumber;
     private String licenseClass;
@@ -26,6 +27,7 @@ public class DriverResponse {
     public DriverResponse(Drivers driver) {
         this.id = driver.getId();
         this.fullName = driver.getEmployee().getUser().getFullName();
+        this.phone = driver.getEmployee().getUser().getPhone();
         this.branchName = driver.getBranch().getBranchName();
         this.licenseNumber = driver.getLicenseNumber();
         this.licenseClass = driver.getLicenseClass();
