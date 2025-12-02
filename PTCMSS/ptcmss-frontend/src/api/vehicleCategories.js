@@ -36,3 +36,4 @@ export function updateVehicleCategory(id, body) {
 export function deleteVehicleCategory(id) {
     return apiFetch(`/api/vehicle-categories/${id}`, { method: "DELETE" });
 }
+

@@ -14,6 +14,7 @@ import {
     createSystemSetting,
     updateSystemSetting,
 } from "../../api/systemSettings";
+import QrPaymentSettings from "../common/QrPaymentSettings.jsx";
 
 /**
  * SystemSettingsPage – Module 1.S1 (THEME LIGHT VERSION)
@@ -56,7 +57,7 @@ function Toasts({ toasts }) {
                     className={cls(
                         "rounded-md px-3 py-2 text-sm shadow border",
                         t.kind === "success" &&
-                        "bg-amber-50 border-amber-300 text-amber-700",
+                        "bg-sky-50 border-sky-300 text-sky-800",
                         t.kind === "error" &&
                         "bg-rose-50 border-rose-300 text-rose-700",
                         t.kind === "info" &&
@@ -336,11 +337,15 @@ export default function SystemSettingsPage() {
         }
 
         try {
-            // Map frontend format to backend format
+            // Map frontend format to backend format - include all required fields
             const newSetting = {
                 settingKey: draftNew.key.trim(),
                 settingValue: draftNew.value.trim(),
                 description: draftNew.description.trim(),
+                effectiveStartDate: new Date().toISOString().split('T')[0],
+                effectiveEndDate: null,
+                valueType: 'STRING',
+                category: null,
             };
 
             const created = await createSystemSetting(newSetting);
@@ -432,11 +437,16 @@ export default function SystemSettingsPage() {
                 })
                 .map((item) => {
                     const existing = settings.find((s) => s.key === item.key);
-                    // Map frontend format to backend format
+                    // Map frontend format to backend format - include all required fields
                     return updateSystemSetting(existing.id, {
                         settingKey: item.key,
                         settingValue: item.value,
                         description: item.description,
+                        // Keep existing values for required fields
+                        effectiveStartDate: existing.effectiveStartDate || new Date().toISOString().split('T')[0],
+                        effectiveEndDate: existing.effectiveEndDate || null,
+                        valueType: existing.valueType || 'STRING',
+                        category: existing.category || null,
                     });
                 });
 
@@ -447,11 +457,15 @@ export default function SystemSettingsPage() {
                     return !existing || !existing.id;
                 })
                 .map((item) =>
-                    // Map frontend format to backend format
+                    // Map frontend format to backend format - include all required fields
                     createSystemSetting({
                         settingKey: item.key,
                         settingValue: item.value,
                         description: item.description,
+                        effectiveStartDate: new Date().toISOString().split('T')[0],
+                        effectiveEndDate: null,
+                        valueType: 'STRING',
+                        category: null,
                     })
                 );
 
@@ -517,17 +531,6 @@ export default function SystemSettingsPage() {
                             />
                             <span>Làm mới</span>
                         </button>
-
-                        {/* nút thêm tham số */}
-                        {/* <button
-                            onClick={startAdd}
-                            disabled={adding}
-                            className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-lg disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-xl transition-all active:scale-[0.98]"
-                            style={{ backgroundColor: BRAND_COLOR }}
-                        >
-                            <Plus className="h-4 w-4" />
-                            <span>Thêm tham số</span>
-                        </button> */}
                     </div>
                 </div>
 
@@ -627,8 +630,8 @@ export default function SystemSettingsPage() {
 
                     {/* footer save bar */}
                     {hasChanges && (
-                        <div className="px-6 py-4 border-t border-slate-200 bg-gradient-to-r from-amber-50 to-yellow-50 flex flex-wrap items-center gap-3 justify-between">
-                            <div className="text-sm text-amber-800 font-medium flex items-center gap-2">
+                        <div className="px-6 py-4 border-t border-slate-200 bg-gradient-to-r from-sky-50 to-blue-50 flex flex-wrap items-center gap-3 justify-between">
+                            <div className="text-sm text-sky-800 font-medium flex items-center gap-2">
                                 <Info className="h-4 w-4" />
                                 <span>{dirtyPayload.length} thay đổi chưa lưu</span>
                             </div>
@@ -645,6 +648,11 @@ export default function SystemSettingsPage() {
                         </div>
                     )}
                 </div>
+            </div>
+
+            {/* QR Payment Settings Section */}
+            <div className="mt-6">
+                <QrPaymentSettings />
             </div>
 
             {/* Loading indicator */}

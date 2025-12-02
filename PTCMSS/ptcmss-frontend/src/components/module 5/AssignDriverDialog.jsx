@@ -574,7 +574,7 @@ export default function AssignDriverDialog({
                             rounded-md px-3 py-2 border text-[13px] font-medium flex items-center gap-1
                             ${autoPosting
                             ? "opacity-60 cursor-not-allowed border-amber-300 text-amber-400 bg-white"
-                            : "border-[#EDC531] text-amber-700 bg-white hover:bg-amber-50"
+                            : "border-sky-500 text-sky-700 bg-white hover:bg-sky-50"
                         }
                         `}
                     >

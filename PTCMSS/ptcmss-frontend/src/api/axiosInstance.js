@@ -21,14 +21,14 @@ function getAccessToken() {
     try {
         const v = localStorage.getItem("access_token") || "";
         if (v) return v;
-    } catch {}
+    } catch { }
     try {
         const parts = document.cookie.split("; ");
         for (const p of parts) {
             const [k, v] = p.split("=");
             if (k === "access_token") return decodeURIComponent(v || "");
         }
-    } catch {}
+    } catch { }
     return "";
 }
 
@@ -50,6 +50,7 @@ async function get(path, { params, responseType } = {}) {
     }
 
     const qs = buildQuery(params);
+    // Let apiFetch throw - caller should handle errors
     const data = await apiFetch(`${path}${qs}`);
     return { data };
 }

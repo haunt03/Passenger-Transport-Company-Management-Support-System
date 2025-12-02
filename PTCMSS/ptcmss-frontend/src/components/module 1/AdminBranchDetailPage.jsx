@@ -1,9 +1,10 @@
 import React from "react";
-import { Building2, ArrowLeft, Save, ShieldCheck, RefreshCw } from "lucide-react";
+import { Building2, ArrowLeft, Save, ShieldCheck, RefreshCw, X, MapPin } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getBranch, updateBranch } from "../../api/branches";
 import { listEmployeesByRole } from "../../api/employees";
 import { listUsers, listRoles } from "../../api/users";
+import ProvinceAutocomplete from "../common/ProvinceAutocomplete";
 
 const cls = (...a) => a.filter(Boolean).join(" ");
 
@@ -66,13 +67,17 @@ export default function AdminBranchDetailPage() {
   const [managers, setManagers] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
+  const [fieldErrors, setFieldErrors] = React.useState({});
 
   React.useEffect(() => {
     (async () => {
       setLoading(true);
       try {
         const b = await getBranch(branchId);
-        setBranchName(b.branchName || "");
+        // Strip "Chi nhánh" prefix if it exists when loading
+        const rawName = b.branchName || "";
+        const cleanedName = rawName.replace(/^Chi nhánh\s*/i, "").trim();
+        setBranchName(cleanedName);
         setAddress(b.location || "");
         setStatus(b.status || "ACTIVE");
         // Set managerId from the branch data
@@ -110,19 +115,58 @@ export default function AdminBranchDetailPage() {
     })();
   }, []);
 
+  const validateBranchName = React.useCallback((nameStr) => {
+    const cleaned = nameStr.trim();
+
+    if (!cleaned) {
+      return "Vui lòng chọn tỉnh/thành phố";
+    }
+
+    if (cleaned.toLowerCase().includes("chi nhánh")) {
+      return "Tên chi nhánh không được chứa cụm từ 'chi nhánh'";
+    }
+
+    return null;
+  }, []);
+
+  const validate = () => {
+    const errs = {};
+
+    if (!branchName.trim()) {
+      errs.branchName = "Vui lòng nhập tên chi nhánh";
+    } else {
+      const nameError = validateBranchName(branchName);
+      if (nameError) errs.branchName = nameError;
+    }
+
+    if (!address.trim()) errs.address = "Vui lòng nhập địa chỉ";
+
+    setFieldErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
   // Manager có thể giữ nguyên (không bắt buộc chọn lại)
-  const valid = branchName.trim() !== "" && (status === "ACTIVE" || status === "INACTIVE");
+  const valid = React.useMemo(() => {
+    if (!branchName.trim() || !address.trim()) {
+      return false;
+    }
+    return validateBranchName(branchName) === null;
+  }, [branchName, address, validateBranchName]);
 
   const onSave = async () => {
-    if (!valid) return;
+    if (!validate()) return;
     setSaving(true);
     try {
-      const body = { branchName, location: address, status };
+      const body = { branchName: `Chi nhánh ${branchName.trim()}`, location: address.trim(), status };
       if (managerId) body.managerId = Number(managerId);
       await updateBranch(branchId, body);
       push("Cập nhật chi nhánh thành công", "success");
-    } catch {
-      push("Cập nhật chi nhánh thất bại", "error");
+      setTimeout(() => {
+        navigate("/admin/branches");
+      }, 1500);
+    } catch (e) {
+      const errorMsg = e.response?.data?.message || e.message || "Cập nhật chi nhánh thất bại";
+      push(errorMsg, "error", 4000);
     } finally {
       setSaving(false);
     }
@@ -148,28 +192,85 @@ export default function AdminBranchDetailPage() {
           </button>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-4">
-          <div className="grid gap-4">
-            <div>
-              <div className="text-xs text-slate-600 mb-1">Tên chi nhánh <span className="text-rose-500">*</span></div>
-              <input value={branchName} onChange={(e) => setBranchName(e.target.value)} className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm" />
+        <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-6">
+          <div className="grid gap-5">
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                <Building2 className="h-4 w-4 text-slate-400" />
+                <span>Tên chi nhánh</span>
+                <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-slate-600 pointer-events-none z-10">
+                  Chi nhánh
+                </div>
+                <div className="pl-[90px]">
+                  <ProvinceAutocomplete
+                      value={branchName}
+                      onChange={(value) => {
+                        setBranchName(value);
+                        setFieldErrors((p) => ({ ...p, branchName: undefined }));
+                      }}
+                      error={fieldErrors.branchName}
+                      placeholder="Chọn tỉnh/thành phố (VD: Hà Nội, Cần Thơ...)"
+                  />
+                </div>
+              </div>
+              {fieldErrors.branchName && (
+                  <div className="text-xs text-red-600 mt-1.5 flex items-center gap-1.5">
+                    <X className="h-3.5 w-3.5" />
+                    <span>{fieldErrors.branchName}</span>
+                  </div>
+              )}
+              <div className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                💡 "Chi nhánh" đã được gán sẵn, chỉ cần chọn tỉnh/thành phố từ danh sách.
+              </div>
             </div>
-            <div>
-              <div className="text-xs text-slate-600 mb-1">Địa chỉ</div>
-              <input value={address} onChange={(e) => setAddress(e.target.value)} className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm" />
+
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                <MapPin className="h-4 w-4 text-slate-400" />
+                <span>Địa chỉ</span>
+                <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                  value={address}
+                  onChange={(e) => {
+                    setAddress(e.target.value);
+                    setFieldErrors((p) => ({ ...p, address: undefined }));
+                  }}
+                  rows={3}
+                  className={`w-full border rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 resize-none ${
+                      fieldErrors.address
+                          ? "border-red-400 focus:border-red-500 focus:ring-red-200"
+                          : "border-slate-300 focus:border-sky-500/50 focus:ring-sky-500/20"
+                  }`}
+                  placeholder="VD: 123 Đường ABC, Quận XYZ"
+              />
+              {fieldErrors.address && (
+                  <div className="text-xs text-red-600 mt-1.5 flex items-center gap-1.5">
+                    <X className="h-3.5 w-3.5" />
+                    <span>{fieldErrors.address}</span>
+                  </div>
+              )}
             </div>
+
             <div>
-              <div className="text-xs text-slate-600 mb-1">Quản lý chi nhánh <span className="text-rose-500">*</span></div>
-              <select value={managerId} onChange={(e) => setManagerId(e.target.value)} className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm">
-                <option value="">-- Chọn quản lý --</option>
+              <div className="text-xs text-slate-600 mb-1">Quản lý chi nhánh <span className="text-slate-400">(tùy chọn)</span></div>
+              <select value={managerId} onChange={(e) => setManagerId(e.target.value)} className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500">
+                <option value="">-- Không gán Manager --</option>
                 {(managers || []).map((m) => (
-                    <option key={m.id} value={m.id}>{m.name}</option>
+                    <option key={m.id} value={m.id}>{m.name}{m.email ? ` (${m.email})` : ''}</option>
                 ))}
               </select>
+              <div className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                Chỉ hiển thị các Manager đã có bản ghi nhân viên. Có thể để trống nếu chưa có.
+              </div>
             </div>
+
             <div>
               <div className="text-xs text-slate-600 mb-1">Trạng thái hoạt động</div>
-              <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm">
+              <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500">
                 <option value="ACTIVE">Đang hoạt động</option>
                 <option value="INACTIVE">Ngừng hoạt động</option>
               </select>

@@ -13,6 +13,7 @@ import {
   ChevronRight,
   AlertTriangle,
   Loader2,
+  Star,
 } from "lucide-react";
 import TripExpenseModal from "./TripExpenseModal.jsx";
 import TripPaymentRequestModal from "./TripPaymentRequestModal.jsx";
@@ -55,6 +56,7 @@ function normalizeTripDetail(payload) {
     pickup_location: payload.startLocation || "",
     dropoff_location: payload.endLocation || "",
     pickup_time: payload.startTime || "",
+    dropoff_time: payload.endTime || payload.end_time || "",
     customer_name: payload.customerName || "",
     customer_phone: payload.customerPhone || "",
     vehicle_plate: payload.vehiclePlate || "Chưa gán xe",
@@ -64,6 +66,8 @@ function normalizeTripDetail(payload) {
     deposit_amount: payload.depositAmount || 0,
     remaining_amount: payload.remainingAmount || 0,
     booking_id: payload.bookingId || null,
+    rating: payload.rating ? Number(payload.rating) : 0,
+    rating_comment: payload.ratingComment || payload.rating_comment || "",
   };
 }
 
@@ -114,13 +118,13 @@ function ConfirmModal({ open, title, message, onCancel, onConfirm }) {
                 onClick={onCancel}
                 className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 shadow-sm"
             >
-              Huy
+              Hủy
             </button>
             <button
                 onClick={onConfirm}
-                className="rounded-lg bg-[#EDC531] hover:bg-amber-500 px-3 py-2 text-sm font-medium text-white shadow-sm"
+                className="rounded-lg bg-sky-600 hover:bg-sky-500 px-3 py-2 text-sm font-medium text-white shadow-sm"
             >
-              Xac nhan
+              Xác nhận
             </button>
           </div>
         </div>
@@ -131,17 +135,17 @@ function ConfirmModal({ open, title, message, onCancel, onConfirm }) {
 function StatusChip({ status }) {
   const map = {
     NOT_STARTED: {
-      label: "Chua bat dau",
+      label: "Chưa bắt đầu",
       cls: "bg-slate-100 text-slate-700 border-slate-300",
       icon: <Flag className="h-3.5 w-3.5 text-slate-500" />,
     },
     IN_PROGRESS: {
-      label: "Dang di chuyen",
+      label: "Đang di chuyển",
       cls: "bg-sky-50 text-sky-700 border-sky-200",
       icon: <Navigation className="h-3.5 w-3.5 text-sky-500" />,
     },
     COMPLETED: {
-      label: "Hoan thanh",
+      label: "Hoàn thành",
       cls: "bg-amber-50 text-amber-700 border-amber-200",
       icon: <CheckCircle2 className="h-3.5 w-3.5 text-amber-500" />,
     },
@@ -157,9 +161,9 @@ function StatusChip({ status }) {
 
 function ProgressSteps({ status }) {
   const steps = [
-    { key: "NOT_STARTED", label: "Chua bat dau" },
-    { key: "IN_PROGRESS", label: "Dang chay" },
-    { key: "COMPLETED", label: "Hoan thanh" },
+    { key: "NOT_STARTED", label: "Chưa bắt đầu" },
+    { key: "IN_PROGRESS", label: "Đang chạy" },
+    { key: "COMPLETED", label: "Hoàn thành" },
   ];
   const idxActive = steps.findIndex((s) => s.key === status);
   return (
@@ -230,7 +234,7 @@ function TripMetaCard({ trip }) {
   );
 }
 
-function RouteCard({ pickupLocation, dropoffLocation, pickupTime }) {
+function RouteCard({ pickupLocation, dropoffLocation, pickupTime, dropoffTime }) {
   return (
       <div className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-4 shadow-inner">
         <div className="flex items-center gap-2 text-slate-600 text-xs font-medium uppercase tracking-wide">
@@ -259,7 +263,9 @@ function RouteCard({ pickupLocation, dropoffLocation, pickupTime }) {
                   Điểm trả
                 </div>
                 <div className="font-semibold text-slate-900">{dropoffLocation || "—"}</div>
-                <div className="text-xs text-slate-500">Kết thúc: Sau khi đón khách</div>
+                <div className="text-xs text-slate-500">
+                  Kết thúc: {dropoffTime ? fmtDateTime(dropoffTime) : "Sau khi đón khách"}
+                </div>
               </div>
             </div>
           </div>
@@ -397,6 +403,14 @@ export default function DriverTripDetailPage() {
       else if (nextStatus === "COMPLETED") await apiCompleteTrip(driver.driverId, trip.id);
       pushToast("Đã cập nhật trạng thái chuyến.", "success");
       await loadTripDetail(trip.id, { silent: true });
+
+      // Sau khi hoàn thành chuyến, nếu còn tiền chưa thanh toán → tự động mở modal tạo payment request
+      if (nextStatus === "COMPLETED" && trip.remaining_amount > 0) {
+        setTimeout(() => {
+          setPaymentOpen(true);
+          pushToast("Vui lòng tạo yêu cầu thanh toán cho số tiền còn lại.", "info");
+        }, 500);
+      }
     } catch (err) {
       pushToast(err?.data?.message || err?.message || "Không thể cập nhật trạng thái chuyến.", "error");
     } finally {
@@ -484,7 +498,7 @@ export default function DriverTripDetailPage() {
                           onClick={requestStatusChange}
                           disabled={actionLoading || detailLoading}
                           className={cls(
-                              "rounded-xl text-white font-semibold text-sm px-4 py-2 shadow-[0_12px_24px_rgba(16,185,129,0.35)] transition-colors bg-gradient-to-r from-[#EDC531] to-amber-500 hover:from-amber-500 hover:to-emerald-400",
+                              "rounded-xl text-white font-semibold text-sm px-4 py-2 shadow-[0_12px_24px_rgba(16,185,129,0.35)] transition-colors bg-gradient-to-r from-sky-600 to-blue-500 hover:from-blue-500 hover:to-emerald-400",
                               actionLoading || detailLoading ? "opacity-60 cursor-not-allowed" : ""
                           )}
                       >
@@ -499,8 +513,11 @@ export default function DriverTripDetailPage() {
                       </button>
                   )}
 
-                  {/* Nút Yêu cầu thanh toán - hiển thị khi IN_PROGRESS (trước khi hoàn thành) */}
-                  {canUpdateStatus && trip?.status === "IN_PROGRESS" && (
+                  {/* Nút Yêu cầu thanh toán - hiển thị khi:
+                  1. IN_PROGRESS (trước khi hoàn thành)
+                  2. COMPLETED nhưng còn tiền chưa thanh toán */}
+                  {(canUpdateStatus && trip?.status === "IN_PROGRESS") ||
+                  (trip?.status === "COMPLETED" && trip?.remaining_amount > 0) ? (
                       <button
                           onClick={() => setPaymentOpen(true)}
                           className="rounded-xl border border-[#0079BC] bg-[#0079BC] hover:bg-[#0079BC]/90 text-white text-sm font-semibold px-4 py-2 flex items-center justify-center gap-2 shadow-sm"
@@ -508,7 +525,7 @@ export default function DriverTripDetailPage() {
                         <BadgeDollarSign className="h-4 w-4" />
                         <span>Yêu cầu thanh toán</span>
                       </button>
-                  )}
+                  ) : null}
 
                   {/* Nút Báo cáo chi phí - chỉ khi HÔM NAY + chưa hoàn thành */}
                   {canUpdateStatus && (
@@ -531,7 +548,12 @@ export default function DriverTripDetailPage() {
               </div>
               <div className="grid xl:grid-cols-2 gap-5">
                 <TripMetaCard trip={trip} />
-                <RouteCard pickupLocation={trip.pickup_location} dropoffLocation={trip.dropoff_location} pickupTime={trip.pickup_time} />
+                <RouteCard
+                    pickupLocation={trip.pickup_location}
+                    dropoffLocation={trip.dropoff_location}
+                    pickupTime={trip.pickup_time}
+                    dropoffTime={trip.dropoff_time}
+                />
               </div>
 
               {/* Card thông tin thanh toán */}
@@ -554,6 +576,40 @@ export default function DriverTripDetailPage() {
                         <div className="text-[11px] text-amber-600 mb-1">Còn lại</div>
                         <div className="text-lg font-bold text-amber-700 tabular-nums">{fmtVND(trip.remaining_amount)} đ</div>
                       </div>
+                    </div>
+                  </div>
+              )}
+
+              {/* Card đánh giá - chỉ hiển thị khi chuyến đã hoàn thành và có rating */}
+              {trip.status === "COMPLETED" && trip.rating > 0 && (
+                  <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-inner">
+                    <div className="text-[11px] uppercase tracking-wide text-amber-700 flex items-center gap-2 font-medium mb-3">
+                      <Star className="h-3.5 w-3.5 text-amber-600 fill-amber-600" />
+                      Đánh giá từ khách hàng
+                    </div>
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                  key={star}
+                                  className={cls(
+                                      "h-5 w-5",
+                                      star <= Math.round(trip.rating)
+                                          ? "text-amber-500 fill-amber-500"
+                                          : "text-slate-300"
+                                  )}
+                              />
+                          ))}
+                        </div>
+                        <span className="text-lg font-bold text-amber-700">{trip.rating.toFixed(1)}</span>
+                      </div>
+                      {trip.rating_comment && (
+                          <div className="rounded-lg border border-amber-200 bg-white p-3 text-sm text-slate-700 leading-relaxed">
+                            <div className="text-xs text-slate-500 mb-1 font-medium">Nhận xét:</div>
+                            <div>{trip.rating_comment}</div>
+                          </div>
+                      )}
                     </div>
                   </div>
               )}
@@ -581,8 +637,12 @@ export default function DriverTripDetailPage() {
                   remainingAmount={trip?.remaining_amount}
                   customerName={trip?.customer_name}
                   onClose={() => setPaymentOpen(false)}
-                  onSubmitted={({ amount, paymentMethod }) => {
+                  onSubmitted={async ({ amount, paymentMethod }) => {
                     pushToast(`Đã gửi yêu cầu thanh toán ${fmtVND(amount)}đ (${paymentMethod === "CASH" ? "Tiền mặt" : "Chuyển khoản"})`, "success");
+                    // Reload trip detail để cập nhật remaining amount
+                    if (trip?.id) {
+                      await loadTripDetail(trip.id, { silent: true });
+                    }
                   }}
               />
             </>

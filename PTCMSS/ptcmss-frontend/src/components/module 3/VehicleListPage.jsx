@@ -1,7 +1,10 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { listVehicles, createVehicle, updateVehicle, listVehicleCategories } from "../../api/vehicles";
 import { listBranches } from "../../api/branches";
-import { getCurrentRole, ROLES } from "../../utils/session";
+import { getEmployeeByUserId } from "../../api/employees";
+import { getCurrentRole, getStoredUserId, ROLES } from "../../utils/session";
+import { checkVehicleAvailability } from "../../api/bookings";
 import {
     CarFront,
     PlusCircle,
@@ -79,14 +82,16 @@ function Toasts({ toasts }) {
 /* -------------------------------- */
 const VEHICLE_STATUS = {
     AVAILABLE: "AVAILABLE",
-    ON_TRIP: "ON_TRIP",
+    INUSE: "INUSE",
     MAINTENANCE: "MAINTENANCE",
+    INACTIVE: "INACTIVE",
 };
 
 const STATUS_LABEL = {
     AVAILABLE: "Sẵn sàng",
-    ON_TRIP: "Đang chạy",
+    INUSE: "Đang sử dụng",
     MAINTENANCE: "Bảo trì",
+    INACTIVE: "Không hoạt động",
 };
 
 function VehicleStatusBadge({ status }) {
@@ -100,11 +105,17 @@ function VehicleStatusBadge({ status }) {
         IconEl = (
             <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
         );
-    } else if (status === "ON_TRIP") {
+    } else if (status === "INUSE") {
         clsColor =
             "bg-sky-50 text-sky-700 border-sky-200";
         IconEl = (
             <CarFront className="h-3.5 w-3.5 text-sky-600" />
+        );
+    } else if (status === "INACTIVE") {
+        clsColor =
+            "bg-gray-50 text-gray-700 border-gray-200";
+        IconEl = (
+            <X className="h-3.5 w-3.5 text-gray-600" />
         );
     } else {
         clsColor =
@@ -136,6 +147,9 @@ function CreateVehicleModal({
                                 onCreate,
                                 branches,
                                 categories,
+                                isManager = false,
+                                managerBranchId = null,
+                                managerBranchName = "",
                             }) {
     const [licensePlate, setLicensePlate] = React.useState("");
     const [brand, setBrand] = React.useState("");
@@ -157,17 +171,20 @@ function CreateVehicleModal({
             setYear("");
             setOdometer("");
             setCategoryId("");
-            setBranchId("");
+            // Manager tự động set chi nhánh của mình
+            setBranchId(isManager && managerBranchId ? String(managerBranchId) : "");
             setStatus("AVAILABLE");
             setRegDueDate("");
             setInsDueDate("");
             setError("");
         }
-    }, [open]);
+    }, [open, isManager, managerBranchId]);
 
     if (!open) return null;
 
     const numericOnly = (s) => s.replace(/[^0-9]/g, "");
+    const currentYear = new Date().getFullYear();
+    const today = new Date().toISOString().split("T")[0];
 
     // Validation biển số xe theo chuẩn Việt Nam
     const isPlateValid = (plate) => {
@@ -184,14 +201,42 @@ function CreateVehicleModal({
             militaryPlateRegex.test(cleanPlate);
     };
 
+    // Validation năm sản xuất: 2000 - năm hiện tại
+    const yearNum = Number(year);
+    const isYearValid = year.trim() !== "" && yearNum >= 2000 && yearNum <= currentYear;
+
+    // Validation hạn đăng kiểm: phải là ngày trong tương lai
+    const isRegDueDateValid = !regDueDate || regDueDate > today;
+
+    // Validation hạn bảo hiểm: phải là ngày trong tương lai
+    const isInsDueDateValid = !insDueDate || insDueDate > today;
+
     const valid =
         isPlateValid(licensePlate) &&
         categoryId !== "" &&
         branchId !== "" &&
-        year.trim() !== "" &&
-        odometer.trim() !== "";
+        isYearValid &&
+        odometer.trim() !== "" &&
+        isRegDueDateValid &&
+        isInsDueDateValid;
 
     const handleSubmit = () => {
+        if (!isPlateValid(licensePlate)) {
+            setError("Biển số xe không đúng định dạng.");
+            return;
+        }
+        if (!isYearValid) {
+            setError(`Năm sản xuất phải từ 2000 đến ${currentYear}.`);
+            return;
+        }
+        if (!isRegDueDateValid) {
+            setError("Hạn đăng kiểm phải là ngày trong tương lai.");
+            return;
+        }
+        if (!isInsDueDateValid) {
+            setError("Hạn bảo hiểm phải là ngày trong tương lai.");
+            return;
+        }
         if (!valid) {
             setError("Vui lòng điền đủ thông tin bắt buộc.");
             return;
@@ -313,22 +358,31 @@ function CreateVehicleModal({
                         {/* Năm sản xuất */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1">
-                                Năm sản xuất{" "}
+                                Năm sản xuất (2000-{currentYear}){" "}
                                 <span className="text-red-500">*</span>
                             </div>
                             <input
                                 value={year}
-                                onChange={(e) =>
-                                    setYear(numericOnly(e.target.value))
-                                }
+                                onChange={(e) => {
+                                    const val = numericOnly(e.target.value);
+                                    if (val.length <= 4) setYear(val);
+                                }}
                                 inputMode="numeric"
+                                maxLength={4}
                                 className={cls(
                                     "w-full rounded-md border px-3 py-2 text-[13px] text-slate-900 placeholder:text-slate-400 outline-none",
-                                    "border-slate-300 bg-white shadow-sm",
+                                    year && !isYearValid
+                                        ? "border-red-400 bg-red-50"
+                                        : "border-slate-300 bg-white shadow-sm",
                                     "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
                                 )}
-                                placeholder="2022"
+                                placeholder={`VD: ${currentYear}`}
                             />
+                            {year && !isYearValid && (
+                                <div className="text-[11px] text-red-500 mt-1">
+                                    Năm sản xuất phải từ 2000 đến {currentYear}
+                                </div>
+                            )}
                         </div>
 
                         {/* Odo */}
@@ -367,8 +421,8 @@ function CreateVehicleModal({
                                 )}
                             >
                                 <option value="AVAILABLE">Sẵn sàng</option>
-                                <option value="ON_TRIP">Đang chạy</option>
                                 <option value="MAINTENANCE">Bảo trì</option>
+                                <option value="INACTIVE">Không hoạt động</option>
                             </select>
                         </div>
 
@@ -390,78 +444,105 @@ function CreateVehicleModal({
                                 )}
                             >
                                 <option value="">-- Chọn danh mục --</option>
-                                {categories.map((c) => (
-                                    <option key={c.id} value={c.id}>
-                                        {c.name} ({c.seats} chỗ)
-                                    </option>
-                                ))}
+                                {categories
+                                    .filter((c) => c.status === "ACTIVE")
+                                    .map((c) => (
+                                        <option key={c.id} value={c.id}>
+                                            {c.name} ({c.seats} chỗ)
+                                        </option>
+                                    ))}
                             </select>
                         </div>
 
-                        {/* Chi nhánh */}
+                        {/* Chi nhánh - Manager không được đổi */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1">
                                 Chi nhánh quản lý{" "}
                                 <span className="text-red-500">*</span>
-                            </div>
-                            <select
-                                value={branchId}
-                                onChange={(e) =>
-                                    setBranchId(e.target.value)
-                                }
-                                className={cls(
-                                    "w-full rounded-md border px-3 py-2 text-[13px] text-slate-700 outline-none",
-                                    "border-slate-300 bg-white shadow-sm",
-                                    "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                                {isManager && (
+                                    <span className="text-amber-600 ml-1">(Tự động)</span>
                                 )}
-                            >
-                                <option value="">-- Chọn chi nhánh --</option>
-                                {branches.map((b) => (
-                                    <option key={b.id} value={b.id}>
-                                        {b.name}
-                                    </option>
-                                ))}
-                            </select>
+                            </div>
+                            {isManager ? (
+                                <div className="w-full rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-[13px] text-slate-600">
+                                    {managerBranchName || `Chi nhánh #${managerBranchId}`}
+                                </div>
+                            ) : (
+                                <select
+                                    value={branchId}
+                                    onChange={(e) =>
+                                        setBranchId(e.target.value)
+                                    }
+                                    className={cls(
+                                        "w-full rounded-md border px-3 py-2 text-[13px] text-slate-700 outline-none",
+                                        "border-slate-300 bg-white shadow-sm",
+                                        "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                                    )}
+                                >
+                                    <option value="">-- Chọn chi nhánh --</option>
+                                    {branches.map((b) => (
+                                        <option key={b.id} value={b.id}>
+                                            {b.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            )}
                         </div>
 
                         {/* Ngày Đăng kiểm tiếp theo */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1 flex items-center gap-2">
                                 <Calendar className="h-4 w-4 text-slate-400" />
-                                <span>Ngày Đăng kiểm tiếp theo</span>
+                                <span>Hạn đăng kiểm (ngày trong tương lai)</span>
                             </div>
                             <input
                                 type="date"
                                 value={regDueDate}
+                                min={today}
                                 onChange={(e) =>
                                     setRegDueDate(e.target.value)
                                 }
                                 className={cls(
                                     "w-full rounded-md border px-3 py-2 text-[13px] text-slate-700 outline-none",
-                                    "border-slate-300 bg-white shadow-sm",
+                                    regDueDate && !isRegDueDateValid
+                                        ? "border-red-400 bg-red-50"
+                                        : "border-slate-300 bg-white shadow-sm",
                                     "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
                                 )}
                             />
+                            {regDueDate && !isRegDueDateValid && (
+                                <div className="text-[11px] text-red-500 mt-1">
+                                    Hạn đăng kiểm phải là ngày trong tương lai
+                                </div>
+                            )}
                         </div>
 
                         {/* Ngày hết hạn bảo hiểm TNDS */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1 flex items-center gap-2">
                                 <Calendar className="h-4 w-4 text-slate-400" />
-                                <span>Hạn hết hạn bảo hiểm TNDS</span>
+                                <span>Hạn bảo hiểm TNDS (ngày trong tương lai)</span>
                             </div>
                             <input
                                 type="date"
                                 value={insDueDate}
+                                min={today}
                                 onChange={(e) =>
                                     setInsDueDate(e.target.value)
                                 }
                                 className={cls(
                                     "w-full rounded-md border px-3 py-2 text-[13px] text-slate-700 outline-none",
-                                    "border-slate-300 bg-white shadow-sm",
+                                    insDueDate && !isInsDueDateValid
+                                        ? "border-red-400 bg-red-50"
+                                        : "border-slate-300 bg-white shadow-sm",
                                     "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
                                 )}
                             />
+                            {insDueDate && !isInsDueDateValid && (
+                                <div className="text-[11px] text-red-500 mt-1">
+                                    Hạn bảo hiểm phải là ngày trong tương lai
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -506,8 +587,11 @@ function EditVehicleModal({
                               vehicle,
                               branches,
                               categories,
+                              isManager = false,
+                              readOnly = false, // Add readOnly prop for Accountant view
                           }) {
     const [status, setStatus] = React.useState("");
+    const [branchId, setBranchId] = React.useState("");
     const [regDueDate, setRegDueDate] = React.useState("");
     const [insDueDate, setInsDueDate] = React.useState("");
     const [error, setError] = React.useState("");
@@ -515,6 +599,7 @@ function EditVehicleModal({
     React.useEffect(() => {
         if (open && vehicle) {
             setStatus(vehicle.status || "AVAILABLE");
+            setBranchId(vehicle.branch_id ? String(vehicle.branch_id) : "");
             setRegDueDate(vehicle.reg_due_date || "");
             setInsDueDate(vehicle.ins_due_date || "");
             setError("");
@@ -523,52 +608,32 @@ function EditVehicleModal({
 
     if (!open || !vehicle) return null;
 
-    const valid = status !== "";
+    const today = new Date().toISOString().split("T")[0];
+
+    // Validation hạn đăng kiểm: phải là ngày trong tương lai
+    const isRegDueDateValid = !regDueDate || regDueDate > today;
+
+    const valid = status !== "" && isRegDueDateValid;
 
     const handleSubmit = () => {
+        if (!isRegDueDateValid) {
+            setError("Hạn đăng kiểm phải là ngày trong tương lai.");
+            return;
+        }
         if (!valid) {
             setError("Thiếu thông tin bắt buộc.");
             return;
         }
 
-        // Validation: không cho phép cập nhật ngày đăng kiểm, bảo hiểm về quá khứ
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        if (regDueDate) {
-            const regDate = new Date(regDueDate);
-            if (regDate < today) {
-                setError("Ngày đăng kiểm không được là ngày trong quá khứ");
-                return;
-            }
-        }
-
-        if (insDueDate) {
-            const insDate = new Date(insDueDate);
-            if (insDate < today) {
-                setError("Ngày hết hạn bảo hiểm không được là ngày trong quá khứ");
-                return;
-            }
-        }
-
-        // Validation: Xe đang "Đang chạy" (ON_TRIP) không cho phép đổi trạng thái
-        if (vehicle.status === "ON_TRIP" && status !== "ON_TRIP") {
-            setError("Không thể thay đổi trạng thái khi xe đang trong chuyến đi");
-            return;
-        }
-
-        // Validation: Không cho phép đổi sang "Đang chạy" thủ công
-        if (vehicle.status !== "ON_TRIP" && status === "ON_TRIP") {
-            setError("Trạng thái 'Đang chạy' chỉ được cập nhật tự động khi xe trong chuyến");
-            return;
-        }
-
         const payload = {
-            branchId: Number(vehicle.branch_id), // Không cho sửa, giữ nguyên
-            categoryId: Number(vehicle.category_id), // Không cho sửa, giữ nguyên
+            branchId: branchId ? Number(branchId) : Number(vehicle.branch_id),
+            categoryId: Number(vehicle.category_id),
+            licensePlate: vehicle.license_plate,
+            brand: vehicle.brand || "",
+            model: vehicle.model || "",
+            productionYear: vehicle.year || null,
+            odometer: vehicle.odometer || null,
             status,
-            model: vehicle.model || null, // Không cho sửa, giữ nguyên
-            productionYear: vehicle.year || null, // Không cho sửa, giữ nguyên
             inspectionExpiry: regDueDate || null,
             insuranceExpiry: insDueDate || null,
         };
@@ -623,24 +688,31 @@ function EditVehicleModal({
 
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1">
-                                Trạng thái xe mới{" "}
-                                <span className="text-red-500">*</span>
+                                Trạng thái xe{readOnly ? "" : " mới"}{" "}
+                                {!readOnly && <span className="text-red-500">*</span>}
                             </div>
-                            <select
-                                value={status}
-                                onChange={(e) =>
-                                    setStatus(e.target.value)
-                                }
-                                className={cls(
-                                    "w-full rounded-md border px-3 py-2 text-[13px] text-slate-700 outline-none",
-                                    "border-slate-300 bg-white shadow-sm",
-                                    "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
-                                )}
-                            >
-                                <option value="AVAILABLE">Sẵn sàng</option>
-                                <option value="ON_TRIP">Đang chạy</option>
-                                <option value="MAINTENANCE">Bảo trì</option>
-                            </select>
+                            {readOnly ? (
+                                <div className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 font-medium shadow-inner">
+                                    {STATUS_LABEL[status] || status}
+                                </div>
+                            ) : (
+                                <select
+                                    value={status}
+                                    onChange={(e) =>
+                                        setStatus(e.target.value)
+                                    }
+                                    className={cls(
+                                        "w-full rounded-md border px-3 py-2 text-[13px] text-slate-700 outline-none",
+                                        "border-slate-300 bg-white shadow-sm",
+                                        "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                                    )}
+                                >
+                                    <option value="AVAILABLE">Sẵn sàng</option>
+                                    <option value="INUSE">Đang sử dụng</option>
+                                    <option value="MAINTENANCE">Bảo trì</option>
+                                    <option value="INACTIVE">Không hoạt động</option>
+                                </select>
+                            )}
                         </div>
 
                         {/* model - READONLY */}
@@ -673,34 +745,71 @@ function EditVehicleModal({
                             </div>
                         </div>
 
-                        {/* branch - READONLY (yêu cầu mới: KHÔNG cho chuyển chi nhánh) */}
+                        {/* branch - Manager có thể chuyển xe sang chi nhánh khác, Accountant chỉ xem */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1">
-                                Chi nhánh
+                                Chi nhánh{" "}
+                                {isManager && !readOnly && (
+                                    <span className="text-sky-600">(Có thể chuyển)</span>
+                                )}
                             </div>
-                            <div className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 font-medium shadow-inner">
-                                {vehicle.branch_name || "—"}
-                            </div>
+                            {isManager && !readOnly ? (
+                                <select
+                                    value={branchId}
+                                    onChange={(e) => setBranchId(e.target.value)}
+                                    className={cls(
+                                        "w-full rounded-md border px-3 py-2 text-[13px] text-slate-700 outline-none",
+                                        "border-slate-300 bg-white shadow-sm",
+                                        "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                                    )}
+                                >
+                                    {branches.map((b) => (
+                                        <option key={b.id} value={b.id}>
+                                            {b.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <div className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 font-medium shadow-inner">
+                                    {vehicle.branch_name || "—"}
+                                </div>
+                            )}
                         </div>
 
                         {/* Ngày đăng kiểm tiếp theo */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1 flex items-center gap-2">
                                 <Calendar className="h-4 w-4 text-slate-400" />
-                                <span>Ngày đăng kiểm tiếp theo</span>
+                                <span>Hạn đăng kiểm{!readOnly && " (ngày trong tương lai)"}</span>
                             </div>
-                            <input
-                                type="date"
-                                value={regDueDate || ""}
-                                onChange={(e) =>
-                                    setRegDueDate(e.target.value)
-                                }
-                                className={cls(
-                                    "w-full rounded-md border px-3 py-2 text-[13px] text-slate-700 outline-none",
-                                    "border-slate-300 bg-white shadow-sm",
-                                    "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
-                                )}
-                            />
+                            {readOnly ? (
+                                <div className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 font-medium shadow-inner">
+                                    {regDueDate || "—"}
+                                </div>
+                            ) : (
+                                <>
+                                    <input
+                                        type="date"
+                                        value={regDueDate || ""}
+                                        min={today}
+                                        onChange={(e) =>
+                                            setRegDueDate(e.target.value)
+                                        }
+                                        className={cls(
+                                            "w-full rounded-md border px-3 py-2 text-[13px] text-slate-700 outline-none",
+                                            regDueDate && !isRegDueDateValid
+                                                ? "border-red-400 bg-red-50"
+                                                : "border-slate-300 bg-white shadow-sm",
+                                            "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                                        )}
+                                    />
+                                    {regDueDate && !isRegDueDateValid && (
+                                        <div className="text-[11px] text-red-500 mt-1">
+                                            Hạn đăng kiểm phải là ngày trong tương lai
+                                        </div>
+                                    )}
+                                </>
+                            )}
                         </div>
 
                         {/* Ngày hết hạn bảo hiểm */}
@@ -709,18 +818,24 @@ function EditVehicleModal({
                                 <Calendar className="h-4 w-4 text-slate-400" />
                                 <span>Hết hạn bảo hiểm xe TNDS</span>
                             </div>
-                            <input
-                                type="date"
-                                value={insDueDate || ""}
-                                onChange={(e) =>
-                                    setInsDueDate(e.target.value)
-                                }
-                                className={cls(
-                                    "w-full rounded-md border px-3 py-2 text-[13px] text-slate-700 outline-none",
-                                    "border-slate-300 bg-white shadow-sm",
-                                    "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
-                                )}
-                            />
+                            {readOnly ? (
+                                <div className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 font-medium shadow-inner">
+                                    {insDueDate || "—"}
+                                </div>
+                            ) : (
+                                <input
+                                    type="date"
+                                    value={insDueDate || ""}
+                                    onChange={(e) =>
+                                        setInsDueDate(e.target.value)
+                                    }
+                                    className={cls(
+                                        "w-full rounded-md border px-3 py-2 text-[13px] text-slate-700 outline-none",
+                                        "border-slate-300 bg-white shadow-sm",
+                                        "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                                    )}
+                                />
+                            )}
                         </div>
                     </div>
 
@@ -739,16 +854,19 @@ function EditVehicleModal({
                     >
                         Đóng
                     </button>
-                    <button
-                        onClick={handleSubmit}
-                        className={cls(
-                            "inline-flex items-center gap-2 rounded-md px-3 py-2 font-medium text-white shadow-sm",
-                            "bg-sky-600 hover:bg-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
-                        )}
-                    >
-                        <Wrench className="h-4 w-4" />
-                        Lưu Thay Đổi
-                    </button>
+                    {/* Chỉ hiển thị nút Lưu khi không phải readOnly (Accountant) */}
+                    {!readOnly && (
+                        <button
+                            onClick={handleSubmit}
+                            className={cls(
+                                "inline-flex items-center gap-2 rounded-md px-3 py-2 font-medium text-white shadow-sm",
+                                "bg-sky-600 hover:bg-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                            )}
+                        >
+                            <Wrench className="h-4 w-4" />
+                            Lưu Thay Đổi
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
@@ -775,6 +893,12 @@ function FilterBar({
                        showBranchFilter = true, // Add prop to control branch filter visibility
                        showCreateButton = true, // Add prop to control create button visibility
                        createButtonPosition = "left", // "left" or "right"
+                       // Time filter for Consultant
+                       isConsultant = false,
+                       timeFilterStart = "",
+                       setTimeFilterStart = () => {},
+                       timeFilterEnd = "",
+                       setTimeFilterEnd = () => {},
                    }) {
     return (
         <div className="flex flex-col lg:flex-row lg:flex-wrap gap-3 text-[13px] text-slate-700">
@@ -845,8 +969,9 @@ function FilterBar({
                     >
                         <option value="">Tất cả trạng thái</option>
                         <option value="AVAILABLE">Sẵn sàng</option>
-                        <option value="ON_TRIP">Đang chạy</option>
+                        <option value="INUSE">Đang sử dụng</option>
                         <option value="MAINTENANCE">Bảo trì</option>
+                        <option value="INACTIVE">Không hoạt động</option>
                     </select>
                 </div>
 
@@ -860,6 +985,64 @@ function FilterBar({
                         className="bg-transparent outline-none text-[13px] placeholder:text-slate-400 text-slate-700 flex-1"
                     />
                 </div>
+
+                {/* Time filter for Consultant - Check vehicle availability */}
+                {isConsultant && (
+                    <>
+                        <div className="flex items-center gap-2 rounded-md border border-slate-300 bg-white shadow-sm px-3 py-2 min-w-[160px]">
+                            <Calendar className="h-4 w-4 text-slate-400" />
+                            <input
+                                type="date"
+                                value={timeFilterStart}
+                                onChange={(e) => {
+                                    const newStart = e.target.value;
+                                    setTimeFilterStart(newStart);
+                                    // Nếu ngày end < ngày start mới, reset end
+                                    if (timeFilterEnd && newStart && timeFilterEnd < newStart) {
+                                        setTimeFilterEnd("");
+                                    }
+                                }}
+                                max={timeFilterEnd || undefined}
+                                placeholder="Từ ngày"
+                                className="bg-transparent outline-none text-[13px] text-slate-700 flex-1"
+                                title="Từ ngày"
+                            />
+                        </div>
+                        <span className="text-slate-400 text-[13px]">→</span>
+                        <div className="flex items-center gap-2 rounded-md border border-slate-300 bg-white shadow-sm px-3 py-2 min-w-[160px]">
+                            <Calendar className="h-4 w-4 text-slate-400" />
+                            <input
+                                type="date"
+                                value={timeFilterEnd}
+                                onChange={(e) => {
+                                    const newEnd = e.target.value;
+                                    // Validate: end phải >= start
+                                    if (timeFilterStart && newEnd && newEnd < timeFilterStart) {
+                                        // Không cho phép chọn ngày end < start (browser sẽ tự động ngăn chặn với min attribute)
+                                        return;
+                                    }
+                                    setTimeFilterEnd(newEnd);
+                                }}
+                                min={timeFilterStart || undefined}
+                                placeholder="Đến ngày"
+                                className="bg-transparent outline-none text-[13px] text-slate-700 flex-1"
+                                title="Đến ngày"
+                            />
+                        </div>
+                        {(timeFilterStart || timeFilterEnd) && (
+                            <button
+                                onClick={() => {
+                                    setTimeFilterStart("");
+                                    setTimeFilterEnd("");
+                                }}
+                                className="rounded-md border border-slate-300 bg-white hover:bg-slate-100 text-[13px] text-slate-700 px-3 py-2 flex items-center gap-2"
+                                title="Xóa filter thời gian"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        )}
+                    </>
+                )}
 
                 {/* Làm mới */}
                 <button
@@ -917,6 +1100,11 @@ function VehicleTable({
                           setSortDir,
                           totalPages,
                           onClickDetail,
+                          isAccountant = false,
+                          isConsultant = false,
+                          vehicleAvailability = {},
+                          timeFilterStart = "",
+                          timeFilterEnd = "",
                       }) {
     const headerCell = (key, label) => (
         <th
@@ -989,7 +1177,30 @@ function VehicleTable({
 
                         {/* Trạng thái */}
                         <td className="px-3 py-2 whitespace-nowrap">
-                            <VehicleStatusBadge status={v.status} />
+                            <div className="flex flex-col gap-1">
+                                <VehicleStatusBadge status={v.status} />
+                                {/* Availability badge for Consultant with time filter */}
+                                {isConsultant && timeFilterStart && timeFilterEnd && vehicleAvailability[v.id] && (
+                                    <span className={cls(
+                                        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium",
+                                        vehicleAvailability[v.id].available
+                                            ? "bg-green-50 text-green-700 border border-green-200"
+                                            : "bg-orange-50 text-orange-700 border border-orange-200"
+                                    )}>
+                                            {vehicleAvailability[v.id].available ? (
+                                                <>
+                                                    <CheckCircle2 className="h-3 w-3" />
+                                                    Rảnh
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <AlertTriangle className="h-3 w-3" />
+                                                    Bận
+                                                </>
+                                            )}
+                                        </span>
+                                )}
+                            </div>
                         </td>
 
                         {/* Hạn đăng kiểm */}
@@ -1004,19 +1215,25 @@ function VehicleTable({
 
                         {/* Action */}
                         <td className="px-3 py-2 whitespace-nowrap">
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    onClickDetail && onClickDetail(v)
-                                }
-                                className={cls(
-                                    "inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-[12px] font-medium shadow-sm",
-                                    "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100"
-                                )}
-                            >
-                                <Wrench className="h-3.5 w-3.5 text-sky-600" />
-                                <span>Chi tiết / Sửa</span>
-                            </button>
+                            {/* Consultant: Ẩn button Chi tiết/Sửa */}
+                            {!isConsultant && (
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        onClickDetail && onClickDetail(v)
+                                    }
+                                    className={cls(
+                                        "inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-[12px] font-medium shadow-sm",
+                                        "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100"
+                                    )}
+                                >
+                                    <Wrench className="h-3.5 w-3.5 text-sky-600" />
+                                    <span>{isAccountant ? "Chi tiết" : "Chi tiết / Sửa"}</span>
+                                </button>
+                            )}
+                            {isConsultant && (
+                                <span className="text-[11px] text-slate-400 italic">Chỉ xem</span>
+                            )}
                         </td>
                     </tr>
                 ))}
@@ -1132,7 +1349,7 @@ const MOCK_VEHICLES = [
         seats: 16,
         branch_id: "HP",
         branch_name: "Hải Phòng",
-        status: VEHICLE_STATUS.ON_TRIP,
+        status: VEHICLE_STATUS.INUSE,
         reg_due_date: "2025-11-20",
         ins_due_date: "2025-11-30",
         model: "Solati",
@@ -1174,7 +1391,7 @@ const MOCK_VEHICLES = [
         seats: 4,
         branch_id: "HN",
         branch_name: "Hà Nội",
-        status: VEHICLE_STATUS.ON_TRIP,
+        status: VEHICLE_STATUS.INUSE,
         reg_due_date: "2025-10-05",
         ins_due_date: "2025-10-20",
         model: "City",
@@ -1185,18 +1402,33 @@ const MOCK_VEHICLES = [
 /* -------------------------------- */
 /* MAIN PAGE                        */
 /* -------------------------------- */
-export default function VehicleListPage() {
+export default function VehicleListPage({ readOnly: readOnlyProp = false }) {
     const { toasts, push } = useToasts();
+    const navigate = useNavigate();
 
     // Check current user role
     const currentRole = React.useMemo(() => getCurrentRole(), []);
+    const currentUserId = React.useMemo(() => getStoredUserId(), []);
     const isManager = currentRole === ROLES.MANAGER;
+    const isAccountant = currentRole === ROLES.ACCOUNTANT;
+    const isConsultant = currentRole === ROLES.CONSULTANT;
+    // readOnly mode: Consultant và Accountant chỉ được xem, không được thêm/sửa/xóa
+    const isReadOnly = readOnlyProp || isAccountant || isConsultant;
+
+    // Manager's branch info
+    const [managerBranchId, setManagerBranchId] = React.useState(null);
+    const [managerBranchName, setManagerBranchName] = React.useState("");
 
     // filter state
     const [branchFilter, setBranchFilter] = React.useState("");
     const [categoryFilter, setCategoryFilter] = React.useState("");
     const [statusFilter, setStatusFilter] = React.useState("");
     const [searchPlate, setSearchPlate] = React.useState("");
+
+    // Time filter for Consultant (to check vehicle availability)
+    const [timeFilterStart, setTimeFilterStart] = React.useState("");
+    const [timeFilterEnd, setTimeFilterEnd] = React.useState("");
+    const [vehicleAvailability, setVehicleAvailability] = React.useState({}); // { vehicleId: { available: boolean, reason: string } }
 
     // refresh state
     const [loadingRefresh, setLoadingRefresh] = React.useState(false);
@@ -1211,6 +1443,25 @@ export default function VehicleListPage() {
     const [vehicles, setVehicles] = React.useState([]);
     const [branches, setBranches] = React.useState([]);
     const [categories, setCategories] = React.useState([]);
+
+    // Load user's branch (Manager, Consultant, Accountant)
+    React.useEffect(() => {
+        if ((!isManager && !isConsultant && !isAccountant) || !currentUserId) return;
+
+        (async () => {
+            try {
+                const resp = await getEmployeeByUserId(currentUserId);
+                const emp = resp?.data || resp;
+                if (emp?.branchId) {
+                    setManagerBranchId(emp.branchId);
+                    setManagerBranchName(emp.branchName || "");
+                    setBranchFilter(String(emp.branchId)); // Auto filter by user's branch
+                }
+            } catch (err) {
+                console.error("Error loading user branch:", err);
+            }
+        })();
+    }, [isManager, isConsultant, isAccountant, currentUserId]);
 
     // helper map backend -> UI
     const mapVehicle = React.useCallback((v) => ({
@@ -1231,14 +1482,15 @@ export default function VehicleListPage() {
     React.useEffect(() => {
         (async () => {
             try {
+                // Skip loading categories/branches lists for read-only roles to avoid 403 errors
                 const [brData, catData, vehData] = await Promise.all([
-                    listBranches({ size: 1000 }).catch(() => ({ content: [] })),
-                    listVehicleCategories().catch(() => []),
+                    isReadOnly ? Promise.resolve({ content: [] }) : listBranches({ size: 1000 }).catch(() => ({ content: [] })),
+                    isReadOnly ? Promise.resolve([]) : listVehicleCategories().catch(() => []),
                     listVehicles().catch(() => []),
                 ]);
                 const brs = Array.isArray(brData) ? brData : (brData?.items || brData?.content || []);
                 setBranches(brs.map(b => ({ id: b.id, name: b.branchName || b.name || b.branch_name })));
-                setCategories((catData || []).map(c => ({ id: c.id, name: c.categoryName || c.name })));
+                setCategories((catData || []).map(c => ({ id: c.id, name: c.categoryName || c.name, seats: c.seats, status: c.status })));
                 setVehicles((vehData || []).map(mapVehicle));
             } catch { }
         })();
@@ -1249,10 +1501,13 @@ export default function VehicleListPage() {
     const [editOpen, setEditOpen] = React.useState(false);
     const [editingVehicle, setEditingVehicle] = React.useState(null);
 
-    // filter + sort data
+    // filter + sort data (moved before useEffect that uses it)
     const filteredSorted = React.useMemo(() => {
         const q = searchPlate.trim().toLowerCase();
-        const bf = branchFilter ? String(branchFilter) : "";
+        // Manager chỉ xem xe trong chi nhánh của mình
+        const bf = isManager && managerBranchId
+            ? String(managerBranchId)
+            : (branchFilter ? String(branchFilter) : "");
         const cf = categoryFilter ? String(categoryFilter) : "";
 
         const afterFilter = vehicles.filter((v) => {
@@ -1300,6 +1555,8 @@ export default function VehicleListPage() {
         searchPlate,
         sortKey,
         sortDir,
+        isManager,
+        managerBranchId
     ]);
 
     // total pages
@@ -1322,19 +1579,29 @@ export default function VehicleListPage() {
 
     // "Thêm xe mới"
     const handleCreateSubmit = async (payload) => {
+        // Kiểm tra trùng biển số
+        const plateToCheck = (payload.license_plate || payload.licensePlate || "").trim().toUpperCase();
+        const isDuplicate = vehicles.some(v =>
+            v.license_plate?.toUpperCase().replace(/[.\s-]/g, "") === plateToCheck.replace(/[.\s-]/g, "")
+        );
+        if (isDuplicate) {
+            push("Biển số xe đã tồn tại trong hệ thống!", "error");
+            return;
+        }
+
         try {
             const created = await createVehicle(payload);
             setVehicles((prev) => [mapVehicle(created), ...prev]);
-            push("Thêm xe mới thành công:   " + (payload.license_plate || payload.licensePlate), "success");
+            push("Thêm xe mới thành công: " + plateToCheck, "success");
         } catch (e) {
-            push("Thêm xe mới thất bại", "error");
+            const errMsg = e?.message || e?.response?.data?.message || "Thêm xe mới thất bại";
+            push(errMsg, "error");
         }
     };
 
-    // "Chi tiết xe"
+    // "Chi tiết xe" - Navigate đến VehicleDetailPage để xem đầy đủ (hồ sơ, chuyến đi, chi phí)
     const handleClickDetail = (vehicle) => {
-        setEditingVehicle(vehicle);
-        setEditOpen(true);
+        navigate(`/vehicles/${vehicle.id}`);
     };
 
     // "Lưu thay đổi" từ edit modal
@@ -1385,8 +1652,11 @@ export default function VehicleListPage() {
                                     Quản lý phương tiện
                                 </div>
                                 <div className="text-[12px] text-slate-500 leading-snug max-w-xl">
-                                    Theo dõi tình trạng xe, hiện đang kiểm, và
-                                    phân bổ theo chi nhánh.
+                                    {isManager && managerBranchName ? (
+                                        <>Chi nhánh: <span className="font-medium text-slate-700">{managerBranchName}</span></>
+                                    ) : (
+                                        "Theo dõi tình trạng xe, hiện đang kiểm, và phân bổ theo chi nhánh."
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -1414,9 +1684,15 @@ export default function VehicleListPage() {
                     onClickCreate={handleCreateNew}
                     loadingRefresh={loadingRefresh}
                     onRefresh={handleRefresh}
-                    showBranchFilter={!isManager}
-                    showCreateButton={true}
-                    createButtonPosition={isManager ? "right" : "left"}
+                    showBranchFilter={!isManager && !isConsultant && !isAccountant}
+                    showCreateButton={!isReadOnly}
+                    createButtonPosition="left"
+                    // Time filter for Consultant
+                    isConsultant={isConsultant}
+                    timeFilterStart={timeFilterStart}
+                    setTimeFilterStart={setTimeFilterStart}
+                    timeFilterEnd={timeFilterEnd}
+                    setTimeFilterEnd={setTimeFilterEnd}
                 />
             </div>
 
@@ -1445,6 +1721,11 @@ export default function VehicleListPage() {
                     setSortDir={setSortDir}
                     totalPages={totalPages}
                     onClickDetail={handleClickDetail}
+                    isAccountant={isAccountant}
+                    isConsultant={isConsultant}
+                    vehicleAvailability={vehicleAvailability}
+                    timeFilterStart={timeFilterStart}
+                    timeFilterEnd={timeFilterEnd}
                 />
             </div>
 
@@ -1455,6 +1736,9 @@ export default function VehicleListPage() {
                 onCreate={handleCreateSubmit}
                 branches={branches}
                 categories={categories}
+                isManager={isManager}
+                managerBranchId={managerBranchId}
+                managerBranchName={managerBranchName}
             />
 
             <EditVehicleModal
@@ -1464,6 +1748,8 @@ export default function VehicleListPage() {
                 vehicle={editingVehicle}
                 branches={branches}
                 categories={categories}
+                isManager={isManager}
+                readOnly={isAccountant}
             />
         </div>
     );

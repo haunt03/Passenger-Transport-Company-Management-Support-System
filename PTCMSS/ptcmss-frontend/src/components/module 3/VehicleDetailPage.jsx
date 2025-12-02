@@ -10,6 +10,7 @@ import {
     getVehicleMaintenance,
 } from "../../api/vehicles";
 import { listBranches } from "../../api/branches";
+import { getCurrentRole, ROLES } from "../../utils/session";
 import {
     CarFront,
     Wrench,
@@ -66,8 +67,11 @@ const fmtDateTimeShort = (isoLike) => {
 /* ---------------- status badge ---------------- */
 const STATUS_LABEL = {
     AVAILABLE: "Sẵn sàng",
+    INUSE: "Đang sử dụng",
     MAINTENANCE: "Bảo trì",
-    INACTIVE: "Ngưng sử dụng",
+    INACTIVE: "Không hoạt động",
+    COMPLETED: "Hoàn thành",
+    ONGOING: "Đang thực hiện",
 };
 
 function VehicleStatusBadge({ status }) {
@@ -81,11 +85,35 @@ function VehicleStatusBadge({ status }) {
         IconEl = (
             <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
         );
+    } else if (status === "COMPLETED") {
+        classes =
+            "bg-green-50 text-green-700 border-green-200";
+        IconEl = (
+            <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+        );
+    } else if (status === "ONGOING") {
+        classes =
+            "bg-sky-50 text-sky-700 border-sky-200";
+        IconEl = (
+            <CarFront className="h-3.5 w-3.5 text-sky-600" />
+        );
+    } else if (status === "INUSE") {
+        classes =
+            "bg-sky-50 text-sky-700 border-sky-200";
+        IconEl = (
+            <CarFront className="h-3.5 w-3.5 text-sky-600" />
+        );
     } else if (status === "MAINTENANCE") {
         classes =
             "bg-amber-50 text-amber-700 border-amber-200";
         IconEl = (
             <Wrench className="h-3.5 w-3.5 text-amber-600" />
+        );
+    } else if (status === "INACTIVE") {
+        classes =
+            "bg-gray-50 text-gray-700 border-gray-200";
+        IconEl = (
+            <X className="h-3.5 w-3.5 text-gray-600" />
         );
     } else {
         classes =
@@ -174,12 +202,13 @@ function TabBar({ active, setActive }) {
 }
 
 /* ---------------- Tab 1: Hồ sơ xe ---------------- */
-function VehicleProfileTab({ form, setForm, onSave, dirty }) {
+function VehicleProfileTab({ form, setForm, onSave, dirty, readOnly = false }) {
     const numericOnly = (s) => s.replace(/[^0-9]/g, "");
 
     const handleChange = (field) => (e) => {
+        if (readOnly) return;
         const val = e.target.value;
-        if (field === "odometer" || field === "year") {
+        if (field === "year") {
             setForm((f) => ({ ...f, [field]: numericOnly(val) }));
         } else {
             setForm((f) => ({ ...f, [field]: val }));
@@ -189,13 +218,15 @@ function VehicleProfileTab({ form, setForm, onSave, dirty }) {
     const inputCls = cls(
         "w-full rounded-md border px-3 py-2 text-[13px] outline-none shadow-sm",
         "border-slate-300 bg-white text-slate-900 placeholder:text-slate-400",
-        "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+        "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20",
+        readOnly && "bg-slate-100 text-slate-500 cursor-not-allowed"
     );
 
     const selectCls = cls(
         "w-full rounded-md border px-3 py-2 text-[13px] outline-none shadow-sm",
         "border-slate-300 bg-white text-slate-700",
-        "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+        "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20",
+        readOnly && "bg-slate-100 text-slate-500 cursor-not-allowed"
     );
 
     return (
@@ -208,9 +239,12 @@ function VehicleProfileTab({ form, setForm, onSave, dirty }) {
                         <div className="text-[12px] text-slate-600 mb-1">
                             Biển số xe
                         </div>
-                        <div className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 font-medium shadow-inner">
-                            {form.license_plate}
-                        </div>
+                        <input
+                            className="rounded-md border border-slate-300 bg-slate-100 px-3 py-2 text-[13px] text-slate-500 font-medium cursor-not-allowed"
+                            value={form.license_plate}
+                            readOnly
+                            disabled
+                        />
                     </div>
 
                     {/* Danh mục xe */}
@@ -218,17 +252,27 @@ function VehicleProfileTab({ form, setForm, onSave, dirty }) {
                         <div className="text-[12px] text-slate-600 mb-1">
                             Danh mục xe
                         </div>
-                        <select
-                            className={selectCls}
-                            value={form.category_id}
-                            onChange={handleChange("category_id")}
-                        >
-                            {form._categoryOptions.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                    {c.name} ({c.seats} chỗ)
-                                </option>
-                            ))}
-                        </select>
+                        {readOnly ? (
+                            <input
+                                className="rounded-md border border-slate-300 bg-slate-100 px-3 py-2 text-[13px] text-slate-500 font-medium cursor-not-allowed w-full"
+                                value={form.category_name || "—"}
+                                readOnly
+                                disabled
+                            />
+                        ) : (
+                            <select
+                                className={selectCls}
+                                value={form.category_id}
+                                onChange={handleChange("category_id")}
+                                disabled={readOnly}
+                            >
+                                {form._categoryOptions.map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                        {c.name.includes('chỗ') ? c.name : `${c.name} (${c.seats} chỗ)`}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
                     </div>
 
                     {/* Chi nhánh */}
@@ -236,17 +280,27 @@ function VehicleProfileTab({ form, setForm, onSave, dirty }) {
                         <div className="text-[12px] text-slate-600 mb-1">
                             Chi nhánh quản lý
                         </div>
-                        <select
-                            className={selectCls}
-                            value={form.branch_id}
-                            onChange={handleChange("branch_id")}
-                        >
-                            {form._branchOptions.map((b) => (
-                                <option key={b.id} value={b.id}>
-                                    {b.name}
-                                </option>
-                            ))}
-                        </select>
+                        {readOnly ? (
+                            <input
+                                className="rounded-md border border-slate-300 bg-slate-100 px-3 py-2 text-[13px] text-slate-500 font-medium cursor-not-allowed w-full"
+                                value={form.branch_name || "—"}
+                                readOnly
+                                disabled
+                            />
+                        ) : (
+                            <select
+                                className={selectCls}
+                                value={form.branch_id}
+                                onChange={handleChange("branch_id")}
+                                disabled={readOnly}
+                            >
+                                {form._branchOptions.map((b) => (
+                                    <option key={b.id} value={b.id}>
+                                        {b.name}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
                     </div>
 
                     {/* Trạng thái xe */}
@@ -258,6 +312,7 @@ function VehicleProfileTab({ form, setForm, onSave, dirty }) {
                             className={selectCls}
                             value={form.status}
                             onChange={handleChange("status")}
+                            disabled={readOnly}
                         >
                             <option value="AVAILABLE">Sẵn sàng</option>
                             <option value="MAINTENANCE">Bảo trì</option>
@@ -271,23 +326,23 @@ function VehicleProfileTab({ form, setForm, onSave, dirty }) {
                             Hãng sản xuất
                         </div>
                         <input
-                            className={inputCls}
+                            className="rounded-md border border-slate-300 bg-slate-100 px-3 py-2 text-[13px] text-slate-500 font-medium cursor-not-allowed"
                             value={form.brand}
-                            onChange={handleChange("brand")}
-                            placeholder="Toyota / Ford / Hyundai..."
+                            readOnly
+                            disabled
                         />
                     </div>
 
-                    {/* Model */}
+                    {/* Dòng xe */}
                     <div>
                         <div className="text-[12px] text-slate-600 mb-1">
-                            Model
+                            Dòng xe
                         </div>
                         <input
-                            className={inputCls}
+                            className="rounded-md border border-slate-300 bg-slate-100 px-3 py-2 text-[13px] text-slate-500 font-medium cursor-not-allowed"
                             value={form.model}
-                            onChange={handleChange("model")}
-                            placeholder="Vios / Fortuner / Solati..."
+                            readOnly
+                            disabled
                         />
                     </div>
 
@@ -297,25 +352,10 @@ function VehicleProfileTab({ form, setForm, onSave, dirty }) {
                             Năm sản xuất
                         </div>
                         <input
-                            className={inputCls}
+                            className="rounded-md border border-slate-300 bg-slate-100 px-3 py-2 text-[13px] text-slate-500 font-medium cursor-not-allowed"
                             value={form.year}
-                            onChange={handleChange("year")}
-                            inputMode="numeric"
-                            placeholder="2022"
-                        />
-                    </div>
-
-                    {/* Odometer */}
-                    <div>
-                        <div className="text-[12px] text-slate-600 mb-1">
-                            Odometer hiện tại (km)
-                        </div>
-                        <input
-                            className={cls(inputCls, "tabular-nums")}
-                            value={form.odometer}
-                            onChange={handleChange("odometer")}
-                            inputMode="numeric"
-                            placeholder="50000"
+                            readOnly
+                            disabled
                         />
                     </div>
 
@@ -326,9 +366,10 @@ function VehicleProfileTab({ form, setForm, onSave, dirty }) {
                         </div>
                         <input
                             type="date"
-                            className={selectCls}
+                            className="rounded-md border border-slate-300 bg-slate-100 px-3 py-2 text-[13px] text-slate-500 font-medium cursor-not-allowed"
                             value={form.reg_due_date || ""}
-                            onChange={handleChange("reg_due_date")}
+                            readOnly
+                            disabled
                         />
                     </div>
 
@@ -342,6 +383,7 @@ function VehicleProfileTab({ form, setForm, onSave, dirty }) {
                             className={selectCls}
                             value={form.ins_due_date || ""}
                             onChange={handleChange("ins_due_date")}
+                            disabled={readOnly}
                         />
                     </div>
                 </div>
@@ -379,46 +421,35 @@ function VehicleProfileTab({ form, setForm, onSave, dirty }) {
                             </span>
                         </span>
                     </div>
-
-                    <div className="flex items-center gap-1 text-slate-600">
-                        <Fuel className="h-3.5 w-3.5 text-sky-600" />
-                        <span>
-                            Odo:{" "}
-                            <span className="text-slate-800 font-medium tabular-nums">
-                                {Number(form.odometer || 0).toLocaleString(
-                                    "vi-VN"
-                                )}{" "}
-                                km
-                            </span>
-                        </span>
-                    </div>
                 </div>
             </div>
 
             {/* save button row */}
-            <div className="flex justify-end">
-                <button
-                    disabled={!dirty}
-                    onClick={onSave}
-                    className={cls(
-                        "inline-flex items-center gap-2 rounded-md px-3 py-2 text-[13px] font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500/20",
-                        dirty
-                            ? "bg-sky-600 hover:bg-sky-500 text-white"
-                            : "bg-slate-200 text-slate-500 cursor-not-allowed"
-                    )}
-                >
-                    <Save className="h-4 w-4" />
-                    <span>Lưu thay đổi</span>
-                </button>
-            </div>
+            {!readOnly && (
+                <div className="flex justify-end">
+                    <button
+                        disabled={!dirty}
+                        onClick={onSave}
+                        className={cls(
+                            "inline-flex items-center gap-2 rounded-md px-3 py-2 text-[13px] font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500/20",
+                            dirty
+                                ? "bg-sky-600 hover:bg-sky-500 text-white"
+                                : "bg-slate-200 text-slate-500 cursor-not-allowed"
+                        )}
+                    >
+                        <Save className="h-4 w-4" />
+                        <span>Lưu thay đổi</span>
+                    </button>
+                </div>
+            )}
 
             {/* dev note */}
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-500 shadow-sm">
+            {/* <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-500 shadow-sm">
                 Khi bấm Lưu thay đổi:
                 {" "}PUT /api/vehicles/
                 <span className="text-slate-700 font-medium">{form.id}</span>{" "}
-                với body như odometer, status, reg_due_date...
-            </div>
+                với body như status, reg_due_date, ins_due_date...
+            </div> */}
         </div>
     );
 }
@@ -694,6 +725,11 @@ export default function VehicleDetailPage() {
     const { toasts, push } = useToasts();
     const { vehicleId } = useParams();
 
+    const currentRole = React.useMemo(() => getCurrentRole(), []);
+    const isAccountant = currentRole === ROLES.ACCOUNTANT;
+    const isConsultant = currentRole === ROLES.CONSULTANT;
+    const isReadOnly = isAccountant || isConsultant;
+
     const [initialVehicle, setInitialVehicle] = React.useState({
         id: vehicleId ? Number(vehicleId) : undefined,
         license_plate: "",
@@ -705,7 +741,6 @@ export default function VehicleDetailPage() {
         brand: "",
         model: "",
         year: "",
-        odometer: "",
         reg_due_date: "",
         ins_due_date: "",
         _branchOptions: [],
@@ -715,10 +750,11 @@ export default function VehicleDetailPage() {
     React.useEffect(() => {
         (async () => {
             try {
+                // Skip loading categories/branches lists for read-only roles to avoid 403 errors
                 const [v, brData, catData] = await Promise.all([
                     getVehicle(vehicleId),
-                    listBranches({ size: 1000 }).catch(() => ({ content: [] })),
-                    listVehicleCategories().catch(() => []),
+                    isReadOnly ? Promise.resolve({ content: [] }) : listBranches({ size: 1000 }).catch(() => ({ content: [] })),
+                    isReadOnly ? Promise.resolve([]) : listVehicleCategories().catch(() => []),
                 ]);
                 const brs = Array.isArray(brData) ? brData : (brData?.items || brData?.content || []);
                 const mapped = {
@@ -732,7 +768,6 @@ export default function VehicleDetailPage() {
                     brand: v.brand || "",
                     model: v.model || "",
                     year: v.productionYear != null ? String(v.productionYear) : "",
-                    odometer: v.odometer != null ? String(v.odometer) : "",
                     reg_due_date: v.inspectionExpiry || "",
                     ins_due_date: v.insuranceExpiry || "",
                     _branchOptions: brs.map(b => ({ id: b.id, name: b.branchName || b.name || b.branch_name })),
@@ -755,9 +790,12 @@ export default function VehicleDetailPage() {
     const [loadingExpenses, setLoadingExpenses] = React.useState(false);
     const [loadingMaintenance, setLoadingMaintenance] = React.useState(false);
 
+    // tab state (moved before useEffect that uses it)
+    const [activeTab, setActiveTab] = React.useState("PROFILE");
+
     // Load trips data
     const loadTrips = React.useCallback(async () => {
-        if (!vehicleId || loadingTrips) return;
+        if (!vehicleId) return;
         setLoadingTrips(true);
         try {
             const data = await getVehicleTrips(vehicleId);
@@ -765,26 +803,29 @@ export default function VehicleDetailPage() {
             // Map backend data to frontend format
             const mappedTrips = trips.map((t) => ({
                 id: t.tripId || t.id,
-                code: t.tripCode || t.code || `TRIP-${t.tripId || t.id}`,
-                customer_name: t.customerName || t.customer_name || "—",
-                customer_phone: t.customerPhone || t.customer_phone || "—",
-                pickup: t.pickupLocation || t.pickup || "—",
-                pickup_time: t.startTime || t.pickup_time || t.pickupTime,
+                code: `TRIP-${t.tripId || t.id}`,
+                customer_name: t.customerName || "—",
+                customer_phone: t.customerPhone || "—",
+                pickup: t.startLocation || t.pickupLocation || "—",
+                pickup_time: t.startTime || t.pickup_time,
                 status: t.status || "AVAILABLE",
             }));
             setTripsData(mappedTrips);
         } catch (err) {
             console.error("Failed to load vehicle trips:", err);
-            push("Không thể tải lịch sử chuyến đi: " + (err.message || "Lỗi không xác định"), "error");
+            // Don't show error toast if endpoint doesn't exist (404)
+            if (err.status !== 404) {
+                push("Không thể tải lịch sử chuyến đi", "error");
+            }
             setTripsData([]);
         } finally {
             setLoadingTrips(false);
         }
-    }, [vehicleId, loadingTrips, push]);
+    }, [vehicleId, push]);
 
     // Load expenses data
     const loadExpenses = React.useCallback(async () => {
-        if (!vehicleId || loadingExpenses) return;
+        if (!vehicleId) return;
         setLoadingExpenses(true);
         try {
             const data = await getVehicleExpenses(vehicleId);
@@ -805,16 +846,18 @@ export default function VehicleDetailPage() {
             setExpensesData(mappedExpenses);
         } catch (err) {
             console.error("Failed to load vehicle expenses:", err);
-            push("Không thể tải lịch sử chi phí: " + (err.message || "Lỗi không xác định"), "error");
+            if (err.status !== 404) {
+                push("Không thể tải lịch sử chi phí", "error");
+            }
             setExpensesData([]);
         } finally {
             setLoadingExpenses(false);
         }
-    }, [vehicleId, loadingExpenses, push]);
+    }, [vehicleId, push]);
 
     // Load maintenance data
     const loadMaintenance = React.useCallback(async () => {
-        if (!vehicleId || loadingMaintenance) return;
+        if (!vehicleId) return;
         setLoadingMaintenance(true);
         try {
             const data = await getVehicleMaintenance(vehicleId);
@@ -834,26 +877,28 @@ export default function VehicleDetailPage() {
             setMaintenanceData(mappedMaintenance);
         } catch (err) {
             console.error("Failed to load vehicle maintenance:", err);
-            push("Không thể tải lịch sử bảo trì: " + (err.message || "Lỗi không xác định"), "error");
+            if (err.status !== 404) {
+                push("Không thể tải lịch sử bảo trì", "error");
+            }
             setMaintenanceData([]);
         } finally {
             setLoadingMaintenance(false);
         }
-    }, [vehicleId, loadingMaintenance, push]);
+    }, [vehicleId, push]);
 
     // Load data when switching tabs
     React.useEffect(() => {
-        if (activeTab === "TRIPS" && vehicleId && tripsData.length === 0 && !loadingTrips) {
+        if (activeTab === "TRIPS" && vehicleId && tripsData.length === 0) {
             loadTrips();
         } else if (activeTab === "COSTS" && vehicleId) {
-            if (expensesData.length === 0 && !loadingExpenses) {
+            if (expensesData.length === 0) {
                 loadExpenses();
             }
-            if (maintenanceData.length === 0 && !loadingMaintenance) {
+            if (maintenanceData.length === 0) {
                 loadMaintenance();
             }
         }
-    }, [activeTab, vehicleId, tripsData.length, expensesData.length, maintenanceData.length, loadingTrips, loadingExpenses, loadingMaintenance, loadTrips, loadExpenses, loadMaintenance]);
+    }, [activeTab, vehicleId, tripsData.length, expensesData.length, maintenanceData.length, loadTrips, loadExpenses, loadMaintenance]);
 
     // Combine expenses and maintenance for COSTS tab
     const combinedExpensesData = React.useMemo(() => {
@@ -863,9 +908,6 @@ export default function VehicleDetailPage() {
             return dateB - dateA; // Newest first
         });
     }, [expensesData, maintenanceData]);
-
-    // tab state
-    const [activeTab, setActiveTab] = React.useState("PROFILE");
 
     // form state for PROFILE tab
     const [vehicleForm, setVehicleForm] = React.useState(initialVehicle);
@@ -898,17 +940,8 @@ export default function VehicleDetailPage() {
                 }
             }
 
-            // Validation: Nếu xe đang "ON_TRIP", không cho phép đổi trạng thái
-            if (savedVehicle.status === "ON_TRIP" && vehicleForm.status !== "ON_TRIP") {
-                push("Không thể thay đổi trạng thái khi xe đang trong chuyến đi", "error");
-                return;
-            }
-
-            // Validation: Nếu xe không phải "ON_TRIP", không cho phép đổi sang "ON_TRIP"
-            if (savedVehicle.status !== "ON_TRIP" && vehicleForm.status === "ON_TRIP") {
-                push("Trạng thái 'Đang chạy' chỉ được cập nhật tự động khi xe trong chuyến", "error");
-                return;
-            }
+            // Note: Removed validation for INUSE status to allow manual status changes
+            // Status can now be changed freely by authorized users (ADMIN, MANAGER, COORDINATOR)
 
             await updateVehicle(vehicleForm.id, {
                 license_plate: vehicleForm.license_plate,
@@ -918,7 +951,6 @@ export default function VehicleDetailPage() {
                 brand: vehicleForm.brand,
                 model: vehicleForm.model,
                 year: vehicleForm.year,
-                odometer: vehicleForm.odometer,
                 reg_due_date: vehicleForm.reg_due_date,
                 ins_due_date: vehicleForm.ins_due_date,
             });
@@ -977,6 +1009,7 @@ export default function VehicleDetailPage() {
                     setForm={setVehicleForm}
                     onSave={handleSaveProfile}
                     dirty={dirty}
+                    readOnly={isReadOnly}
                 />
             ) : null}
 

@@ -18,6 +18,7 @@ import {
   getDriverProfileByUser,
   getDriverDashboard,
   getDriverSchedule,
+  getDayOffHistory,
   startTrip as apiStartTrip,
   completeTrip as apiCompleteTrip,
 } from "../../api/drivers";
@@ -212,56 +213,6 @@ function NotificationsCard({ notifications = [] }) {
 
         <div className="px-4 py-3 border-t border-slate-200 text-[11px] text-slate-500 bg-slate-50/60">
           Xem tất cả thông báo trong mục Thông báo.
-        </div>
-      </div>
-  );
-}
-
-/* ---------------- Quick actions ---------------- */
-function QuickActions({ onLeave, onVehicleCheck }) {
-  return (
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-900/5">
-        <div className="px-4 py-3 border-b border-slate-200 text-sm text-slate-800 font-medium flex items-center gap-2 bg-slate-50/80">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600 ring-1 ring-inset ring-emerald-100 shadow-sm">
-            <AlertCircle className="h-4 w-4" />
-          </div>
-          Hành động nhanh
-        </div>
-
-        <div className="p-4 flex flex-col gap-3 text-sm">
-          <button
-              onClick={onLeave}
-              className="group w-full rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-left px-4 py-3 flex flex-col gap-1 shadow-sm transition-colors"
-          >
-            <div className="flex items-center gap-2 text-slate-800 font-medium">
-            <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-amber-50 border border-amber-300 text-amber-700 text-[10px] font-semibold shadow-sm">
-              !
-            </span>
-              Đăng ký nghỉ ca
-            </div>
-            <div className="text-[11px] text-slate-500 leading-snug">
-              Gửi yêu cầu phê duyệt cho Điều phối
-            </div>
-          </button>
-
-          <button
-              onClick={onVehicleCheck}
-              className="group w-full rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-left px-4 py-3 flex flex-col gap-1 shadow-sm transition-colors"
-          >
-            <div className="flex items-center gap-2 text-slate-800 font-medium">
-            <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-amber-50 border border-amber-300 text-amber-700 text-[10px] font-semibold shadow-sm">
-              ✓
-            </span>
-              Báo cáo tình trạng xe
-            </div>
-            <div className="text-[11px] text-slate-500 leading-snug">
-              Check list trước ca lái
-            </div>
-          </button>
-        </div>
-
-        <div className="px-4 py-3 border-t border-slate-200 text-[11px] text-slate-500 bg-slate-50/60">
-          Một số yêu cầu có thể cần duyệt.
         </div>
       </div>
   );
@@ -499,9 +450,6 @@ export default function DriverDashboard() {
     setError("");
     try {
       const dash = await getDriverDashboard(driverId);
-      console.log("📊 Dashboard API Response:", dash);
-      console.log("📞 Customer Phone:", dash?.customerPhone);
-      console.log("🗺️ Distance:", dash?.distance);
 
       let mapped = null;
       if (dash && dash.tripId) {
@@ -526,11 +474,8 @@ export default function DriverDashboard() {
             customerPhone: dash.customerPhone,
             distance: dash.distance,
           };
-        } else {
-          console.log("⏭️ Trip is not today, skipping:", dash.startTime);
         }
       }
-      console.log("🔄 Mapped Trip:", mapped);
       setTrip(mapped);
 
       // Load upcoming trips
@@ -561,9 +506,9 @@ export default function DriverDashboard() {
             : [];
         setUpcomingTrips(upcoming);
       } catch (err) {
-        console.warn("Could not load upcoming trips:", err);
         setUpcomingTrips([]);
       }
+
     } catch (err) {
       setTrip(null);
       setError(
@@ -608,6 +553,81 @@ export default function DriverDashboard() {
       mounted = false;
     };
   }, [fetchDashboard]);
+
+  // Load days off for current month
+  React.useEffect(() => {
+    if (!driver?.driverId) return;
+
+    async function loadDaysOff() {
+      try {
+        const dayOffList = await getDayOffHistory(driver.driverId);
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+
+        // Filter approved day-offs in current month
+        const approvedDayOffs = Array.isArray(dayOffList)
+            ? dayOffList.filter((dayOff) => {
+              if (dayOff.status !== "APPROVED") return false;
+
+              // Get date from various possible fields
+              const leaveDate = dayOff.date || dayOff.leaveDate || dayOff.startDate;
+              if (!leaveDate) return false;
+
+              const date = new Date(leaveDate);
+              if (isNaN(date.getTime())) return false;
+
+              // Check if in current month
+              return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+            })
+            : [];
+
+        // Count days (handle range: startDate to endDate)
+        let daysOffUsed = 0;
+        approvedDayOffs.forEach((dayOff) => {
+          const startDate = new Date(dayOff.startDate || dayOff.date || dayOff.leaveDate);
+          const endDate = dayOff.endDate ? new Date(dayOff.endDate) : startDate;
+
+          if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+            // Calculate days in range, but only count days in current month
+            const monthStart = new Date(currentYear, currentMonth, 1);
+            const monthEnd = new Date(currentYear, currentMonth + 1, 0);
+
+            // Normalize to start of day for accurate comparison
+            startDate.setHours(0, 0, 0, 0);
+            endDate.setHours(0, 0, 0, 0);
+            monthStart.setHours(0, 0, 0, 0);
+            monthEnd.setHours(23, 59, 59, 999);
+
+            const start = new Date(Math.max(startDate.getTime(), monthStart.getTime()));
+            const end = new Date(Math.min(endDate.getTime(), monthEnd.getTime()));
+
+            if (end >= start) {
+              // Calculate inclusive days: (end - start) / ms_per_day + 1
+              const diffDays = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+              daysOffUsed += diffDays;
+            }
+          } else {
+            // Single day
+            daysOffUsed += 1;
+          }
+        });
+
+        // Get days off allowed (default to 2, or from profile/config if available)
+        const daysOffAllowed = driver?.daysOffAllowed || 2;
+
+        setStats((prev) => ({
+          ...prev,
+          daysOffUsed,
+          daysOffAllowed,
+        }));
+      } catch (err) {
+        // Keep default values on error
+      }
+    }
+
+    loadDaysOff();
+  }, [driver?.driverId]);
 
   // sync phase theo backend status
   React.useEffect(() => {
@@ -670,14 +690,6 @@ export default function DriverDashboard() {
     } finally {
       setTripLoading(false);
     }
-  };
-
-  const requestLeave = () => {
-    navigate("/driver/leave-request");
-  };
-
-  const vehicleCheck = () => {
-    navigate("/driver/report-incident");
   };
 
   const driverName = driver?.fullName || "Tài xế";
@@ -760,8 +772,6 @@ export default function DriverDashboard() {
               </div>
             </div>
           </div>
-
-
         </div>
 
         {error && (
@@ -813,7 +823,6 @@ export default function DriverDashboard() {
 
           <div className="flex flex-col gap-6">
             <NotificationsCard notifications={notifications} />
-            <QuickActions onLeave={requestLeave} onVehicleCheck={vehicleCheck} />
           </div>
         </div>
 
