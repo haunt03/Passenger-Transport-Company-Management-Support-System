@@ -40,6 +40,7 @@ public class AssignmentSuggestionResponse {
         private String startLocation;
         private String endLocation;
         private String hireType;
+        private String vehicleType;
         private BookingStatus bookingStatus;
         private String routeLabel;
     }
@@ -59,6 +60,7 @@ public class AssignmentSuggestionResponse {
         private Integer score;
         private boolean eligible;
         private List<String> reasons;
+        private Boolean hasHistoryWithCustomer; // Đã từng đi chuyến với khách hàng này
     }
 
     @Data
@@ -95,6 +97,7 @@ public class AssignmentSuggestionResponse {
         private Integer id;
         private String name;
         private String phone;
+        private Boolean hasHistoryWithCustomer;
     }
 
     @Data

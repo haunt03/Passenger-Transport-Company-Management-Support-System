@@ -29,7 +29,7 @@ public class DepositController {
 
     @Operation(summary = "Tạo cọc cho booking", description = "Tạo một khoản cọc/thanh toán cho booking. Tự động tạo receipt number nếu paymentMethod = CASH")
     @PostMapping("/bookings/{bookingId}")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT','CONSULTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT','CONSULTANT','COORDINATOR','DRIVER')")
     public ResponseEntity<ApiResponse<InvoiceResponse>> createDeposit(
             @Parameter(description = "ID của booking", required = true) @PathVariable Integer bookingId,
             @Valid @RequestBody CreateInvoiceRequest request) {
@@ -53,7 +53,7 @@ public class DepositController {
 
     @Operation(summary = "Danh sách cọc của booking", description = "Lấy tất cả các khoản cọc/thanh toán của một booking")
     @GetMapping("/bookings/{bookingId}")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT','CONSULTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT','CONSULTANT','COORDINATOR','DRIVER')")
     public ResponseEntity<ApiResponse<List<InvoiceResponse>>> getDepositsByBooking(
             @Parameter(description = "ID của booking", required = true) @PathVariable Integer bookingId) {
         log.info("[DepositController] Getting deposits for booking: {}", bookingId);
@@ -75,7 +75,7 @@ public class DepositController {
 
     @Operation(summary = "Tổng cọc đã thu", description = "Tính tổng số tiền cọc đã thu của một booking")
     @GetMapping("/bookings/{bookingId}/total-paid")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT','CONSULTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT','CONSULTANT','COORDINATOR','DRIVER')")
     public ResponseEntity<ApiResponse<BigDecimal>> getTotalDepositPaid(
             @Parameter(description = "ID của booking", required = true) @PathVariable Integer bookingId) {
         log.info("[DepositController] Getting total deposit paid for booking: {}", bookingId);
@@ -97,7 +97,7 @@ public class DepositController {
 
     @Operation(summary = "Số tiền còn lại", description = "Tính số tiền còn lại cần thu của một booking (totalCost - totalPaid)")
     @GetMapping("/bookings/{bookingId}/remaining")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT','CONSULTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT','CONSULTANT','COORDINATOR','DRIVER')")
     public ResponseEntity<ApiResponse<BigDecimal>> getRemainingAmount(
             @Parameter(description = "ID của booking", required = true) @PathVariable Integer bookingId) {
         log.info("[DepositController] Getting remaining amount for booking: {}", bookingId);
@@ -142,7 +142,7 @@ public class DepositController {
 
     @Operation(summary = "Tạo số phiếu thu", description = "Tạo số phiếu thu tự động theo format: REC-{YYYYMMDD}-{SEQ}")
     @GetMapping("/generate-receipt-number")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT','CONSULTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT','CONSULTANT','COORDINATOR','DRIVER')")
     public ResponseEntity<ApiResponse<String>> generateReceiptNumber(
             @Parameter(description = "ID chi nhánh", required = true) @RequestParam Integer branchId) {
         log.info("[DepositController] Generating receipt number for branch: {}", branchId);

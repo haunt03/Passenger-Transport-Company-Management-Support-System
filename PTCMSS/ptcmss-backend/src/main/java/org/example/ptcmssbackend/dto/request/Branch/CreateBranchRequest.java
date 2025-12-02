@@ -15,7 +15,5 @@ public class CreateBranchRequest {
     @NotEmpty(message = "Địa chỉ không được để trống")
     private String location;
 
-    @PhoneNumber(message = "Số điện thoại phải gồm 10 chữ số")
-    private String phone;
     private Integer managerId;
 }

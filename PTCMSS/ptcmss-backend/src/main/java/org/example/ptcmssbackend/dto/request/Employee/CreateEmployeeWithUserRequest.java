@@ -47,4 +47,7 @@ public class CreateEmployeeWithUserRequest {
     private Integer roleId;
 
     private String status; // ACTIVE or INACTIVE (default: ACTIVE)
+
+    // Driver-specific information (optional, only for Driver role)
+    private String licenseNumber;
 }

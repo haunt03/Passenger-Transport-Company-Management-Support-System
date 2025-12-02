@@ -42,7 +42,7 @@ public class DriverController {
     // ======================================================
     @Operation(summary = "Dashboard tài xế", description = "Hiển thị chuyến đi hiện tại và lịch trình sắp tới của tài xế.")
     @GetMapping("/{driverId}/dashboard")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','DRIVER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','DRIVER','COORDINATOR')")
     public ResponseData<DriverDashboardResponse> getDriverDashboard(
             @Parameter(description = "ID tài xế") @PathVariable Integer driverId) {
         try{
@@ -59,7 +59,7 @@ public class DriverController {
     // ======================================================
     @Operation(summary = "Lịch làm việc tài xế", description = "Lấy danh sách chuyến đi trong ngày hoặc trong tuần của tài xế. Có thể filter theo startDate và endDate.")
     @GetMapping("/{driverId}/schedule")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','DRIVER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','DRIVER','COORDINATOR')")
     public ResponseData<List<DriverScheduleResponse>> getDriverSchedule(
             @Parameter(description = "ID tài xế") @PathVariable Integer driverId,
             @Parameter(description = "Ngày bắt đầu (ISO format: yyyy-MM-ddTHH:mm:ssZ)") @RequestParam(required = false) String startDate,
@@ -82,7 +82,7 @@ public class DriverController {
     // ======================================================
     @Operation(summary = "Xem hồ sơ tài xế", description = "Hiển thị thông tin chi tiết cá nhân và nghiệp vụ của tài xế.")
     @GetMapping("/{driverId}/profile")
-    @PreAuthorize("hasAnyRole('DRIVER', 'MANAGER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('DRIVER', 'MANAGER', 'ADMIN', 'COORDINATOR')")
     public ResponseData<DriverProfileResponse> getDriverProfile(
             @Parameter(description = "ID tài xế") @PathVariable Integer driverId) {
         try{
@@ -115,7 +115,7 @@ public class DriverController {
 
     @Operation(summary = "Cập nhật hồ sơ tài xế", description = "Tài xế có thể chỉnh sửa số điện thoại, địa chỉ hoặc ghi chú.")
     @PutMapping("/{driverId}/profile")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','DRIVER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','DRIVER','COORDINATOR')")
     public ResponseData<DriverProfileResponse> updateDriverProfile(
             @Parameter(description = "ID tài xế") @PathVariable Integer driverId,
             @RequestBody DriverProfileUpdateRequest request) {
@@ -152,7 +152,7 @@ public class DriverController {
 
     @Operation(summary = "Lịch sử nghỉ phép", description = "Lấy danh sách các yêu cầu nghỉ phép của tài xế (đã gửi, đã duyệt, bị từ chối).")
     @GetMapping("/{driverId}/dayoff")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','DRIVER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','DRIVER','COORDINATOR')")
     public ResponseData<List<DriverDayOffResponse>> getDayOffHistory(
             @Parameter(description = "ID tài xế") @PathVariable Integer driverId) {
         try {
@@ -163,6 +163,26 @@ public class DriverController {
         } catch (Exception e) {
             log.error("Get day off history failed", e);
             throw new RuntimeException(e);
+        }
+    }
+
+    @Operation(summary = "Hủy yêu cầu nghỉ phép", description = "Tài xế hủy yêu cầu nghỉ phép đã gửi (PENDING hoặc APPROVED). Trạng thái tài xế sẽ chuyển về ACTIVE.")
+    @DeleteMapping("/{driverId}/dayoff/{dayOffId}")
+    @PreAuthorize("hasRole('DRIVER')")
+    public ResponseData<?> cancelDayOffRequest(
+            @Parameter(description = "ID tài xế") @PathVariable Integer driverId,
+            @Parameter(description = "ID yêu cầu nghỉ phép") @PathVariable Integer dayOffId) {
+        try {
+            log.info("Driver {} cancelling day off request {}", driverId, dayOffId);
+            driverService.cancelDayOffRequest(dayOffId, driverId);
+            return new ResponseData<>(HttpStatus.OK.value(),
+                    "Đã hủy yêu cầu nghỉ phép thành công. Trạng thái của bạn đã chuyển về sẵn sàng.",
+                    null);
+        } catch (Exception e) {
+            log.error("Cancel day off request failed", e);
+            return new ResponseData<>(HttpStatus.BAD_REQUEST.value(),
+                    e.getMessage(),
+                    null);
         }
     }
 

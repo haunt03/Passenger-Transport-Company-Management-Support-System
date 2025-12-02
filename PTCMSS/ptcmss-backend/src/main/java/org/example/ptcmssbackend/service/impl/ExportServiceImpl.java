@@ -84,7 +84,7 @@ public class ExportServiceImpl implements ExportService {
             return new ByteArrayResource(bytes);
         } catch (Exception e) {
             log.error("[ExportService] Error exporting revenue report to Excel", e);
-            throw new RuntimeException("Failed to export revenue report", e);
+            throw new RuntimeException("Không thể xuất báo cáo doanh thu", e);
         }
     }
 
@@ -120,7 +120,7 @@ public class ExportServiceImpl implements ExportService {
             return new ByteArrayResource(bytes);
         } catch (Exception e) {
             log.error("[ExportService] Error exporting expense report to Excel", e);
-            throw new RuntimeException("Failed to export expense report", e);
+            throw new RuntimeException("Không thể xuất báo cáo chi phí", e);
         }
     }
 
@@ -156,7 +156,7 @@ public class ExportServiceImpl implements ExportService {
             return new ByteArrayResource(bytes);
         } catch (Exception e) {
             log.error("[ExportService] Error exporting invoice list to Excel", e);
-            throw new RuntimeException("Failed to export invoice list", e);
+            throw new RuntimeException("Không thể xuất danh sách hóa đơn", e);
         }
     }
 
@@ -389,7 +389,7 @@ public class ExportServiceImpl implements ExportService {
             return new ByteArrayResource(bytes);
         } catch (Exception e) {
             log.error("[ExportService] Error exporting invoice to PDF: {}", invoiceId, e);
-            throw new RuntimeException("Failed to export invoice to PDF: " + e.getMessage(), e);
+            throw new RuntimeException("Không thể xuất hóa đơn sang PDF: " + e.getMessage(), e);
         }
     }
 

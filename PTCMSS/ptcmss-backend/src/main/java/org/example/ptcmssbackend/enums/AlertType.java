@@ -8,5 +8,6 @@ public enum AlertType {
     SCHEDULE_CONFLICT,              // Xung đột lịch
     DRIVING_HOURS_EXCEEDED,         // Vượt giới hạn giờ lái
     VEHICLE_MAINTENANCE_DUE,        // Sắp đến hạn bảo dưỡng
-    DRIVER_REST_REQUIRED            // Tài xế cần nghỉ ngơi
+    DRIVER_REST_REQUIRED,           // Tài xế cần nghỉ ngơi
+    REASSIGNMENT_NEEDED             // Cần sắp xếp lại tài xế
 }

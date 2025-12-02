@@ -14,6 +14,13 @@ import java.util.List;
 @AllArgsConstructor
 public class DispatchDashboardResponse {
 
+    // Thống kê tổng quan
+    private Integer pendingCount;      // Số chuyến chờ gắn lịch
+    private Integer assignedCount;     // Số chuyến đã gắn lịch
+    private Integer cancelledCount;    // Số chuyến đã hủy
+    private Integer completedCount;    // Số chuyến đã hoàn thành
+    private Integer inProgressCount;   // Số chuyến đang thực hiện
+
     private List<PendingTripResponse> pendingTrips;
     private List<DriverScheduleItem> driverSchedules;
     private List<VehicleScheduleItem> vehicleSchedules;
