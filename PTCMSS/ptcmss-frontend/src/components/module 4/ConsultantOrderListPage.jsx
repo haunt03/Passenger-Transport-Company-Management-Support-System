@@ -2,7 +2,7 @@
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { listVehicleCategories } from "../../api/vehicleCategories";
-import { listBookings, createBooking } from "../../api/bookings";
+import { listBookings, createBooking, cancelBooking } from "../../api/bookings";
 import { listBranches } from "../../api/branches";
 import { getEmployeeByUserId } from "../../api/employees";
 import { getCurrentRole, getStoredUserId, ROLES } from "../../utils/session";
@@ -26,6 +26,8 @@ import {
     X,
     Clock,
     CarFront,
+    Trash2,
+    AlertCircle,
 } from "lucide-react";
 
 /**
@@ -388,6 +390,7 @@ function OrdersTable({
                          setSortDir,
                          onViewDetail,
                          onEdit,
+                         onCancel,
                          showActions = true, // Add prop to control actions column visibility
                      }) {
     const headerCell = (key, label) => (
@@ -428,6 +431,15 @@ function OrdersTable({
             normalized === 'QUOTATIONSENT';
     };
 
+    // Cho phép hủy khi chưa khởi hành/chưa hoàn thành/chưa hủy
+    const canCancel = (status) => {
+        const normalized = status ? status.replace(/_/g, '').toUpperCase() : '';
+        // Không cho hủy khi: đang thực hiện, hoàn thành, đã hủy
+        return normalized !== 'INPROGRESS' &&
+            normalized !== 'COMPLETED' &&
+            normalized !== 'CANCELLED';
+    };
+
     return (
         <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -441,11 +453,9 @@ function OrdersTable({
                     {headerCell("deposit_amount", "Đã thu")}
                     {headerCell("quoted_price", "Tổng tiền")}
                     {headerCell("status", "Trạng thái")}
-                    {showActions && (
-                        <th className="px-3 py-2 font-medium text-slate-500 text-[12px]">
-                            Hành động
-                        </th>
-                    )}
+                    <th className="px-3 py-2 font-medium text-slate-500 text-[12px]">
+                        Hành động
+                    </th>
                 </tr>
                 </thead>
 
@@ -542,45 +552,64 @@ function OrdersTable({
                             <OrderStatusPill status={o.status} />
                         </td>
 
-                        {/* Actions - Hidden for Manager */}
-                        {showActions && (
-                            <td className="px-3 py-2 text-[13px] whitespace-nowrap">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <button
-                                        type="button"
-                                        onClick={() => onViewDetail(o)}
-                                        className="rounded-md border border-sky-300 text-sky-700 bg-white hover:bg-sky-50 px-2.5 py-1.5 text-[12px] flex items-center gap-1 shadow-sm"
-                                    >
-                                        <Eye className="h-3.5 w-3.5" />
-                                        <span>Chi tiết</span>
-                                    </button>
+                        {/* Actions - Always show "Chi tiết", hide "Sửa" for Manager/Accountant */}
+                        <td className="px-3 py-2 text-[13px] whitespace-nowrap">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <button
+                                    type="button"
+                                    onClick={() => onViewDetail(o)}
+                                    className="rounded-md border border-sky-300 text-sky-700 bg-white hover:bg-sky-50 px-2.5 py-1.5 text-[12px] flex items-center gap-1 shadow-sm"
+                                >
+                                    <Eye className="h-3.5 w-3.5" />
+                                    <span>Chi tiết</span>
+                                </button>
 
-                                    <button
-                                        type="button"
-                                        disabled={!canEdit(o.status)}
-                                        onClick={() => {
-                                            if (canEdit(o.status)) onEdit(o);
-                                        }}
-                                        className={cls(
-                                            "rounded-md border px-2.5 py-1.5 text-[12px] flex items-center gap-1 shadow-sm",
-                                            canEdit(o.status)
-                                                ? "border-amber-300 text-amber-700 bg-white hover:bg-amber-50"
-                                                : "border-slate-200 text-slate-400 bg-white cursor-not-allowed opacity-50"
-                                        )}
-                                    >
-                                        <Pencil className="h-3.5 w-3.5" />
-                                        <span>Sửa</span>
-                                    </button>
-                                </div>
-                            </td>
-                        )}
+                                {showActions && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            disabled={!canEdit(o.status)}
+                                            onClick={() => {
+                                                if (canEdit(o.status)) onEdit(o);
+                                            }}
+                                            className={cls(
+                                                "rounded-md border px-2.5 py-1.5 text-[12px] flex items-center gap-1 shadow-sm",
+                                                canEdit(o.status)
+                                                    ? "border-amber-300 text-amber-700 bg-white hover:bg-amber-50"
+                                                    : "border-slate-200 text-slate-400 bg-white cursor-not-allowed opacity-50"
+                                            )}
+                                        >
+                                            <Pencil className="h-3.5 w-3.5" />
+                                            <span>Sửa</span>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            disabled={!canCancel(o.status)}
+                                            onClick={() => {
+                                                if (canCancel(o.status)) onCancel(o);
+                                            }}
+                                            className={cls(
+                                                "rounded-md border px-2.5 py-1.5 text-[12px] flex items-center gap-1 shadow-sm",
+                                                canCancel(o.status)
+                                                    ? "border-rose-300 text-rose-700 bg-white hover:bg-rose-50"
+                                                    : "border-slate-200 text-slate-400 bg-white cursor-not-allowed opacity-50"
+                                            )}
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                            <span>Hủy</span>
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        </td>
                     </tr>
                 ))}
 
                 {current.length === 0 && (
                     <tr>
                         <td
-                            colSpan={showActions ? 9 : 8}
+                            colSpan={9}
                             className="px-3 py-6 text-center text-slate-500 text-[13px]"
                         >
                             Không có đơn hàng phù hợp.
@@ -869,25 +898,29 @@ function OrderFormModal({
     React.useEffect(() => {
         if (!open) return;
 
-        // tải danh sách loại xe từ BE
+        // tải danh sách loại xe từ BE - chỉ lấy danh mục đang hoạt động (ACTIVE)
         let mounted = true;
         setLoadingCats(true);
         listVehicleCategories()
             .then((list) => {
                 if (!mounted || !Array.isArray(list)) return;
-                setCategories(list);
+                // Filter chỉ lấy categories có status = ACTIVE
+                const activeCategories = list.filter(c => !c.status || c.status === "ACTIVE");
+                setCategories(activeCategories);
             })
             .catch(() => { })
             .finally(() => { if (mounted) setLoadingCats(false); });
 
-        // Load branches
+        // Load branches - chỉ lấy chi nhánh đang hoạt động (ACTIVE)
         setLoadingBranches(true);
         listBranches({ page: 0, size: 50 })
             .then((res) => {
                 const list = Array.isArray(res?.items) ? res.items : (Array.isArray(res) ? res : []);
                 if (!mounted) return;
-                setBranches(list);
-                if (!branchId && list.length) setBranchId(String(list[0].branchId ?? list[0].id));
+                // Filter chỉ lấy branches có status = ACTIVE
+                const activeBranches = list.filter(b => !b.status || b.status === "ACTIVE");
+                setBranches(activeBranches);
+                if (!branchId && activeBranches.length) setBranchId(String(activeBranches[0].branchId ?? activeBranches[0].id));
             })
             .catch(() => { })
             .finally(() => { if (mounted) setLoadingBranches(false); });
@@ -1638,7 +1671,7 @@ function OrderFormModal({
                                 onClick={saveChanges}
                                 disabled={saving}
                                 type="button"
-                                className="rounded-md bg-[#EDC531] hover:bg-amber-500 px-3 py-2 text-[13px] text-white font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="rounded-md bg-sky-600 hover:bg-sky-500 px-3 py-2 text-[13px] text-white font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {saving
                                     ? "Đang lưu..."
@@ -1661,7 +1694,7 @@ function OrderFormModal({
                                     onClick={submitPending}
                                     disabled={saving}
                                     type="button"
-                                    className="rounded-md bg-[#EDC531] hover:bg-amber-500 px-3 py-2 text-[13px] text-white font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="rounded-md bg-sky-600 hover:bg-sky-500 px-3 py-2 text-[13px] text-white font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {saving
                                         ? "Đang gửi..."
@@ -1687,6 +1720,7 @@ export default function ConsultantOrdersPage() {
     // Check current user role
     const currentRole = React.useMemo(() => getCurrentRole(), []);
     const isManager = currentRole === ROLES.MANAGER;
+    const isAccountant = currentRole === ROLES.ACCOUNTANT;
 
     // filters
     const [statusFilter, setStatusFilter] = React.useState("");
@@ -1869,6 +1903,11 @@ export default function ConsultantOrdersPage() {
     const [formMode, setFormMode] = React.useState("create"); // "create" | "edit"
     const [formOrder, setFormOrder] = React.useState(null);
 
+    // Cancel dialog states
+    const [cancelDialogOpen, setCancelDialogOpen] = React.useState(false);
+    const [cancelOrder, setCancelOrder] = React.useState(null);
+    const [cancelLoading, setCancelLoading] = React.useState(false);
+
     // lọc + sort
     const filteredSorted = React.useMemo(() => {
         const q = searchText.trim().toLowerCase();
@@ -1975,9 +2014,41 @@ export default function ConsultantOrdersPage() {
             return;
         }
         // fallback: open modal cũ nếu thiếu id
-        setFormMode("edit");
-        setFormOrder(order);
-        setFormOpen(true);
+    };
+
+    // Mở dialog xác nhận hủy đơn
+    const handleCancelClick = (order) => {
+        setCancelOrder(order);
+        setCancelDialogOpen(true);
+    };
+
+    // Xác nhận hủy đơn
+    const handleConfirmCancel = async () => {
+        if (!cancelOrder || !cancelOrder.id) return;
+
+        setCancelLoading(true);
+        try {
+            await cancelBooking(cancelOrder.id);
+
+            // Thông báo chi tiết
+            const orderCode = cancelOrder.code || `#${cancelOrder.id}`;
+            const customerName = cancelOrder.customer_name || "";
+            const depositInfo = cancelOrder.deposit_amount > 0
+                ? ` (Tiền cọc sẽ được xử lý theo chính sách)`
+                : "";
+
+            push(`✓ Đã hủy đơn hàng ${orderCode}${customerName ? ` - ${customerName}` : ""}${depositInfo}`, "success", 4000);
+
+            setCancelDialogOpen(false);
+            setCancelOrder(null);
+            // Refresh danh sách
+            window.location.reload();
+        } catch (err) {
+            console.error("Cancel booking error:", err);
+            push("Không thể hủy đơn hàng: " + (err.message || "Lỗi không xác định"), "error");
+        } finally {
+            setCancelLoading(false);
+        }
     };
 
     // refresh from backend
@@ -2025,31 +2096,34 @@ export default function ConsultantOrdersPage() {
                 return Number.isNaN(d.getTime()) ? null : d.toISOString();
             };
             const branchId = Number(resultOrder.branch_id || defaultBranchId || 1);
+            const bookingPayload = {
+                customer: {
+                    fullName: resultOrder.customer_name,
+                    phone: resultOrder.customer_phone,
+                    email: resultOrder.customer_email,
+                },
+                branchId,
+                useHighway: false,
+                trips: [{
+                    startTime: toIsoZ(resultOrder.pickup_time),
+                    endTime: toIsoZ(resultOrder.dropoff_eta || resultOrder.pickup_time),
+                    startLocation: resultOrder.pickup,
+                    endLocation: resultOrder.dropoff,
+                }],
+                vehicles: [{
+                    vehicleCategoryId: Number(resultOrder.vehicle_category_id),
+                    quantity: Number(resultOrder.vehicle_count || 1),
+                }],
+                estimatedCost: Number(resultOrder.quoted_price || 0) + Number(resultOrder.discount_amount || 0),
+                discountAmount: Number(resultOrder.discount_amount || 0),
+                totalCost: Number(resultOrder.quoted_price || 0),
+                status: resultOrder.status || "DRAFT",
+                note: resultOrder.notes || "",
+            };
+            console.log("📤 ConsultantOrderListPage - Creating booking with STATUS:", bookingPayload.status);
+            console.log("📤 Full booking payload:", bookingPayload);
             try {
-                await createBooking({
-                    customer: {
-                        fullName: resultOrder.customer_name,
-                        phone: resultOrder.customer_phone,
-                        email: resultOrder.customer_email,
-                    },
-                    branchId,
-                    useHighway: false,
-                    trips: [{
-                        startTime: toIsoZ(resultOrder.pickup_time),
-                        endTime: toIsoZ(resultOrder.dropoff_eta || resultOrder.pickup_time),
-                        startLocation: resultOrder.pickup,
-                        endLocation: resultOrder.dropoff,
-                    }],
-                    vehicles: [{
-                        vehicleCategoryId: Number(resultOrder.vehicle_category_id),
-                        quantity: Number(resultOrder.vehicle_count || 1),
-                    }],
-                    estimatedCost: Number(resultOrder.quoted_price || 0) + Number(resultOrder.discount_amount || 0),
-                    discountAmount: Number(resultOrder.discount_amount || 0),
-                    totalCost: Number(resultOrder.quoted_price || 0),
-                    status: resultOrder.status || "DRAFT",
-                    note: resultOrder.notes || "",
-                });
+                await createBooking(bookingPayload);
                 // refresh list from backend to show the new booking
                 await handleRefresh();
                 push("Đã tạo đơn hàng", "success");
@@ -2170,7 +2244,8 @@ export default function ConsultantOrdersPage() {
                     setSortDir={setSortDir}
                     onViewDetail={handleViewDetail}
                     onEdit={handleEdit}
-                    showActions={!isManager}
+                    onCancel={handleCancelClick}
+                    showActions={!isManager && !isAccountant}
                 />
 
 
@@ -2191,6 +2266,85 @@ export default function ConsultantOrdersPage() {
                 onClose={() => setFormOpen(false)}
                 onSave={handleSaveFromForm}
             />
+
+            {/* DIALOG XÁC NHẬN HỦY ĐƠN */}
+            {cancelDialogOpen && cancelOrder && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+                        <div className="px-5 py-4 border-b border-slate-200 bg-rose-50">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-full bg-rose-100">
+                                    <AlertCircle className="h-5 w-5 text-rose-600" />
+                                </div>
+                                <div>
+                                    <h3 className="text-[15px] font-semibold text-slate-900">
+                                        Xác nhận hủy đơn hàng
+                                    </h3>
+                                    <p className="text-[12px] text-slate-500">
+                                        Mã đơn: {cancelOrder.code || cancelOrder.id}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="px-5 py-4 space-y-3">
+                            <p className="text-[13px] text-slate-700">
+                                Bạn có chắc chắn muốn hủy đơn hàng này không?
+                            </p>
+
+                            {/* Cảnh báo nếu đã đặt cọc */}
+                            {cancelOrder.deposit_amount > 0 && (
+                                <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
+                                    <div className="flex items-start gap-2">
+                                        <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                                        <div className="text-[12px] text-amber-800">
+                                            <p className="font-semibold">Đơn hàng đã đặt cọc!</p>
+                                            <p className="mt-1">
+                                                Số tiền cọc: <span className="font-medium">{new Intl.NumberFormat('vi-VN').format(cancelOrder.deposit_amount)}đ</span>
+                                            </p>
+                                            <p className="mt-1">
+                                                Nếu hủy, tiền cọc có thể bị mất theo chính sách:
+                                            </p>
+                                            <ul className="list-disc list-inside mt-1 text-[11px] space-y-0.5">
+                                                <li>Hủy &lt; 24h trước khởi hành: Mất 100% tiền cọc</li>
+                                                <li>Hủy &lt; 48h trước khởi hành: Mất 30% tiền cọc</li>
+                                                <li>Hủy &gt;= 48h trước khởi hành: Hoàn lại tiền cọc</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <p className="text-[12px] text-slate-500 italic">
+                                Hành động này không thể hoàn tác.
+                            </p>
+                        </div>
+
+                        <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setCancelDialogOpen(false);
+                                    setCancelOrder(null);
+                                }}
+                                disabled={cancelLoading}
+                                className="px-4 py-2 text-[13px] font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50"
+                            >
+                                Đóng
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleConfirmCancel}
+                                disabled={cancelLoading}
+                                className="px-4 py-2 text-[13px] font-medium text-white bg-rose-600 rounded-lg hover:bg-rose-700 disabled:opacity-50 flex items-center gap-2"
+                            >
+                                {cancelLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                                {cancelLoading ? "Đang hủy..." : "Xác nhận hủy"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

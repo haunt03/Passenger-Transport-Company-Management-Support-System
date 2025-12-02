@@ -1,7 +1,8 @@
 import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getUser, updateUser, listRoles } from "../../api/users";
+import { listRoles } from "../../api/users";
 import { listBranches } from "../../api/branches";
+import { getEmployeeByUserId, updateEmployee } from "../../api/employees";
 import { Save, ArrowLeft, XCircle, CheckCircle, User, Mail, Phone, MapPin, Shield, Info, AlertCircle, Building2 } from "lucide-react";
 
 export default function UserDetailPage() {
@@ -14,8 +15,11 @@ export default function UserDetailPage() {
   const [branches, setBranches] = React.useState([]);
   const [currentUserId, setCurrentUserId] = React.useState(null);
   const [isCurrentUserAdmin, setIsCurrentUserAdmin] = React.useState(false);
+  const [isCurrentUserManager, setIsCurrentUserManager] = React.useState(false);
   const [canEditTarget, setCanEditTarget] = React.useState(true);
   const [targetRoleName, setTargetRoleName] = React.useState("");
+  const [canEditStatus, setCanEditStatus] = React.useState(false);
+  const [employeeId, setEmployeeId] = React.useState(null);
 
   // Thông tin cá nhân (view-only)
   const [fullName, setFullName] = React.useState("");
@@ -44,29 +48,70 @@ export default function UserDetailPage() {
         }
         const currentUserRole = (localStorage.getItem("roleName") || "").toUpperCase();
         const isAdminLocal = currentUserRole === "ADMIN";
+        const isManagerLocal = currentUserRole === "MANAGER";
         setIsCurrentUserAdmin(isAdminLocal);
+        setIsCurrentUserManager(isManagerLocal);
 
-        const response = await getUser(userId);
-        const u = response?.data || response;
-        setFullName(u.fullName || "");
-        setEmail(u.email || "");
-        setPhone(u.phone || "");
-        setAddress(u.address || "");
-        setStatus(u.status || "ACTIVE");
-        setRoleId(u.roleId ? String(u.roleId) : "");
-        if (u.branchId != null) {
-          setBranchId(String(u.branchId));
+        // Load target user info via employee endpoint (backend doesn't have /api/users/{id})
+        const response = await getEmployeeByUserId(userId);
+        const emp = response?.data || response;
+
+        // Save employeeId for updates
+        setEmployeeId(emp.id);
+
+        // Map employee data to user format
+        setFullName(emp.userFullName || "");
+        setEmail(emp.userEmail || "");
+        setPhone(emp.userPhone || "");
+        setAddress(emp.userAddress || "");
+        setStatus(emp.status || "ACTIVE");
+        setRoleId(emp.roleId ? String(emp.roleId) : "");
+        const targetBranchId = emp.branchId != null ? Number(emp.branchId) : null;
+        if (targetBranchId != null) {
+          setBranchId(String(targetBranchId));
         } else {
           setBranchId("");
         }
-        const targetRole = String(u.roleName || "").toUpperCase();
+        const targetRole = String(emp.roleName || "").toUpperCase();
         setTargetRoleName(targetRole);
 
         const editingSelf = numericUserId != null && numericUserId === Number(userId);
-        const basePermission = isAdminLocal || editingSelf;
         const isTargetAdmin = targetRole === "ADMIN";
-        const finalPermission = basePermission && (!isTargetAdmin || isAdminLocal);
+        const isTargetManager = targetRole === "MANAGER";
+
+        // Check permission
+        let finalPermission = false;
+        let statusPermission = false;
+
+        if (isAdminLocal) {
+          // Admin có thể sửa tất cả
+          finalPermission = true;
+          statusPermission = true;
+        } else if (editingSelf) {
+          // Tự sửa mình (trừ Admin)
+          finalPermission = !isTargetAdmin;
+        } else if (isManagerLocal && numericUserId) {
+          // Manager có thể sửa nhân viên cùng chi nhánh (trừ Manager/Admin khác)
+          if (!isTargetAdmin && !isTargetManager) {
+            try {
+              const empResp = await getEmployeeByUserId(numericUserId);
+              const emp = empResp?.data || empResp;
+              const managerBranchId = emp?.branchId ? Number(emp.branchId) : null;
+              if (managerBranchId && targetBranchId && managerBranchId === targetBranchId) {
+                finalPermission = true;
+                const manageableRoles = ["DRIVER", "CUSTOMER", "CLIENT", "KHACH", "KHÁCH"];
+                if (manageableRoles.includes(targetRole) || targetRole.includes("DRIVER") || targetRole.includes("CUSTOMER")) {
+                  statusPermission = true;
+                }
+              }
+            } catch (err) {
+              console.error("Error checking manager branch:", err);
+            }
+          }
+        }
+
         setCanEditTarget(Boolean(finalPermission));
+        setCanEditStatus(Boolean(statusPermission));
         if (!finalPermission) {
           setGeneralError("Bạn không có quyền chỉnh sửa tài khoản này. Vui lòng liên hệ Admin.");
         } else {
@@ -89,6 +134,36 @@ export default function UserDetailPage() {
       } catch {}
     })();
   }, []);
+
+  // Filter roles dựa trên quyền của current user
+  const filteredRoles = React.useMemo(() => {
+    if (!roles.length) return [];
+
+    const editingSelf = currentUserId != null && currentUserId === Number(userId);
+
+    return roles.filter(r => {
+      const roleName = (r.roleName || r.name || "").toUpperCase();
+
+      // Nếu đang edit chính mình và là Admin, cho phép giữ nguyên Admin
+      if (editingSelf && isCurrentUserAdmin && roleName === "ADMIN") {
+        return true;
+      }
+
+      // Admin không được đổi người khác sang Admin
+      if (isCurrentUserAdmin && !editingSelf && roleName === "ADMIN") {
+        return false;
+      }
+
+      // Manager không được chọn Admin hoặc Manager
+      if (!isCurrentUserAdmin) {
+        if (roleName === "ADMIN" || roleName === "MANAGER" || roleName === "QUẢN LÝ") {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [roles, isCurrentUserAdmin, currentUserId, userId]);
 
   React.useEffect(() => {
     (async () => {
@@ -124,17 +199,17 @@ export default function UserDetailPage() {
       setGeneralError("Bạn không có quyền chỉnh sửa tài khoản này.");
       return;
     }
+    if (!employeeId) {
+      setGeneralError("Không tìm thấy thông tin nhân viên.");
+      return;
+    }
     setSaving(true);
     setGeneralError("");
     try {
-      await updateUser(userId, {
-        fullName, // Giữ nguyên để tương thích với backend
-        email,
-        phone,
-        address,
+      await updateEmployee(employeeId, {
+        branchId: branchId ? Number(branchId) : undefined,
         roleId: roleId ? Number(roleId) : undefined,
         status,
-        branchId: branchId ? Number(branchId) : undefined,
       });
       setShowSuccess(true);
       setTimeout(() => navigate(-1), 1500);
@@ -235,48 +310,88 @@ export default function UserDetailPage() {
                 <h2 className="text-base font-bold text-slate-900">Thông tin cá nhân</h2>
               </div>
 
-              {/* Full Name - View Only */}
+              {/* Full Name - Editable */}
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
                   <User className="h-4 w-4 text-slate-400" />
                   <span>Họ và tên</span>
                 </label>
-                <div className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm bg-slate-50 text-slate-600">
-                  {fullName || "—"}
-                </div>
+                <input
+                    type="text"
+                    className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:border-[#0079BC]/50 focus:ring-[#0079BC]/20 disabled:bg-slate-100 disabled:text-slate-500"
+                    value={fullName}
+                    onChange={(e) => {
+                      setFullName(e.target.value);
+                      updateField("fullName", e.target.value);
+                    }}
+                    disabled={!canEditTarget}
+                    placeholder="Nhập họ và tên"
+                />
+                {errors.fullName && (
+                    <div className="text-xs text-red-600 mt-1">{errors.fullName}</div>
+                )}
               </div>
 
-              {/* Email - View Only */}
+              {/* Email - Editable */}
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
                   <Mail className="h-4 w-4 text-slate-400" />
                   <span>Email</span>
                 </label>
-                <div className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm bg-slate-50 text-slate-600">
-                  {email || "—"}
-                </div>
+                <input
+                    type="email"
+                    className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:border-[#0079BC]/50 focus:ring-[#0079BC]/20 disabled:bg-slate-100 disabled:text-slate-500"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      updateField("email", e.target.value);
+                    }}
+                    disabled={!canEditTarget}
+                    placeholder="Nhập email"
+                />
+                {errors.email && (
+                    <div className="text-xs text-red-600 mt-1">{errors.email}</div>
+                )}
               </div>
 
-              {/* Phone - View Only */}
+              {/* Phone - Editable */}
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
                   <Phone className="h-4 w-4 text-slate-400" />
                   <span>Số điện thoại</span>
                 </label>
-                <div className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm bg-slate-50 text-slate-600">
-                  {phone || "—"}
-                </div>
+                <input
+                    type="tel"
+                    className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:border-[#0079BC]/50 focus:ring-[#0079BC]/20 disabled:bg-slate-100 disabled:text-slate-500"
+                    value={phone}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      updateField("phone", e.target.value);
+                    }}
+                    disabled={!canEditTarget}
+                    placeholder="Nhập số điện thoại"
+                />
+                {errors.phone && (
+                    <div className="text-xs text-red-600 mt-1">{errors.phone}</div>
+                )}
               </div>
 
-              {/* Address - View Only */}
+              {/* Address - Editable */}
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
                   <MapPin className="h-4 w-4 text-slate-400" />
                   <span>Địa chỉ</span>
                 </label>
-                <div className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm bg-slate-50 text-slate-600 min-h-[60px]">
-                  {address || "—"}
-                </div>
+                <textarea
+                    className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:border-[#0079BC]/50 focus:ring-[#0079BC]/20 disabled:bg-slate-100 disabled:text-slate-500 min-h-[60px] resize-y"
+                    value={address}
+                    onChange={(e) => {
+                      setAddress(e.target.value);
+                      updateField("address", e.target.value);
+                    }}
+                    disabled={!canEditTarget}
+                    placeholder="Nhập địa chỉ"
+                />
               </div>
             </div>
 
@@ -300,7 +415,7 @@ export default function UserDetailPage() {
                     disabled={!canEditTarget}
                 >
                   <option value="">-- Chọn vai trò --</option>
-                  {roles.map((r) => (
+                  {filteredRoles.map((r) => (
                       <option key={r.id} value={r.id}>
                         {r.roleName || r.name}
                       </option>
@@ -314,17 +429,20 @@ export default function UserDetailPage() {
                 )}
               </div>
 
-              {/* Branch */}
+              {/* Branch - Manager không được đổi chi nhánh */}
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
                   <Building2 className="h-4 w-4 text-slate-400" />
                   <span>Chi nhánh</span>
+                  {isCurrentUserManager && (
+                      <span className="text-xs text-amber-600">(Không thể thay đổi)</span>
+                  )}
                 </label>
                 <select
-                    className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:border-[#0079BC]/50 focus:ring-[#0079BC]/20"
+                    className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:border-[#0079BC]/50 focus:ring-[#0079BC]/20 disabled:bg-slate-100 disabled:text-slate-500"
                     value={branchId}
                     onChange={(e) => setBranchId(e.target.value)}
-                    disabled={!canEditTarget}
+                    disabled={!canEditTarget || isCurrentUserManager}
                 >
                   <option value="">Chọn chi nhánh</option>
                   {branches.map((b) => (
@@ -335,17 +453,20 @@ export default function UserDetailPage() {
                 </select>
               </div>
 
-              {/* Status */}
+              {/* Status - Manager không được đổi trạng thái */}
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
                   <Info className="h-4 w-4 text-slate-400" />
                   <span>Trạng thái</span>
+                  {isCurrentUserManager && !canEditStatus && (
+                      <span className="text-xs text-amber-600">(Không thể thay đổi)</span>
+                  )}
                 </label>
                 <select
-                    className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:border-[#0079BC]/50 focus:ring-[#0079BC]/20"
+                    className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:border-[#0079BC]/50 focus:ring-[#0079BC]/20 disabled:bg-slate-100 disabled:text-slate-500"
                     value={status}
                     onChange={(e) => setStatus(e.target.value)}
-                    disabled={!canEditTarget}
+                    disabled={!canEditTarget || !canEditStatus}
                 >
                   <option value="ACTIVE">ACTIVE</option>
                   <option value="INACTIVE">INACTIVE</option>

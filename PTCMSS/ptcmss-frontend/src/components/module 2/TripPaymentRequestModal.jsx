@@ -29,8 +29,14 @@ import {
  */
 
 const cls = (...a) => a.filter(Boolean).join(" ");
-const fmtVND = (n) =>
-    new Intl.NumberFormat("vi-VN").format(Math.max(0, Number(n || 0)));
+const fmtVND = (n) => {
+    const num = Math.max(0, Number(n || 0));
+    // Format với số thập phân nếu có, tối đa 2 chữ số sau dấu phẩy
+    return new Intl.NumberFormat("vi-VN", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+    }).format(num);
+};
 
 export default function TripPaymentRequestModal({
                                                     open,
@@ -48,6 +54,8 @@ export default function TripPaymentRequestModal({
     const [notes, setNotes] = React.useState("");
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState("");
+    const [successMsg, setSuccessMsg] = React.useState("");
+    const [qrData, setQrData] = React.useState(null); // { qrText, qrImageUrl, expiresAt }
 
     // Payment history state
     const [paymentHistory, setPaymentHistory] = React.useState([]);
@@ -61,27 +69,71 @@ export default function TripPaymentRequestModal({
         }
     }, [open, bookingId]);
 
-    // Reset form khi modal mở
+    // Tính lại remaining amount dựa trên payment history (trừ đi các payment requests PENDING)
+    const calculatedRemainingAmount = React.useMemo(() => {
+        const originalRemaining = remainingAmount || 0;
+
+        if (!paymentHistory || paymentHistory.length === 0) {
+            return {
+                amount: originalRemaining,
+                pendingTotal: 0,
+                isOverLimit: false,
+                hasPending: false,
+                originalRemaining: originalRemaining
+            };
+        }
+
+        // Tính tổng các payment requests PENDING
+        const pendingPayments = paymentHistory.filter(ph => ph.confirmationStatus === 'PENDING');
+        const pendingTotal = pendingPayments.reduce((sum, ph) => sum + (Number(ph.amount) || 0), 0);
+        const hasPending = pendingPayments.length > 0;
+
+        // Remaining amount = original remaining - pending payments
+        const remaining = originalRemaining - pendingTotal;
+
+        return {
+            amount: Math.max(0, remaining),
+            pendingTotal: pendingTotal,
+            isOverLimit: remaining < 0,
+            hasPending: hasPending,
+            pendingCount: pendingPayments.length,
+            originalRemaining: originalRemaining
+        };
+    }, [remainingAmount, paymentHistory]);
+
+    // Reset form khi modal mở (nhưng giữ QR data nếu đã có)
     React.useEffect(() => {
         if (open) {
             setPaymentMethod("CASH");
-            setAmountStr(String(remainingAmount || 0));
+            setAmountStr(String(calculatedRemainingAmount.amount || 0));
             setNotes("");
             setLoading(false);
             setError("");
+            setSuccessMsg("");
+            // KHÔNG reset qrData ở đây - giữ lại để hiển thị QR code
+            // setQrData(null);
+        } else {
+            // Chỉ reset qrData khi modal đóng
+            setQrData(null);
         }
-    }, [open, remainingAmount]);
+    }, [open, calculatedRemainingAmount]);
+
+    // Khi chọn TRANSFER, tự động set amount = remaining amount
+    React.useEffect(() => {
+        if (paymentMethod === "TRANSFER" && calculatedRemainingAmount.amount > 0) {
+            setAmountStr(String(calculatedRemainingAmount.amount));
+        }
+    }, [paymentMethod, calculatedRemainingAmount.amount]);
 
     async function loadPaymentHistory() {
         setHistoryLoading(true);
         try {
-            const { getPaymentHistory } = await import("../../api/invoices");
-            // Assuming we need to get invoice by bookingId first
-            // For now, we'll try to get payment history directly with bookingId as invoiceId
-            const history = await getPaymentHistory(bookingId);
+            // Dùng endpoint booking payments thay vì invoice payments
+            const { listBookingPayments } = await import("../../api/bookings");
+            const history = await listBookingPayments(bookingId);
             setPaymentHistory(Array.isArray(history) ? history : []);
         } catch (err) {
-            console.error("Error loading payment history:", err);
+            console.error("Lỗi khi tải lịch sử thanh toán:", err);
             setPaymentHistory([]);
         } finally {
             setHistoryLoading(false);
@@ -101,10 +153,10 @@ export default function TripPaymentRequestModal({
             // Reload payment history
             await loadPaymentHistory();
 
-            // Show success message (you can use a toast library here)
-            alert("Đã xóa yêu cầu thanh toán");
+            // Hiển thị thông báo thành công
+            alert("Đã xóa yêu cầu thanh toán thành công");
         } catch (err) {
-            console.error("Error deleting payment:", err);
+            console.error("Lỗi khi xóa yêu cầu thanh toán:", err);
             const errorMsg = err?.data?.message || err?.message || "Không thể xóa yêu cầu thanh toán";
             alert(errorMsg);
         } finally {
@@ -114,50 +166,135 @@ export default function TripPaymentRequestModal({
 
     if (!open) return null;
 
-    const cleanDigits = (s) => String(s || "").replace(/[^0-9]/g, "");
-    const amount = Number(cleanDigits(amountStr || ""));
-    const valid = amount > 0 && paymentMethod;
+    // Clean input: chỉ giữ số và dấu chấm (cho số thập phân)
+    const cleanDigits = (s) => {
+        const str = String(s || "");
+        // Loại bỏ tất cả ký tự không phải số hoặc dấu chấm
+        let cleaned = str.replace(/[^0-9.]/g, "");
+        // Chỉ giữ 1 dấu chấm đầu tiên
+        const parts = cleaned.split(".");
+        if (parts.length > 2) {
+            cleaned = parts[0] + "." + parts.slice(1).join("");
+        }
+        return cleaned;
+    };
+
+    const amount = Number(cleanDigits(amountStr || "") || 0);
+
+    // Validation:
+    // 1. Không được tạo yêu cầu mới nếu đã có yêu cầu PENDING
+    // 2. Tổng pending + amount mới <= remaining amount
+    const canCreateNewRequest = !calculatedRemainingAmount.hasPending;
+    const totalWithNewAmount = calculatedRemainingAmount.pendingTotal + amount;
+    const exceedsRemaining = totalWithNewAmount > calculatedRemainingAmount.originalRemaining;
+
+    const valid = amount > 0
+        && amount <= calculatedRemainingAmount.amount
+        && paymentMethod
+        && !calculatedRemainingAmount.isOverLimit
+        && canCreateNewRequest
+        && !exceedsRemaining;
 
     async function handleSubmit() {
         if (!valid) {
-            setError("Vui lòng nhập số tiền hợp lệ.");
+            if (calculatedRemainingAmount.hasPending) {
+                setError(`Không thể tạo yêu cầu mới. Đã có ${calculatedRemainingAmount.pendingCount} yêu cầu thanh toán đang chờ duyệt (tổng ${fmtVND(calculatedRemainingAmount.pendingTotal)}đ). Vui lòng đợi kế toán xác nhận các yêu cầu trước.`);
+            } else if (calculatedRemainingAmount.isOverLimit) {
+                setError(`Đã có ${fmtVND(calculatedRemainingAmount.pendingTotal)}đ đang chờ duyệt, vượt quá số tiền còn lại (${fmtVND(calculatedRemainingAmount.originalRemaining)}đ). Vui lòng đợi kế toán xác nhận các yêu cầu trước.`);
+            } else if (totalWithNewAmount > calculatedRemainingAmount.originalRemaining) {
+                setError(`Tổng số tiền yêu cầu (${fmtVND(calculatedRemainingAmount.pendingTotal + amount)}đ) vượt quá số tiền còn lại (${fmtVND(calculatedRemainingAmount.originalRemaining)}đ). Số tiền có thể tạo thêm: ${fmtVND(calculatedRemainingAmount.amount)}đ.`);
+            } else if (amount > calculatedRemainingAmount.amount) {
+                setError(`Số tiền vượt quá số tiền còn lại (${fmtVND(calculatedRemainingAmount.amount)}đ). Đã có ${calculatedRemainingAmount.pendingCount} yêu cầu đang chờ duyệt.`);
+            } else {
+                setError("Vui lòng nhập số tiền hợp lệ.");
+            }
             return;
         }
 
         setLoading(true);
         setError("");
+        setSuccessMsg("");
+        setQrData(null);
 
         try {
-            // Import API
-            const { createPayment } = await import("../../api/payments");
+            if (paymentMethod === "TRANSFER") {
+                // Chuyển khoản: Tạo QR code
+                const { generateBookingQrPayment } = await import("../../api/bookings");
 
-            const payload = {
-                bookingId: bookingId,
-                amount: amount,
-                paymentMethod: paymentMethod,
-                note: notes || `Thu tiền từ khách - Chuyến #${tripId}`,
-                status: "PENDING", // Chờ kế toán duyệt
-            };
-
-            await createPayment(payload);
-
-            // Reload payment history sau khi tạo mới
-            await loadPaymentHistory();
-
-            if (typeof onSubmitted === "function") {
-                onSubmitted({
-                    amount,
-                    paymentMethod,
-                    notes,
+                const qrResponse = await generateBookingQrPayment(bookingId, {
+                    amount: amount,
+                    note: notes || `Thu tiền từ khách - Chuyến #${tripId}`,
+                    deposit: false, // Đây là thanh toán, không phải cọc
                 });
+
+                console.log("[TripPaymentRequestModal] QR Response:", qrResponse);
+
+                // API trả về ApiResponse<PaymentResponse>, nên data nằm trong qrResponse.data
+                // Hoặc nếu apiFetch đã unwrap thì trực tiếp trong qrResponse
+                const qrDataFromResponse = qrResponse?.data || qrResponse;
+
+                // Lưu QR data để hiển thị
+                if (qrDataFromResponse?.qrImageUrl) {
+                    setQrData({
+                        qrText: qrDataFromResponse.qrText || "",
+                        qrImageUrl: qrDataFromResponse.qrImageUrl,
+                        expiresAt: qrDataFromResponse.expiresAt,
+                    });
+                } else {
+                    console.error("[TripPaymentRequestModal] QR response không có qrImageUrl:", qrDataFromResponse);
+                    setError("Không thể tạo mã QR. Vui lòng thử lại hoặc liên hệ hỗ trợ.");
+                    return;
+                }
+
+                // Reload payment history sau khi tạo QR (nhưng KHÔNG reset qrData)
+                await loadPaymentHistory();
+
+                // Hiển thị thông báo thành công
+                setSuccessMsg(`Đã tạo mã QR thanh toán ${fmtVND(amount)}đ. Vui lòng cho khách quét mã QR để thanh toán.`);
+
+                // Gọi callback sau khi đã set qrData và successMsg
+                if (typeof onSubmitted === "function") {
+                    onSubmitted({
+                        amount,
+                        paymentMethod: "TRANSFER",
+                        notes,
+                        qrData: qrDataFromResponse,
+                    });
+                }
+            } else {
+                // Tiền mặt: Tạo payment request như cũ
+                const { createPayment } = await import("../../api/payments");
+
+                const payload = {
+                    bookingId: bookingId,
+                    amount: amount,
+                    paymentMethod: paymentMethod,
+                    note: notes || `Thu tiền từ khách - Chuyến #${tripId}`,
+                    status: "PENDING", // Chờ kế toán duyệt
+                };
+
+                await createPayment(payload);
+
+                // Reload payment history sau khi tạo mới
+                await loadPaymentHistory();
+
+                if (typeof onSubmitted === "function") {
+                    onSubmitted({
+                        amount,
+                        paymentMethod,
+                        notes,
+                    });
+                }
+
+                // Hiển thị thông báo thành công
+                setSuccessMsg(`Đã gửi yêu cầu thanh toán ${fmtVND(amount)}đ. Đang chờ kế toán xác nhận.`);
             }
 
-            // Reset form nhưng không đóng modal để user thấy request vừa tạo
-            setAmountStr(String(remainingAmount || 0));
+            // Reset form với remaining amount mới (sẽ được tính lại bởi useEffect khi paymentHistory thay đổi)
             setNotes("");
             setError("");
         } catch (err) {
-            console.error("Error creating payment request:", err);
+            console.error("Lỗi khi tạo yêu cầu thanh toán:", err);
             setError(
                 err?.data?.message || err?.message || "Không thể gửi yêu cầu thanh toán. Vui lòng thử lại."
             );
@@ -217,13 +354,20 @@ export default function TripPaymentRequestModal({
                                         Đang tải...
                                     </div>
                                 ) : (
-                                    paymentHistory.map((payment) => {
+                                    paymentHistory.map((payment, idx) => {
                                         const isPending = payment.confirmationStatus === "PENDING";
                                         const isConfirmed = payment.confirmationStatus === "CONFIRMED";
                                         const isRejected = payment.confirmationStatus === "REJECTED";
 
+                                        // Tạo unique key: invoiceId + paymentId + idx để tránh duplicate
+                                        const uniqueKey = payment.invoiceId
+                                            ? `invoice-${payment.invoiceId}-${payment.paymentId || idx}`
+                                            : payment.paymentId
+                                                ? `payment-${payment.paymentId}-${idx}`
+                                                : `payment-${payment.id || idx}-${idx}`;
+
                                         return (
-                                            <div key={payment.id} className="px-4 py-3 hover:bg-slate-50">
+                                            <div key={uniqueKey} className="px-4 py-3 hover:bg-slate-50">
                                                 <div className="flex items-start justify-between gap-3">
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2 mb-1">
@@ -264,12 +408,12 @@ export default function TripPaymentRequestModal({
                                                     {/* Nút xóa - chỉ hiện với PENDING */}
                                                     {isPending && (
                                                         <button
-                                                            onClick={() => handleDeletePayment(payment.id)}
-                                                            disabled={deleteLoading === payment.id}
+                                                            onClick={() => handleDeletePayment(payment.paymentId || payment.id)}
+                                                            disabled={deleteLoading === (payment.paymentId || payment.id)}
                                                             className="flex-shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 border border-rose-200 hover:border-rose-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                                                             title="Xóa yêu cầu"
                                                         >
-                                                            {deleteLoading === payment.id ? (
+                                                            {deleteLoading === (payment.paymentId || payment.id) ? (
                                                                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                                             ) : (
                                                                 <Trash2 className="h-3.5 w-3.5" />
@@ -296,9 +440,28 @@ export default function TripPaymentRequestModal({
                             <span className="text-slate-500">Đã đặt cọc:</span>
                             <span className="font-semibold text-emerald-600">{fmtVND(depositAmount)} đ</span>
                         </div>
-                        <div className="border-t border-slate-200 pt-2 flex justify-between text-[14px]">
-                            <span className="text-slate-700 font-medium">Còn lại cần thu:</span>
-                            <span className="font-bold text-amber-600">{fmtVND(remainingAmount)} đ</span>
+                        <div className="border-t border-slate-200 pt-2">
+                            <div className="flex justify-between text-[14px] mb-1">
+                                <span className="text-slate-700 font-medium">Còn lại cần thu:</span>
+                                <span className={calculatedRemainingAmount.isOverLimit ? "font-bold text-rose-600" : "font-bold text-amber-600"}>
+                  {fmtVND(calculatedRemainingAmount.amount)} đ
+                </span>
+                            </div>
+                            {calculatedRemainingAmount.hasPending && (
+                                <div className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded px-2 py-1 mt-1">
+                                    ⚠️ Đã có {calculatedRemainingAmount.pendingCount} yêu cầu thanh toán đang chờ duyệt (tổng {fmtVND(calculatedRemainingAmount.pendingTotal)}đ). Vui lòng đợi kế toán xác nhận trước khi tạo yêu cầu mới.
+                                </div>
+                            )}
+                            {calculatedRemainingAmount.isOverLimit && !calculatedRemainingAmount.hasPending && (
+                                <div className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded px-2 py-1 mt-1">
+                                    ⚠️ Đã có {fmtVND(calculatedRemainingAmount.pendingTotal)}đ đang chờ duyệt, vượt quá số tiền còn lại ({fmtVND(calculatedRemainingAmount.originalRemaining)}đ)
+                                </div>
+                            )}
+                            {calculatedRemainingAmount.pendingTotal > 0 && !calculatedRemainingAmount.isOverLimit && !calculatedRemainingAmount.hasPending && (
+                                <div className="text-xs text-amber-600 mt-1">
+                                    (Đã có {fmtVND(calculatedRemainingAmount.pendingTotal)}đ đang chờ duyệt)
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -324,11 +487,18 @@ export default function TripPaymentRequestModal({
                             onChange={(e) => setAmountStr(cleanDigits(e.target.value))}
                             inputMode="numeric"
                             placeholder="0"
+                            disabled={paymentMethod === "TRANSFER"}
                             className={cls(
                                 "w-full bg-white border border-slate-300 rounded-lg px-3 py-2 tabular-nums text-base outline-none shadow-sm",
-                                "focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 text-slate-900 placeholder:text-slate-400"
+                                "focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 text-slate-900 placeholder:text-slate-400",
+                                paymentMethod === "TRANSFER" ? "bg-slate-50 cursor-not-allowed" : ""
                             )}
                         />
+                        {paymentMethod === "TRANSFER" && (
+                            <div className="text-[11px] text-slate-500 mt-1">
+                                Số tiền sẽ tự động được set bằng số tiền còn lại
+                            </div>
+                        )}
                     </div>
 
                     {/* Phương thức thanh toán */}
@@ -339,7 +509,10 @@ export default function TripPaymentRequestModal({
                         <div className="grid grid-cols-2 gap-3">
                             <button
                                 type="button"
-                                onClick={() => setPaymentMethod("CASH")}
+                                onClick={() => {
+                                    setPaymentMethod("CASH");
+                                    setQrData(null);
+                                }}
                                 className={cls(
                                     "rounded-xl border p-3 flex flex-col items-center gap-2 transition-all",
                                     paymentMethod === "CASH"
@@ -364,7 +537,50 @@ export default function TripPaymentRequestModal({
                                 <span className="text-[13px] font-medium">Chuyển khoản</span>
                             </button>
                         </div>
+                        {paymentMethod === "TRANSFER" && (
+                            <div className="mt-2 text-[11px] text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                                💡 Khi chọn chuyển khoản, hệ thống sẽ tự động tạo mã QR với số tiền còn lại
+                            </div>
+                        )}
                     </div>
+
+                    {/* QR Code Display */}
+                    {qrData && qrData.qrImageUrl && (
+                        <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                            <div className="text-[12px] font-semibold text-slate-700 text-center">
+                                Mã QR thanh toán
+                            </div>
+                            <div className="flex justify-center">
+                                <img
+                                    src={qrData.qrImageUrl}
+                                    alt="QR Code"
+                                    className="w-48 h-48 border border-slate-200 rounded-lg"
+                                />
+                            </div>
+                            <div className="text-center text-[11px] text-slate-600">
+                                <div className="font-medium mb-1">Số tiền: {fmtVND(amount)} đ</div>
+                                {qrData.expiresAt && (
+                                    <div className="text-amber-600">
+                                        Mã QR hết hạn: {new Date(qrData.expiresAt).toLocaleString("vi-VN")}
+                                    </div>
+                                )}
+                            </div>
+                            {qrData.qrText && (
+                                <div className="text-center">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(qrData.qrText);
+                                            alert("Đã sao chép mã QR vào bộ nhớ tạm");
+                                        }}
+                                        className="text-[11px] text-sky-600 hover:text-sky-700 underline"
+                                    >
+                                        Sao chép mã QR
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Ghi chú */}
                     <div>
@@ -392,9 +608,19 @@ export default function TripPaymentRequestModal({
                         </div>
                     </div>
 
+                    {/* Success message */}
+                    {successMsg && (
+                        <div className="flex items-start gap-2 text-[11px] leading-relaxed bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                            <CheckCircle className="h-4 w-4 mt-0.5 text-emerald-500 shrink-0" />
+                            <div className="text-emerald-700 font-medium">{successMsg}</div>
+                        </div>
+                    )}
+
+                    {/* Error message */}
                     {error && (
-                        <div className="text-rose-600 text-[11px] leading-relaxed">
-                            {error}
+                        <div className="flex items-start gap-2 text-[11px] leading-relaxed bg-rose-50 border border-rose-200 rounded-lg p-3">
+                            <XCircle className="h-4 w-4 mt-0.5 text-rose-500 shrink-0" />
+                            <div className="text-rose-600">{error}</div>
                         </div>
                     )}
                 </div>
@@ -410,12 +636,13 @@ export default function TripPaymentRequestModal({
 
                     <button
                         onClick={handleSubmit}
-                        disabled={!valid || loading}
+                        disabled={!valid || loading || calculatedRemainingAmount.hasPending}
                         className={cls(
                             "rounded-lg px-4 py-2 text-sm font-medium text-white shadow-sm flex items-center gap-2",
                             "bg-[#0079BC] hover:bg-[#0079BC]/90",
                             "disabled:opacity-50 disabled:cursor-not-allowed"
                         )}
+                        title={calculatedRemainingAmount.hasPending ? "Không thể tạo yêu cầu mới khi đã có yêu cầu đang chờ duyệt" : ""}
                     >
                         {loading ? (
                             <>

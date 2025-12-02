@@ -104,19 +104,14 @@ export default function DepositModal({
     const newBalance = Math.max(0, total - (paid + (amount || 0)));
     const overpay = amount > remaining;
 
+    // Validation: chỉ cần tiền mặt (chuyển khoản dùng QR)
     const baseValid =
         amount > 0 &&
-        (method === "CASH" || method === "BANK_TRANSFER") &&
+        method === "CASH" &&
         isISODate(date);
 
-    const bankValid =
-        method === "BANK_TRANSFER"
-            ? String(bankAccount).trim().length > 0
-            : true;
-
     // Validation: số tiền phải nằm trong khoảng còn thiếu (không cho overpay)
-    const valid =
-        baseValid && bankValid && !overpay;
+    const valid = baseValid && !overpay;
 
     // ----- EFFECT: reset khi open -----
     React.useEffect(() => {
@@ -199,6 +194,8 @@ export default function DepositModal({
         const v = cleanDigits(input); // giữ lại chỉ số và dấu chấm thập phân
         setAmountStr(v);
         setPreset("CUSTOM");
+        // Tự động set ngày thanh toán về hôm nay khi nhập số tiền
+        setDate(todayISO());
     };
 
     // Format hiển thị trong input với dấu phân cách (hỗ trợ số thập phân)
@@ -219,6 +216,8 @@ export default function DepositModal({
 
         setAmountStr(String(finalVal));
         setPreset(String(ratio)); // "30" / "50"
+        // Tự động set ngày thanh toán về hôm nay
+        setDate(todayISO());
     };
 
     // chọn preset ALL (tất cả còn lại)
@@ -226,6 +225,8 @@ export default function DepositModal({
         const finalVal = Math.max(0, remaining);
         setAmountStr(String(finalVal));
         setPreset("ALL");
+        // Tự động set ngày thanh toán về hôm nay
+        setDate(todayISO());
     };
 
     // user bấm "Tùy chỉnh"
@@ -299,11 +300,11 @@ export default function DepositModal({
                 await createDeposit(context.id, depositPayload);
             } else {
                 // Record payment for invoice - Backend expects RecordPaymentRequest
-                // Kế toán tạo payment CONFIRMED luôn (không qua PENDING)
+                // Driver/Consultant tạo payment với status PENDING → Kế toán xác nhận sau
                 const paymentPayload = {
                     amount,
                     paymentMethod: method,
-                    confirmationStatus: "CONFIRMED", // Kế toán xác nhận ngay
+                    confirmationStatus: "PENDING", // Chờ Kế toán xác nhận
                     note: note || undefined,
                     createdBy: userId ? parseInt(userId) : undefined,
                 };
@@ -320,7 +321,7 @@ export default function DepositModal({
             console.error("Error submitting payment:", err);
             console.error("Error status:", err.status);
             console.error("Error data:", err.data);
-            const errorMsg = err.data?.message || err.message || "Unknown error";
+            const errorMsg = err.data?.message || err.message || "Lỗi không xác định";
             setError("Không thể ghi nhận thanh toán: " + errorMsg);
         } finally {
             setLoading(false);
@@ -559,61 +560,12 @@ export default function DepositModal({
                                 <CreditCard className="h-4 w-4" /> Tiền mặt
                             </button>
 
-                            <button
-                                type="button"
-                                onClick={() => setMethod("BANK_TRANSFER")}
-                                className={cls(
-                                    "rounded-lg border px-3 py-2 flex items-center justify-center gap-2 text-[13px] font-medium shadow-sm transition-colors text-center",
-                                    method === "BANK_TRANSFER"
-                                        ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                                        : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                                )}
-                            >
-                                <CreditCard className="h-4 w-4" /> Chuyển khoản
-                            </button>
+                            {/* Chuyển khoản dùng QR - không cần nhập thủ công */}
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-1">
+                            Thanh toán chuyển khoản? Sử dụng tính năng <span className="text-emerald-600 font-medium">Tạo QR</span> để khách hàng chuyển khoản tự động.
                         </div>
                     </div>
-
-                    {/* Thông tin ngân hàng nếu BANK_TRANSFER */}
-                    {method === "BANK_TRANSFER" ? (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <div>
-                                <div className="text-[12px] text-slate-500 mb-1">
-                                    Ngân hàng
-                                </div>
-                                <input
-                                    value={bankName}
-                                    onChange={(e) => setBankName(e.target.value)}
-                                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-[13px] text-slate-900 shadow-sm outline-none placeholder-slate-400"
-                                    placeholder="VD: Vietcombank"
-                                />
-                            </div>
-
-                            <div>
-                                <div className="text-[12px] text-slate-500 mb-1">
-                                    Số tài khoản (bắt buộc)
-                                </div>
-                                <input
-                                    value={bankAccount}
-                                    onChange={(e) => setBankAccount(e.target.value)}
-                                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-[13px] text-slate-900 shadow-sm outline-none placeholder-slate-400"
-                                    placeholder="123456789"
-                                />
-                            </div>
-
-                            <div>
-                                <div className="text-[12px] text-slate-500 mb-1">
-                                    Mã tham chiếu
-                                </div>
-                                <input
-                                    value={bankRef}
-                                    onChange={(e) => setBankRef(e.target.value)}
-                                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-[13px] text-slate-900 shadow-sm outline-none placeholder-slate-400"
-                                    placeholder="FT123..."
-                                />
-                            </div>
-                        </div>
-                    ) : null}
 
                     {/* Ngày thanh toán */}
                     <div>
@@ -680,10 +632,8 @@ export default function DepositModal({
                     <div className="flex items-start gap-2 text-[12px] text-slate-500 leading-relaxed">
                         <Info className="h-4 w-4 text-slate-400 mt-0.5" />
                         <div>
-                            Điền đầy đủ thông tin. Nếu chọn chuyển khoản, bắt buộc
-                            nhập{" "}
-                            <b className="text-slate-700">Số tài khoản</b>.
-                            Số tiền phải lớn hơn 0 và không vượt quá số tiền còn thiếu.
+                            Điền đầy đủ thông tin. Số tiền phải lớn hơn 0 và không vượt quá số tiền còn thiếu.
+                            Yêu cầu sẽ được gửi đến <b className="text-slate-700">Kế toán</b> để xác nhận.
                         </div>
                     </div>
 

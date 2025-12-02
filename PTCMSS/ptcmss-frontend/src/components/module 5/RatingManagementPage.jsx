@@ -30,7 +30,10 @@ const RatingManagementPage = () => {
         try {
             // Call real API to get completed trips
             const response = await getCompletedTripsForRating();
-            const tripsData = response.data || response || [];
+            let tripsData = response.data || response || [];
+
+            // Double-check: chỉ lấy trips COMPLETED (phòng trường hợp API trả về sai)
+            tripsData = tripsData.filter(trip => trip.status === 'COMPLETED');
 
             // Check rating status for each trip
             const tripsWithRating = await Promise.all(
@@ -260,7 +263,7 @@ const RatingManagementPage = () => {
                                 <th className="w-32 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Thời gian
                                 </th>
-                                <th className="w-32 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="w-28 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Trạng thái
                                 </th>
                                 <th className="w-32 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -312,7 +315,15 @@ const RatingManagementPage = () => {
                                         </div>
                                     </td>
                                     <td className="px-4 py-4">
-                                        {getStatusBadge(trip.hasRating)}
+                                        {trip.status === 'COMPLETED' ? (
+                                            <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                                                    Hoàn thành
+                                                </span>
+                                        ) : (
+                                            <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
+                                                    {trip.status || 'N/A'}
+                                                </span>
+                                        )}
                                     </td>
                                     <td className="px-4 py-4">
                                         {trip.hasRating && trip.rating ? (
@@ -355,13 +366,17 @@ const RatingManagementPage = () => {
                                             >
                                                 Xem chi tiết
                                             </button>
-                                        ) : (
+                                        ) : trip.status === 'COMPLETED' ? (
                                             <button
                                                 onClick={() => handleRateClick(trip)}
                                                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium whitespace-nowrap"
                                             >
                                                 Đánh giá
                                             </button>
+                                        ) : (
+                                            <span className="text-sm text-gray-400">
+                                                    Chưa hoàn thành
+                                                </span>
                                         )}
                                     </td>
                                 </tr>

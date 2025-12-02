@@ -180,13 +180,13 @@ function TripsSummaryCard({ completed, inProgress, cancelled }) {
                 <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-3 flex flex-col items-start">
                     <div className="flex items-center gap-1 text-[11px] text-slate-500">
                         <XCircle className="h-3.5 w-3.5 text-rose-600" />
-                        <span>Huỷ</span>
+                        <span>Hủy</span>
                     </div>
                     <div className="text-lg font-semibold text-slate-900 leading-none">
                         {fmtInt(cancelled)}
                     </div>
                     <div className="text-[10px] text-slate-500 mt-1">
-                        {cancelRate.toFixed(1)}% huỷ
+                        {cancelRate.toFixed(1)}% hủy
                     </div>
                 </div>
             </div>

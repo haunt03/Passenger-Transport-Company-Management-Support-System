@@ -7,7 +7,8 @@ import {
     listBookingPayments,
     generateBookingQrPayment,
 } from "../../api/bookings";
-import { getCurrentRole, ROLES } from "../../utils/session";
+import { getCurrentRole, getStoredUserId, ROLES } from "../../utils/session";
+import AssignDriverDialog from "../module 5/AssignDriverDialog";
 import {
     ClipboardList,
     User,
@@ -203,12 +204,41 @@ function CustomerInfoCard({ customer }) {
 }
 
 /* 2. Thông tin lịch trình */
-function TripInfoCard({ trip }) {
+function TripInfoCard({ trip, hireTypeName, useHighway }) {
+    // Format chi tiết xe: "1×Xe 45 chỗ, 2×Xe 16 chỗ"
+    const vehicleDetailsText = trip.vehicle_details && trip.vehicle_details.length > 0
+        ? trip.vehicle_details.map(v => `${v.quantity}×${v.name}`).join(", ")
+        : (trip.vehicle_category ? `${trip.vehicle_count || 1}×${trip.vehicle_category}` : "—");
+
     return (
         <div className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-4 shadow-sm">
             <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
                 <MapPin className="h-4 w-4 text-amber-600" />
                 Thông tin lịch trình
+            </div>
+
+            {/* Hình thức thuê & Thông tin chung */}
+            <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 flex flex-wrap gap-x-6 gap-y-2 text-[13px]">
+                <div className="flex items-center gap-2">
+                    <ClipboardList className="h-4 w-4 text-sky-600" />
+                    <span className="text-slate-600">Hình thức:</span>
+                    <span className="font-semibold text-sky-700">
+                        {hireTypeName || "—"}
+                    </span>
+                </div>
+                {trip.distance > 0 && (
+                    <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-slate-500" />
+                        <span className="text-slate-600">Khoảng cách:</span>
+                        <span className="font-medium text-slate-900">{trip.distance} km</span>
+                    </div>
+                )}
+                {useHighway && (
+                    <div className="flex items-center gap-2">
+                        <Truck className="h-4 w-4 text-emerald-600" />
+                        <span className="font-medium text-emerald-700">Có đi cao tốc</span>
+                    </div>
+                )}
             </div>
 
             <div className="grid lg:grid-cols-[1fr_auto] gap-6">
@@ -236,11 +266,9 @@ function TripInfoCard({ trip }) {
                                 <div className="mt-1 flex items-center gap-1 text-[12px] text-slate-500">
                                     <Clock className="h-3.5 w-3.5 text-slate-400" />
                                     <span>
-                                        Giờ đón:{" "}
+                                        Thời gian đi:{" "}
                                         <span className="font-medium text-slate-900 tabular-nums">
-                                            {fmtDateTime(
-                                                trip.pickup_time
-                                            )}
+                                            {fmtDateTime(trip.pickup_time)}
                                         </span>
                                     </span>
                                 </div>
@@ -259,11 +287,9 @@ function TripInfoCard({ trip }) {
                                 <div className="mt-1 flex items-center gap-1 text-[12px] text-slate-500">
                                     <Clock className="h-3.5 w-3.5 text-slate-400" />
                                     <span>
-                                        Dự kiến đến:{" "}
+                                        Thời gian về:{" "}
                                         <span className="font-medium text-slate-900 tabular-nums">
-                                            {fmtDateTime(
-                                                trip.dropoff_eta
-                                            )}
+                                            {fmtDateTime(trip.dropoff_eta)}
                                         </span>
                                     </span>
                                 </div>
@@ -271,30 +297,31 @@ function TripInfoCard({ trip }) {
                         </div>
                     </div>
 
-                    {/* meta box */}
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex flex-wrap gap-4 text-[13px] text-slate-700">
+                    {/* meta box - Thông tin xe */}
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex flex-col gap-2 text-[13px] text-slate-700">
                         <div className="flex items-center gap-2">
                             <Users className="h-4 w-4 text-slate-500" />
                             <span>
-                                Hành khách:{" "}
+                                Sức chứa:{" "}
                                 <span className="font-medium text-slate-900">
-                                    {trip.pax_count ??
-                                        "—"}
+                                    {trip.pax_count > 0 ? `${trip.pax_count} chỗ` : "—"}
                                 </span>
                             </span>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <CarFront className="h-4 w-4 text-amber-600" />
-                            <span className="text-slate-700">
-                                {trip.vehicle_category ||
-                                    "—"}{" "}
-                                ·{" "}
-                                {trip.vehicle_count
-                                    ? trip.vehicle_count +
-                                    " xe"
-                                    : "—"}
-                            </span>
+                        <div className="flex items-start gap-2">
+                            <CarFront className="h-4 w-4 text-amber-600 mt-0.5" />
+                            <div>
+                                <span className="text-slate-600">Xe: </span>
+                                <span className="font-medium text-slate-900">
+                                    {vehicleDetailsText}
+                                </span>
+                                {trip.vehicle_count > 0 && (
+                                    <span className="text-slate-500 ml-1">
+                                        ({trip.vehicle_count} xe)
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -375,7 +402,7 @@ function QuoteInfoCard({ quote }) {
 }
 
 /* 4. Thanh toán / Cọc */
-function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr }) {
+function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr, isConsultant = false }) {
     const remain = Math.max(0, Number(payment.remaining || 0));
     const paid = Math.max(0, Number(payment.paid || 0));
 
@@ -407,7 +434,7 @@ function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr })
 
             {/* Trạng thái & ghi chú */}
             {remain <= 0 ? (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-700 flex items-center gap-2">
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-700 flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4" />
                     <span className="font-medium">Đã thanh toán đủ</span>
                 </div>
@@ -417,29 +444,35 @@ function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr })
                 </div>
             )}
 
-            {/* Nút hành động */}
-            <div className="grid grid-cols-2 gap-3">
-                <button
-                    className="rounded-lg bg-[#EDC531] hover:bg-amber-500 text-white font-medium text-[13px] px-4 py-2.5 shadow-sm flex items-center justify-center gap-2 transition-colors"
-                    onClick={onOpenDeposit}
-                >
-                    <BadgeDollarSign className="h-4 w-4" />
-                    <span>Ghi nhận thanh toán</span>
-                </button>
+            {/* Nút hành động - Chỉ hiển thị khi còn tiền chưa thanh toán */}
+            {remain > 0 && (
+                <>
+                    <div className="grid grid-cols-2 gap-3">
+                        <button
+                            className="rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-medium text-[13px] px-4 py-2.5 shadow-sm flex items-center justify-center gap-2 transition-colors"
+                            onClick={onOpenDeposit}
+                        >
+                            <BadgeDollarSign className="h-4 w-4" />
+                            <span>{isConsultant ? "Yêu cầu đặt cọc" : "Ghi nhận thanh toán"}</span>
+                        </button>
 
-                <button
-                    type="button"
-                    className="rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium text-[13px] px-4 py-2.5 shadow-sm flex items-center justify-center gap-2 transition-colors"
-                    onClick={onGenerateQr}
-                >
-                    <QrCode className="h-4 w-4 text-sky-600" />
-                    <span>Tạo QR</span>
-                </button>
-            </div>
+                        <button
+                            type="button"
+                            className="rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium text-[13px] px-4 py-2.5 shadow-sm flex items-center justify-center gap-2 transition-colors"
+                            onClick={onGenerateQr}
+                        >
+                            <QrCode className="h-4 w-4 text-sky-600" />
+                            <span>Tạo QR</span>
+                        </button>
+                    </div>
 
-            <div className="text-[11px] text-slate-500 text-center leading-relaxed px-2">
-                Ghi nhận tiền mặt/chuyển khoản hoặc gửi mã QR để khách tự thanh toán.
-            </div>
+                    <div className="text-[11px] text-slate-500 text-center leading-relaxed px-2">
+                        {isConsultant
+                            ? "Tạo yêu cầu thu cọc/thanh toán để kế toán xác nhận, hoặc gửi QR cho khách."
+                            : "Ghi nhận tiền mặt/chuyển khoản hoặc gửi mã QR để khách tự thanh toán."}
+                    </div>
+                </>
+            )}
 
             {/* Lịch sử thanh toán */}
             <div className="border-t border-slate-200 pt-4 space-y-3">
@@ -456,16 +489,24 @@ function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr })
                                     <span className="text-[11px] text-slate-500 whitespace-nowrap">{item.createdAt ? fmtDateTime(item.createdAt) : "--"}</span>
                                 </div>
                                 <div className="flex justify-between items-center text-[11px]">
-                                    <span className="text-slate-600">{item.paymentMethod || "N/A"}</span>
+                                    <span className="text-slate-600">{item.paymentMethod || "Không có"}</span>
                                     <span
                                         className={cls(
                                             "font-semibold px-2 py-0.5 rounded-md",
                                             item.paymentStatus === "PAID"
-                                                ? "bg-amber-100 text-amber-700"
-                                                : "bg-amber-100 text-amber-700"
+                                                ? "bg-emerald-100 text-emerald-700"
+                                                : item.paymentStatus === "PENDING"
+                                                    ? "bg-amber-100 text-amber-700"
+                                                    : "bg-slate-100 text-slate-700"
                                         )}
                                     >
-                                        {item.paymentStatus || "UNPAID"}
+                                        {item.paymentStatus === "PAID"
+                                            ? "Đã thanh toán"
+                                            : item.paymentStatus === "PENDING"
+                                                ? "Chờ xác nhận"
+                                                : item.paymentStatus === "UNPAID"
+                                                    ? "Chưa thanh toán"
+                                                    : item.paymentStatus || "Chưa thanh toán"}
                                     </span>
                                 </div>
                                 {item.note ? (
@@ -649,23 +690,26 @@ function QrPaymentModal({
                         </div>
                     ) : null}
 
-                    <div className="flex items-center justify-end gap-2 pt-2">
-                        <button
-                            type="button"
-                            className="text-[13px] font-medium text-slate-500 hover:text-slate-700"
-                            onClick={onClose}
-                        >
-                            Hủy
-                        </button>
-                        <button
-                            type="button"
-                            className="rounded-md bg-sky-600 px-4 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-sky-500 disabled:opacity-60"
-                            onClick={handleGenerate}
-                            disabled={loading}
-                        >
-                            {loading ? "Đang tạo..." : "Tạo QR"}
-                        </button>
-                    </div>
+                    {/* Chỉ hiển thị nút khi chưa tạo QR */}
+                    {!result && (
+                        <div className="flex items-center justify-end gap-2 pt-2">
+                            <button
+                                type="button"
+                                className="text-[13px] font-medium text-slate-500 hover:text-slate-700"
+                                onClick={onClose}
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                type="button"
+                                className="rounded-md bg-sky-600 px-4 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-sky-500 disabled:opacity-60"
+                                onClick={handleGenerate}
+                                disabled={loading}
+                            >
+                                {loading ? "Đang tạo..." : "Tạo QR"}
+                            </button>
+                        </div>
+                    )}
 
                     {result ? (
                         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3 mt-4">
@@ -768,7 +812,7 @@ function QrPaymentModal({
 }
 
 /* 5. Điều phối */
-function DispatchInfoCard({ dispatch }) {
+function DispatchInfoCard({ dispatch, onAssignClick, showAssignButton = false }) {
     const hasAssign =
         dispatch &&
         (dispatch.driver_name ||
@@ -786,13 +830,20 @@ function DispatchInfoCard({ dispatch }) {
                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-[12px] text-amber-800 flex items-start gap-2 leading-relaxed">
                     <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
                     <div>
-                        Chưa gán tài
-                        xế/xe. Đơn đang
-                        chờ điều phối
-                        hoặc chưa xác
-                        nhận.
+                        Chưa gán tài xế/xe. Đơn đang chờ điều phối hoặc chưa xác nhận.
                     </div>
                 </div>
+
+                {/* Button gán chuyến cho Coordinator */}
+                {showAssignButton && (
+                    <button
+                        onClick={onAssignClick}
+                        className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 text-sm font-semibold shadow-sm transition-colors flex items-center justify-center gap-2"
+                    >
+                        <Truck className="h-4 w-4" />
+                        Gán chuyến
+                    </button>
+                )}
             </div>
         );
     }
@@ -876,20 +927,35 @@ export default function OrderDetailPage() {
     const { toasts, push } = useToasts();
     const { orderId } = useParams();
 
-    // Check role - ẩn phần thanh toán cho Consultant
+    // Check role - ẩn phần thanh toán cho Consultant và Accountant
     const currentRole = React.useMemo(() => getCurrentRole(), []);
     const isConsultant = currentRole === ROLES.CONSULTANT;
+    const isAccountant = currentRole === ROLES.ACCOUNTANT;
+    const isCoordinator = currentRole === ROLES.COORDINATOR;
 
     const [order, setOrder] = React.useState(null);
     const [loading, setLoading] = React.useState(true);
     const [paymentHistory, setPaymentHistory] = React.useState([]);
     const [qrModalOpen, setQrModalOpen] = React.useState(false);
+    const [assignDialogOpen, setAssignDialogOpen] = React.useState(false);
 
     const mapBookingToOrder = (b) => {
         if (!b) return null;
         const firstTrip = Array.isArray(b.trips) && b.trips.length ? b.trips[0] : {};
         const vehicleCount = Array.isArray(b.vehicles) ? b.vehicles.reduce((sum, v) => sum + (v.quantity || 0), 0) : 0;
         const vehicleCategory = Array.isArray(b.vehicles) && b.vehicles.length ? b.vehicles[0].categoryName : "";
+        // Tính tổng sức chứa từ vehicles
+        const totalCapacity = Array.isArray(b.vehicles)
+            ? b.vehicles.reduce((sum, v) => sum + ((v.capacity || 0) * (v.quantity || 1)), 0)
+            : 0;
+        // Chi tiết các loại xe
+        const vehicleDetails = Array.isArray(b.vehicles)
+            ? b.vehicles.map(v => ({
+                name: v.categoryName || '',
+                quantity: v.quantity || 1,
+                capacity: v.capacity || 0,
+            }))
+            : [];
         const discount = Number(b.discountAmount || 0);
         const basePrice = Number(b.estimatedCost || 0);
         const finalPrice = Number(b.totalCost || 0);
@@ -905,14 +971,20 @@ export default function OrderDetailPage() {
                 email: b.customer?.email || '',
             },
             trip: {
+                id: firstTrip.id || firstTrip.tripId || null,
                 pickup: firstTrip.startLocation || '',
                 dropoff: firstTrip.endLocation || '',
                 pickup_time: firstTrip.startTime || '',
                 dropoff_eta: firstTrip.endTime || '',
-                pax_count: 0,
+                pax_count: totalCapacity, // Tổng sức chứa
                 vehicle_category: vehicleCategory,
                 vehicle_count: vehicleCount,
+                vehicle_details: vehicleDetails, // Chi tiết các loại xe
+                distance: firstTrip.distance || null,
             },
+            // Thông tin hình thức thuê
+            hireTypeName: b.hireTypeName || '',
+            useHighway: b.useHighway || false,
             quote: {
                 base_price: basePrice,
                 discount_amount: discount,
@@ -928,6 +1000,7 @@ export default function OrderDetailPage() {
                 vehicle_plate: firstTrip.vehicleLicensePlate || '',
             },
             notes_internal: b.note || '',
+            branch_name: b.branchName || b.branch?.name || '',
         };
     };
 
@@ -972,6 +1045,19 @@ export default function OrderDetailPage() {
 
     const openQrModal = () => {
         setQrModalOpen(true);
+    };
+
+    const openAssignDialog = () => {
+        setAssignDialogOpen(true);
+    };
+
+    const handleAssignSuccess = async () => {
+        try {
+            await fetchOrder();
+            push("Đã gán chuyến thành công", "success");
+        } catch (e) {
+            push("Không thể tải lại dữ liệu", "error");
+        }
     };
 
     // callback khi ghi nhận thanh toán thành công (DepositModal đã xử lý API call)
@@ -1096,56 +1182,7 @@ export default function OrderDetailPage() {
                     )}
                 </div>
 
-                {/* thanh toán summary box - ẩn với Consultant */}
-                {!isConsultant && (
-                    <div className="w-full max-w-[260px] rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-3 text-sm shadow-sm">
-                        <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                            <DollarSign className="h-3.5 w-3.5 text-amber-600" />
-                            Tình trạng thanh toán
-                        </div>
-
-                        <div className="flex items-baseline justify-between">
-                            <div className="text-[12px] text-slate-500">
-                                Giá chốt
-                            </div>
-                            <div className="font-semibold text-slate-900 tabular-nums">
-                                {fmtVND(finalPrice)}
-                            </div>
-                        </div>
-
-                        <div className="flex items-baseline justify-between">
-                            <div className="text-[12px] text-slate-500">
-                                Đã thu
-                            </div>
-                            <div className="font-semibold text-amber-600 tabular-nums flex items-center gap-1">
-                                <DollarSign className="h-3.5 w-3.5 text-amber-600" />
-                                <span>{fmtVND(paid)}</span>
-                            </div>
-                        </div>
-
-                        <div className="flex items-baseline justify-between">
-                            <div className="text-[12px] text-slate-500">
-                                Còn lại
-                            </div>
-                            <div className="font-semibold text-amber-600 tabular-nums flex items-center gap-1">
-                                <DollarSign className="h-3.5 w-3.5 text-amber-600" />
-                                <span>
-                                    {fmtVND(remain)}
-                                </span>
-                            </div>
-                        </div>
-
-                        <button
-                            className="w-full rounded-md bg-[#EDC531] hover:bg-amber-500 text-white font-medium text-[13px] px-4 py-2 shadow-sm flex items-center justify-center gap-2"
-                            onClick={openDeposit}
-                        >
-                            <BadgeDollarSign className="h-4 w-4" />
-                            <span>
-                                Ghi nhận thanh toán
-                            </span>
-                        </button>
-                    </div>
-                )}
+                {/* Bỏ bảng thanh toán summary - thông tin đã có trong PaymentInfoCard */}
             </div>
 
             {/* BODY GRID */}
@@ -1153,17 +1190,22 @@ export default function OrderDetailPage() {
                 <CustomerInfoCard
                     customer={order.customer}
                 />
-                <TripInfoCard trip={order.trip} />
+                <TripInfoCard
+                    trip={order.trip}
+                    hireTypeName={order.hireTypeName}
+                    useHighway={order.useHighway}
+                />
             </div>
 
-            <div className={`grid ${isConsultant ? 'xl:grid-cols-1' : 'xl:grid-cols-2'} gap-5 mb-5`}>
+            <div className={`grid ${isAccountant ? 'xl:grid-cols-1' : 'xl:grid-cols-2'} gap-5 mb-5`}>
                 <QuoteInfoCard quote={order.quote} />
-                {!isConsultant && (
+                {!isAccountant && (
                     <PaymentInfoCard
                         payment={order.payment}
                         history={paymentHistory}
                         onOpenDeposit={openDeposit}
                         onGenerateQr={openQrModal}
+                        isConsultant={isConsultant}
                     />
                 )}
             </div>
@@ -1171,6 +1213,8 @@ export default function OrderDetailPage() {
             <div className="grid xl:grid-cols-2 gap-5">
                 <DispatchInfoCard
                     dispatch={order.dispatch}
+                    onAssignClick={openAssignDialog}
+                    showAssignButton={isCoordinator}
                 />
 
                 {/* ghi chú nội bộ */}
@@ -1195,8 +1239,26 @@ export default function OrderDetailPage() {
                 </div>
             </div>
 
-            {/* Payment modals - ẩn với Consultant */}
-            {!isConsultant && (
+            {/* Assign Driver Dialog - cho Coordinator */}
+            {isCoordinator && order && (
+                <AssignDriverDialog
+                    open={assignDialogOpen}
+                    order={{
+                        id: order.id,
+                        bookingId: order.id,
+                        tripId: order.trip?.id,
+                        code: order.code,
+                        pickup_time: order.trip?.pickup_time,
+                        vehicle_type: order.trip?.vehicle_category,
+                        branch_name: order.branch_name,
+                    }}
+                    onClose={() => setAssignDialogOpen(false)}
+                    onAssigned={handleAssignSuccess}
+                />
+            )}
+
+            {/* Payment modals - ẩn với Accountant */}
+            {!isAccountant && (
                 <>
                     <QrPaymentModal
                         open={qrModalOpen}

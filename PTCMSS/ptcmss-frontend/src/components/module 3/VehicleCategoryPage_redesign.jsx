@@ -7,8 +7,6 @@ import {
     Hash,
     Check,
     Wrench,
-    Search,
-    Filter,
 } from "lucide-react";
 
 const cls = (...a) => a.filter(Boolean).join(" ");
@@ -305,9 +303,6 @@ export default function VehicleCategoryPage() {
     }, [mapCat, pushToast]);
 
     const [createOpen, setCreateOpen] = React.useState(false);
-    const [searchText, setSearchText] = React.useState("");
-    const [statusFilter, setStatusFilter] = React.useState("ALL");
-    const [seatsFilter, setSeatsFilter] = React.useState("ALL");
 
     async function handleCreated(newCat) {
         try {
@@ -318,38 +313,6 @@ export default function VehicleCategoryPage() {
             pushToast("Tạo danh mục thất bại", "error");
         }
     }
-
-    // Filter categories
-    const filteredCategories = React.useMemo(() => {
-        return categories.filter((cat) => {
-            // Search filter
-            if (searchText) {
-                const search = searchText.toLowerCase();
-                const matchName = cat.name.toLowerCase().includes(search);
-                const matchSeats = String(cat.seats || "").includes(search);
-                if (!matchName && !matchSeats) return false;
-            }
-
-            // Status filter
-            if (statusFilter !== "ALL" && cat.status !== statusFilter) {
-                return false;
-            }
-
-            // Seats filter
-            if (seatsFilter !== "ALL") {
-                if (seatsFilter === "4" && cat.seats !== 4) return false;
-                if (seatsFilter === "7" && cat.seats !== 7) return false;
-                if (seatsFilter === "16" && cat.seats !== 16) return false;
-                if (seatsFilter === "29" && cat.seats !== 29) return false;
-                if (seatsFilter === "45" && cat.seats !== 45) return false;
-                if (seatsFilter === "OTHER") {
-                    if ([4, 7, 16, 29, 45].includes(cat.seats)) return false;
-                }
-            }
-
-            return true;
-        });
-    }, [categories, searchText, statusFilter, seatsFilter]);
 
     return (
         <div className="relative min-h-screen bg-slate-50 text-slate-900 p-6">
@@ -391,92 +354,26 @@ export default function VehicleCategoryPage() {
                 </div>
             </div>
 
-            {/* FILTERS */}
-            <div className="mb-6 flex flex-col md:flex-row gap-3">
-                {/* Search */}
-                <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <input
-                        type="text"
-                        value={searchText}
-                        onChange={(e) => setSearchText(e.target.value)}
-                        placeholder="Tìm theo tên hoặc số ghế..."
-                        className="w-full pl-10 pr-4 py-2 text-[13px] border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
-                    />
-                </div>
-
-                {/* Status Filter */}
-                <div className="relative">
-                    <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-                    <select
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                        className="pl-10 pr-8 py-2 text-[13px] border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 appearance-none cursor-pointer"
-                    >
-                        <option value="ALL">Tất cả trạng thái</option>
-                        <option value="ACTIVE">Đang hoạt động</option>
-                        <option value="INACTIVE">Ngừng hoạt động</option>
-                    </select>
-                </div>
-
-                {/* Seats Filter */}
-                <div className="relative">
-                    <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-                    <select
-                        value={seatsFilter}
-                        onChange={(e) => setSeatsFilter(e.target.value)}
-                        className="pl-10 pr-8 py-2 text-[13px] border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 appearance-none cursor-pointer"
-                    >
-                        <option value="ALL">Tất cả số ghế</option>
-                        <option value="4">4 chỗ</option>
-                        <option value="7">7 chỗ</option>
-                        <option value="16">16 chỗ</option>
-                        <option value="29">29 chỗ</option>
-                        <option value="45">45 chỗ</option>
-                        <option value="OTHER">Khác</option>
-                    </select>
-                </div>
-
-                {/* Reset Filter Button */}
-                {(searchText || statusFilter !== "ALL" || seatsFilter !== "ALL") && (
-                    <button
-                        onClick={() => {
-                            setSearchText("");
-                            setStatusFilter("ALL");
-                            setSeatsFilter("ALL");
-                        }}
-                        className="px-4 py-2 text-[13px] text-slate-600 hover:text-slate-900 border border-slate-300 rounded-lg bg-white hover:bg-slate-50 transition-colors"
-                    >
-                        <X className="h-4 w-4 inline mr-1" />
-                        Xóa filter
-                    </button>
-                )}
-            </div>
-
             {/* TABLE CARD - Match VehicleListPage style */}
             <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                {filteredCategories.length === 0 ? (
+                {categories.length === 0 ? (
                     <div className="px-4 py-16 text-center">
                         <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-400 mb-4">
                             <CarFront className="h-8 w-8" />
                         </div>
                         <div className="text-[14px] font-medium text-slate-700 mb-1">
-                            {categories.length === 0 ? "Chưa có danh mục xe nào" : "Không tìm thấy kết quả"}
+                            Chưa có danh mục xe nào
                         </div>
                         <div className="text-[12px] text-slate-500 mb-4 max-w-sm mx-auto">
-                            {categories.length === 0
-                                ? "Tạo danh mục xe đầu tiên để bắt đầu phân loại và quản lý đội xe của bạn"
-                                : "Thử điều chỉnh bộ lọc hoặc từ khóa tìm kiếm"}
+                            Tạo danh mục xe đầu tiên để bắt đầu phân loại và quản lý đội xe của bạn
                         </div>
-                        {categories.length === 0 && (
-                            <button
-                                onClick={() => setCreateOpen(true)}
-                                className="inline-flex items-center gap-2 rounded-md text-[13px] font-medium px-4 py-2 text-white bg-sky-600 hover:bg-sky-500 shadow-sm"
-                            >
-                                <PlusCircle className="h-4 w-4" />
-                                <span>Tạo danh mục đầu tiên</span>
-                            </button>
-                        )}
+                        <button
+                            onClick={() => setCreateOpen(true)}
+                            className="inline-flex items-center gap-2 rounded-md text-[13px] font-medium px-4 py-2 text-white bg-sky-600 hover:bg-sky-500 shadow-sm"
+                        >
+                            <PlusCircle className="h-4 w-4" />
+                            <span>Tạo danh mục đầu tiên</span>
+                        </button>
                     </div>
                 ) : (
                     <>
@@ -512,7 +409,7 @@ export default function VehicleCategoryPage() {
                                 </thead>
 
                                 <tbody className="divide-y divide-slate-200">
-                                {filteredCategories.map((cat) => (
+                                {categories.map((cat) => (
                                     <tr
                                         key={cat.id}
                                         className="hover:bg-slate-50 transition-colors"
@@ -579,7 +476,7 @@ export default function VehicleCategoryPage() {
                         <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 text-[11px] text-slate-500 flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <div className="h-1.5 w-1.5 rounded-full bg-sky-500"></div>
-                                <span>Hiển thị {filteredCategories.length} / {categories.length} danh mục</span>
+                                <span>Hiển thị {categories.length} / {categories.length} danh mục</span>
                             </div>
                             <div>
                                 Tổng số hiện tại: <span className="font-medium text-slate-700">{categories.length}</span>

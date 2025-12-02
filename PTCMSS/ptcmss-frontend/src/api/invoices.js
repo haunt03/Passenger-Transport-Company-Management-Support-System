@@ -142,3 +142,20 @@ export function generateInvoiceNumber(branchId) {
     const qs = params.toString();
     return apiFetch(`/api/invoices/generate-number${qs ? `?${qs}` : ""}`);
 }
+
+// Get pending payment requests (for accountant to confirm)
+export function getPendingPayments(branchId = null) {
+    const params = new URLSearchParams();
+    if (branchId != null) params.append("branchId", String(branchId));
+    const qs = params.toString();
+    return apiFetch(`/api/invoices/payments/pending${qs ? `?${qs}` : ""}`);
+}
+
+// Count pending payment requests
+export function countPendingPayments(branchId = null) {
+    const params = new URLSearchParams();
+    if (branchId != null) params.append("branchId", String(branchId));
+    const qs = params.toString();
+    return apiFetch(`/api/invoices/payments/pending/count${qs ? `?${qs}` : ""}`);
+}
+

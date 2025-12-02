@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-r
 
 /**
  * Pagination Component
- * 
+ *
  * Props:
  * - currentPage: number - Trang hiện tại (bắt đầu từ 1)
  * - totalPages: number - Tổng số trang
@@ -13,13 +13,13 @@ import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-r
  * - maxVisible: number - Số trang hiển thị tối đa (default: 5)
  */
 export default function Pagination({
-    currentPage = 1,
-    totalPages = 1,
-    onPageChange,
-    itemsPerPage = 10,
-    totalItems = 0,
-    maxVisible = 5,
-}) {
+                                       currentPage = 1,
+                                       totalPages = 1,
+                                       onPageChange,
+                                       itemsPerPage = 10,
+                                       totalItems = 0,
+                                       maxVisible = 5,
+                                   }) {
     const pages = [];
 
     // Tính toán range của pages cần hiển thị
@@ -91,9 +91,9 @@ export default function Pagination({
                         key={page}
                         onClick={() => onPageChange(page)}
                         className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${page === currentPage
-                                ? "bg-[#EDC531] text-white shadow-md"
-                                : "border border-slate-300 hover:bg-slate-50"
-                            }`}
+                            ? "bg-sky-600 text-white shadow-md"
+                            : "border border-slate-300 hover:bg-slate-50"
+                        }`}
                     >
                         {page}
                     </button>
