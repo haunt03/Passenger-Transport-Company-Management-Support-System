@@ -15,6 +15,10 @@ import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
 
+import org.example.ptcmssbackend.entity.ExpenseRequests;
+import org.example.ptcmssbackend.enums.ExpenseRequestStatus;
+import org.example.ptcmssbackend.repository.ExpenseRequestRepository;
+
 /**
  * Analytics Service for Module 7
  * Handles all dashboard and reporting logic
@@ -25,6 +29,7 @@ import java.util.Map;
 public class AnalyticsService {
 
     private final JdbcTemplate jdbcTemplate;
+    private final ExpenseRequestRepository expenseRequestRepository;
 
     /**
      * Get Admin Dashboard data
@@ -38,14 +43,28 @@ public class AnalyticsService {
 
         // Query total revenue & expense
         String financialSql = "SELECT " +
-                "COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amount ELSE 0 END), 0) as totalRevenue, " +
+                "COALESCE(SUM(CASE WHEN type = 'INCOME' AND paymentStatus = 'PAID' THEN amount ELSE 0 END), 0) as totalRevenue, " +
                 "COALESCE(SUM(CASE WHEN type = 'EXPENSE' THEN amount ELSE 0 END), 0) as totalExpense " +
                 "FROM invoices " +
                 "WHERE status = 'ACTIVE' AND invoiceDate BETWEEN ? AND ?";
 
         Map<String, Object> financial = jdbcTemplate.queryForMap(financialSql, startDate, endDate);
         BigDecimal totalRevenue = (BigDecimal) financial.get("totalRevenue");
-        BigDecimal totalExpense = (BigDecimal) financial.get("totalExpense");
+        BigDecimal invoiceExpense = (BigDecimal) financial.get("totalExpense");
+
+        // Bổ sung chi phí từ ExpenseRequests đã được duyệt (APPROVED) trong kỳ
+        Instant startInstant = startDate.atZone(ZoneId.systemDefault()).toInstant();
+        Instant endInstant = endDate.atZone(ZoneId.systemDefault()).toInstant();
+        BigDecimal requestExpense = expenseRequestRepository.findByStatus(ExpenseRequestStatus.APPROVED)
+                .stream()
+                .filter(req -> req.getCreatedAt() != null
+                        && !req.getCreatedAt().isBefore(startInstant)
+                        && !req.getCreatedAt().isAfter(endInstant))
+                .map(ExpenseRequests::getAmount)
+                .filter(amount -> amount != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalExpense = invoiceExpense.add(requestExpense);
         BigDecimal netProfit = totalRevenue.subtract(totalExpense);
 
         // Query trip stats
@@ -115,9 +134,9 @@ public class AnalyticsService {
     public List<RevenueTrendDTO> getRevenueTrend() {
         String sql = "SELECT " +
                 "DATE_FORMAT(invoiceDate, '%Y-%m') as month, " +
-                "SUM(CASE WHEN type = 'INCOME' THEN amount ELSE 0 END) as revenue, " +
+                "SUM(CASE WHEN type = 'INCOME' AND paymentStatus = 'PAID' THEN amount ELSE 0 END) as revenue, " +
                 "SUM(CASE WHEN type = 'EXPENSE' THEN amount ELSE 0 END) as expense, " +
-                "SUM(CASE WHEN type = 'INCOME' THEN amount ELSE 0 END) - " +
+                "SUM(CASE WHEN type = 'INCOME' AND paymentStatus = 'PAID' THEN amount ELSE 0 END) - " +
                 "SUM(CASE WHEN type = 'EXPENSE' THEN amount ELSE 0 END) as netProfit " +
                 "FROM invoices " +
                 "WHERE status = 'ACTIVE' AND invoiceDate >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) " +
@@ -142,9 +161,9 @@ public class AnalyticsService {
 
         String sql = "SELECT " +
                 "b.branchId, b.branchName, b.location, " +
-                "COALESCE(SUM(CASE WHEN i.type = 'INCOME' THEN i.amount ELSE 0 END), 0) as revenue, " +
+                "COALESCE(SUM(CASE WHEN i.type = 'INCOME' AND i.paymentStatus = 'PAID' THEN i.amount ELSE 0 END), 0) as revenue, " +
                 "COALESCE(SUM(CASE WHEN i.type = 'EXPENSE' THEN i.amount ELSE 0 END), 0) as expense, " +
-                "COALESCE(SUM(CASE WHEN i.type = 'INCOME' THEN i.amount ELSE 0 END), 0) - " +
+                "COALESCE(SUM(CASE WHEN i.type = 'INCOME' AND i.paymentStatus = 'PAID' THEN i.amount ELSE 0 END), 0) - " +
                 "COALESCE(SUM(CASE WHEN i.type = 'EXPENSE' THEN i.amount ELSE 0 END), 0) as netProfit, "
                 +
                 "COUNT(DISTINCT bk.bookingId) as totalBookings, " +
@@ -287,14 +306,29 @@ public class AnalyticsService {
 
         // Query total revenue & expense for branch
         String financialSql = "SELECT " +
-                "COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amount ELSE 0 END), 0) as totalRevenue, " +
+                "COALESCE(SUM(CASE WHEN type = 'INCOME' AND paymentStatus = 'PAID' THEN amount ELSE 0 END), 0) as totalRevenue, " +
                 "COALESCE(SUM(CASE WHEN type = 'EXPENSE' THEN amount ELSE 0 END), 0) as totalExpense " +
                 "FROM invoices " +
                 "WHERE status = 'ACTIVE' AND branchId = ? AND invoiceDate BETWEEN ? AND ?";
 
         Map<String, Object> financial = jdbcTemplate.queryForMap(financialSql, branchId, startDate, endDate);
         BigDecimal totalRevenue = (BigDecimal) financial.get("totalRevenue");
-        BigDecimal totalExpense = (BigDecimal) financial.get("totalExpense");
+        BigDecimal invoiceExpense = (BigDecimal) financial.get("totalExpense");
+
+        // Bổ sung chi phí từ ExpenseRequests đã được duyệt (APPROVED) theo chi nhánh trong kỳ
+        Instant startInstant = startDate.atZone(ZoneId.systemDefault()).toInstant();
+        Instant endInstant = endDate.atZone(ZoneId.systemDefault()).toInstant();
+        BigDecimal requestExpense = expenseRequestRepository
+                .findByStatusAndBranch_Id(ExpenseRequestStatus.APPROVED, branchId)
+                .stream()
+                .filter(req -> req.getCreatedAt() != null
+                        && !req.getCreatedAt().isBefore(startInstant)
+                        && !req.getCreatedAt().isAfter(endInstant))
+                .map(ExpenseRequests::getAmount)
+                .filter(amount -> amount != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalExpense = invoiceExpense.add(requestExpense);
         BigDecimal netProfit = totalRevenue.subtract(totalExpense);
 
         // Query trip stats for branch
@@ -371,9 +405,9 @@ public class AnalyticsService {
     public List<RevenueTrendDTO> getBranchRevenueTrend(Integer branchId) {
         String sql = "SELECT " +
                 "DATE_FORMAT(invoiceDate, '%Y-%m') as month, " +
-                "SUM(CASE WHEN type = 'INCOME' THEN amount ELSE 0 END) as revenue, " +
+                "SUM(CASE WHEN type = 'INCOME' AND paymentStatus = 'PAID' THEN amount ELSE 0 END) as revenue, " +
                 "SUM(CASE WHEN type = 'EXPENSE' THEN amount ELSE 0 END) as expense, " +
-                "SUM(CASE WHEN type = 'INCOME' THEN amount ELSE 0 END) - " +
+                "SUM(CASE WHEN type = 'INCOME' AND paymentStatus = 'PAID' THEN amount ELSE 0 END) - " +
                 "SUM(CASE WHEN type = 'EXPENSE' THEN amount ELSE 0 END) as netProfit " +
                 "FROM invoices " +
                 "WHERE status = 'ACTIVE' AND branchId = ? AND invoiceDate >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) "
@@ -421,6 +455,39 @@ public class AnalyticsService {
                 "totalTrips", rs.getLong("totalTrips"),
                 "completedTrips", rs.getLong("completedTrips"),
                 "totalKm", rs.getBigDecimal("totalKm")), startDate, endDate, branchId, limit);
+    }
+
+    /**
+     * Get vehicle booking performance for branch (vehicles ordered by booking count)
+     */
+    public List<Map<String, Object>> getVehicleBookingPerformance(Integer branchId, Integer limit, String period) {
+        Map<String, LocalDateTime> dates = getPeriodDates(period);
+        LocalDateTime startDate = dates.get("start");
+        LocalDateTime endDate = dates.get("end");
+
+        String sql = "SELECT " +
+                "v.vehicleId, " +
+                "v.licensePlate as vehicleName, " +
+                "COUNT(DISTINCT bk.bookingId) as totalBookings, " +
+                "COUNT(DISTINCT CASE WHEN bk.status = 'CONFIRMED' THEN bk.bookingId END) as confirmedBookings, " +
+                "COUNT(DISTINCT CASE WHEN bk.status = 'COMPLETED' THEN bk.bookingId END) as completedBookings " +
+                "FROM vehicles v " +
+                "LEFT JOIN trip_vehicles tv ON v.vehicleId = tv.vehicleId " +
+                "LEFT JOIN trips t ON tv.tripId = t.tripId " +
+                "LEFT JOIN bookings bk ON t.bookingId = bk.bookingId " +
+                "AND bk.bookingDate BETWEEN ? AND ? " +
+                "WHERE v.branchId = ? AND v.status != 'INACTIVE' " +
+                "GROUP BY v.vehicleId, v.licensePlate " +
+                "HAVING totalBookings > 0 " +
+                "ORDER BY totalBookings DESC, confirmedBookings DESC " +
+                "LIMIT ?";
+
+        return jdbcTemplate.query(sql, (rs, rowNum) -> Map.of(
+                "vehicleId", rs.getInt("vehicleId"),
+                "vehicleName", rs.getString("vehicleName"),
+                "totalBookings", rs.getLong("totalBookings"),
+                "confirmedBookings", rs.getLong("confirmedBookings"),
+                "completedBookings", rs.getLong("completedBookings")), startDate, endDate, branchId, limit);
     }
 
     /**
@@ -628,7 +695,7 @@ public class AnalyticsService {
                     "t.endLocation, " +
                     "COUNT(DISTINCT t.tripId) as tripCount, " +
                     "COALESCE(SUM(t.distance), 0) as totalDistance, " +
-                    "COALESCE(SUM(CASE WHEN i.type = 'INCOME' THEN i.amount ELSE 0 END), 0) as totalRevenue "
+                    "COALESCE(SUM(CASE WHEN i.type = 'INCOME' AND i.paymentStatus = 'PAID' THEN i.amount ELSE 0 END), 0) as totalRevenue "
                     +
                     "FROM trips t " +
                     "INNER JOIN bookings bk ON t.bookingId = bk.bookingId " +
@@ -728,6 +795,66 @@ public class AnalyticsService {
         }
 
         return alerts;
+    }
+
+    /**
+     * Get top vehicle categories by usage (số lần được đặt)
+     */
+    public List<Map<String, Object>> getTopVehicleCategories(String period, Integer limit) {
+        Map<String, LocalDateTime> dates = getPeriodDates(period);
+        LocalDateTime startDate = dates.get("start");
+        LocalDateTime endDate = dates.get("end");
+
+        String sql = """
+                        SELECT 
+                            vcp.categoryId,
+                            vcp.categoryName,
+                            vcp.seats,
+                            COUNT(DISTINCT b.bookingId) as bookingCount,
+                            (SELECT COALESCE(SUM(bvd2.quantity), 0) 
+                             FROM booking_vehicle_details bvd2 
+                             INNER JOIN bookings b2 ON bvd2.bookingId = b2.bookingId
+                             WHERE bvd2.vehicleCategoryId = vcp.categoryId
+                               AND b2.bookingDate BETWEEN ? AND ?
+                               AND b2.status NOT IN ('CANCELLED', 'DRAFT')
+                            ) as totalVehiclesBooked,
+                            (SELECT COALESCE(SUM(CASE WHEN t2.status = 'COMPLETED' THEN t2.distance ELSE 0 END), 0)
+                             FROM trips t2
+                             INNER JOIN bookings b3 ON t2.bookingId = b3.bookingId
+                             INNER JOIN booking_vehicle_details bvd3 ON b3.bookingId = bvd3.bookingId
+                             WHERE bvd3.vehicleCategoryId = vcp.categoryId
+                               AND b3.bookingDate BETWEEN ? AND ?
+                               AND b3.status NOT IN ('CANCELLED', 'DRAFT')
+                            ) as totalKm,
+                            (SELECT COUNT(DISTINCT t3.tripId)
+                             FROM trips t3
+                             INNER JOIN bookings b4 ON t3.bookingId = b4.bookingId
+                             INNER JOIN booking_vehicle_details bvd4 ON b4.bookingId = bvd4.bookingId
+                             WHERE bvd4.vehicleCategoryId = vcp.categoryId
+                               AND b4.bookingDate BETWEEN ? AND ?
+                               AND b4.status NOT IN ('CANCELLED', 'DRAFT')
+                            ) as tripCount
+                        FROM vehicle_category_pricing vcp
+                        INNER JOIN booking_vehicle_details bvd ON vcp.categoryId = bvd.vehicleCategoryId
+                        INNER JOIN bookings b ON bvd.bookingId = b.bookingId 
+                            AND b.bookingDate BETWEEN ? AND ?
+                            AND b.status NOT IN ('CANCELLED', 'DRAFT')
+                        WHERE vcp.status = 'ACTIVE'
+                        GROUP BY vcp.categoryId, vcp.categoryName, vcp.seats
+                        HAVING bookingCount > 0
+                        ORDER BY bookingCount DESC, totalVehiclesBooked DESC
+                        LIMIT ?
+                        """;
+
+        return jdbcTemplate.query(sql, (rs, rowNum) -> Map.of(
+                "categoryId", rs.getInt("categoryId"),
+                "categoryName", rs.getString("categoryName"),
+                "seats", rs.getInt("seats"),
+                "bookingCount", rs.getLong("bookingCount"),
+                "totalVehiclesBooked", rs.getLong("totalVehiclesBooked"),
+                "totalKm", rs.getBigDecimal("totalKm"),
+                "tripCount", rs.getLong("tripCount")
+        ), startDate, endDate, startDate, endDate, startDate, endDate, startDate, endDate, limit != null ? limit : 5);
     }
 
     /**
