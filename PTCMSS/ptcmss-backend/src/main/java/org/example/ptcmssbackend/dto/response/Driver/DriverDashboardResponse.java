@@ -21,6 +21,13 @@ public class DriverDashboardResponse {
     private String customerName;
     private String customerPhone;
     private BigDecimal distance; // km
+    private String driverName; // Tên tài xế
+    private String driverPhone; // SĐT tài xế
+    private String vehiclePlate; // Biển số xe
+    private String vehicleModel; // Model xe
+    private BigDecimal totalCost; // Tổng giá trị đơn hàng
+    private BigDecimal paidAmount; // Đã thanh toán
+    private BigDecimal remainingAmount; // Còn lại
 
 }
 
