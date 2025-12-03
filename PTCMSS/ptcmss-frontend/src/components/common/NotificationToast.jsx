@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from 'lucide-react';
 import { useNotifications } from '../../hooks/useNotifications';
+import { getCurrentRole, ROLES } from '../../utils/session';
 
 /**
  * Toast notification component that displays WebSocket notifications
@@ -9,15 +10,80 @@ import { useNotifications } from '../../hooks/useNotifications';
 export default function NotificationToast() {
     const { notifications, clearNotification } = useNotifications();
     const [visibleNotifications, setVisibleNotifications] = useState([]);
+    const role = getCurrentRole();
+    const isDriver = role === ROLES.DRIVER;
+    const isConsultant = role === ROLES.CONSULTANT;
 
     useEffect(() => {
         // Only show unread notifications that should show toast (not from DB load)
         // showToast === false means loaded from DB (should only appear in bell, not as popup)
-        const unread = notifications
-            .filter(n => !n.read && n.showToast !== false)
-            .slice(0, 3); // Max 3 toasts
-        setVisibleNotifications(unread);
-    }, [notifications]);
+        let unread = notifications
+            .filter(n => !n.read && n.showToast !== false);
+
+        // For Driver role, filter to only show driver-relevant notifications
+        if (isDriver) {
+            const driverNotificationTypes = [
+                'TRIP_ASSIGNED', 'TRIP_ASSIGNMENT', 'ASSIGN_TRIP', // Chuyến mới được nhận
+                'EXPENSE_APPROVED', 'EXPENSE_REJECTED', 'EXPENSE_REQUEST_APPROVED', 'EXPENSE_REQUEST_REJECTED', // Duyệt chi phí
+                'PAYMENT_APPROVED', 'PAYMENT_REJECTED', 'PAYMENT_REQUEST_APPROVED', 'PAYMENT_REQUEST_REJECTED', // Duyệt thanh toán
+                'LEAVE_APPROVED', 'LEAVE_REJECTED', 'LEAVE_APPROVAL', 'DRIVER_DAY_OFF_APPROVED', 'DRIVER_DAY_OFF_REJECTED', // Duyệt nghỉ phép
+            ];
+
+            unread = unread.filter(n => {
+                // Nếu có type, kiểm tra type
+                if (n.type) {
+                    return driverNotificationTypes.some(t => n.type.includes(t) || t.includes(n.type));
+                }
+                // Nếu không có type nhưng có message, kiểm tra message
+                if (n.message) {
+                    const msg = n.message.toLowerCase();
+                    return msg.includes('chuyến') ||
+                        msg.includes('chi phí') ||
+                        msg.includes('thanh toán') ||
+                        msg.includes('nghỉ phép') ||
+                        msg.includes('duyệt') ||
+                        msg.includes('trip') ||
+                        msg.includes('expense') ||
+                        msg.includes('payment') ||
+                        msg.includes('leave');
+                }
+                // Nếu không có type và message không rõ, chỉ hiển thị nếu từ user-specific channel
+                return true; // Hiển thị tất cả từ /topic/notifications/{userId}
+            });
+        }
+
+        // For Consultant role, filter to show payment approval/rejection notifications
+        if (isConsultant) {
+            const paymentNotificationTypes = [
+                'PAYMENT_APPROVED', 'PAYMENT_REJECTED',
+                'PAYMENT_REQUEST_APPROVED', 'PAYMENT_REQUEST_REJECTED',
+                'PAYMENT_UPDATE'
+            ];
+
+            unread = unread.filter(n => {
+                // Nếu có type, kiểm tra type
+                if (n.type) {
+                    return paymentNotificationTypes.some(t =>
+                        n.type.includes(t) || t.includes(n.type) ||
+                        n.type === 'PAYMENT_UPDATE'
+                    );
+                }
+                // Nếu không có type nhưng có message, kiểm tra message
+                if (n.message) {
+                    const msg = n.message.toLowerCase();
+                    return msg.includes('thanh toán') ||
+                        msg.includes('payment') ||
+                        msg.includes('duyệt') ||
+                        msg.includes('approve') ||
+                        msg.includes('reject');
+                }
+                // Nếu từ user-specific channel và có liên quan đến payment
+                return n.data?.paymentId || n.data?.requestId;
+            });
+        }
+
+        setVisibleNotifications(unread.slice(0, 3)); // Max 3 toasts
+    }, [notifications, isDriver, isConsultant]);
 
     const handleDismiss = (notificationId) => {
         clearNotification(notificationId);
@@ -129,7 +195,7 @@ function ToastItem({ notification, onDismiss }) {
                 <button
                     onClick={handleManualDismiss}
                     className="shrink-0 rounded-md p-1 hover:bg-slate-200/50 transition-colors"
-                    aria-label="Dismiss notification"
+                    aria-label="Đóng thông báo"
                 >
                     <X className="h-4 w-4 text-slate-600" />
                 </button>

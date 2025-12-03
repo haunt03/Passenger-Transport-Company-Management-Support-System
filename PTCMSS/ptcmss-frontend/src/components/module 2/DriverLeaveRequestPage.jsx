@@ -1,7 +1,7 @@
 import { getCookie } from '../../utils/cookies';
 // src/components/driver/DriverLeaveRequestPage.jsx
 import React from "react";
-import { getDriverProfileByUser, requestDayOff } from "../../api/drivers";
+import { getDriverProfileByUser, requestDayOff, getDayOffHistory } from "../../api/drivers";
 import {
     Calendar,
     Send,
@@ -66,9 +66,6 @@ function diffDaysInclusive(startISO, endISO) {
 }
 
 export default function DriverLeaveRequestPage() {
-    // giả lập quota còn lại trong tháng
-    const remainingDays = 2;
-
     const { toasts, push } = useToasts();
 
     const [startDate, setStartDate] = React.useState("");
@@ -76,7 +73,79 @@ export default function DriverLeaveRequestPage() {
     const [reason, setReason] = React.useState("");
     const [submitting, setSubmitting] = React.useState(false);
     const [errorMsg, setErrorMsg] = React.useState("");
+    const [daysOffAllowed, setDaysOffAllowed] = React.useState(2);
+    const [daysOffUsed, setDaysOffUsed] = React.useState(0);
+    const [loading, setLoading] = React.useState(true);
 
+    // Load driver's day off statistics
+    React.useEffect(() => {
+        async function loadDayOffStats() {
+            try {
+                const uid = getCookie("userId");
+                if (!uid) return;
+
+                const profile = await getDriverProfileByUser(uid);
+                const dayOffList = await getDayOffHistory(profile.driverId);
+
+                const now = new Date();
+                const currentMonth = now.getMonth();
+                const currentYear = now.getFullYear();
+
+                // Filter approved day-offs in current month
+                const approvedDayOffs = Array.isArray(dayOffList)
+                    ? dayOffList.filter((dayOff) => {
+                        if (dayOff.status !== "APPROVED") return false;
+
+                        const leaveDate = dayOff.date || dayOff.leaveDate || dayOff.startDate;
+                        if (!leaveDate) return false;
+
+                        const date = new Date(leaveDate);
+                        if (isNaN(date.getTime())) return false;
+
+                        return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+                    })
+                    : [];
+
+                // Count days
+                let used = 0;
+                approvedDayOffs.forEach((dayOff) => {
+                    const startDate = new Date(dayOff.startDate || dayOff.date || dayOff.leaveDate);
+                    const endDate = dayOff.endDate ? new Date(dayOff.endDate) : startDate;
+
+                    if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+                        const monthStart = new Date(currentYear, currentMonth, 1);
+                        const monthEnd = new Date(currentYear, currentMonth + 1, 0);
+
+                        startDate.setHours(0, 0, 0, 0);
+                        endDate.setHours(0, 0, 0, 0);
+                        monthStart.setHours(0, 0, 0, 0);
+                        monthEnd.setHours(23, 59, 59, 999);
+
+                        const start = new Date(Math.max(startDate.getTime(), monthStart.getTime()));
+                        const end = new Date(Math.min(endDate.getTime(), monthEnd.getTime()));
+
+                        if (end >= start) {
+                            const diffDays = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                            used += diffDays;
+                        }
+                    } else {
+                        used += 1;
+                    }
+                });
+
+                setDaysOffUsed(used);
+                setDaysOffAllowed(profile.daysOffAllowed || 2);
+            } catch (err) {
+                console.error("Failed to load day off stats:", err);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        loadDayOffStats();
+    }, []);
+
+    const remainingDays = daysOffAllowed - daysOffUsed;
     const requestedDays = diffDaysInclusive(startDate, endDate);
 
     const validDateOrder =
@@ -159,11 +228,17 @@ export default function DriverLeaveRequestPage() {
                             <span>Ngày nghỉ còn lại trong tháng</span>
                         </div>
                         <div className="text-slate-900 font-semibold text-lg leading-none flex items-center gap-2">
-                            {remainingDays}{" "}
-                            <span className="text-[11px] font-medium text-slate-500">ngày</span>
+                            {loading ? (
+                                <span className="text-slate-400">...</span>
+                            ) : (
+                                <>
+                                    {remainingDays}{" "}
+                                    <span className="text-[11px] font-medium text-slate-500">ngày</span>
+                                </>
+                            )}
                         </div>
                         <div className="text-[11px] text-slate-500 mt-2 leading-normal">
-                            Tính theo chính sách HR / MAX_DRIVER_LEAVE_DAYS.
+                            {loading ? "Đang tải..." : `Đã dùng ${daysOffUsed}/${daysOffAllowed} ngày trong tháng này`}
                         </div>
                     </div>
                 </div>
@@ -316,7 +391,7 @@ export default function DriverLeaveRequestPage() {
                         className={cls(
                             "rounded-lg px-4 py-2 text-sm font-medium inline-flex items-center gap-2 shadow-sm",
                             canSubmit
-                                ? "bg-[#EDC531] hover:bg-amber-500 text-white"
+                                ? "bg-sky-600 hover:bg-sky-500 text-white"
                                 : "bg-slate-200 text-slate-500 cursor-not-allowed"
                         )}
                     >

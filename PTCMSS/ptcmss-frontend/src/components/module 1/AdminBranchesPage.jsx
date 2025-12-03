@@ -13,7 +13,6 @@ import {
   ChevronRight,
   MapPin,
   Users,
-  Phone,
   UserCog,
 } from "lucide-react";
 import AnimatedDialog from "../common/AnimatedDialog";
@@ -314,7 +313,6 @@ export default function AdminBranchesPage() {
           id: b.id,
           name: b.branchName || b.name,
           address: b.location || "",
-          phone: b.phone || "",
           managerName: managerName,
           employeeCount: b.employeeCount || 0,
           status: b.status || "ACTIVE",
@@ -336,7 +334,7 @@ export default function AdminBranchesPage() {
   const handleCreateBranch = async ({ name, address, managerId }) => {
     try {
       await createBranch({
-        branchName: name,
+        branchName: `Chi nhánh ${name}`,
         location: address,
         managerId,
       });
@@ -444,9 +442,6 @@ export default function AdminBranchesPage() {
                     Địa chỉ
                   </th>
                   <th className="text-left font-semibold px-6 py-3.5 text-xs text-slate-700 uppercase tracking-wider">
-                    Số điện thoại
-                  </th>
-                  <th className="text-left font-semibold px-6 py-3.5 text-xs text-slate-700 uppercase tracking-wider">
                     Quản lý
                   </th>
                   <th className="text-left font-semibold px-6 py-3.5 text-xs text-slate-700 uppercase tracking-wider">
@@ -465,7 +460,7 @@ export default function AdminBranchesPage() {
                 {current.length === 0 ? (
                     <tr>
                       <td
-                          colSpan={7}
+                          colSpan={6}
                           className="px-6 py-12 text-center"
                       >
                         <div className="flex flex-col items-center gap-3">
@@ -487,12 +482,6 @@ export default function AdminBranchesPage() {
                             <div className="flex items-start gap-2 text-slate-700">
                               <MapPin className="h-4 w-4 text-slate-400 mt-0.5 flex-shrink-0" />
                               <span className="text-sm">{b.address || "—"}</span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-2 text-slate-700">
-                              <Phone className="h-4 w-4 text-slate-400" />
-                              <span className="text-sm font-mono">{b.phone || "—"}</span>
                             </div>
                           </td>
                           <td className="px-6 py-4">

@@ -1,11 +1,8 @@
 import React from "react";
 import {
     CalendarDays,
-    ZoomIn,
-    ZoomOut,
     Search,
     UserRound,
-    Car as CarIcon,
     Clock,
     MoveRight,
     Download,
@@ -14,6 +11,11 @@ import {
     Loader2,
     AlertCircle,
     RefreshCw,
+    ClipboardList,
+    CheckCircle2,
+    XCircle,
+    PlayCircle,
+    TrendingUp,
 } from "lucide-react";
 import { getDispatchDashboard, assignTrips } from "../../api/dispatch";
 import { listBranches, getBranchByUserId } from "../../api/branches";
@@ -23,69 +25,33 @@ import { listVehiclesByBranch } from "../../api/vehicles";
 import AnimatedDialog from "../common/AnimatedDialog";
 
 /**
- * CoordinatorTimelinePro – Queue + Gantt (LIGHT THEME, styled giống AdminBranchListPage)
+ * CoordinatorTimelinePro – Bảng điều phối (LIGHT THEME, styled giống AdminBranchListPage)
  *
- * Khung 1 (Queue):
- *   - Hiển thị các đơn PENDING, ưu tiên gần giờ pickup
+ * Khung 1 (Bên trái):
+ *   - Hiển thị các chuyến chưa được gắn lịch (PENDING)
  *   - Tìm kiếm
- *   - Nút "Gán chuyến"
+ *   - Click vào chuyến để hiện popup gắn lịch kèm gợi ý
  *
- * Khung 2 (Gantt):
- *   - Dải thời gian 06:00–24:00 (tick mỗi 30')
- *   - Line "Now"
- *   - Zoom ngang (0.5x → 2.5x)
- *   - %Utilization/ca
- *   - Cảnh báo Overlap / thiếu nghỉ
+ * Khung 2 (Bên phải):
+ *   - Danh sách sự cố chuyến đi (nếu có)
+ *   - Click vào để xem chi tiết sự cố
  *
  * API dự kiến:
  *   GET  /api/v1/coordinator/dashboard?date=YYYY-MM-DD
  *   POST /api/v1/dispatch/assign { orderId, driverId, vehicleId }
  */
 
-// ===== CẤU HÌNH THỜI GIAN =====
-const DAY_START = 6; // 06:00
-const DAY_END = 24; // 24:00
-const HOUR_WIDTH = 90; // px / giờ ở zoom=1
-const TICK_MINUTES = 30; // vạch lưới mỗi 30 phút
-
-// ===== MÀU / THEME =====
-const COLORS = {
-    GRID: "border-slate-200",
-    FREE_BG: "bg-white",
-    SHIFT: "bg-cyan-200/50",
-    BUSY: "bg-rose-500",
-    MAINT: "bg-amber-400",
-    OVERLAP: "ring-2 ring-fuchsia-500",
-    REST: "ring-2 ring-amber-400",
-};
-
 // ===== Helpers thời gian =====
-const toDate = (v) => (v instanceof Date ? v : new Date(v));
 const pad2 = (n) => String(n).padStart(2, "0");
-const startOfDay = (dateStr) => new Date(`${dateStr}T${pad2(DAY_START)}:00:00`);
-const msBetween = (a, b) => toDate(b) - toDate(a);
-const minutesBetween = (a, b) => msBetween(a, b) / 60000;
-const hoursBetween = (a, b) => msBetween(a, b) / 36e5; // ms -> hours
-const xFrom = (dateStr, when, zoom) =>
-    Math.max(0, hoursBetween(startOfDay(dateStr), when) * HOUR_WIDTH * zoom);
-const wFrom = (start, end, zoom) =>
-    Math.max(0, hoursBetween(start, end) * HOUR_WIDTH * zoom);
 
 const fmtHM = (d) => {
-    const t = toDate(d);
+    const t = d instanceof Date ? d : new Date(d);
     const hh = pad2(t.getHours());
     const mm = pad2(t.getMinutes());
     return `${hh}:${mm}`;
 };
 
-const isSameDay = (dateStr, d = new Date()) => {
-    const x = new Date(dateStr);
-    return (
-        x.getFullYear() === d.getFullYear() &&
-        x.getMonth() === d.getMonth() &&
-        x.getDate() === d.getDate()
-    );
-};
+
 
 const fmtRel = (iso) => {
     const now = new Date();
@@ -265,46 +231,7 @@ const extractBranchItems = (payload) => {
     return [];
 };
 
-const normalizeScheduleWindow = (win) => {
-    if (!win || !win.start || !win.end) return null;
-    return { start: win.start, end: win.end };
-};
 
-const normalizeScheduleItems = (items = []) =>
-    items
-        .filter((it) => it && it.start && it.end)
-        .map((it) => ({
-            start: it.start,
-            end: it.end,
-            type: (it.type || "BUSY").toUpperCase(),
-            ref: it.ref || it.reference || "",
-            note: it.note || it.message || "",
-        }))
-        .sort((a, b) => new Date(a.start) - new Date(b.start));
-
-const normalizeDriverSchedules = (rows = []) =>
-    rows
-        .filter(Boolean)
-        .map((d, idx) => ({
-            id: d.driverId ?? d.id ?? `driver-${idx}`,
-            name: d.driverName || d.name || `Tai xe #${d.driverId ?? idx + 1}`,
-            phone: d.driverPhone || d.phone || "",
-            shift: normalizeScheduleWindow(d.shift),
-            items: normalizeScheduleItems(d.items || []),
-            raw: d,
-        }));
-
-const normalizeVehicleSchedules = (rows = []) =>
-    rows
-        .filter(Boolean)
-        .map((v, idx) => ({
-            id: v.vehicleId ?? v.id ?? `vehicle-${idx}`,
-            plate: v.licensePlate || v.plate || v.license_plate || `VEH-${idx + 1}`,
-            model: v.model || "",
-            shift: normalizeScheduleWindow(v.shift),
-            items: normalizeScheduleItems(v.items || []),
-            raw: v,
-        }));
 
 const normalizePendingTrips = (rows = []) =>
     rows
@@ -363,57 +290,10 @@ const mapVehicleOptions = (payload) =>
         status: v.status || "",
     }));
 
-// ===== Phát hiện xung đột & vi phạm nghỉ =====
-function computeOverlapFlags(items) {
-    const arr = [...items].sort(
-        (a, b) => new Date(a.start) - new Date(b.start)
-    );
-    const flags = new Map();
-    for (let i = 0; i < arr.length - 1; i++) {
-        const cur = arr[i],
-            next = arr[i + 1];
-        if (new Date(next.start) < new Date(cur.end)) {
-            flags.set(cur, true);
-            flags.set(next, true);
-        }
-    }
-    return items.map((it) => !!flags.get(it));
-}
 
-function computeRestFlags(items, minGapMin = 30) {
-    const arr = [...items].sort(
-        (a, b) => new Date(a.start) - new Date(b.start)
-    );
-    const flags = new Map();
-    for (let i = 0; i < arr.length - 1; i++) {
-        const a = arr[i],
-            b = arr[i + 1];
-        const gap = minutesBetween(a.end, b.start);
-        if (gap < minGapMin) {
-            flags.set(a, true);
-            flags.set(b, true);
-        }
-    }
-    return items.map((it) => !!flags.get(it));
-}
 
-// ===== % utilization trong ca =====
-function utilizationPercent(shift, items, countTypes = ["BUSY"]) {
-    if (!shift) return 0;
-    const totalMs = Math.max(0, msBetween(shift.start, shift.end));
-    if (!totalMs) return 0;
-    const busyMs = items
-        .filter((it) => countTypes.includes(it.type))
-        .reduce(
-            (sum, it) =>
-                sum + Math.max(0, msBetween(it.start, it.end)),
-            0
-        );
-    return Math.round((busyMs / totalMs) * 100);
-}
-
-// ===== Queue Panel (Khung 1) =====
-function QueuePanel({ orders, onAssign, query, onQuery, loading }) {
+// ===== Panel chuyến chưa gắn lịch (Bên trái) =====
+function UnassignedTripsPanel({ orders, onAssign, query, onQuery, loading }) {
     const sorted = [...orders].sort(
         (a, b) => new Date(a.pickupTime) - new Date(b.pickupTime)
     );
@@ -422,7 +302,8 @@ function QueuePanel({ orders, onAssign, query, onQuery, loading }) {
     const filtered = sorted.filter(
         (o) =>
             (o.code || "").toLowerCase().includes(q) ||
-            (o.route || "").toLowerCase().includes(q)
+            (o.route || "").toLowerCase().includes(q) ||
+            (o.customerName || "").toLowerCase().includes(q)
     );
 
     const urgencyCls = (iso) => {
@@ -445,10 +326,10 @@ function QueuePanel({ orders, onAssign, query, onQuery, loading }) {
             <div className="sticky top-0 z-10 bg-white/95 backdrop-blur px-4 py-3 border-b border-slate-200 flex items-center gap-2">
                 <ListChecks className="h-5 w-5 text-emerald-600" />
                 <div className="font-semibold text-slate-900 text-sm">
-                    Khung 1 – Queue (PENDING)
+                    Chuyến chưa được gắn lịch
                 </div>
                 <div className="text-[12px] text-slate-500">
-                    {loading ? "Đang tải..." : `${filtered.length} đơn`}
+                    {loading ? "Đang tải..." : `${filtered.length} chuyến`}
                 </div>
             </div>
 
@@ -459,27 +340,29 @@ function QueuePanel({ orders, onAssign, query, onQuery, loading }) {
                     <input
                         value={query}
                         onChange={(e) => onQuery?.(e.target.value)}
-                        placeholder="Tìm theo mã / route..."
+                        placeholder="Tìm theo mã / tuyến đường / khách hàng..."
                         className="bg-transparent outline-none text-[13px] text-slate-900 placeholder:text-slate-400 w-full"
                     />
                 </div>
             </div>
 
             {/* list */}
-            <div className="max-h-[66vh] overflow-y-auto p-2 space-y-2">
+            <div className="max-h-[calc(100vh-280px)] overflow-y-auto p-2 space-y-2">
                 {loading ? (
-                    <div className="text-[13px] text-slate-500 px-3 py-6">
-                        Đang tải queue...
+                    <div className="text-[13px] text-slate-500 px-3 py-6 flex items-center justify-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Đang tải danh sách chuyến...
                     </div>
                 ) : (
                     <>
                         {filtered.map((o) => (
-                            <div
+                            <button
                                 key={o.id}
-                                className="rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 transition p-3 flex items-center gap-3"
+                                onClick={() => onAssign?.(o)}
+                                className="w-full rounded-xl border border-slate-200 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 transition p-3 flex items-center gap-3 text-left cursor-pointer"
                             >
                                 <div className="flex flex-col min-w-0 grow">
-                                    <div className="flex items-center gap-2 min-w-0">
+                                    <div className="flex items-center gap-2 min-w-0 mb-1">
                                         <span className="text-[13px] font-semibold text-slate-900 truncate">
                                             {o.code}
                                         </span>
@@ -491,23 +374,32 @@ function QueuePanel({ orders, onAssign, query, onQuery, loading }) {
                                             {fmtRel(o.pickupTime)}
                                         </span>
                                     </div>
-                                    <div className="text-[12px] text-slate-500">
-                                        {fmtHM(o.pickupTime)} · {o.route || "—"}
+                                    <div className="text-[12px] text-slate-600 mb-0.5">
+                                        <Clock className="h-3 w-3 inline mr-1" />
+                                        {fmtHM(o.pickupTime)}
                                     </div>
+                                    <div className="text-[12px] text-slate-600 mb-0.5">
+                                        <MoveRight className="h-3 w-3 inline mr-1" />
+                                        {o.route || "—"}
+                                    </div>
+                                    {o.customerName && (
+                                        <div className="text-[11px] text-slate-500">
+                                            <UserRound className="h-3 w-3 inline mr-1" />
+                                            {o.customerName}
+                                        </div>
+                                    )}
                                 </div>
 
-                                <button
-                                    onClick={() => onAssign?.(o)}
-                                    className="shrink-0 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 text-[13px] font-medium shadow-sm"
-                                >
-                                    Gán chuyến
-                                </button>
-                            </div>
+                                <div className="shrink-0 text-emerald-600">
+                                    <MoveRight className="h-5 w-5" />
+                                </div>
+                            </button>
                         ))}
 
                         {filtered.length === 0 && (
-                            <div className="text-[13px] text-slate-500 px-3 py-6">
-                                Không có đơn PENDING.
+                            <div className="text-[13px] text-slate-500 px-3 py-12 text-center">
+                                <CheckCircle2 className="h-12 w-12 mx-auto mb-2 text-slate-300" />
+                                <div>Không có chuyến chưa gắn lịch</div>
                             </div>
                         )}
                     </>
@@ -517,259 +409,255 @@ function QueuePanel({ orders, onAssign, query, onQuery, loading }) {
     );
 }
 
-// ===== Legend (pastel giống badge trong AdminBranchListPage) =====
-function Legend() {
-    const Item = ({ boxClass, label }) => (
-        <div className="flex items-center gap-2 text-[12px] text-slate-700">
-            <span className={`h-3 w-3 rounded border inline-block ${boxClass}`} />
-            <span className="text-slate-700">{label}</span>
-        </div>
+// ===== Panel sự cố chuyến đi (Bên phải) =====
+function IncidentsPanel({ incidents = [], onViewDetail, loading }) {
+    const [query, setQuery] = React.useState("");
+
+    const q = query.toLowerCase();
+    const filtered = incidents.filter(
+        (inc) =>
+            (inc.tripCode || "").toLowerCase().includes(q) ||
+            (inc.description || "").toLowerCase().includes(q) ||
+            (inc.driverName || "").toLowerCase().includes(q)
     );
+
+    const severityCls = (severity) => {
+        switch (severity?.toUpperCase()) {
+            case "HIGH":
+            case "CRITICAL":
+                return "bg-rose-50 text-rose-700 border-rose-300";
+            case "MEDIUM":
+                return "bg-amber-50 text-amber-700 border-amber-300";
+            case "LOW":
+                return "bg-sky-50 text-sky-700 border-sky-300";
+            default:
+                return "bg-slate-50 text-slate-700 border-slate-300";
+        }
+    };
+
+    const severityIcon = (severity) => {
+        switch (severity?.toUpperCase()) {
+            case "HIGH":
+            case "CRITICAL":
+                return <XCircle className="h-4 w-4 text-rose-600" />;
+            case "MEDIUM":
+                return <AlertCircle className="h-4 w-4 text-amber-600" />;
+            default:
+                return <AlertCircle className="h-4 w-4 text-sky-600" />;
+        }
+    };
 
     return (
-        <div className="flex flex-wrap gap-4">
-            <Item
-                boxClass="bg-emerald-50 border-emerald-300"
-                label="Rảnh (nền)"
-            />
-            <Item
-                boxClass="bg-rose-50 border-rose-300"
-                label="Bận (chuyến)"
-            />
-            <Item
-                boxClass="bg-amber-50 border-amber-300"
-                label="Bảo trì"
-            />
-            <Item
-                boxClass="bg-cyan-200 border-cyan-300"
-                label="Ca làm"
-            />
-            <div className="flex items-center gap-2 text-[12px] text-slate-700">
-                <span className="h-3 w-3 rounded bg-white ring-2 ring-fuchsia-500 inline-block" />
-                <span className="text-slate-700">Xung đột (Overlap)</span>
-            </div>
-            <div className="flex items-center gap-2 text-[12px] text-slate-700">
-                <span className="h-3 w-3 rounded bg-white ring-2 ring-amber-400 inline-block" />
-                <span className="text-slate-700">Thiếu nghỉ giữa chuyến</span>
-            </div>
-        </div>
-    );
-}
-
-// ===== TimeHeader =====
-function TimeHeader({ zoom }) {
-    const totalMinutes = (DAY_END - DAY_START) * 60;
-    const ticks = Array.from(
-        { length: totalMinutes / TICK_MINUTES + 1 },
-        (_, i) => i * TICK_MINUTES
-    );
-    const width = (DAY_END - DAY_START) * HOUR_WIDTH * zoom;
-
-    return (
-        <div className="relative border-b border-slate-200 bg-slate-50">
-            <div className="sticky left-0 w-80 shrink-0 px-4 py-2 text-[11px] text-slate-500 tracking-wide flex items-center gap-2 bg-slate-50">
-                <Clock className="h-4 w-4 text-slate-400" />
-                <span className="uppercase font-medium">THỜI GIAN</span>
-                <span className="text-slate-400">(mỗi {TICK_MINUTES}')</span>
-            </div>
-
-            <div className="overflow-hidden">
-                <div className="relative" style={{ width }}>
-                    {ticks.map((m, idx) => {
-                        const left = (m / 60) * HOUR_WIDTH * zoom;
-                        const isHour = m % 60 === 0;
-                        return (
-                            <div
-                                key={idx}
-                                className={`absolute top-0 bottom-0 ${COLORS.GRID} ${isHour ? "border-l" : ""
-                                }`}
-                                style={{ left }}
-                            >
-                                {isHour && (
-                                    <div className="text-[10px] text-slate-500 px-2 py-1 font-mono">
-                                        {pad2(DAY_START + m / 60)}:00
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
+        <div className="h-full rounded-2xl border border-slate-200 overflow-hidden bg-white shadow-sm">
+            {/* header */}
+            <div className="sticky top-0 z-10 bg-white/95 backdrop-blur px-4 py-3 border-b border-slate-200 flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-rose-600" />
+                <div className="font-semibold text-slate-900 text-sm">
+                    Sự cố chuyến đi
+                </div>
+                <div className="text-[12px] text-slate-500">
+                    {loading ? "Đang tải..." : `${filtered.length} sự cố`}
                 </div>
             </div>
-        </div>
-    );
-}
 
-function Tooltip({ children, text }) {
-    return (
-        <div className="group relative">
-            {children}
-            <div className="pointer-events-none absolute -top-10 left-1/2 -translate-x-1/2 whitespace-pre rounded-md bg-slate-800 px-2 py-1 text-[11px] leading-4 text-white opacity-0 shadow-md transition group-hover:opacity-100">
-                {text}
-            </div>
-        </div>
-    );
-}
-
-function UtilBadge({ percent }) {
-    return (
-        <div className="ml-auto flex items-center gap-2 text-[11px] text-slate-500">
-            <div className="w-20 h-2 bg-slate-200 rounded overflow-hidden">
-                <div
-                    className="h-full bg-emerald-500"
-                    style={{
-                        width: `${Math.min(100, Math.max(0, percent))}%`,
-                    }}
-                />
-            </div>
-            <span className="tabular-nums font-medium text-slate-600">
-                {String(percent).padStart(2, " ")}%
-            </span>
-        </div>
-    );
-}
-
-function Row({
-                 kind,
-                 label,
-                 date,
-                 items = [],
-                 shift,
-                 zoom,
-                 onOpen,
-                 showLabels,
-                 showBusy,
-                 showMaint,
-                 minRest = 30,
-             }) {
-    const width = (DAY_END - DAY_START) * HOUR_WIDTH * zoom;
-
-    const overlap = computeOverlapFlags(items);
-    const rest = computeRestFlags(items, minRest);
-    const util = utilizationPercent(shift, items, ["BUSY"]);
-
-    const filteredItems = items.filter(
-        (it) =>
-            (it.type === "BUSY" && showBusy) ||
-            (it.type === "MAINT" && showMaint)
-    );
-
-    return (
-        <div className={`flex ${COLORS.GRID} border-b`}>
-            {/* left sticky label */}
-            <div className="sticky left-0 z-10 w-80 shrink-0 bg-white/95 backdrop-blur px-4 py-2 text-[13px] text-slate-900 flex items-center gap-2 border-r border-slate-200">
-                {kind === "driver" ? (
-                    <UserRound className="h-4 w-4 text-emerald-600" />
-                ) : (
-                    <CarIcon className="h-4 w-4 text-sky-600" />
-                )}
-                <span className="truncate font-medium" title={label}>
-                    {label}
-                </span>
-
-                <UtilBadge percent={util} />
-            </div>
-
-            {/* timeline cells */}
-            <div
-                className={`relative ${COLORS.FREE_BG}`}
-                style={{ width }}
-            >
-                {/* Lưới 30' */}
-                {Array.from(
-                    {
-                        length:
-                            ((DAY_END - DAY_START) * 60) / TICK_MINUTES + 1,
-                    },
-                    (_, i) => (
-                        <div
-                            key={i}
-                            className={`absolute top-0 bottom-0 ${COLORS.GRID} ${i % 2 === 0 ? "border-l" : ""
-                            }`}
-                            style={{
-                                left:
-                                    (i * TICK_MINUTES) / 60 *
-                                    HOUR_WIDTH *
-                                    zoom,
-                            }}
-                        />
-                    )
-                )}
-
-                {/* SHIFT block */}
-                {shift && (
-                    <div
-                        title={`Ca làm ${fmtHM(shift.start)} → ${fmtHM(
-                            shift.end
-                        )}`}
-                        className={`absolute top-2 h-9 rounded-md ${COLORS.SHIFT}`}
-                        style={{
-                            left: xFrom(date, shift.start, zoom),
-                            width: wFrom(shift.start, shift.end, zoom),
-                        }}
+            {/* search box */}
+            <div className="px-3 py-2 flex items-center gap-2 border-b border-slate-200">
+                <div className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 grow">
+                    <Search className="h-4 w-4 text-slate-400" />
+                    <input
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Tìm theo mã chuyến / mô tả..."
+                        className="bg-transparent outline-none text-[13px] text-slate-900 placeholder:text-slate-400 w-full"
                     />
-                )}
+                </div>
+            </div>
 
-                {/* ITEMS (busy / maint / ...) */}
-                {filteredItems.map((it, i) => {
-                    const idx = items.indexOf(it);
-
-                    const x = xFrom(date, it.start, zoom);
-                    const w = wFrom(it.start, it.end, zoom);
-                    const baseColor =
-                        it.type === "BUSY" ? COLORS.BUSY : COLORS.MAINT;
-
-                    // tooltip text
-                    let tt = it.type === "BUSY" ? "Chuyến" : "Bảo trì";
-                    tt += `\n${fmtHM(it.start)} → ${fmtHM(it.end)} (${Math.round(
-                        minutesBetween(it.start, it.end)
-                    )}p)`;
-                    if (it.ref) tt += `\nRef: ${it.ref}`;
-                    if (it.note) tt += `\n${it.note}`;
-
-                    const rings = [
-                        overlap[idx] ? COLORS.OVERLAP : "",
-                        rest[idx] ? COLORS.REST : "",
-                    ].join(" ");
-
-                    const textColor =
-                        it.type === "BUSY" ? "text-white" : "text-slate-900";
-
-                    return (
-                        <div
-                            key={i}
-                            className="absolute top-1.5"
-                            style={{ left: x }}
-                        >
-                            <Tooltip text={tt}>
-                                <button
-                                    onClick={() =>
-                                        onOpen?.(it, { kind, label })
-                                    }
-                                    className={`h-7 rounded-lg ${baseColor} shadow-sm hover:brightness-110 active:scale-[.99] transition px-2 ${rings}`}
-                                    style={{
-                                        width: Math.max(12, w),
-                                    }}
-                                >
-                                    {showLabels && (
-                                        <span
-                                            className={`pointer-events-none select-none text-[11px] leading-none font-medium truncate block ${textColor}`}
-                                        >
-                                            {it.ref ||
-                                                it.note ||
-                                                `${fmtHM(it.start)}-${fmtHM(
-                                                    it.end
-                                                )}`}
+            {/* list */}
+            <div className="max-h-[calc(100vh-280px)] overflow-y-auto p-2 space-y-2">
+                {loading ? (
+                    <div className="text-[13px] text-slate-500 px-3 py-6 flex items-center justify-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Đang tải danh sách sự cố...
+                    </div>
+                ) : (
+                    <>
+                        {filtered.map((inc) => (
+                            <button
+                                key={inc.id}
+                                onClick={() => onViewDetail?.(inc)}
+                                className="w-full rounded-xl border border-slate-200 bg-slate-50 hover:bg-rose-50 hover:border-rose-300 transition p-3 flex items-start gap-3 text-left cursor-pointer"
+                            >
+                                <div className="shrink-0 mt-0.5">
+                                    {severityIcon(inc.severity)}
+                                </div>
+                                <div className="flex flex-col min-w-0 grow">
+                                    <div className="flex items-center gap-2 min-w-0 mb-1">
+                                        <span className="text-[13px] font-semibold text-slate-900 truncate">
+                                            {inc.tripCode || "—"}
                                         </span>
+                                        <span
+                                            className={`text-[11px] border rounded px-1.5 py-0.5 font-medium ${severityCls(
+                                                inc.severity
+                                            )}`}
+                                        >
+                                            {inc.severity || "LOW"}
+                                        </span>
+                                    </div>
+                                    <div className="text-[12px] text-slate-700 mb-1 line-clamp-2">
+                                        {inc.description || "Không có mô tả"}
+                                    </div>
+                                    {inc.driverName && (
+                                        <div className="text-[11px] text-slate-500">
+                                            <UserRound className="h-3 w-3 inline mr-1" />
+                                            {inc.driverName}
+                                        </div>
                                     )}
-                                </button>
-                            </Tooltip>
-                        </div>
-                    );
-                })}
+                                    {inc.reportedAt && (
+                                        <div className="text-[11px] text-slate-500">
+                                            <Clock className="h-3 w-3 inline mr-1" />
+                                            {fmtHM(inc.reportedAt)}
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="shrink-0 text-slate-400">
+                                    <MoveRight className="h-4 w-4" />
+                                </div>
+                            </button>
+                        ))}
+
+                        {filtered.length === 0 && (
+                            <div className="text-[13px] text-slate-500 px-3 py-12 text-center">
+                                <CheckCircle2 className="h-12 w-12 mx-auto mb-2 text-emerald-300" />
+                                <div>Không có sự cố nào</div>
+                            </div>
+                        )}
+                    </>
+                )}
             </div>
         </div>
     );
 }
+
+// ===== Modal chi tiết sự cố =====
+function IncidentDetailModal({ open, onClose, incident }) {
+    if (!incident) return null;
+
+    const severityCls = (severity) => {
+        switch (severity?.toUpperCase()) {
+            case "HIGH":
+            case "CRITICAL":
+                return "bg-rose-50 text-rose-700 border-rose-300";
+            case "MEDIUM":
+                return "bg-amber-50 text-amber-700 border-amber-300";
+            case "LOW":
+                return "bg-sky-50 text-sky-700 border-sky-300";
+            default:
+                return "bg-slate-50 text-slate-700 border-slate-300";
+        }
+    };
+
+    return (
+        <AnimatedDialog
+            open={open}
+            onClose={onClose}
+            size="lg"
+            showCloseButton={true}
+        >
+            <div className="p-5 text-slate-900">
+                <div className="flex items-center gap-2 mb-1">
+                    <AlertCircle className="h-5 w-5 text-rose-600" />
+                    <div className="text-base font-semibold text-slate-900">
+                        Chi tiết sự cố
+                    </div>
+                </div>
+                <div className="text-[13px] text-slate-500 mb-4">
+                    Thông tin chi tiết về sự cố chuyến đi
+                </div>
+
+                <div className="space-y-3 text-[13px]">
+                    <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                        <span className="text-slate-600">Mã chuyến</span>
+                        <span className="font-semibold text-slate-900">
+                            {incident.tripCode || "—"}
+                        </span>
+                    </div>
+
+                    <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                        <span className="text-slate-600">Mức độ</span>
+                        <span
+                            className={`text-[11px] border rounded px-2 py-1 font-medium ${severityCls(
+                                incident.severity
+                            )}`}
+                        >
+                            {incident.severity || "LOW"}
+                        </span>
+                    </div>
+
+                    {incident.driverName && (
+                        <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                            <span className="text-slate-600">Tài xế</span>
+                            <span className="text-slate-900">{incident.driverName}</span>
+                        </div>
+                    )}
+
+                    {incident.vehiclePlate && (
+                        <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                            <span className="text-slate-600">Biển số xe</span>
+                            <span className="text-slate-900 font-mono">{incident.vehiclePlate}</span>
+                        </div>
+                    )}
+
+                    {incident.reportedAt && (
+                        <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                            <span className="text-slate-600">Thời gian báo cáo</span>
+                            <span className="text-slate-900 tabular-nums">
+                                {new Date(incident.reportedAt).toLocaleString("vi-VN")}
+                            </span>
+                        </div>
+                    )}
+
+                    <div className="pt-2">
+                        <div className="text-slate-600 mb-2 font-medium">Mô tả sự cố</div>
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-slate-700">
+                            {incident.description || "Không có mô tả chi tiết"}
+                        </div>
+                    </div>
+
+                    {incident.resolution && (
+                        <div className="pt-2">
+                            <div className="text-slate-600 mb-2 font-medium">Giải pháp xử lý</div>
+                            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-emerald-700">
+                                {incident.resolution}
+                            </div>
+                        </div>
+                    )}
+
+                    {incident.status && (
+                        <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                            <span className="text-slate-600">Trạng thái</span>
+                            <span className="text-slate-900">{incident.status}</span>
+                        </div>
+                    )}
+                </div>
+
+                <div className="mt-5 flex justify-end gap-2">
+                    <button
+                        onClick={onClose}
+                        className="rounded-md border border-slate-300 bg-white hover:bg-slate-100 px-3 py-2 text-[13px] text-slate-600 font-medium transition-colors"
+                    >
+                        Đóng
+                    </button>
+                    <button className="rounded-md bg-emerald-600 hover:bg-emerald-500 px-3 py-2 text-[13px] text-white font-medium shadow-sm transition-colors">
+                        Xử lý sự cố
+                    </button>
+                </div>
+            </div>
+        </AnimatedDialog>
+    );
+}
+
+// Các hàm helper không còn cần thiết cho Gantt chart đã được loại bỏ
 
 // ===== Modal chi tiết block thời gian =====
 function Modal({ open, onClose, item }) {
@@ -979,25 +867,32 @@ export default function CoordinatorTimelinePro() {
     const [date, setDate] = React.useState(() =>
         new Date().toISOString().slice(0, 10)
     );
-    const [zoom, setZoom] = React.useState(1);
-    const [query, setQuery] = React.useState("");
     const [queueQuery, setQueueQuery] = React.useState("");
     const role = React.useMemo(() => getCurrentRole(), []);
     const userId = React.useMemo(() => getStoredUserId(), []);
     const isBranchScoped =
         role === ROLES.MANAGER || role === ROLES.COORDINATOR;
 
-    const [drivers, setDrivers] = React.useState([]);
-    const [vehicles, setVehicles] = React.useState([]);
     const [pending, setPending] = React.useState([]);
+    const [incidents, setIncidents] = React.useState([]);
     const [branches, setBranches] = React.useState([]);
     const [branchId, setBranchId] = React.useState("");
     const [branchLoading, setBranchLoading] = React.useState(true);
     const [branchError, setBranchError] = React.useState("");
 
+    // Thống kê dashboard
+    const [stats, setStats] = React.useState({
+        pendingCount: 0,
+        assignedCount: 0,
+        cancelledCount: 0,
+        completedCount: 0,
+        inProgressCount: 0,
+        incidentsCount: 0,
+    });
+
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState("");
-    const [active, setActive] = React.useState(null);
+    const [selectedIncident, setSelectedIncident] = React.useState(null);
 
     const [assignOrder, setAssignOrder] = React.useState(null);
     const [assignSuggest, setAssignSuggest] = React.useState({
@@ -1009,10 +904,7 @@ export default function CoordinatorTimelinePro() {
     const [assigning, setAssigning] = React.useState(false);
     const [assignErrorMsg, setAssignErrorMsg] = React.useState("");
 
-    const [showLabels, setShowLabels] = React.useState(true);
-    const [showBusy, setShowBusy] = React.useState(true);
-    const [showMaint, setShowMaint] = React.useState(true);
-    const [minRest, setMinRest] = React.useState(30); // phút
+    // Removed Gantt-related states
 
     React.useEffect(() => {
         let cancelled = false;
@@ -1113,14 +1005,7 @@ export default function CoordinatorTimelinePro() {
         };
     }, [isBranchScoped, userId]);
 
-    // Scroll sync
-    const headerRef = React.useRef(null);
-    const bodyRef = React.useRef(null);
-    const syncScroll = () => {
-        if (headerRef.current && bodyRef.current) {
-            headerRef.current.scrollLeft = bodyRef.current.scrollLeft;
-        }
-    };
+
 
     // Load data
     const fetchData = React.useCallback(
@@ -1149,24 +1034,28 @@ export default function CoordinatorTimelinePro() {
                     payload?.pending_trips ??
                     payload?.pending_orders ??
                     [];
-                const driverRows =
-                    payload?.driverSchedules ??
-                    payload?.driver_schedules ??
-                    [];
-                const vehicleRows =
-                    payload?.vehicleSchedules ??
-                    payload?.vehicle_schedules ??
+                const incidentRows =
+                    payload?.incidents ??
+                    payload?.tripIncidents ??
                     [];
                 setPending(normalizePendingTrips(pendingRows));
-                setDrivers(normalizeDriverSchedules(driverRows));
-                setVehicles(normalizeVehicleSchedules(vehicleRows));
+                setIncidents(incidentRows);
+
+                // Cập nhật thống kê
+                setStats({
+                    pendingCount: payload?.pendingCount ?? pendingRows.length ?? 0,
+                    assignedCount: payload?.assignedCount ?? 0,
+                    cancelledCount: payload?.cancelledCount ?? 0,
+                    completedCount: payload?.completedCount ?? 0,
+                    inProgressCount: payload?.inProgressCount ?? 0,
+                    incidentsCount: incidentRows.length ?? 0,
+                });
             } catch (err) {
                 console.error("[CoordinatorTimelinePro] Failed to load dashboard:", err);
 
                 // Clear data on error
                 setPending([]);
-                setDrivers([]);
-                setVehicles([]);
+                setIncidents([]);
 
                 // Extract error message
                 let msg = "Không tải được dữ liệu dashboard.";
@@ -1237,98 +1126,14 @@ export default function CoordinatorTimelinePro() {
         };
     }, [assignOrder, branchId]);
 
-    const width = (DAY_END - DAY_START) * HOUR_WIDTH * zoom;
-
-    const nowX = React.useMemo(() => {
-        if (!isSameDay(date)) return null;
-        const now = new Date();
-        const hhmm = new Date(
-            `${date}T${pad2(now.getHours())}:${pad2(
-                now.getMinutes()
-            )}:00`
-        );
-        return xFrom(date, hhmm, zoom);
-    }, [date, zoom]);
-
-    const filterByQuery = (rows, getLabel) =>
-        rows.filter((r) =>
-            getLabel(r)
-                .toLowerCase()
-                .includes(query.trim().toLowerCase())
-        );
-
-    const _drivers = filterByQuery(drivers, (d) => d.name || "");
-    const _vehicles = filterByQuery(vehicles, (v) => v.plate || "");
-
-    const jumpTo = (hh) => {
-        const pos = (hh - DAY_START) * HOUR_WIDTH * zoom;
-        if (headerRef.current)
-            headerRef.current.scrollLeft = Math.max(0, pos - 120);
-        if (bodyRef.current)
-            bodyRef.current.scrollLeft = Math.max(0, pos - 120);
-    };
     const dataLoading = loading || branchLoading;
-    const queueOrders = branchId ? pending : [];
-
-
-    // gợi ý assign
-    const isWithin = (when, start, end) =>
-        new Date(start) <= new Date(when) &&
-        new Date(when) <= new Date(end);
-
-    const occupyAt = (
-        items,
-        when,
-        disallowTypes = ["BUSY"]
-    ) =>
-        items?.some(
-            (it) =>
-                disallowTypes.includes(it.type) &&
-                isWithin(when, it.start, it.end)
-        );
-
-    const availableDriversAt = (when) => {
-        return drivers
-            .filter(
-                (d) =>
-                    d.shift &&
-                    isWithin(when, d.shift.start, d.shift.end) &&
-                    !occupyAt(d.items || [], when, ["BUSY"])
-            )
-            .sort(
-                (a, b) =>
-                    (a.items?.length || 0) -
-                    (b.items?.length || 0)
-            )
-            .slice(0, 6);
-    };
-
-    const availableVehiclesAt = (when) => {
-        return vehicles
-            .filter(
-                (v) =>
-                    v.shift &&
-                    isWithin(when, v.shift.start, v.shift.end) &&
-                    !occupyAt(v.items || [], when, [
-                        "BUSY",
-                        "MAINT",
-                    ])
-            )
-            .sort(
-                (a, b) =>
-                    (a.items?.length || 0) -
-                    (b.items?.length || 0)
-            )
-            .slice(0, 6);
-    };
+    const unassignedTrips = branchId ? pending : [];
 
     const openAssign = (order) => {
-        const driversS = availableDriversAt(order.pickupTime);
-        const vehiclesS = availableVehiclesAt(order.pickupTime);
         setAssignOrder(order);
         setAssignSuggest({
-            drivers: driversS,
-            vehicles: vehiclesS,
+            drivers: [],
+            vehicles: [],
         });
         setAssignOptionsError("");
         setAssignOptionsLoading(false);
@@ -1405,12 +1210,11 @@ export default function CoordinatorTimelinePro() {
                             </div>
 
                             <h1 className="text-lg font-semibold text-slate-900 leading-tight">
-                                Coordinator (Queue + Schedule)
+                                Bảng điều phối
                             </h1>
 
                             <p className="text-slate-500 text-[13px]">
-                                Queue (PENDING) · Gantt 06:00–24:00 · tick
-                                30' · Now · Zoom · %Utilization · Alerts
+                                Chuyến chưa gắn lịch · Sự cố chuyến đi · Gán lịch nhanh
                             </p>
                         </div>
                     </div>
@@ -1480,57 +1284,6 @@ export default function CoordinatorTimelinePro() {
                             />
                         </div>
 
-                        {/* zoom - */}
-                        <button
-                            onClick={() =>
-                                setZoom((z) => Math.max(0.5, z - 0.25))
-                            }
-                            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-[13px] text-slate-700 hover:bg-slate-100 flex items-center gap-1"
-                        >
-                            <ZoomOut className="h-4 w-4 text-slate-600" />
-                            Zoom-
-                        </button>
-
-                        {/* zoom + */}
-                        <button
-                            onClick={() =>
-                                setZoom((z) => Math.min(2.5, z + 0.25))
-                            }
-                            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-[13px] text-slate-700 hover:bg-slate-100 flex items-center gap-1"
-                        >
-                            <ZoomIn className="h-4 w-4 text-slate-600" />
-                            Zoom+
-                        </button>
-
-                        {/* quick jumps */}
-                        <button
-                            onClick={() => jumpTo(8)}
-                            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-[13px] text-slate-700 hover:bg-slate-100"
-                        >
-                            08:00
-                        </button>
-                        <button
-                            onClick={() => jumpTo(12)}
-                            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-[13px] text-slate-700 hover:bg-slate-100"
-                        >
-                            12:00
-                        </button>
-                        <button
-                            onClick={() => jumpTo(18)}
-                            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-[13px] text-slate-700 hover:bg-slate-100"
-                        >
-                            18:00
-                        </button>
-                        <button
-                            onClick={() =>
-                                jumpTo(new Date().getHours())
-                            }
-                            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-[13px] text-slate-700 hover:bg-slate-100 flex items-center gap-1"
-                        >
-                            Now{" "}
-                            <MoveRight className="inline h-4 w-4 text-slate-600" />
-                        </button>
-
                         {/* refresh */}
                         <button
                             onClick={() => {
@@ -1588,187 +1341,94 @@ export default function CoordinatorTimelinePro() {
                     </div>
                 </div>
 
-                {/* FILTER BAR for Gantt */}
-                <div className="flex flex-wrap items-center gap-3 text-[13px]">
-                    {/* search driver/vehicle */}
-                    <div className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2">
-                        <Search className="h-4 w-4 text-slate-500" />
-                        <input
-                            type="text"
-                            placeholder="Tìm tài xế / xe"
-                            className="bg-transparent outline-none text-[13px] text-slate-900 placeholder:text-slate-400"
-                            value={query}
-                            onChange={(e) =>
-                                setQuery(e.target.value)
-                            }
-                        />
+
+
+                {/* THỐNG KÊ DASHBOARD */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                    {/* Chờ gắn lịch */}
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-amber-100 flex items-center justify-center">
+                            <ClipboardList className="h-5 w-5 text-amber-600" />
+                        </div>
+                        <div>
+                            <div className="text-2xl font-bold text-amber-700">{stats.pendingCount}</div>
+                            <div className="text-[11px] text-amber-600 font-medium">Chờ gắn lịch</div>
+                        </div>
                     </div>
 
-                    <label className="inline-flex items-center gap-2 text-slate-700 select-none">
-                        <input
-                            type="checkbox"
-                            className="accent-emerald-500"
-                            checked={showLabels}
-                            onChange={(e) =>
-                                setShowLabels(e.target.checked)
-                            }
-                        />
-                        <span>Nhãn trên thanh</span>
-                    </label>
-
-                    <label className="inline-flex items-center gap-2 text-slate-700 select-none">
-                        <input
-                            type="checkbox"
-                            className="accent-emerald-500"
-                            checked={showBusy}
-                            onChange={(e) =>
-                                setShowBusy(e.target.checked)
-                            }
-                        />
-                        <span>BUSY</span>
-                    </label>
-
-                    <label className="inline-flex items-center gap-2 text-slate-700 select-none">
-                        <input
-                            type="checkbox"
-                            className="accent-emerald-500"
-                            checked={showMaint}
-                            onChange={(e) =>
-                                setShowMaint(e.target.checked)
-                            }
-                        />
-                        <span>MAINT</span>
-                    </label>
-
-                    <div className="flex items-center gap-2 text-slate-700 flex-wrap">
-                        <span>Nghỉ tối thiểu:</span>
-                        <input
-                            type="number"
-                            min={0}
-                            step={5}
-                            value={minRest}
-                            onChange={(e) =>
-                                setMinRest(
-                                    Number(
-                                        e.target
-                                            .value || 0
-                                    )
-                                )
-                            }
-                            className="w-20 bg-white border border-slate-300 rounded-md px-2 py-1 text-[13px] text-slate-900"
-                        />
-                        <span>phút</span>
+                    {/* Đã gắn lịch */}
+                    <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-sky-100 flex items-center justify-center">
+                            <CheckCircle2 className="h-5 w-5 text-sky-600" />
+                        </div>
+                        <div>
+                            <div className="text-2xl font-bold text-sky-700">{stats.assignedCount}</div>
+                            <div className="text-[11px] text-sky-600 font-medium">Đã gắn lịch</div>
+                        </div>
                     </div>
 
-                    <Legend />
+                    {/* Đang thực hiện */}
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+                            <PlayCircle className="h-5 w-5 text-emerald-600" />
+                        </div>
+                        <div>
+                            <div className="text-2xl font-bold text-emerald-700">{stats.inProgressCount}</div>
+                            <div className="text-[11px] text-emerald-600 font-medium">Đang thực hiện</div>
+                        </div>
+                    </div>
+
+                    {/* Hoàn thành */}
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-slate-100 flex items-center justify-center">
+                            <TrendingUp className="h-5 w-5 text-slate-600" />
+                        </div>
+                        <div>
+                            <div className="text-2xl font-bold text-slate-700">{stats.completedCount}</div>
+                            <div className="text-[11px] text-slate-600 font-medium">Hoàn thành</div>
+                        </div>
+                    </div>
+
+                    {/* Đã hủy */}
+                    <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-rose-100 flex items-center justify-center">
+                            <XCircle className="h-5 w-5 text-rose-600" />
+                        </div>
+                        <div>
+                            <div className="text-2xl font-bold text-rose-700">{stats.cancelledCount}</div>
+                            <div className="text-[11px] text-rose-600 font-medium">Đã hủy</div>
+                        </div>
+                    </div>
+
+                    {/* Sự cố */}
+                    <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-rose-100 flex items-center justify-center">
+                            <AlertCircle className="h-5 w-5 text-rose-600" />
+                        </div>
+                        <div>
+                            <div className="text-2xl font-bold text-rose-700">{stats.incidentsCount}</div>
+                            <div className="text-[11px] text-rose-600 font-medium">Sự cố</div>
+                        </div>
+                    </div>
                 </div>
 
-                {/* MAIN LAYOUT: Queue (left) + Gantt (right) */}
-                <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-5">
-                    {/* Khung 1: Queue */}
-                    <QueuePanel
-                        orders={queueOrders}
+                {/* MAIN LAYOUT: Chuyến chưa gắn lịch (left) + Sự cố (right) */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                    {/* Bên trái: Chuyến chưa gắn lịch */}
+                    <UnassignedTripsPanel
+                        orders={unassignedTrips}
                         onAssign={openAssign}
                         query={queueQuery}
                         onQuery={setQueueQuery}
                         loading={dataLoading}
                     />
 
-                    {/* Khung 2: Gantt */}
-                    <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-lg shadow-slate-200/50 bg-white">
-                        {/* TIME HEADER (scroll sync container 1) */}
-                        <div
-                            className="overflow-x-auto"
-                            ref={headerRef}
-                        >
-                            <div style={{ width }}>
-                                <TimeHeader zoom={zoom} />
-                            </div>
-                        </div>
-
-                        {/* BODY (scroll sync container 2) */}
-                        <div
-                            className="relative overflow-x-auto max-h-[66vh]"
-                            ref={bodyRef}
-                            onScroll={syncScroll}
-                        >
-                            {/* Now line (sky brand) */}
-                            {nowX !== null && (
-                                <div
-                                    className="pointer-events-none absolute top-0 bottom-0"
-                                    style={{ left: nowX }}
-                                >
-                                    <div className="h-full w-[2px] bg-sky-500/80 shadow-[0_0_12px_rgba(2,132,199,0.6)]" />
-                                </div>
-                            )}
-
-                            {/* Content rows */}
-                            <div
-                                style={{ width }}
-                                className="bg-white"
-                            >
-                                {dataLoading ? (
-                                    <div className="p-6 text-slate-500 text-[13px]">
-                                        Đang tải dữ liệu...
-                                    </div>
-                                ) : (
-                                    <>
-                                        {/* DRIVERS */}
-                                        <div>
-                                            <div className="sticky top-0 z-10 bg-white/95 backdrop-blur px-4 py-2 text-[11px] text-slate-500 border-b border-slate-200 flex items-center gap-2 uppercase font-medium tracking-wide">
-                                                <UserRound className="h-4 w-4 text-emerald-600" />
-                                                <span>
-                                                    TÀI XẾ ({_drivers.length})
-                                                </span>
-                                            </div>
-                                            {_drivers.map((d) => (
-                                                <Row
-                                                    key={d.id}
-                                                    kind="driver"
-                                                    label={d.name}
-                                                    date={date}
-                                                    items={d.items}
-                                                    shift={d.shift}
-                                                    zoom={zoom}
-                                                    onOpen={setActive}
-                                                    showLabels={showLabels}
-                                                    showBusy={showBusy}
-                                                    showMaint={showMaint}
-                                                    minRest={minRest}
-                                                />
-                                            ))}
-                                        </div>
-
-                                        {/* VEHICLES */}
-                                        <div>
-                                            <div className="sticky top-0 z-10 bg-white/95 backdrop-blur px-4 py-2 text-[11px] text-slate-500 border-b border-slate-200 flex items-center gap-2 uppercase font-medium tracking-wide">
-                                                <CarIcon className="h-4 w-4 text-sky-600" />
-                                                <span>
-                                                    XE ({_vehicles.length})
-                                                </span>
-                                            </div>
-                                            {_vehicles.map((v) => (
-                                                <Row
-                                                    key={v.id}
-                                                    kind="vehicle"
-                                                    label={v.plate}
-                                                    date={date}
-                                                    items={v.items}
-                                                    shift={v.shift}
-                                                    zoom={zoom}
-                                                    onOpen={setActive}
-                                                    showLabels={showLabels}
-                                                    showBusy={showBusy}
-                                                    showMaint={showMaint}
-                                                    minRest={minRest}
-                                                />
-                                            ))}
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    </div>
+                    {/* Bên phải: Sự cố chuyến đi */}
+                    <IncidentsPanel
+                        incidents={incidents}
+                        onViewDetail={setSelectedIncident}
+                        loading={dataLoading}
+                    />
                 </div>
 
                 {(branchError || error) && (
@@ -1821,11 +1481,11 @@ export default function CoordinatorTimelinePro() {
                 )}
             </div>
 
-            {/* Chi tiết block thời gian */}
-            <Modal
-                open={!!active}
-                onClose={() => setActive(null)}
-                item={active}
+            {/* Modal chi tiết sự cố */}
+            <IncidentDetailModal
+                open={!!selectedIncident}
+                onClose={() => setSelectedIncident(null)}
+                incident={selectedIncident}
             />
 
             {/* Dialog gán chuyến */}

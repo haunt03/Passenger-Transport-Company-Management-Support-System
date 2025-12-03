@@ -64,8 +64,10 @@ export default function ReportRevenuePage() {
     const isAccountant = role === ROLES.ACCOUNTANT;
     const isAdmin = role === ROLES.ADMIN;
     const isManager = role === ROLES.MANAGER;
-    // Accountant chỉ xem được chi nhánh của mình
-    const canChangeBranch = isAdmin || isManager;
+    // Chỉ Admin mới có thể thay đổi chi nhánh và xem đầy đủ filter
+    const canChangeBranch = isAdmin;
+    // Manager và Accountant chỉ xem chi nhánh của mình
+    const isRestrictedView = isManager || isAccountant;
 
     // ====== STATE FILTERS ======
     const [fromDate, setFromDate] = React.useState("");
@@ -96,9 +98,9 @@ export default function ReportRevenuePage() {
 
     const [branches, setBranches] = React.useState([]);
 
-    // Load user's branch if ACCOUNTANT
+    // Load user's branch if ACCOUNTANT or MANAGER (restricted view)
     React.useEffect(() => {
-        if (!isAccountant || !userId) return;
+        if (!isRestrictedView || !userId) return;
 
         (async () => {
             try {
@@ -114,7 +116,7 @@ export default function ReportRevenuePage() {
                 console.error("[ReportRevenuePage] Error loading user branch:", err);
             }
         })();
-    }, [isAccountant, userId]);
+    }, [isRestrictedView, userId]);
 
     // Load branches on mount (only for Admin/Manager)
     React.useEffect(() => {
@@ -226,7 +228,7 @@ export default function ReportRevenuePage() {
             });
         } catch (err) {
             console.error("Export error:", err);
-            alert("Lỗi khi xuất Excel: " + (err.message || "Unknown error"));
+            alert("Lỗi khi xuất Excel: " + (err.message || "Lỗi không xác định"));
         }
     };
 
@@ -314,7 +316,12 @@ export default function ReportRevenuePage() {
                 </div>
 
                 {/* grid bộ lọc */}
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 text-[13px]">
+                <div className={cls(
+                    "grid gap-4 text-[13px]",
+                    isRestrictedView
+                        ? "grid-cols-1 md:grid-cols-2"
+                        : "grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
+                )}>
                     {/* Từ ngày */}
                     <div className="flex flex-col">
                         <label className="text-[12px] text-gray-600 mb-1 flex items-center gap-1">
@@ -351,49 +358,43 @@ export default function ReportRevenuePage() {
                         </div>
                     </div>
 
-                    {/* Period */}
-                    <div className="flex flex-col">
-                        <label className="text-[12px] text-gray-600 mb-1 flex items-center gap-1">
-                            <Calendar className="h-3.5 w-3.5 text-gray-400" />
-                            <span>Kỳ báo cáo</span>
-                        </label>
-                        <div className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm">
-                            <select
-                                className="bg-transparent outline-none text-[13px] text-gray-800 w-full"
-                                value={period}
-                                onChange={(e) => {
-                                    setPeriod(e.target.value);
-                                    if (e.target.value) {
-                                        setFromDate("");
-                                        setToDate("");
-                                    }
-                                }}
-                            >
-                                {PERIOD_OPTIONS.map((opt) => (
-                                    <option key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                    </option>
-                                ))}
-                            </select>
+                    {/* Period - Ẩn với Manager */}
+                    {!isRestrictedView && (
+                        <div className="flex flex-col">
+                            <label className="text-[12px] text-gray-600 mb-1 flex items-center gap-1">
+                                <Calendar className="h-3.5 w-3.5 text-gray-400" />
+                                <span>Kỳ báo cáo</span>
+                            </label>
+                            <div className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm">
+                                <select
+                                    className="bg-transparent outline-none text-[13px] text-gray-800 w-full"
+                                    value={period}
+                                    onChange={(e) => {
+                                        setPeriod(e.target.value);
+                                        if (e.target.value) {
+                                            setFromDate("");
+                                            setToDate("");
+                                        }
+                                    }}
+                                >
+                                    {PERIOD_OPTIONS.map((opt) => (
+                                        <option key={opt.value} value={opt.value}>
+                                            {opt.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
-                    </div>
+                    )}
 
-                    {/* Chi nhánh */}
-                    <div className="flex flex-col">
-                        <label className="text-[12px] text-gray-600 mb-1 flex items-center gap-1">
-                            <Building2 className="h-3.5 w-3.5 text-gray-400" />
-                            <span>Chi nhánh</span>
-                            {!canChangeBranch && (
-                                <span className="text-[10px] text-amber-600 ml-1">(Chỉ xem chi nhánh của bạn)</span>
-                            )}
-                        </label>
-                        <div className={cls(
-                            "flex items-center gap-2 rounded-lg border px-3 py-2 shadow-sm",
-                            canChangeBranch
-                                ? "border-gray-300 bg-white"
-                                : "border-gray-200 bg-gray-100 cursor-not-allowed"
-                        )}>
-                            {canChangeBranch ? (
+                    {/* Chi nhánh - Ẩn với Manager, chỉ hiện thông tin */}
+                    {!isRestrictedView && (
+                        <div className="flex flex-col">
+                            <label className="text-[12px] text-gray-600 mb-1 flex items-center gap-1">
+                                <Building2 className="h-3.5 w-3.5 text-gray-400" />
+                                <span>Chi nhánh</span>
+                            </label>
+                            <div className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm">
                                 <select
                                     className="bg-transparent outline-none text-[13px] text-gray-800 w-full"
                                     value={branchId || ""}
@@ -413,34 +414,43 @@ export default function ReportRevenuePage() {
                                         <option disabled>Đang tải...</option>
                                     )}
                                 </select>
-                            ) : (
-                                <span className="text-[13px] text-gray-700 font-medium">
-                                    {userBranchName || "Đang tải..."}
-                                </span>
-                            )}
+                            </div>
                         </div>
-                    </div>
+                    )}
 
-                    {/* Khách hàng */}
-                    <div className="flex flex-col">
-                        <label className="text-[12px] text-gray-600 mb-1 flex items-center gap-1">
-                            <User className="h-3.5 w-3.5 text-gray-400" />
-                            <span>Khách hàng</span>
-                        </label>
-                        <div className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm">
-                            <input
-                                className="bg-transparent outline-none text-[13px] text-gray-800 placeholder:text-gray-400 w-full"
-                                placeholder="Nhập tên KH..."
-                                value={customerQuery}
-                                onChange={(e) =>
-                                    setCustomerQuery(
-                                        e.target.value
-                                    )
-                                }
-                            />
+                    {/* Khách hàng - Ẩn với Manager */}
+                    {!isRestrictedView && (
+                        <div className="flex flex-col">
+                            <label className="text-[12px] text-gray-600 mb-1 flex items-center gap-1">
+                                <User className="h-3.5 w-3.5 text-gray-400" />
+                                <span>Khách hàng</span>
+                            </label>
+                            <div className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm">
+                                <input
+                                    className="bg-transparent outline-none text-[13px] text-gray-800 placeholder:text-gray-400 w-full"
+                                    placeholder="Nhập tên KH..."
+                                    value={customerQuery}
+                                    onChange={(e) =>
+                                        setCustomerQuery(
+                                            e.target.value
+                                        )
+                                    }
+                                />
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Hiển thị chi nhánh cho Manager/Accountant */}
+                {isRestrictedView && (
+                    <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                        <div className="flex items-center gap-2 text-[13px] text-amber-800">
+                            <Building2 className="h-4 w-4" />
+                            <span className="font-medium">Chi nhánh:</span>
+                            <span>{userBranchName || "Đang tải..."}</span>
                         </div>
                     </div>
-                </div>
+                )}
 
                 {/* nút chạy lọc */}
                 <div className="mt-4 flex flex-wrap gap-2">
@@ -670,7 +680,7 @@ export default function ReportRevenuePage() {
 
                 {/* footer hint */}
                 <div className="border-t border-gray-200 bg-white px-4 py-2 text-[11px] leading-relaxed text-gray-500">
-                    Dữ liệu được tải từ API. Tổng: {reportData.totalInvoices || 0} hóa đơn.
+                    Tổng: {reportData.totalInvoices || 0} hóa đơn.
                     {error && <span className="text-rose-600 ml-2">Lỗi: {error}</span>}
                 </div>
             </div>

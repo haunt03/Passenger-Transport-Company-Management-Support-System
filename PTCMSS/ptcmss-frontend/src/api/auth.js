@@ -72,3 +72,15 @@ export async function forgotPassword(email) {
         body: { email },
     });
 }
+
+export async function setPassword({ token, password, confirmPassword }) {
+    return apiFetch("/api/auth/set-password", {
+        method: "POST",
+        auth: false,
+        body: {
+            token,
+            password,
+            confirmPassword,
+        },
+    });
+}

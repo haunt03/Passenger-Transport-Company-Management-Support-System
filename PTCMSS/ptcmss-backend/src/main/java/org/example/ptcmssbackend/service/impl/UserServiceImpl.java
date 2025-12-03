@@ -49,24 +49,24 @@ public class UserServiceImpl implements UserService {
     public Integer createUser(CreateUserRequest request) {
         // Validate role
         Roles role = rolesRepository.findById(request.getRoleId())
-                .orElseThrow(() -> new RuntimeException("Role not found"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy vai trò"));
 
         // Validate branch
         Branches branch = branchesRepository.findById(request.getBranchId())
-                .orElseThrow(() -> new RuntimeException("Branch not found"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy chi nhánh"));
 
         // Validate unique fields
         String email = Optional.ofNullable(request.getEmail()).map(String::trim).orElse(null);
         if (StringUtils.hasText(email) && usersRepository.existsByEmailIgnoreCase(email)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email already exists");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email đã tồn tại");
         }
         String phone = Optional.ofNullable(request.getPhone()).map(String::trim).orElse(null);
         if (StringUtils.hasText(phone) && usersRepository.existsByPhone(phone)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Phone already exists");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Số điện thoại đã tồn tại");
         }
         String username = Optional.ofNullable(request.getUsername()).map(String::trim).orElse(null);
         if (StringUtils.hasText(username) && usersRepository.existsByUsername(username)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Username already exists");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tên đăng nhập đã tồn tại");
         }
 
         // Tạo user mới (chưa kích hoạt)
@@ -132,7 +132,7 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public Integer updateUser(Integer id, UpdateUserRequest request) {
         Users user = usersRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
 
         // Chỉ Admin mới được gọi method này (đã check ở Controller)
 
@@ -169,7 +169,7 @@ public class UserServiceImpl implements UserService {
         // Cập nhật role
         if (request.getRoleId() != null) {
             Roles role = rolesRepository.findById(request.getRoleId())
-                    .orElseThrow(() -> new RuntimeException("Role not found"));
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy vai trò"));
             user.setRole(role);
         }
 
@@ -180,7 +180,7 @@ public class UserServiceImpl implements UserService {
         // Cập nhật branch (nếu có)
         if (request.getBranchId() != null) {
             Branches branch = branchesRepository.findById(request.getBranchId())
-                    .orElseThrow(() -> new RuntimeException("Branch not found"));
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy chi nhánh"));
 
             // Tìm hoặc tạo employee record
             Employees employee = employeeRepository.findByUserId(id).orElse(null);
@@ -211,7 +211,7 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public Integer updateProfile(Integer id, org.example.ptcmssbackend.dto.request.User.UpdateProfileRequest request) {
         Users user = usersRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
 
         // Chỉ cho phép user tự cập nhật profile của mình (đã check ở Controller)
 
@@ -265,7 +265,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserResponse getUserById(Integer id) {
         Users user = usersRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
 
         Employees employee = employeeRepository.findByUserId(id).orElse(null);
         Integer branchId = null;
@@ -293,7 +293,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public void toggleUserStatus(Integer id) {
         Users user = usersRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
 
         // Validation: Không cho phép vô hiệu hóa admin
         if (user.getRole() != null && "ADMIN".equals(user.getRole().getRoleName())) {
@@ -309,7 +309,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public String updateAvatar(Integer userId, MultipartFile file) {
         Users user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
         // Lưu ảnh mới
         String imageUrl = localImageService.saveImage(file);
         user.setAvatar(imageUrl);
@@ -363,3 +363,4 @@ public class UserServiceImpl implements UserService {
     }
 
 }
+

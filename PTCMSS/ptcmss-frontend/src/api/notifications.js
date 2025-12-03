@@ -49,7 +49,7 @@ export function markNotificationRead(notificationId) {
 export function markAllNotificationsRead(userId) {
     return apiFetch(`/api/notifications/read-all`, {
         method: "PUT",
-        body: { userId },
+        body: { userId: Number(userId) },
     });
 }
 
@@ -80,7 +80,7 @@ export function getAlerts(branchId) {
 export function acknowledgeAlert(alertId, userId) {
     return apiFetch(`/api/notifications/alerts/${alertId}/acknowledge`, {
         method: "POST",
-        body: { userId },
+        body: { userId: Number(userId) },
     });
 }
 
@@ -101,7 +101,7 @@ export function approveApprovalRequest(historyId, { userId, note } = {}) {
     }
     return apiFetch(`/api/notifications/approvals/${historyId}/approve`, {
         method: "POST",
-        body: { userId: resolvedUserId, note },
+        body: { userId: Number(resolvedUserId), note },
     });
 }
 
@@ -112,7 +112,7 @@ export function rejectApprovalRequest(historyId, { userId, note } = {}) {
     }
     return apiFetch(`/api/notifications/approvals/${historyId}/reject`, {
         method: "POST",
-        body: { userId: resolvedUserId, note },
+        body: { userId: Number(resolvedUserId), note },
     });
 }
 
@@ -129,3 +129,4 @@ export function deleteNotification(notificationId, userId) {
         method: "DELETE",
     });
 }
+

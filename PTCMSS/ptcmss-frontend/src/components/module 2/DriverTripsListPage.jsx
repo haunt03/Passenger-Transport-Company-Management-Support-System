@@ -8,6 +8,7 @@ import {
     ChevronRight,
     Filter,
     Search,
+    CheckCircle2,
 } from "lucide-react";
 import { getCookie } from "../../utils/cookies";
 import { getDriverProfileByUser, getDriverSchedule } from "../../api/drivers";
@@ -32,9 +33,21 @@ const fmtDateTime = (iso) => {
 function TripCard({ trip, onClick }) {
     const rating = trip.rating || 0;
     const statusMap = {
-        SCHEDULED: { label: "Chưa bắt đầu", color: "bg-slate-100 text-slate-700" },
-        ONGOING: { label: "Đang chạy", color: "bg-sky-100 text-sky-700" },
-        COMPLETED: { label: "Hoàn thành", color: "bg-amber-100 text-amber-700" },
+        SCHEDULED: {
+            label: "Chưa bắt đầu",
+            color: "bg-slate-100 text-slate-700",
+            icon: null
+        },
+        ONGOING: {
+            label: "Đang chạy",
+            color: "bg-sky-100 text-sky-700",
+            icon: null
+        },
+        COMPLETED: {
+            label: "Hoàn thành",
+            color: "bg-emerald-100 text-emerald-700",
+            icon: <CheckCircle2 className="h-3.5 w-3.5" />
+        },
     };
     const status = statusMap[trip.status] || statusMap.SCHEDULED;
 
@@ -46,7 +59,8 @@ function TripCard({ trip, onClick }) {
             <div className="flex items-start justify-between gap-3 mb-3">
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2">
-                        <span className={cls("px-2 py-1 rounded-md text-xs font-medium", status.color)}>
+                        <span className={cls("px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1", status.color)}>
+                            {status.icon}
                             {status.label}
                         </span>
                         {trip.status === "COMPLETED" && rating > 0 && (
@@ -108,9 +122,10 @@ export default function DriverTripsListPage() {
                         startLocation: trip.startLocation || trip.start_location || "—",
                         endLocation: trip.endLocation || trip.end_location || "—",
                         startTime: trip.startTime || trip.start_time,
-                        endTime: trip.endTime || trip.end_time,
+                        endTime: trip.endTime || trip.end_time || null,
                         status: trip.status || "SCHEDULED",
-                        rating: trip.rating || 0,
+                        rating: trip.rating ? Number(trip.rating) : 0,
+                        ratingComment: trip.ratingComment || trip.rating_comment || "",
                     }))
                     : [];
 

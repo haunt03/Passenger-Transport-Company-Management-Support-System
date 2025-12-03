@@ -163,6 +163,10 @@ export default function EditOrderPage() {
     const [customerName, setCustomerName] = React.useState("");
     const [customerEmail, setCustomerEmail] = React.useState("");
 
+    /* --- hình thức thuê --- */
+    const [hireTypeId, setHireTypeId] = React.useState("");
+    const [hireTypeName, setHireTypeName] = React.useState("");
+
     /* --- hành trình --- */
     const [pickup, setPickup] = React.useState("");
     const [dropoff, setDropoff] = React.useState("");
@@ -289,10 +293,12 @@ export default function EditOrderPage() {
             try {
                 const br = await listBranches({ page: 0 });
                 const items = Array.isArray(br?.items) ? br.items : (Array.isArray(br) ? br : []);
-                if (items.length > 0) {
-                    setBranches(items);
+                // Filter chỉ lấy branches ACTIVE
+                const activeItems = items.filter(b => !b.status || b.status === "ACTIVE");
+                if (activeItems.length > 0) {
+                    setBranches(activeItems);
                 } else {
-                    pushToast("Không thể tải chi nhánh: Dữ liệu trống", "error");
+                    pushToast("Không thể tải chi nhánh: Không có chi nhánh hoạt động", "error");
                 }
             } catch (err) {
                 console.error("Failed to load branches:", err);
@@ -307,6 +313,9 @@ export default function EditOrderPage() {
                 setCustomerPhone(b.customer?.phone || "");
                 setCustomerName(b.customer?.fullName || "");
                 setCustomerEmail(b.customer?.email || "");
+                // Load hire type info
+                if (b.hireTypeId) setHireTypeId(String(b.hireTypeId));
+                if (b.hireTypeName) setHireTypeName(b.hireTypeName);
                 setPickup(t.startLocation || "");
                 setDropoff(t.endLocation || "");
                 // Convert UTC to local datetime-local format (YYYY-MM-DDTHH:mm)
@@ -692,6 +701,7 @@ export default function EditOrderPage() {
         const req = {
             customer: { fullName: customerName.trim(), phone: customerPhone.trim(), email: customerEmail?.trim() || null },
             branchId: Number(branchId || 0) || undefined,
+            hireTypeId: hireTypeId ? Number(hireTypeId) : undefined,
             trips: [{
                 startLocation: pickup.trim(),
                 endLocation: dropoff.trim(),
@@ -775,6 +785,7 @@ export default function EditOrderPage() {
         const req2 = {
             customer: { fullName: customerName, phone: customerPhone, email: customerEmail },
             branchId: Number(branchId || 0) || undefined,
+            hireTypeId: hireTypeId ? Number(hireTypeId) : undefined,
             trips: [{ startLocation: pickup, endLocation: dropoff, startTime: toIsoZ(startTime), endTime: toIsoZ(endTime), distance: distanceKm ? Number(distanceKm) : undefined }],
             vehicles: [{ vehicleCategoryId: Number(categoryId || 0), quantity: Number(vehiclesNeeded || 1) }],
             estimatedCost: Number(systemPrice || 0),
@@ -944,7 +955,7 @@ export default function EditOrderPage() {
                         className={cls(
                             "rounded-md font-medium text-[13px] px-4 py-2 flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed",
                             canEdit
-                                ? "bg-[#EDC531] hover:bg-amber-500 text-white"
+                                ? "bg-sky-600 hover:bg-sky-500 text-white"
                                 : "bg-slate-200 text-slate-400 cursor-not-allowed"
                         )}
                     >

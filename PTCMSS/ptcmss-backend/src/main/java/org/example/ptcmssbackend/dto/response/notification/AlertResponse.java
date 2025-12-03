@@ -4,8 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.example.ptcmssbackend.enums.AlertSeverity;
 import org.example.ptcmssbackend.enums.AlertType;
+import org.example.ptcmssbackend.enums.AlertSeverity;
 
 import java.time.Instant;
 

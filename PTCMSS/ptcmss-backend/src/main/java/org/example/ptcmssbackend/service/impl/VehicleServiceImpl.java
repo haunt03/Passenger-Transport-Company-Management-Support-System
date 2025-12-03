@@ -25,6 +25,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -66,9 +68,31 @@ public class VehicleServiceImpl implements VehicleService {
 
     @Override
     public VehicleResponse update(Integer id, VehicleRequest request) {
+        System.out.println("[VehicleService] Updating vehicle ID=" + id + ", status=" + request.getStatus());
+
+        // Get current user role
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        boolean isCoordinator = auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_COORDINATOR"));
+
         Vehicles vehicle = vehicleRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy xe ID=" + id));
+        System.out.println("[VehicleService] Current vehicle status: " + vehicle.getStatus());
+
+        // VALIDATION: Coordinator không được chuyển xe sang trạng thái INUSE
+        if (isCoordinator && request.getStatus() != null) {
+            VehicleStatus newStatus = parseVehicleStatus(request.getStatus());
+            if (newStatus == VehicleStatus.INUSE && vehicle.getStatus() != VehicleStatus.INUSE) {
+                throw new RuntimeException("Điều phối viên không được phép chuyển xe sang trạng thái 'Đang sử dụng'. Trạng thái này chỉ được cập nhật tự động khi xe được gán vào chuyến.");
+            }
+            // Coordinator cũng không được phép thay đổi trạng thái nếu xe đang INUSE
+            if (vehicle.getStatus() == VehicleStatus.INUSE && newStatus != VehicleStatus.INUSE) {
+                throw new RuntimeException("Không thể thay đổi trạng thái khi xe đang trong chuyến đi.");
+            }
+        }
+
         Vehicles updated = updateEntity(vehicle, request);
+        System.out.println("[VehicleService] Updated vehicle status: " + updated.getStatus());
         vehicleRepository.save(updated);
         return mapToResponse(updated);
     }
@@ -339,9 +363,9 @@ public class VehicleServiceImpl implements VehicleService {
                 parseVehicleStatus(req.getStatus()) :
                 VehicleStatus.AVAILABLE);
         v.setBranch(branchRepository.findById(req.getBranchId())
-                .orElseThrow(() -> new RuntimeException("Branch not found")));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy chi nhánh")));
         v.setCategory(categoryRepository.findById(req.getCategoryId())
-                .orElseThrow(() -> new RuntimeException("Category not found")));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy loại xe")));
         return v;
     }
 
@@ -359,9 +383,9 @@ public class VehicleServiceImpl implements VehicleService {
                 parseVehicleStatus(req.getStatus()) :
                 existing.getStatus());
         existing.setBranch(branchRepository.findById(req.getBranchId())
-                .orElseThrow(() -> new RuntimeException("Branch not found")));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy chi nhánh")));
         existing.setCategory(categoryRepository.findById(req.getCategoryId())
-                .orElseThrow(() -> new RuntimeException("Category not found")));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy loại xe")));
         return existing;
     }
 
@@ -391,26 +415,35 @@ public class VehicleServiceImpl implements VehicleService {
      * Also supports: "AVAILABLE", "IN_USE", etc. (converts to proper format)
      */
     private VehicleStatus parseVehicleStatus(String status) {
+        System.out.println("[VehicleService] Parsing status: '" + status + "'");
         if (status == null || status.isBlank()) {
+            System.out.println("[VehicleService] Status is null/blank, returning AVAILABLE");
             return VehicleStatus.AVAILABLE;
         }
         // Normalize: remove underscores, capitalize first letter of each word
         String normalized = status.trim();
         // Handle common formats
         if (normalized.equalsIgnoreCase("AVAILABLE") || normalized.equalsIgnoreCase("available")) {
+            System.out.println("[VehicleService] Parsed as AVAILABLE");
             return VehicleStatus.AVAILABLE;
         } else if (normalized.equalsIgnoreCase("IN_USE") || normalized.equalsIgnoreCase("INUSE") || normalized.equalsIgnoreCase("inuse") || normalized.equalsIgnoreCase("InUse")) {
+            System.out.println("[VehicleService] Parsed as INUSE");
             return VehicleStatus.INUSE;
         } else if (normalized.equalsIgnoreCase("MAINTENANCE") || normalized.equalsIgnoreCase("maintenance")) {
+            System.out.println("[VehicleService] Parsed as MAINTENANCE");
             return VehicleStatus.MAINTENANCE;
         } else if (normalized.equalsIgnoreCase("INACTIVE") || normalized.equalsIgnoreCase("inactive")) {
+            System.out.println("[VehicleService] Parsed as INACTIVE");
             return VehicleStatus.INACTIVE;
         }
         // Try direct match (case-sensitive)
         try {
-            return VehicleStatus.valueOf(normalized);
+            VehicleStatus result = VehicleStatus.valueOf(normalized);
+            System.out.println("[VehicleService] Direct match: " + result);
+            return result;
         } catch (IllegalArgumentException e) {
             // Default to Available if unknown
+            System.out.println("[VehicleService] Unknown status, defaulting to AVAILABLE");
             return VehicleStatus.AVAILABLE;
         }
     }

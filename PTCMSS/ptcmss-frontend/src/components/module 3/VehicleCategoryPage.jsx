@@ -6,19 +6,14 @@ import {
     X,
     Hash,
     Check,
-    FolderKanban,
-    Users,
-    GaugeCircle,
+    Wrench,
+    Search,
+    Filter,
 } from "lucide-react";
 
-/* -------------------------------------------------
-   Tiny helpers
-------------------------------------------------- */
 const cls = (...a) => a.filter(Boolean).join(" ");
 
-/* -------------------------------------------------
-   Toast system (light style giống AdminBranchesPage)
-------------------------------------------------- */
+/* Toast system */
 function useToasts() {
     const [toasts, setToasts] = React.useState([]);
 
@@ -57,9 +52,7 @@ function Toasts({ toasts }) {
     );
 }
 
-/* -------------------------------------------------
-   Trạng thái ACTIVE / INACTIVE
-------------------------------------------------- */
+/* Status badge */
 function StatusPill({ status }) {
     const map = {
         ACTIVE: {
@@ -80,15 +73,11 @@ function StatusPill({ status }) {
                 info.cls
             )}
         >
-            {info.label}
-        </span>
+            {info.label}</span>
     );
 }
 
-/* -------------------------------------------------
-   Modal tạo danh mục xe (light)
-   POST /api/admin/vehicle-categories
-------------------------------------------------- */
+/* Modal tạo danh mục xe */
 function VehicleCategoryCreateModal({
                                         open,
                                         onClose,
@@ -112,11 +101,19 @@ function VehicleCategoryCreateModal({
 
     const cleanDigits = (s) => s.replace(/[^0-9]/g, "");
     const seatsNum = Number(cleanDigits(seats || ""));
-    const valid = name.trim().length > 0 && seatsNum > 0;
+    const valid = name.trim().length > 0 && seatsNum > 0 && seatsNum <= 45;
 
     async function handleSave() {
-        if (!valid) {
-            setError("Vui lòng nhập tên danh mục và số ghế hợp lệ (>0).");
+        if (!name.trim()) {
+            setError("Vui lòng nhập tên danh mục.");
+            return;
+        }
+        if (seatsNum <= 0) {
+            setError("Số ghế phải lớn hơn 0.");
+            return;
+        }
+        if (seatsNum > 45) {
+            setError("Số ghế không được vượt quá 45.");
             return;
         }
         setLoading(true);
@@ -128,7 +125,6 @@ function VehicleCategoryCreateModal({
         };
 
         try {
-            // giả lập API
             await new Promise((r) => setTimeout(r, 400));
 
             const fakeCreated = {
@@ -167,7 +163,7 @@ function VehicleCategoryCreateModal({
                             Tạo danh mục xe
                         </div>
                         <div className="text-[11px] text-slate-500">
-                            Ví dụ: “Xe 7 chỗ”, “Limousine 9 chỗ”
+                            Ví dụ: "Xe 7 chỗ", "Limousine 9 chỗ"
                         </div>
                     </div>
 
@@ -199,13 +195,8 @@ function VehicleCategoryCreateModal({
                                 "border-slate-300 bg-white shadow-sm",
                                 "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
                             )}
-                            placeholder='VD: "Xe 7 chỗ", "Xe VIP 4 chỗ"'
+                            placeholder="VD: Xe 7 chỗ, Xe 16 chỗ, Limousine"
                         />
-
-                        <div className="text-[11px] text-slate-500 mt-1 leading-snug">
-                            Hiển thị cho điều phối / CSKH khi chọn loại xe giao
-                            chuyến.
-                        </div>
                     </div>
 
                     {/* Số ghế */}
@@ -216,7 +207,7 @@ function VehicleCategoryCreateModal({
                                 <span className="text-red-500">*</span>
                             </span>
                             <span className="text-[11px] text-slate-400">
-                                Thường: 4 / 7 / 16 ...
+                                Tối đa: 45 ghế
                             </span>
                         </div>
 
@@ -224,16 +215,20 @@ function VehicleCategoryCreateModal({
                             <div className="flex-1">
                                 <input
                                     value={seats}
-                                    onChange={(e) =>
-                                        setSeats(cleanDigits(e.target.value))
-                                    }
+                                    onChange={(e) => {
+                                        const val = cleanDigits(e.target.value);
+                                        if (val === "" || Number(val) <= 45) {
+                                            setSeats(val);
+                                            setError("");
+                                        }
+                                    }}
                                     inputMode="numeric"
                                     className={cls(
                                         "w-full rounded-md border px-3 py-2 text-[13px] text-slate-900 placeholder:text-slate-400 outline-none tabular-nums",
                                         "border-slate-300 bg-white shadow-sm",
                                         "focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
                                     )}
-                                    placeholder="7"
+                                    placeholder="VD: 4, 7, 16, 45..."
                                 />
                             </div>
 
@@ -242,6 +237,12 @@ function VehicleCategoryCreateModal({
                                 ghế
                             </div>
                         </div>
+                        {seatsNum > 45 && (
+                            <div className="text-[11px] text-red-600 mt-1 flex items-center gap-1">
+                                <X className="h-3 w-3" />
+                                Số ghế không được vượt quá 45
+                            </div>
+                        )}
                     </div>
 
                     {error ? (
@@ -273,79 +274,12 @@ function VehicleCategoryCreateModal({
                         {loading ? "Đang lưu..." : "Lưu danh mục"}
                     </button>
                 </div>
-
-                {/* Dev note */}
-                <div className="border-t border-slate-200 bg-white px-5 py-2 text-[10px] text-slate-400">
-                    POST{" "}
-                    <code className="text-slate-600">
-                        /api/admin/vehicle-categories
-                    </code>
-                </div>
             </div>
         </div>
     );
 }
 
-/* -------------------------------------------------
-   StatCard KPI (light, giống vibe dashboard admin)
-------------------------------------------------- */
-function StatCard({ icon, label, value, hint, color = "sky" }) {
-    const colorMap = {
-        sky: {
-            chipBg: "bg-sky-50 border-sky-200 text-sky-600",
-            num: "text-slate-900",
-        },
-        green: {
-            chipBg: "bg-green-50 border-green-200 text-green-600",
-            num: "text-slate-900",
-        },
-        amber: {
-            chipBg: "bg-amber-50 border-amber-200 text-amber-600",
-            num: "text-slate-900",
-        },
-    };
-    const c = colorMap[color] || colorMap.sky;
-
-    return (
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-4 flex items-start gap-3">
-            <div
-                className={cls(
-                    "h-10 w-10 shrink-0 rounded-md border flex items-center justify-center text-[13px] font-medium",
-                    c.chipBg
-                )}
-            >
-                {icon}
-            </div>
-
-            <div className="flex flex-col min-w-0 leading-tight">
-                <div className="text-[11px] text-slate-500 font-medium uppercase tracking-wide">
-                    {label}
-                </div>
-                <div
-                    className={cls(
-                        "text-xl font-semibold tabular-nums leading-snug break-words",
-                        c.num
-                    )}
-                >
-                    {value}
-                </div>
-                {hint ? (
-                    <div className="text-[11px] text-slate-500 leading-snug">
-                        {hint}
-                    </div>
-                ) : null}
-            </div>
-        </div>
-    );
-}
-
-/* -------------------------------------------------
-   MAIN PAGE (light version)
-   - Header
-   - KPI
-   - Bảng
-   - Modal tạo
-------------------------------------------------- */
+/* MAIN PAGE - Redesigned to match VehicleListPage */
 export default function VehicleCategoryPage() {
     const { toasts, pushToast } = useToasts();
 
@@ -368,19 +302,12 @@ export default function VehicleCategoryPage() {
                 pushToast("Không tải được danh mục", "error");
             }
         })();
-    }, [mapCat]);
+    }, [mapCat, pushToast]);
 
     const [createOpen, setCreateOpen] = React.useState(false);
-
-    // KPIs
-    const totalTypes = categories.length;
-    const totalCars = categories.reduce(
-        (sum, c) => sum + Number(c.vehicles_count || 0),
-        0
-    );
-    const activeTypes = categories.filter(
-        (c) => c.status === "ACTIVE"
-    ).length;
+    const [searchText, setSearchText] = React.useState("");
+    const [statusFilter, setStatusFilter] = React.useState("ALL");
+    const [seatsFilter, setSeatsFilter] = React.useState("ALL");
 
     async function handleCreated(newCat) {
         try {
@@ -392,193 +319,274 @@ export default function VehicleCategoryPage() {
         }
     }
 
+    // Filter categories
+    const filteredCategories = React.useMemo(() => {
+        return categories.filter((cat) => {
+            // Search filter
+            if (searchText) {
+                const search = searchText.toLowerCase();
+                const matchName = cat.name.toLowerCase().includes(search);
+                const matchSeats = String(cat.seats || "").includes(search);
+                if (!matchName && !matchSeats) return false;
+            }
+
+            // Status filter
+            if (statusFilter !== "ALL" && cat.status !== statusFilter) {
+                return false;
+            }
+
+            // Seats filter
+            if (seatsFilter !== "ALL") {
+                if (seatsFilter === "4" && cat.seats !== 4) return false;
+                if (seatsFilter === "7" && cat.seats !== 7) return false;
+                if (seatsFilter === "16" && cat.seats !== 16) return false;
+                if (seatsFilter === "29" && cat.seats !== 29) return false;
+                if (seatsFilter === "45" && cat.seats !== 45) return false;
+                if (seatsFilter === "OTHER") {
+                    if ([4, 7, 16, 29, 45].includes(cat.seats)) return false;
+                }
+            }
+
+            return true;
+        });
+    }, [categories, searchText, statusFilter, seatsFilter]);
+
     return (
         <div className="relative min-h-screen bg-slate-50 text-slate-900 p-6">
             <Toasts toasts={toasts} />
 
-            {/* HEADER */}
-            <div className="flex flex-col xl:flex-row xl:items-start gap-6 mb-8">
-                {/* left side */}
-                <div className="flex-1 flex flex-col gap-3 min-w-0">
-                    <div className="flex flex-wrap items-start gap-3">
-                        <div className="flex items-start gap-3">
-                            <div className="h-12 w-12 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-center">
-                                <CarFront className="h-6 w-6 text-sky-600" />
-                            </div>
-
-                            <div className="flex flex-col leading-tight">
-                                <div className="text-[16px] font-semibold text-slate-900">
-                                    Danh mục xe
-                                </div>
-                                <div className="text-[12px] text-slate-500 leading-snug max-w-xl">
-                                    Phân loại xe để điều phối gán chuyến / báo
-                                    giá cho khách.
-                                </div>
-                            </div>
+            {/* HEADER - Match VehicleListPage style */}
+            <div className="mb-6">
+                <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-white border border-slate-200 shadow-sm flex items-center justify-center">
+                            <CarFront className="h-5 w-5 text-sky-600" />
+                        </div>
+                        <div>
+                            <h1 className="text-[16px] font-semibold text-slate-900">
+                                Quản lý danh mục xe
+                            </h1>
+                            <p className="text-[12px] text-slate-500">
+                                Chuẩn hoá loại xe để điều phối và quản lý hiệu quả.
+                            </p>
                         </div>
                     </div>
 
-                    <div className="text-[12px] text-slate-500 leading-snug max-w-xl">
-                        Ví dụ: “Xe 4 chỗ”, “Xe 7 chỗ”, “Xe Limousine VIP”.
-                        Các danh mục này sẽ xuất hiện khi CSKH / Điều phối chọn
-                        xe cho chuyến đi.
-                    </div>
-                </div>
-
-                {/* create button */}
-                <div className="flex-shrink-0">
                     <button
                         onClick={() => setCreateOpen(true)}
                         className={cls(
-                            "inline-flex items-center gap-2 rounded-md text-[13px] font-medium px-3 py-2 text-white shadow-sm",
+                            "inline-flex items-center gap-2 rounded-md text-[13px] font-medium px-4 py-2 text-white shadow-sm",
                             "bg-sky-600 hover:bg-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
                         )}
                     >
                         <PlusCircle className="h-4 w-4" />
-                        <span>Tạo danh mục xe</span>
+                        <span>Tạo danh mục mới</span>
                     </button>
                 </div>
-            </div>
 
-            {/* KPI CARDS */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-8">
-                <StatCard
-                    icon={<FolderKanban className="h-5 w-5" />}
-                    label="Tổng loại xe"
-                    value={totalTypes}
-                    hint="Số danh mục hiện có"
-                    color="sky"
-                />
-
-                <StatCard
-                    icon={<Users className="h-5 w-5" />}
-                    label="Số xe đang quản lý"
-                    value={totalCars}
-                    hint="Gộp tất cả danh mục"
-                    color="green"
-                />
-
-                <StatCard
-                    icon={<GaugeCircle className="h-5 w-5" />}
-                    label="Danh mục đang active"
-                    value={activeTypes + " / " + totalTypes}
-                    hint="Khả dụng để phân công chuyến"
-                    color="amber"
-                />
-            </div>
-
-            {/* TABLE CARD */}
-            <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                {/* head bar */}
-                <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-                    <div className="flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-md bg-sky-100 text-sky-600 border border-sky-200 flex items-center justify-center">
-                            <CarFront className="h-4 w-4" />
-                        </div>
-                        <div className="flex flex-col leading-tight">
-                            <div className="text-[13px] font-medium text-slate-700">
-                                Danh sách danh mục xe
-                            </div>
-                            <div className="text-[11px] text-slate-500">
-                                {categories.length} danh mục
-                            </div>
-                        </div>
+                <div className="flex items-center gap-2 text-[12px]">
+                    <div className="px-3 py-1.5 rounded-md bg-white border border-slate-200 text-slate-600 shadow-sm">
+                        Danh sách danh mục
                     </div>
                 </div>
+            </div>
 
-                {categories.length === 0 ? (
+            {/* FILTERS */}
+            <div className="mb-6 flex flex-col md:flex-row gap-3">
+                {/* Search */}
+                <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                        type="text"
+                        value={searchText}
+                        onChange={(e) => setSearchText(e.target.value)}
+                        placeholder="Tìm theo tên hoặc số ghế..."
+                        className="w-full pl-10 pr-4 py-2 text-[13px] border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+                    />
+                </div>
+
+                {/* Status Filter */}
+                <div className="relative">
+                    <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                    <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="pl-10 pr-8 py-2 text-[13px] border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 appearance-none cursor-pointer"
+                    >
+                        <option value="ALL">Tất cả trạng thái</option>
+                        <option value="ACTIVE">Đang hoạt động</option>
+                        <option value="INACTIVE">Ngừng hoạt động</option>
+                    </select>
+                </div>
+
+                {/* Seats Filter */}
+                <div className="relative">
+                    <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                    <select
+                        value={seatsFilter}
+                        onChange={(e) => setSeatsFilter(e.target.value)}
+                        className="pl-10 pr-8 py-2 text-[13px] border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 appearance-none cursor-pointer"
+                    >
+                        <option value="ALL">Tất cả số ghế</option>
+                        <option value="4">4 chỗ</option>
+                        <option value="7">7 chỗ</option>
+                        <option value="16">16 chỗ</option>
+                        <option value="29">29 chỗ</option>
+                        <option value="45">45 chỗ</option>
+                        <option value="OTHER">Khác</option>
+                    </select>
+                </div>
+
+                {/* Reset Filter Button */}
+                {(searchText || statusFilter !== "ALL" || seatsFilter !== "ALL") && (
+                    <button
+                        onClick={() => {
+                            setSearchText("");
+                            setStatusFilter("ALL");
+                            setSeatsFilter("ALL");
+                        }}
+                        className="px-4 py-2 text-[13px] text-slate-600 hover:text-slate-900 border border-slate-300 rounded-lg bg-white hover:bg-slate-50 transition-colors"
+                    >
+                        <X className="h-4 w-4 inline mr-1" />
+                        Xóa filter
+                    </button>
+                )}
+            </div>
+
+            {/* TABLE CARD - Match VehicleListPage style */}
+            <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                {filteredCategories.length === 0 ? (
                     <div className="px-4 py-16 text-center">
                         <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-400 mb-4">
                             <CarFront className="h-8 w-8" />
                         </div>
                         <div className="text-[14px] font-medium text-slate-700 mb-1">
-                            Chưa có danh mục xe nào
+                            {categories.length === 0 ? "Chưa có danh mục xe nào" : "Không tìm thấy kết quả"}
                         </div>
                         <div className="text-[12px] text-slate-500 mb-4 max-w-sm mx-auto">
-                            Tạo danh mục xe đầu tiên để bắt đầu phân loại và quản lý đội xe của bạn
+                            {categories.length === 0
+                                ? "Tạo danh mục xe đầu tiên để bắt đầu phân loại và quản lý đội xe của bạn"
+                                : "Thử điều chỉnh bộ lọc hoặc từ khóa tìm kiếm"}
                         </div>
-                        <button
-                            onClick={() => setCreateOpen(true)}
-                            className="inline-flex items-center gap-2 rounded-md text-[13px] font-medium px-4 py-2 text-white bg-sky-600 hover:bg-sky-500 shadow-sm"
-                        >
-                            <PlusCircle className="h-4 w-4" />
-                            <span>Tạo danh mục đầu tiên</span>
-                        </button>
+                        {categories.length === 0 && (
+                            <button
+                                onClick={() => setCreateOpen(true)}
+                                className="inline-flex items-center gap-2 rounded-md text-[13px] font-medium px-4 py-2 text-white bg-sky-600 hover:bg-sky-500 shadow-sm"
+                            >
+                                <PlusCircle className="h-4 w-4" />
+                                <span>Tạo danh mục đầu tiên</span>
+                            </button>
+                        )}
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-[13px] text-slate-700">
-                            <thead className="bg-slate-50 border-b border-slate-200 text-[11px] uppercase tracking-wide text-slate-600">
-                            <tr>
-                                <th className="px-5 py-3 font-semibold text-left">
-                                    Tên danh mục
-                                </th>
-                                <th className="px-5 py-3 font-semibold text-center whitespace-nowrap">
-                                    Số ghế
-                                </th>
-                                <th className="px-5 py-3 font-semibold text-center">
-                                    Trạng thái
-                                </th>
-                                <th className="px-5 py-3 font-semibold text-center whitespace-nowrap">
-                                    Số xe
-                                </th>
-                            </tr>
-                            </thead>
+                    <>
+                        <div className="overflow-x-auto text-[13px] text-slate-700">
+                            <table className="w-full text-left">
+                                <thead className="bg-slate-100/60 border-b border-slate-200 text-[11px] uppercase tracking-wide text-slate-500">
+                                <tr>
+                                    <th className="px-5 py-3 font-medium text-left">
+                                        Tên danh mục
+                                    </th>
+                                    <th className="px-5 py-3 font-medium text-center whitespace-nowrap">
+                                        Số ghế
+                                    </th>
+                                    <th className="px-5 py-3 font-medium text-center whitespace-nowrap">
+                                        Phí mở cửa
+                                    </th>
+                                    <th className="px-5 py-3 font-medium text-center whitespace-nowrap">
+                                        Giá cố định/ngày
+                                    </th>
+                                    <th className="px-5 py-3 font-medium text-center whitespace-nowrap">
+                                        Giá theo km
+                                    </th>
+                                    <th className="px-5 py-3 font-medium text-center">
+                                        Trạng thái
+                                    </th>
+                                    <th className="px-5 py-3 font-medium text-center whitespace-nowrap">
+                                        Số xe
+                                    </th>
+                                    <th className="px-5 py-3 font-medium text-center">
+                                        Hành động
+                                    </th>
+                                </tr>
+                                </thead>
 
-                            <tbody className="divide-y divide-slate-100">
-                            {categories.map((cat) => (
-                                <tr
-                                    key={cat.id}
-                                    className="hover:bg-slate-50/70 transition-colors"
-                                >
-                                    {/* name + id */}
-                                    <td className="px-5 py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-sky-50 to-sky-100 border border-sky-200 flex items-center justify-center text-sky-600 font-semibold text-[13px] shadow-sm">
-                                                {cat.seats || "?"}
-                                            </div>
-                                            <div className="flex flex-col leading-tight">
-                                                <div className="text-slate-900 font-medium text-[14px]">
+                                <tbody className="divide-y divide-slate-200">
+                                {filteredCategories.map((cat) => (
+                                    <tr
+                                        key={cat.id}
+                                        className="hover:bg-slate-50 transition-colors"
+                                    >
+                                        {/* name */}
+                                        <td className="px-5 py-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className="text-slate-900 font-medium text-[13px]">
                                                     {cat.name}
                                                 </div>
-                                                <div className="text-[11px] text-slate-500">
-                                                    ID: {cat.id}
-                                                </div>
                                             </div>
-                                        </div>
-                                    </td>
+                                        </td>
 
-                                    {/* seats */}
-                                    <td className="px-5 py-4 text-center">
-                                            <span className="inline-flex items-center gap-1 text-[13px] text-slate-700 tabular-nums font-medium">
-                                                {cat.seats ?? "—"} ghế
-                                            </span>
-                                    </td>
+                                        {/* seats */}
+                                        <td className="px-5 py-3 text-center">
+                                                <span className="text-[13px] text-slate-700 tabular-nums">
+                                                    {cat.seats ?? "—"} ghế
+                                                </span>
+                                        </td>
 
-                                    {/* status */}
-                                    <td className="px-5 py-4 text-center">
-                                        <StatusPill status={cat.status} />
-                                    </td>
+                                        {/* pricing placeholders */}
+                                        <td className="px-5 py-3 text-center text-slate-500 text-[12px]">
+                                            —
+                                        </td>
+                                        <td className="px-5 py-3 text-center text-slate-500 text-[12px]">
+                                            —
+                                        </td>
+                                        <td className="px-5 py-3 text-center text-slate-500 text-[12px]">
+                                            —
+                                        </td>
 
-                                    {/* vehicles_count */}
-                                    <td className="px-5 py-4 text-center">
-                                            <span className="text-[14px] font-semibold text-slate-900 tabular-nums">
-                                                {cat.vehicles_count} xe
-                                            </span>
-                                    </td>
-                                </tr>
-                            ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                        {/* status */}
+                                        <td className="px-5 py-3 text-center">
+                                            <StatusPill status={cat.status} />
+                                        </td>
+
+                                        {/* vehicles_count */}
+                                        <td className="px-5 py-3 text-center">
+                                            <div className="inline-flex items-center gap-1 text-sky-600 text-[13px]">
+                                                <CarFront className="h-3.5 w-3.5" />
+                                                <span className="font-medium">{cat.vehicles_count}</span>
+                                            </div>
+                                        </td>
+
+                                        {/* action */}
+                                        <td className="px-5 py-3 text-center">
+                                            <button
+                                                className={cls(
+                                                    "inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-[12px] font-medium shadow-sm",
+                                                    "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100"
+                                                )}
+                                            >
+                                                <Wrench className="h-3.5 w-3.5 text-sky-600" />
+                                                <span>Sửa</span>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Footer info */}
+                        <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 text-[11px] text-slate-500 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <div className="h-1.5 w-1.5 rounded-full bg-sky-500"></div>
+                                <span>Hiển thị {filteredCategories.length} / {categories.length} danh mục</span>
+                            </div>
+                            <div>
+                                Tổng số hiện tại: <span className="font-medium text-slate-700">{categories.length}</span>
+                            </div>
+                        </div>
+                    </>
                 )}
-
-                <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 text-[11px] text-slate-500 leading-relaxed">
-                    <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-sky-500"></div>
-                        <span>Dữ liệu từ API: <code className="text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">GET /api/vehicle-categories</code></span>
-                    </div>
-                </div>
             </div>
 
             {/* MODAL TẠO MỚI */}

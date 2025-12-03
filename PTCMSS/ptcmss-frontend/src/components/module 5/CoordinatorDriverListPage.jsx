@@ -1,12 +1,18 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Users, Search, Eye, Edit, Calendar, Award, AlertCircle } from "lucide-react";
-import { listDriversByBranch } from "../../api/drivers";
-import { getCookie } from "../../utils/cookies";
+import { Users, Search, Eye, Calendar, Award, AlertCircle, RefreshCw, Loader2, X, CheckCircle2 } from "lucide-react";
+import { listDriversByBranch, getDriverSchedule } from "../../api/drivers";
+import { getBranchByUserId } from "../../api/branches";
+import { getCurrentRole, getStoredUserId, ROLES } from "../../utils/session";
 import Pagination from "../common/Pagination";
 
-export default function CoordinatorDriverListPage() {
+export default function CoordinatorDriverListPage({ readOnly = false }) {
     const navigate = useNavigate();
+    const role = useMemo(() => getCurrentRole(), []);
+    const userId = useMemo(() => getStoredUserId(), []);
+    const isBranchScoped = role === ROLES.MANAGER || role === ROLES.COORDINATOR || role === ROLES.CONSULTANT;
+    const isConsultant = role === ROLES.CONSULTANT;
+
     const [drivers, setDrivers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
@@ -14,21 +20,122 @@ export default function CoordinatorDriverListPage() {
     const [totalPages, setTotalPages] = useState(1);
     const pageSize = 10;
 
-    useEffect(() => {
-        fetchDrivers();
-    }, [currentPage, searchQuery]);
+    // Time filter for Consultant (to check driver availability)
+    const [timeFilterStart, setTimeFilterStart] = useState("");
+    const [timeFilterEnd, setTimeFilterEnd] = useState("");
+    const [driverAvailability, setDriverAvailability] = useState({}); // { driverId: { available: boolean, reason: string } }
 
-    const fetchDrivers = async () => {
-        try {
-            setLoading(true);
-            const branchId = getCookie("branchId");
-            if (!branchId) {
-                console.error("No branchId found");
-                setLoading(false);
-                return;
+    // Branch state
+    const [branchId, setBranchId] = useState(null);
+    const [branchName, setBranchName] = useState("");
+    const [branchLoading, setBranchLoading] = useState(true);
+    const [branchError, setBranchError] = useState("");
+
+    // Load branch for scoped users
+    useEffect(() => {
+        if (!isBranchScoped) {
+            setBranchLoading(false);
+            return;
+        }
+        if (!userId) {
+            setBranchError("Không xác định được user ID");
+            setBranchLoading(false);
+            return;
+        }
+
+        let cancelled = false;
+        async function loadBranch() {
+            setBranchLoading(true);
+            setBranchError("");
+            try {
+                const resp = await getBranchByUserId(Number(userId));
+                if (cancelled) return;
+                const id = resp?.branchId ?? resp?.id ?? null;
+                const name = resp?.branchName ?? resp?.name ?? "";
+                if (id) {
+                    setBranchId(id);
+                    setBranchName(name);
+                } else {
+                    setBranchError("Không tìm thấy chi nhánh phụ trách");
+                }
+            } catch (err) {
+                if (cancelled) return;
+                setBranchError(err?.message || "Không tải được thông tin chi nhánh");
+            } finally {
+                if (!cancelled) setBranchLoading(false);
+            }
+        }
+        loadBranch();
+        return () => { cancelled = true; };
+    }, [isBranchScoped, userId]);
+
+    useEffect(() => {
+        if (branchLoading) return;
+        if (isBranchScoped && !branchId) return;
+        fetchDrivers();
+    }, [currentPage, searchQuery, branchId, branchLoading]);
+
+    // Check driver availability when time filter is set (for Consultant)
+    useEffect(() => {
+        if (!isConsultant || !timeFilterStart || !timeFilterEnd || !drivers.length) {
+            setDriverAvailability({});
+            return;
+        }
+
+        const checkAvailability = async () => {
+            const availabilityMap = {};
+            const startTime = new Date(timeFilterStart + "T00:00:00");
+            const endTime = new Date(timeFilterEnd + "T23:59:59");
+
+            // Check availability for each driver
+            for (const driver of drivers) {
+                try {
+                    const schedule = await getDriverSchedule(driver.id);
+                    const trips = schedule?.trips || schedule || [];
+
+                    // Check if driver has any trip overlapping with the time range
+                    const hasConflict = trips.some(trip => {
+                        if (!trip.startTime || trip.status === 'COMPLETED' || trip.status === 'CANCELLED') {
+                            return false;
+                        }
+                        const tripStart = new Date(trip.startTime);
+                        const tripEnd = trip.endTime ? new Date(trip.endTime) : new Date(tripStart.getTime() + 8 * 60 * 60 * 1000); // Default 8 hours if no endTime
+
+                        // Check overlap
+                        return (tripStart <= endTime && tripEnd >= startTime);
+                    });
+
+                    availabilityMap[driver.id] = {
+                        available: !hasConflict,
+                        reason: hasConflict ? "Có chuyến trong khoảng thời gian này" : "Rảnh",
+                    };
+                } catch (err) {
+                    console.error(`Error checking availability for driver ${driver.id}:`, err);
+                    availabilityMap[driver.id] = {
+                        available: false,
+                        reason: "Lỗi kiểm tra",
+                    };
+                }
             }
 
+            setDriverAvailability(availabilityMap);
+        };
+
+        checkAvailability();
+    }, [isConsultant, timeFilterStart, timeFilterEnd, drivers]);
+
+    const fetchDrivers = async () => {
+        if (!branchId) {
+            console.error("[CoordinatorDriverListPage] No branchId");
+            setLoading(false);
+            return;
+        }
+
+        try {
+            setLoading(true);
+            console.log("[CoordinatorDriverListPage] Fetching drivers for branch:", branchId);
             const response = await listDriversByBranch(branchId);
+            console.log("[CoordinatorDriverListPage] Response:", response);
             let driversList = Array.isArray(response) ? response : [];
 
             // Client-side search filter
@@ -60,10 +167,6 @@ export default function CoordinatorDriverListPage() {
         navigate(`/coordinator/drivers/${driverId}`);
     };
 
-    const handleEditDriver = (driverId) => {
-        navigate(`/coordinator/drivers/${driverId}/edit`);
-    };
-
     const getLicenseStatus = (expiryDate) => {
         if (!expiryDate) return { text: "Chưa cập nhật", color: "text-gray-500" };
         const expiry = new Date(expiryDate);
@@ -73,6 +176,16 @@ export default function CoordinatorDriverListPage() {
         if (daysUntilExpiry < 0) return { text: "Đã hết hạn", color: "text-red-600" };
         if (daysUntilExpiry <= 30) return { text: `Còn ${daysUntilExpiry} ngày`, color: "text-orange-600" };
         return { text: `Còn ${daysUntilExpiry} ngày`, color: "text-green-600" };
+    };
+
+    // Helper để format date
+    const formatDate = (dateStr) => {
+        if (!dateStr) return null;
+        try {
+            return new Date(dateStr).toLocaleDateString("vi-VN");
+        } catch {
+            return dateStr;
+        }
     };
 
     return (
@@ -91,20 +204,116 @@ export default function CoordinatorDriverListPage() {
                     </div>
                 </div>
 
-                {/* Search */}
+                {/* Branch Error */}
+                {branchError && (
+                    <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 mb-6 flex items-center gap-3">
+                        <AlertCircle className="h-5 w-5 text-rose-600 shrink-0" />
+                        <span className="text-sm text-rose-700">{branchError}</span>
+                    </div>
+                )}
+
+                {/* Search + Branch Info + Time Filter */}
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6">
-                    <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5">
-                        <Search className="h-5 w-5 text-slate-400" />
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => {
-                                setSearchQuery(e.target.value);
-                                setCurrentPage(1);
-                            }}
-                            placeholder="Tìm kiếm tài xế theo tên, số điện thoại..."
-                            className="flex-1 bg-transparent outline-none text-slate-700 placeholder:text-slate-400"
-                        />
+                    <div className="flex flex-col gap-4">
+                        {/* Row 1: Search + Refresh + Branch */}
+                        <div className="flex flex-col sm:flex-row gap-4">
+                            <div className="flex-1 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5">
+                                <Search className="h-5 w-5 text-slate-400" />
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => {
+                                        setSearchQuery(e.target.value);
+                                        setCurrentPage(1);
+                                    }}
+                                    placeholder="Tìm kiếm tài xế theo tên, số điện thoại..."
+                                    className="flex-1 bg-transparent outline-none text-slate-700 placeholder:text-slate-400"
+                                />
+                            </div>
+
+                            {/* Refresh */}
+                            <button
+                                onClick={() => fetchDrivers()}
+                                disabled={loading || branchLoading}
+                                className="px-4 py-2 rounded-lg text-sm font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors flex items-center gap-2 disabled:opacity-50"
+                            >
+                                {loading ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <RefreshCw className="h-4 w-4" />
+                                )}
+                                Refresh
+                            </button>
+
+                            {/* Branch info */}
+                            {isBranchScoped && branchName && (
+                                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-sky-50 text-sky-700 text-sm">
+                                    <span className="font-medium">Chi nhánh:</span>
+                                    <span>{branchName}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Row 2: Time filter for Consultant */}
+                        {isConsultant && (
+                            <div className="flex flex-col sm:flex-row items-center gap-3 pt-3 border-t border-slate-200">
+                                <span className="text-sm text-slate-600 font-medium">Kiểm tra tài xế rảnh:</span>
+                                <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                        <Calendar className="h-4 w-4 text-slate-400" />
+                                        <input
+                                            type="date"
+                                            value={timeFilterStart}
+                                            onChange={(e) => {
+                                                const newStart = e.target.value;
+                                                setTimeFilterStart(newStart);
+                                                setCurrentPage(1);
+                                                // Nếu ngày end < ngày start mới, reset end
+                                                if (timeFilterEnd && newStart && timeFilterEnd < newStart) {
+                                                    setTimeFilterEnd("");
+                                                }
+                                            }}
+                                            max={timeFilterEnd || undefined}
+                                            className="bg-transparent outline-none text-sm text-slate-700"
+                                            title="Từ ngày"
+                                        />
+                                    </div>
+                                    <span className="text-slate-400">→</span>
+                                    <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                        <Calendar className="h-4 w-4 text-slate-400" />
+                                        <input
+                                            type="date"
+                                            value={timeFilterEnd}
+                                            onChange={(e) => {
+                                                const newEnd = e.target.value;
+                                                // Validate: end phải >= start
+                                                if (timeFilterStart && newEnd && newEnd < timeFilterStart) {
+                                                    // Không cho phép chọn ngày end < start
+                                                    return;
+                                                }
+                                                setTimeFilterEnd(newEnd);
+                                                setCurrentPage(1);
+                                            }}
+                                            min={timeFilterStart || undefined}
+                                            className="bg-transparent outline-none text-sm text-slate-700"
+                                            title="Đến ngày"
+                                        />
+                                    </div>
+                                    {(timeFilterStart || timeFilterEnd) && (
+                                        <button
+                                            onClick={() => {
+                                                setTimeFilterStart("");
+                                                setTimeFilterEnd("");
+                                            }}
+                                            className="px-3 py-2 rounded-lg text-sm font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors flex items-center gap-2"
+                                            title="Xóa filter thời gian"
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -123,80 +332,120 @@ export default function CoordinatorDriverListPage() {
                         <div className="overflow-x-auto">
                             <table className="w-full">
                                 <thead className="bg-slate-50 border-b border-slate-200">
-                                    <tr>
+                                <tr>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                        Tài xế
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                        Số điện thoại
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                        Hạng GPLX
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                        Hạn GPLX
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                        Khám sức khỏe
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                        Trạng thái
+                                    </th>
+                                    {isConsultant && timeFilterStart && timeFilterEnd && (
                                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                            Tài xế
+                                            Rảnh/Bận
                                         </th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                            Số điện thoại
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                            Hạng GPLX
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                            Hạn GPLX
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                            Khám sức khỏe
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                            Trạng thái
-                                        </th>
-                                        <th className="px-4 py-3 text-center text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                            Thao tác
-                                        </th>
-                                    </tr>
+                                    )}
+                                    <th className="px-4 py-3 text-center text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                        Thao tác
+                                    </th>
+                                </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-200">
-                                    {drivers.map((driver) => {
-                                        const licenseStatus = getLicenseStatus(driver.licenseExpiryDate);
-                                        return (
-                                            <tr key={driver.id} className="hover:bg-slate-50 transition-colors">
-                                                <td className="px-4 py-3">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#0079BC] to-sky-600 flex items-center justify-center text-white font-semibold text-sm">
-                                                            {driver.fullName?.charAt(0) || "?"}
-                                                        </div>
-                                                        <div>
-                                                            <div className="font-medium text-slate-900">{driver.fullName}</div>
-                                                            <div className="text-xs text-slate-500">ID: {driver.id}</div>
-                                                        </div>
+                                {drivers.map((driver) => {
+                                    const licenseStatus = getLicenseStatus(driver.licenseExpiry);
+                                    return (
+                                        <tr key={driver.id} className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#0079BC] to-sky-600 flex items-center justify-center text-white font-semibold text-sm">
+                                                        {driver.fullName?.charAt(0) || "?"}
                                                     </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-sm text-slate-700">{driver.phoneNumber || "—"}</td>
-                                                <td className="px-4 py-3">
+                                                    <div>
+                                                        <div className="font-medium text-slate-900">{driver.fullName}</div>
+                                                        <div className="text-xs text-slate-500">ID: {driver.id}</div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-slate-700">{driver.phone || "—"}</td>
+                                            <td className="px-4 py-3">
                                                     <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-medium">
                                                         <Award className="h-3 w-3" />
                                                         {driver.licenseClass || "—"}
                                                     </span>
-                                                </td>
-                                                <td className="px-4 py-3">
+                                            </td>
+                                            <td className="px-4 py-3">
                                                     <span className={`text-sm font-medium ${licenseStatus.color}`}>
                                                         {licenseStatus.text}
                                                     </span>
-                                                </td>
-                                                <td className="px-4 py-3 text-sm text-slate-700">
-                                                    {driver.lastHealthCheckDate ? (
-                                                        <span className="flex items-center gap-1">
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-slate-700">
+                                                {driver.healthCheckDate ? (
+                                                    <span className="flex items-center gap-1">
                                                             <Calendar className="h-3 w-3 text-slate-400" />
-                                                            {new Date(driver.lastHealthCheckDate).toLocaleDateString("vi-VN")}
+                                                        {formatDate(driver.healthCheckDate)}
                                                         </span>
+                                                ) : (
+                                                    <span className="text-slate-400">Chưa cập nhật</span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {(() => {
+                                                    const statusMap = {
+                                                        "AVAILABLE": { label: "Sẵn sàng", color: "bg-green-50 text-green-700" },
+                                                        "BUSY": { label: "Đang bận", color: "bg-amber-50 text-amber-700" },
+                                                        "ON_LEAVE": { label: "Nghỉ phép", color: "bg-slate-50 text-slate-700" },
+                                                        "INACTIVE": { label: "Không hoạt động", color: "bg-rose-50 text-rose-700" },
+                                                        "ACTIVE": { label: "Hoạt động", color: "bg-green-50 text-green-700" },
+                                                    };
+                                                    const config = statusMap[driver.status] || { label: driver.status || "—", color: "bg-slate-50 text-slate-700" };
+                                                    return (
+                                                        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
+                                                                {config.label}
+                                                            </span>
+                                                    );
+                                                })()}
+                                            </td>
+                                            {/* Availability badge for Consultant with time filter */}
+                                            {isConsultant && timeFilterStart && timeFilterEnd && (
+                                                <td className="px-4 py-3">
+                                                    {driverAvailability[driver.id] ? (
+                                                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium ${
+                                                            driverAvailability[driver.id].available
+                                                                ? "bg-green-50 text-green-700 border border-green-200"
+                                                                : "bg-orange-50 text-orange-700 border border-orange-200"
+                                                        }`}>
+                                                                {driverAvailability[driver.id].available ? (
+                                                                    <>
+                                                                        <CheckCircle2 className="h-3 w-3" />
+                                                                        Rảnh
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <AlertCircle className="h-3 w-3" />
+                                                                        Bận
+                                                                    </>
+                                                                )}
+                                                            </span>
                                                     ) : (
-                                                        <span className="text-slate-400">Chưa cập nhật</span>
+                                                        <span className="text-xs text-slate-400">Đang kiểm tra...</span>
                                                     )}
                                                 </td>
-                                                <td className="px-4 py-3">
-                                                    <span
-                                                        className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${driver.status === "ACTIVE"
-                                                            ? "bg-green-50 text-green-700"
-                                                            : "bg-gray-50 text-gray-700"
-                                                            }`}
-                                                    >
-                                                        {driver.status === "ACTIVE" ? "Hoạt động" : "Không hoạt động"}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <div className="flex items-center justify-center gap-2">
+                                            )}
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center justify-center">
+                                                    {/* Consultant: Ẩn button Xem chi tiết */}
+                                                    {!isConsultant && (
                                                         <button
                                                             onClick={() => handleViewDetail(driver.id)}
                                                             className="p-2 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors"
@@ -204,18 +453,15 @@ export default function CoordinatorDriverListPage() {
                                                         >
                                                             <Eye className="h-4 w-4" />
                                                         </button>
-                                                        <button
-                                                            onClick={() => handleEditDriver(driver.id)}
-                                                            className="p-2 rounded-lg hover:bg-green-50 text-green-600 transition-colors"
-                                                            title="Cập nhật hồ sơ"
-                                                        >
-                                                            <Edit className="h-4 w-4" />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
+                                                    )}
+                                                    {isConsultant && (
+                                                        <span className="text-[11px] text-slate-400 italic">Chỉ xem</span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                                 </tbody>
                             </table>
                         </div>
