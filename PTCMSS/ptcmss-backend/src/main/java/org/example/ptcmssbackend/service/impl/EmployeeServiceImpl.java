@@ -5,12 +5,14 @@ import org.example.ptcmssbackend.entity.Employees;
 import org.example.ptcmssbackend.entity.Users;
 import org.example.ptcmssbackend.entity.Branches;
 import org.example.ptcmssbackend.entity.Roles;
+import org.example.ptcmssbackend.entity.Drivers;
 import org.example.ptcmssbackend.enums.EmployeeStatus;
 import org.example.ptcmssbackend.enums.UserStatus;
 import org.example.ptcmssbackend.repository.EmployeeRepository;
 import org.example.ptcmssbackend.repository.UsersRepository;
 import org.example.ptcmssbackend.repository.BranchesRepository;
 import org.example.ptcmssbackend.repository.RolesRepository;
+import org.example.ptcmssbackend.repository.DriverRepository;
 import org.example.ptcmssbackend.service.EmployeeService;
 import org.example.ptcmssbackend.service.EmailService;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -28,6 +30,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     private final UsersRepository usersRepository;
     private final BranchesRepository branchesRepository;
     private final RolesRepository rolesRepository;
+    private final DriverRepository driverRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
 
@@ -71,20 +74,20 @@ public class EmployeeServiceImpl implements EmployeeService {
 
         // Tìm User, Branch, Role từ ID
         Users user = usersRepository.findById(request.getUserId())
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + request.getUserId()));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng với ID: " + request.getUserId()));
         System.out.println("Found user: " + user.getId() + " - " + user.getFullName());
 
         Branches branch = branchesRepository.findById(request.getBranchId())
-                .orElseThrow(() -> new RuntimeException("Branch not found with id: " + request.getBranchId()));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy chi nhánh với ID: " + request.getBranchId()));
         System.out.println("Found branch: " + branch.getId() + " - " + branch.getBranchName());
 
         Roles role = rolesRepository.findById(request.getRoleId())
-                .orElseThrow(() -> new RuntimeException("Role not found with id: " + request.getRoleId()));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy vai trò với ID: " + request.getRoleId()));
         System.out.println("Found role: " + role.getId() + " - " + role.getRoleName());
 
         // Kiểm tra xem user đã là employee chưa
         if (employeeRepository.existsByUser_Id(request.getUserId())) {
-            throw new RuntimeException("User is already an employee");
+            throw new RuntimeException("Người dùng này đã là nhân viên");
         }
 
         // Tạo Employee mới
@@ -117,15 +120,15 @@ public class EmployeeServiceImpl implements EmployeeService {
 
         // Tìm employee hiện tại với eager loading
         Employees employee = employeeRepository.findByIdWithDetails(id)
-                .orElseThrow(() -> new RuntimeException("Employee not found with id: " + id));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy nhân viên với ID: " + id));
 
         // Tìm Branch và Role mới
         Branches branch = branchesRepository.findById(request.getBranchId())
-                .orElseThrow(() -> new RuntimeException("Branch not found with id: " + request.getBranchId()));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy chi nhánh với ID: " + request.getBranchId()));
         System.out.println("Found branch: " + branch.getId() + " - " + branch.getBranchName());
 
         Roles role = rolesRepository.findById(request.getRoleId())
-                .orElseThrow(() -> new RuntimeException("Role not found with id: " + request.getRoleId()));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy vai trò với ID: " + request.getRoleId()));
         System.out.println("Found role: " + role.getId() + " - " + role.getRoleName());
 
         // Cập nhật thông tin
@@ -136,6 +139,50 @@ public class EmployeeServiceImpl implements EmployeeService {
         if (request.getStatus() != null && !request.getStatus().isEmpty()) {
             employee.setStatus(EmployeeStatus.valueOf(request.getStatus().toUpperCase()));
         }
+
+        // Cập nhật thông tin user liên quan
+        Users user = employee.getUser();
+        if (user == null) {
+            throw new RuntimeException("Nhân viên không gắn với tài khoản người dùng hợp lệ");
+        }
+
+        if (request.getFullName() != null && !request.getFullName().trim().isEmpty()) {
+            user.setFullName(request.getFullName().trim());
+        }
+
+        if (request.getEmail() != null) {
+            String email = request.getEmail().trim();
+            if (!email.isEmpty() && !email.equalsIgnoreCase(user.getEmail() != null ? user.getEmail() : "")) {
+                usersRepository.findByEmail(email)
+                        .filter(existing -> !existing.getId().equals(user.getId()))
+                        .ifPresent(existing -> {
+                            throw new RuntimeException("Email đã tồn tại: " + email);
+                        });
+                user.setEmail(email);
+            } else if (email.isEmpty()) {
+                user.setEmail(null);
+            }
+        }
+
+        if (request.getPhone() != null) {
+            String phone = request.getPhone().trim();
+            if (!phone.isEmpty() && !phone.equals(user.getPhone() != null ? user.getPhone() : "")) {
+                usersRepository.findByPhone(phone)
+                        .filter(existing -> !existing.getId().equals(user.getId()))
+                        .ifPresent(existing -> {
+                            throw new RuntimeException("Số điện thoại đã tồn tại: " + phone);
+                        });
+                user.setPhone(phone);
+            } else if (phone.isEmpty()) {
+                user.setPhone(null);
+            }
+        }
+
+        if (request.getAddress() != null) {
+            user.setAddress(request.getAddress().trim());
+        }
+
+        usersRepository.save(user);
 
         System.out.println("Updating employee...");
         Employees updated = employeeRepository.save(employee);
@@ -152,30 +199,30 @@ public class EmployeeServiceImpl implements EmployeeService {
 
         // Kiểm tra username đã tồn tại chưa
         if (usersRepository.findByUsername(request.getUsername()).isPresent()) {
-            throw new RuntimeException("Username already exists: " + request.getUsername());
+            throw new RuntimeException("Tên đăng nhập đã tồn tại: " + request.getUsername());
         }
 
         // Kiểm tra email đã tồn tại chưa (nếu có)
         if (request.getEmail() != null && !request.getEmail().isEmpty()) {
             if (usersRepository.findByEmail(request.getEmail()).isPresent()) {
-                throw new RuntimeException("Email already exists: " + request.getEmail());
+                throw new RuntimeException("Email đã tồn tại: " + request.getEmail());
             }
         }
 
         // Kiểm tra phone đã tồn tại chưa (nếu có)
         if (request.getPhone() != null && !request.getPhone().isEmpty()) {
             if (usersRepository.findByPhone(request.getPhone()).isPresent()) {
-                throw new RuntimeException("Phone already exists: " + request.getPhone());
+                throw new RuntimeException("Số điện thoại đã tồn tại: " + request.getPhone());
             }
         }
 
         // Tìm Branch và Role
         Branches branch = branchesRepository.findById(request.getBranchId())
-                .orElseThrow(() -> new RuntimeException("Branch not found with id: " + request.getBranchId()));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy chi nhánh với ID: " + request.getBranchId()));
         System.out.println("Found branch: " + branch.getId() + " - " + branch.getBranchName());
 
         Roles role = rolesRepository.findById(request.getRoleId())
-                .orElseThrow(() -> new RuntimeException("Role not found with id: " + request.getRoleId()));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy vai trò với ID: " + request.getRoleId()));
         System.out.println("Found role: " + role.getId() + " - " + role.getRoleName());
 
         // 1. Tạo User mới (KHÔNG CÓ PASSWORD - sẽ tạo sau khi verify email)
@@ -212,6 +259,25 @@ public class EmployeeServiceImpl implements EmployeeService {
         Employees savedEmployee = employeeRepository.save(employee);
         System.out.println("Employee saved with ID: " + savedEmployee.getEmployeeId());
 
+        // 2.1 Nếu role là DRIVER, tự động tạo Driver record
+        if ("DRIVER".equalsIgnoreCase(role.getRoleName()) || "Tài xế".equalsIgnoreCase(role.getRoleName())) {
+            System.out.println("Creating Driver record for employee...");
+            Drivers driver = new Drivers();
+            driver.setEmployee(savedEmployee);
+            driver.setBranch(branch);
+
+            // Set license number from request
+            if (request.getLicenseNumber() != null && !request.getLicenseNumber().trim().isEmpty()) {
+                driver.setLicenseNumber(request.getLicenseNumber().trim());
+            } else {
+                throw new RuntimeException("Số bằng lái là bắt buộc đối với tài xế");
+            }
+
+            // Các thông tin chi tiết về xe,... sẽ được cập nhật sau
+            driverRepository.save(driver);
+            System.out.println("Driver record created successfully with license: " + driver.getLicenseNumber());
+        }
+
         // 3. Gửi email verification (nếu có email)
         if (savedUser.getEmail() != null && !savedUser.getEmail().isEmpty()) {
             try {
@@ -235,5 +301,28 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Override
     public Employees findByUserId(Integer userId) {
         return employeeRepository.findByUserId(userId).orElse(null);
+    }
+
+    @Override
+    public List<Employees> findAvailableManagers(Integer excludeBranchId) {
+        // Lấy tất cả managers
+        List<Employees> allManagers = findByRoleName("Manager");
+
+        // Lấy danh sách chi nhánh
+        List<org.example.ptcmssbackend.entity.Branches> branches = branchesRepository.findAll();
+
+        // Lọc ra managers chưa được gán hoặc đang quản lý chi nhánh excludeBranchId
+        return allManagers.stream()
+                .filter(manager -> {
+                    // Tìm chi nhánh có manager này
+                    boolean isAssigned = branches.stream()
+                            .anyMatch(branch ->
+                                    branch.getManager() != null &&
+                                            branch.getManager().getEmployeeId().equals(manager.getEmployeeId()) &&
+                                            (excludeBranchId == null || !branch.getId().equals(excludeBranchId))
+                            );
+                    return !isAssigned;
+                })
+                .collect(java.util.stream.Collectors.toList());
     }
 }

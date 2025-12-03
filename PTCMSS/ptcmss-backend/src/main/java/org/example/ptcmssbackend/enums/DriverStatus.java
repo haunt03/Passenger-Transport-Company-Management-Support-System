@@ -11,8 +11,4 @@ public enum DriverStatus {
     ON_TRIP,     // Đang chạy - Chỉ hệ thống cập nhật
     OFF_DUTY,    // Nghỉ - Chỉ hệ thống cập nhật
     INACTIVE,    // Không hoạt động - Coordinator có thể chuyển
-
-
-    // Legacy uppercase variants
-    ONTRIP
 }

@@ -130,7 +130,7 @@ public class ExportServiceImpl implements ExportService {
         try {
             Pageable pageable = PageRequest.of(0, 10000); // Get all
             Page<InvoiceListResponse> invoices = invoiceService.getInvoices(
-                    branchId, type, status, null, null, null, null, pageable);
+                    branchId, type, status, null, null, null, null, null, pageable);
 
             StringWriter sw = new StringWriter();
             PrintWriter pw = new PrintWriter(sw);

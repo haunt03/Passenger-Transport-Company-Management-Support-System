@@ -14,6 +14,7 @@ public class InvoiceListResponse {
     private String branchName;
     private Integer customerId;
     private String customerName;
+    private String customerPhone;
     private String customerEmail;
     private Integer bookingId;
     private String type;
@@ -25,4 +26,6 @@ public class InvoiceListResponse {
     private String status;
     private Instant invoiceDate;
     private Integer daysOverdue;
+    private Integer pendingPaymentCount; // Số lượng payment requests đang chờ xác nhận
 }
+

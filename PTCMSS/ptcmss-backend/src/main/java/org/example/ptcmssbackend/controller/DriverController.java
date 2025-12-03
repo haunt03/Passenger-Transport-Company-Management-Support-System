@@ -212,12 +212,16 @@ public class DriverController {
             @Parameter(description = "ID tài xế") @PathVariable Integer driverId,
             @Parameter(description = "ID chuyến đi") @PathVariable Integer tripId) {
         try {
-            log.info("Complete trip successfully");
+            log.info("[DriverController] Completing trip {} for driver {}", tripId, driverId);
+            Integer result = driverService.completeTrip(tripId, driverId);
+            log.info("[DriverController] Complete trip successfully: {}", result);
             return new ResponseData<>(HttpStatus.OK.value(),
-                    "Complete trip successfully", driverService.completeTrip(tripId, driverId));
+                    "Complete trip successfully", result);
         } catch (Exception e) {
-            log.error("Complete trip failed", e);
-            return new ResponseError(HttpStatus.BAD_REQUEST.value(), "Complete trip failed");
+            log.error("[DriverController] Complete trip failed - tripId: {}, driverId: {}, error: {}",
+                    tripId, driverId, e.getMessage(), e);
+            String errorMessage = e.getMessage() != null ? e.getMessage() : "Complete trip failed";
+            return new ResponseError(HttpStatus.BAD_REQUEST.value(), errorMessage);
         }
     }
 

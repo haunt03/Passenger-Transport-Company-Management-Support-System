@@ -75,6 +75,15 @@ public interface InvoiceRepository extends JpaRepository<Invoices, Integer> {
     );
 
     /**
+     * Tính tổng tiền đã thu (CONFIRMED) từ payment_history cho booking
+     */
+    @Query("SELECT COALESCE(SUM(ph.amount), 0) FROM PaymentHistory ph " +
+            "JOIN ph.invoice i " +
+            "WHERE i.booking.id = :bookingId " +
+            "AND ph.confirmationStatus = org.example.ptcmssbackend.enums.PaymentConfirmationStatus.CONFIRMED")
+    BigDecimal calculateConfirmedPaidAmountByBookingId(@Param("bookingId") Integer bookingId);
+
+    /**
      * Tính tổng amount theo branchId, type và khoảng thời gian
      */
     @Query("SELECT COALESCE(SUM(i.amount), 0) FROM Invoices i " +
@@ -105,7 +114,11 @@ public interface InvoiceRepository extends JpaRepository<Invoices, Integer> {
     List<Invoices> findByBranch_IdAndTypeAndStatusOrderByInvoiceDateDesc(
             Integer branchId, InvoiceType type, InvoiceStatus status);
 
-    @Query("SELECT i FROM Invoices i WHERE (:branchId IS NULL OR i.branch.id = :branchId) " +
+    @Query("SELECT DISTINCT i FROM Invoices i " +
+            "JOIN FETCH i.branch " +
+            "LEFT JOIN FETCH i.customer " +
+            "LEFT JOIN FETCH i.booking " +
+            "WHERE (:branchId IS NULL OR i.branch.id = :branchId) " +
             "AND (:type IS NULL OR i.type = :type) " +
             "AND (:status IS NULL OR i.status = :status) " +
             "AND (:startDate IS NULL OR i.invoiceDate >= :startDate) " +

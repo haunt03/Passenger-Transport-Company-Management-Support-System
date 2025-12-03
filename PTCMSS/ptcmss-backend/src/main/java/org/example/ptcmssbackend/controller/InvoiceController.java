@@ -83,7 +83,7 @@ public class InvoiceController {
         }
     }
 
-    @Operation(summary = "Danh sách hóa đơn", description = "Lấy danh sách hóa đơn với các bộ lọc: branch, type, status, paymentStatus, date range, customer")
+    @Operation(summary = "Danh sách hóa đơn", description = "Lấy danh sách hóa đơn với các bộ lọc: branch, type, status, paymentStatus, date range, customer, keyword")
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT','CONSULTANT')")
     public ResponseEntity<ApiResponse<Page<InvoiceListResponse>>> getInvoices(
@@ -94,13 +94,14 @@ public class InvoiceController {
             @Parameter(description = "Ngày bắt đầu (YYYY-MM-DD)") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @Parameter(description = "Ngày kết thúc (YYYY-MM-DD)") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @Parameter(description = "ID khách hàng") @RequestParam(required = false) Integer customerId,
+            @Parameter(description = "Tìm kiếm theo số HĐ, tên KH, mã đơn") @RequestParam(required = false) String keyword,
             @Parameter(description = "Số trang (bắt đầu từ 0)") @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Số lượng mỗi trang") @RequestParam(defaultValue = "20") int size,
             @Parameter(description = "Trường sắp xếp") @RequestParam(defaultValue = "invoiceDate") String sortBy,
             @Parameter(description = "Hướng sắp xếp: ASC, DESC") @RequestParam(defaultValue = "DESC") String sortDir) {
 
-        log.info("[InvoiceController] Getting invoices - branch: {}, type: {}, status: {}",
-                branchId, type, status);
+        log.info("[InvoiceController] Getting invoices - branch: {}, type: {}, status: {}, keyword: {}",
+                branchId, type, status, keyword);
 
         try {
             Sort sort = sortDir.equalsIgnoreCase("ASC")
@@ -110,7 +111,7 @@ public class InvoiceController {
 
             Page<InvoiceListResponse> response = invoiceService.getInvoices(
                     branchId, type, status, paymentStatus,
-                    startDate, endDate, customerId, pageable);
+                    startDate, endDate, customerId, keyword, pageable);
 
             return ResponseEntity.ok(ApiResponse.<Page<InvoiceListResponse>>builder()
                     .success(true)

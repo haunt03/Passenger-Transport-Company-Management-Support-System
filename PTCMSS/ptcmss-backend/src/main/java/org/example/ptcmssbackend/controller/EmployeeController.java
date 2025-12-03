@@ -211,4 +211,26 @@ public class EmployeeController {
 
     // ----------- API: Vô hiệu hóa/Kích hoạt nhân viên -----------
     // Sử dụng PUT /{id} với status INACTIVE/ACTIVE thay vì DELETE
+
+    // ----------- API: Lấy danh sách managers chưa được gán -----------
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @Operation(
+            summary = "Lấy danh sách managers chưa được gán cho chi nhánh",
+            description = "Trả về danh sách managers chưa quản lý chi nhánh nào, hoặc đang quản lý chi nhánh excludeBranchId (dùng khi update)"
+    )
+    @GetMapping("/available-managers")
+    public ResponseData<List<EmployeeResponse>> getAvailableManagers(
+            @Parameter(description = "ID chi nhánh cần loại trừ (dùng khi update chi nhánh)")
+            @RequestParam(required = false) Integer excludeBranchId
+    ) {
+        List<EmployeeResponse> result = employeeService.findAvailableManagers(excludeBranchId)
+                .stream()
+                .map(employeeMapper::toDTO)
+                .collect(Collectors.toList());
+        return new ResponseData<>(
+                HttpStatus.OK.value(),
+                "Get available managers successfully",
+                result
+        );
+    }
 }

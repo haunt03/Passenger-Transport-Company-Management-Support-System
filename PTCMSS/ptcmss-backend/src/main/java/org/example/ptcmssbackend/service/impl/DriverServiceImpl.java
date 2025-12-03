@@ -16,6 +16,9 @@ import org.example.ptcmssbackend.entity.DriverDayOff;
 import org.example.ptcmssbackend.entity.Drivers;
 import org.example.ptcmssbackend.entity.TripDrivers;
 import org.example.ptcmssbackend.entity.TripIncidents;
+import org.example.ptcmssbackend.entity.Trips;
+import org.example.ptcmssbackend.entity.TripVehicles;
+import org.example.ptcmssbackend.entity.Vehicles;
 import org.example.ptcmssbackend.enums.ApprovalType;
 import org.example.ptcmssbackend.enums.DriverDayOffStatus;
 import org.example.ptcmssbackend.enums.DriverStatus;
@@ -27,6 +30,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -39,25 +44,63 @@ public class DriverServiceImpl implements DriverService {
     private final DriverRepository driverRepository;
     private final TripRepository tripRepository;
     private final TripDriverRepository tripDriverRepository;
+    private final TripVehicleRepository tripVehicleRepository;
     private final DriverDayOffRepository driverDayOffRepository;
     private final TripIncidentRepository tripIncidentRepository;
     private final BranchesRepository branchRepository;
     private final EmployeeRepository employeeRepository;
     private final ApprovalService approvalService;
     private final DriverRatingsRepository driverRatingsRepository;
+    private final org.example.ptcmssbackend.service.GraphHopperService graphHopperService;
+    private final org.example.ptcmssbackend.repository.InvoiceRepository invoiceRepository;
 
     @Override
     @Transactional(readOnly = true)
     public DriverDashboardResponse getDashboard(Integer driverId) {
         log.info("[DriverDashboard] Fetching dashboard for driver {}", driverId);
         var driverTrips = tripDriverRepository.findAllByDriverId(driverId);
+
+        // Lấy ngày hôm nay để ưu tiên chuyến hôm nay
+        LocalDate today = LocalDate.now(ZoneId.systemDefault());
+
         return driverTrips.stream()
-                .filter(td -> td.getTrip().getStatus() == TripStatus.SCHEDULED
-                        || td.getTrip().getStatus() == TripStatus.ONGOING)
+                .filter(td -> {
+                    TripStatus status = td.getTrip().getStatus();
+                    // Bao gồm SCHEDULED, ASSIGNED (đã phân xe), và ONGOING
+                    return status == TripStatus.SCHEDULED
+                            || status == TripStatus.ASSIGNED
+                            || status == TripStatus.ONGOING;
+                })
+                .sorted((td1, td2) -> {
+                    // Ưu tiên: 1) Chuyến hôm nay, 2) Chuyến sớm nhất
+                    var trip1 = td1.getTrip();
+                    var trip2 = td2.getTrip();
+
+                    Instant start1 = trip1.getStartTime();
+                    Instant start2 = trip2.getStartTime();
+
+                    if (start1 == null && start2 == null) return 0;
+                    if (start1 == null) return 1;
+                    if (start2 == null) return -1;
+
+                    LocalDate date1 = start1.atZone(ZoneId.systemDefault()).toLocalDate();
+                    LocalDate date2 = start2.atZone(ZoneId.systemDefault()).toLocalDate();
+
+                    boolean isToday1 = date1.equals(today);
+                    boolean isToday2 = date2.equals(today);
+
+                    // Ưu tiên chuyến hôm nay
+                    if (isToday1 && !isToday2) return -1;
+                    if (!isToday1 && isToday2) return 1;
+
+                    // Nếu cùng ngày hoặc cả hai không phải hôm nay, sắp xếp theo thời gian
+                    return start1.compareTo(start2);
+                })
                 .findFirst()
                 .map(td -> {
                     var trip = td.getTrip();
-                    log.info("[DriverDashboard] Trip ID: {}, Distance: {}", trip.getId(), trip.getDistance());
+                    log.info("[DriverDashboard] Trip ID: {}, Status: {}, StartTime: {}",
+                            trip.getId(), trip.getStatus(), trip.getStartTime());
 
                     var booking = trip.getBooking();
                     log.info("[DriverDashboard] Booking: {}", booking != null ? booking.getId() : "null");
@@ -66,6 +109,90 @@ public class DriverServiceImpl implements DriverService {
                     var customerName = customer != null ? customer.getFullName() : null;
                     var customerPhone = customer != null ? customer.getPhone() : null;
                     log.info("[DriverDashboard] Customer: {} - {}", customerName, customerPhone);
+
+                    // Lấy thông tin driver và vehicle
+                    String driverName = null;
+                    String driverPhone = null;
+                    String vehiclePlate = null;
+                    String vehicleModel = null;
+
+                    List<TripDrivers> tripDrivers = tripDriverRepository.findByTripId(trip.getId());
+                    if (!tripDrivers.isEmpty()) {
+                        Drivers driver = tripDrivers.get(0).getDriver();
+                        if (driver != null && driver.getEmployee() != null && driver.getEmployee().getUser() != null) {
+                            driverName = driver.getEmployee().getUser().getFullName();
+                            driverPhone = driver.getEmployee().getUser().getPhone();
+                        }
+                    }
+
+                    List<TripVehicles> tripVehicles = tripVehicleRepository.findByTripId(trip.getId());
+                    if (!tripVehicles.isEmpty()) {
+                        Vehicles vehicle = tripVehicles.get(0).getVehicle();
+                        if (vehicle != null) {
+                            vehiclePlate = vehicle.getLicensePlate();
+                            vehicleModel = vehicle.getModel();
+                        }
+                    }
+
+                    // Lấy thông tin giá tiền từ booking (giống như BookingService)
+                    java.math.BigDecimal totalCost = booking != null && booking.getTotalCost() != null
+                            ? booking.getTotalCost()
+                            : java.math.BigDecimal.ZERO;
+                    java.math.BigDecimal paidAmount = java.math.BigDecimal.ZERO;
+                    java.math.BigDecimal remainingAmount = totalCost;
+
+                    if (booking != null) {
+                        // Tính paidAmount từ payment_history đã CONFIRMED (giống BookingService)
+                        paidAmount = invoiceRepository.calculateConfirmedPaidAmountByBookingId(booking.getId());
+                        if (paidAmount == null) paidAmount = java.math.BigDecimal.ZERO;
+                        remainingAmount = totalCost.subtract(paidAmount);
+                        if (remainingAmount.compareTo(java.math.BigDecimal.ZERO) < 0) {
+                            remainingAmount = java.math.BigDecimal.ZERO;
+                        }
+                    }
+
+                    // Lấy distance từ trip, nếu null thì tìm từ trips khác trong cùng booking
+                    java.math.BigDecimal distance = trip.getDistance();
+                    if (distance == null && booking != null) {
+                        // Tìm trip khác trong cùng booking có distance
+                        List<Trips> allTrips = tripRepository.findByBooking_Id(booking.getId());
+                        for (Trips otherTrip : allTrips) {
+                            if (otherTrip.getDistance() != null && otherTrip.getDistance().compareTo(java.math.BigDecimal.ZERO) > 0) {
+                                distance = otherTrip.getDistance();
+                                log.info("[DriverDashboard] Using distance from trip {} for trip {}: {} km",
+                                        otherTrip.getId(), trip.getId(), distance);
+                                break;
+                            }
+                        }
+
+                        // Nếu vẫn không có, tính từ startLocation và endLocation
+                        if (distance == null && trip.getStartLocation() != null && trip.getEndLocation() != null) {
+                            try {
+                                var distanceResult = graphHopperService.calculateDistance(
+                                        trip.getStartLocation(),
+                                        trip.getEndLocation()
+                                );
+                                if (distanceResult != null && distanceResult.getDistanceKm() != null) {
+                                    distance = java.math.BigDecimal.valueOf(distanceResult.getDistanceKm());
+                                    log.info("[DriverDashboard] Calculated distance for trip {}: {} km", trip.getId(), distance);
+
+                                    // Lưu distance vào trip để dùng lần sau
+                                    trip.setDistance(distance);
+                                    tripRepository.save(trip);
+                                    log.info("[DriverDashboard] Saved calculated distance to trip {}", trip.getId());
+                                }
+                            } catch (Exception e) {
+                                log.warn("[DriverDashboard] Failed to calculate distance for trip {}: {}", trip.getId(), e.getMessage());
+                            }
+                        }
+
+                        if (distance == null) {
+                            log.debug("[DriverDashboard] Trip {} has no distance and cannot calculate from locations", trip.getId());
+                        }
+                    }
+                    log.info("[DriverDashboard] Trip {} distance: {}", trip.getId(), distance);
+                    log.info("[DriverDashboard] Driver: {}, Vehicle: {}, TotalCost: {}, Paid: {}, Remaining: {}",
+                            driverName, vehiclePlate, totalCost, paidAmount, remainingAmount);
 
                     return new DriverDashboardResponse(
                             trip.getId(),
@@ -76,7 +203,14 @@ public class DriverServiceImpl implements DriverService {
                             trip.getStatus(),
                             customerName,
                             customerPhone,
-                            trip.getDistance()
+                            distance,
+                            driverName,
+                            driverPhone,
+                            vehiclePlate,
+                            vehicleModel,
+                            totalCost,
+                            paidAmount,
+                            remainingAmount
                     );
                 })
                 .orElse(null);
@@ -99,6 +233,15 @@ public class DriverServiceImpl implements DriverService {
                     var rating = ratingOpt.map(r -> r.getOverallRating()).orElse(null);
                     var ratingComment = ratingOpt.map(r -> r.getComment()).orElse(null);
 
+                    // Lấy hireType từ booking
+                    var booking = trip.getBooking();
+                    String hireType = null;
+                    String hireTypeName = null;
+                    if (booking != null && booking.getHireType() != null) {
+                        hireType = booking.getHireType().getCode();
+                        hireTypeName = booking.getHireType().getName();
+                    }
+
                     return DriverScheduleResponse.builder()
                             .tripId(trip.getId())
                             .startLocation(trip.getStartLocation())
@@ -108,6 +251,8 @@ public class DriverServiceImpl implements DriverService {
                             .status(trip.getStatus())
                             .rating(rating)
                             .ratingComment(ratingComment)
+                            .hireType(hireType)
+                            .hireTypeName(hireTypeName)
                             .build();
                 })
                 .toList();
@@ -288,9 +433,10 @@ public class DriverServiceImpl implements DriverService {
             throw new RuntimeException("Tài xế không được phân công cho chuyến đi này");
         }
 
-        // chỉ cho start từ trạng thái SCHEDULED
-        if (trip.getStatus() != TripStatus.SCHEDULED) {
-            throw new RuntimeException("Chuyến đi không ở trạng thái ĐÃ LÊN LỊCH");
+        // Cho phép start từ trạng thái SCHEDULED hoặc ASSIGNED
+        // (ASSIGNED = đã phân xe/tài xế, SCHEDULED = đã lên lịch nhưng chưa phân)
+        if (trip.getStatus() != TripStatus.SCHEDULED && trip.getStatus() != TripStatus.ASSIGNED) {
+            throw new RuntimeException("Chuyến đi không ở trạng thái ĐÃ LÊN LỊCH hoặc ĐÃ PHÂN XE");
         }
 
         trip.setStatus(TripStatus.ONGOING);
@@ -307,19 +453,31 @@ public class DriverServiceImpl implements DriverService {
         var trip = tripRepository.findById(tripId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến đi"));
 
+        log.info("[Trip] Trip {} current status: {}", tripId, trip.getStatus());
+
         if (!tripDriverRepository.existsByTrip_IdAndDriver_Id(tripId, driverId)) {
+            log.error("[Trip] Driver {} is not assigned to trip {}", driverId, tripId);
             throw new RuntimeException("Tài xế không được phân công cho chuyến đi này");
         }
 
-        if (trip.getStatus() != TripStatus.ONGOING) {
-            throw new RuntimeException("Chuyến đi không ở trạng thái ĐANG THỰC HIỆN");
+        // Cho phép complete từ ONGOING hoặc ASSIGNED (nếu chưa start nhưng muốn complete)
+        if (trip.getStatus() != TripStatus.ONGOING && trip.getStatus() != TripStatus.ASSIGNED) {
+            log.error("[Trip] Trip {} status is {}, expected ONGOING or ASSIGNED", tripId, trip.getStatus());
+            throw new RuntimeException("Chuyến đi không ở trạng thái ĐANG THỰC HIỆN hoặc ĐÃ PHÂN XE. Trạng thái hiện tại: " + trip.getStatus());
         }
 
-        trip.setStatus(TripStatus.COMPLETED);
-        trip.setEndTime(Instant.now());
-        tripRepository.save(trip);
-
-        return tripId;
+        try {
+            trip.setStatus(TripStatus.COMPLETED);
+            if (trip.getEndTime() == null) {
+                trip.setEndTime(Instant.now());
+            }
+            tripRepository.save(trip);
+            log.info("[Trip] Trip {} completed successfully", tripId);
+            return tripId;
+        } catch (Exception e) {
+            log.error("[Trip] Failed to save completed trip {}: {}", tripId, e.getMessage(), e);
+            throw new RuntimeException("Không thể lưu trạng thái hoàn thành chuyến đi: " + e.getMessage());
+        }
     }
 
     @Override

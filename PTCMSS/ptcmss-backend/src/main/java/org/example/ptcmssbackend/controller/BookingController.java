@@ -293,7 +293,7 @@ public class BookingController {
     }
 
     @GetMapping("/{id}/payments")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT','ACCOUNTANT','DRIVER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT','ACCOUNTANT','DRIVER','COORDINATOR')")
     public ResponseEntity<ApiResponse<java.util.List<PaymentResponse>>> listPayments(
             @PathVariable Integer id
     ) {

@@ -22,5 +22,7 @@ public class DriverScheduleResponse {
     private TripStatus status;
     private BigDecimal rating; // Overall rating from DriverRatings
     private String ratingComment; // Comment from DriverRatings
+    private String hireType; // ONE_WAY, ROUND_TRIP, DAILY, MULTI_DAY
+    private String hireTypeName; // Tên hiển thị: "Một chiều", "Hai chiều", etc.
 }
 

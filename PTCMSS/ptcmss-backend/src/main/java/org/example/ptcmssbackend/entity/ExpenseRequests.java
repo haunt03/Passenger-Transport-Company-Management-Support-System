@@ -49,7 +49,7 @@ public class ExpenseRequests {
 
     @ElementCollection
     @CollectionTable(
-            name = "=expense_request_attachments",
+            name = "expense_request_attachments",
             joinColumns = @JoinColumn(name = "expenseRequestId")
     )
     @Column(name = "fileUrl")

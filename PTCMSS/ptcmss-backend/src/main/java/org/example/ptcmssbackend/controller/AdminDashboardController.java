@@ -96,6 +96,21 @@ public class AdminDashboardController {
     }
 
     /**
+     * Get top vehicle categories by usage
+     * GET /api/v1/admin/analytics/top-vehicle-categories?period=THIS_MONTH&limit=5
+     */
+    @GetMapping("/analytics/top-vehicle-categories")
+    @Operation(summary = "Get top vehicle categories", description = "Returns most used vehicle categories")
+    public ResponseEntity<List<Map<String, Object>>> getTopVehicleCategories(
+            @RequestParam(required = false, defaultValue = "THIS_MONTH") String period,
+            @RequestParam(required = false, defaultValue = "5") Integer limit
+    ) {
+        log.info("GET /api/v1/admin/analytics/top-vehicle-categories - period: {}, limit: {}", period, limit);
+        List<Map<String, Object>> categories = analyticsService.getTopVehicleCategories(period, limit);
+        return ResponseEntity.ok(categories);
+    }
+
+    /**
      * Get system alerts
      * GET /api/v1/admin/alerts?severity=HIGH,CRITICAL
      */
