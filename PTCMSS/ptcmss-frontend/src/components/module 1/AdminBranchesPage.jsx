@@ -1,7 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { listBranches, createBranch } from "../../api/branches";
-import { listEmployeesByRole } from "../../api/employees";
+import { listEmployeesByRole, getAvailableManagers } from "../../api/employees";
 import {
   Building2,
   PlusCircle,
@@ -350,7 +350,8 @@ export default function AdminBranchesPage() {
   React.useEffect(() => {
     (async () => {
       try {
-        const emps = await listEmployeesByRole("Manager");
+        // Lấy danh sách managers chưa được gán cho chi nhánh nào
+        const emps = await getAvailableManagers();
         if (Array.isArray(emps)) {
           const mgrs = emps.map((e) => ({
             id: e.userId,
@@ -362,7 +363,22 @@ export default function AdminBranchesPage() {
           setManagers([]);
         }
       } catch {
-        setManagers([]);
+        // Fallback: lấy tất cả managers nếu API mới không hoạt động
+        try {
+          const emps = await listEmployeesByRole("Manager");
+          if (Array.isArray(emps)) {
+            const mgrs = emps.map((e) => ({
+              id: e.userId,
+              name: e.userFullName || "",
+              email: e.email || "",
+            }));
+            setManagers(mgrs);
+          } else {
+            setManagers([]);
+          }
+        } catch {
+          setManagers([]);
+        }
       }
     })();
   }, []);

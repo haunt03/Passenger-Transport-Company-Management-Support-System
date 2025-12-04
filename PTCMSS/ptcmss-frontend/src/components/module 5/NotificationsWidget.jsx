@@ -36,6 +36,7 @@ import { useNotifications } from "../../hooks/useNotifications";
 import { getBookingsPendingDeposit, pageBookings } from "../../api/bookings";
 import { getDriverSchedule } from "../../api/drivers";
 import { unassignTrip } from "../../api/dispatch";
+import { deleteNotification, deleteNotificationByApproval, dismissApproval } from "../../api/notifications";
 
 /**
  * NotificationsWidget – Hiển thị cảnh báo & yêu cầu chờ duyệt
@@ -69,6 +70,7 @@ export default function NotificationsWidget() {
     const role = getCurrentRole();
     const userId = getStoredUserId();
     const isAdmin = role === ROLES.ADMIN;
+    const isManager = role === ROLES.MANAGER;
     const isConsultant = role === ROLES.CONSULTANT;
 
     // WebSocket real-time notifications
@@ -126,9 +128,9 @@ export default function NotificationsWidget() {
     const loadingRef = React.useRef(false);
 
     const fetchAll = React.useCallback(async () => {
-        // Skip for DRIVER role - they don't have access to notifications dashboard
-        if (role === ROLES.DRIVER) {
-            console.log('[NotificationsWidget] Skipping dashboard fetch for DRIVER role');
+        // Skip for roles không tham gia phê duyệt/điều phối (DRIVER, MANAGER, ADMIN)
+        if (role === ROLES.DRIVER || role === ROLES.MANAGER || role === ROLES.ADMIN) {
+            console.log('[NotificationsWidget] Skipping dashboard fetch for role:', role);
             setDashboard(null);
             setLoading(false);
             return;
@@ -304,7 +306,7 @@ export default function NotificationsWidget() {
             fetchAll();
         } catch (err) {
             console.error("Failed to acknowledge alert:", err);
-            alert("Không thể xác nhận cảnh báo");
+            pushToast("Không thể xác nhận cảnh báo. Vui lòng thử lại.", "error");
         } finally {
             setIdBusy(`alert-${alertId}`, false);
         }
@@ -360,11 +362,11 @@ export default function NotificationsWidget() {
                                     method: "POST",
                                     body: { userId: Number(userId), note: rejectNote },
                                 });
-                                alert("✅ Đã từ chối yêu cầu nghỉ phép");
+                                pushToast("Đã từ chối yêu cầu nghỉ phép", "success");
                                 fetchAll();
                             } catch (err) {
                                 console.error("Failed to reject:", err);
-                                alert("❌ Không thể từ chối. Vui lòng thử lại.");
+                                pushToast("Không thể từ chối. Vui lòng thử lại.", "error");
                             } finally {
                                 setIdBusy(`approval-${historyId}`, false);
                             }
@@ -396,22 +398,51 @@ export default function NotificationsWidget() {
             // Then reassign trips with replacement drivers if any
             if (Object.keys(replacements).length > 0) {
                 const { reassignTrips } = await import("../../api/dispatch");
+                const reassignPromises = [];
                 for (const [tripId, newDriverId] of Object.entries(replacements)) {
+                    if (!tripId || !newDriverId) continue;
                     try {
-                        await reassignTrips({
-                            tripIds: [Number(tripId)],
-                            driverId: Number(newDriverId),
-                            note: "Tài xế thay thế do tài xế cũ nghỉ phép"
-                        });
+                        // Get trip detail to get bookingId
+                        const { getTripDetail } = await import("../../api/dispatch");
+                        const tripDetail = await getTripDetail(Number(tripId));
+                        const bookingId = tripDetail?.bookingId || tripDetail?.booking?.id;
+
+                        reassignPromises.push(
+                            reassignTrips({
+                                bookingId: bookingId ? Number(bookingId) : undefined,
+                                tripIds: [Number(tripId)],
+                                driverId: Number(newDriverId),
+                                note: "Tài xế thay thế do tài xế cũ nghỉ phép"
+                            }).catch(err => {
+                                console.error(`Failed to reassign trip ${tripId}:`, err);
+                                return { tripId, error: err };
+                            })
+                        );
                     } catch (err) {
-                        console.error(`Failed to reassign trip ${tripId}:`, err);
+                        console.error(`Failed to get trip detail for ${tripId}:`, err);
                     }
                 }
-                alert(`✅ Đã phê duyệt thành công!\n\n` +
-                    `• Đã gán ${Object.keys(replacements).length} tài xế thay thế\n` +
-                    `• Hệ thống đã tự động xóa tài xế cũ khỏi các chuyến`);
+
+                const results = await Promise.allSettled(reassignPromises);
+                const successCount = results.filter(r => r.status === 'fulfilled').length;
+                const failCount = results.length - successCount;
+
+                if (failCount > 0) {
+                    pushToast(
+                        `Đã phê duyệt. Gán thành công ${successCount}/${results.length} tài xế thay thế.`,
+                        failCount === results.length ? "error" : "success"
+                    );
+                } else {
+                    pushToast(
+                        `Đã phê duyệt thành công! Đã gán ${successCount} tài xế thay thế.`,
+                        "success"
+                    );
+                }
             } else {
-                alert("✅ Đã phê duyệt thành công!\n\nHệ thống đã tự động xóa tài xế khỏi các chuyến xung đột (nếu có).\nVui lòng kiểm tra cảnh báo để sắp xếp tài xế thay thế.");
+                pushToast(
+                    "Đã phê duyệt thành công! Hệ thống đã tự động xóa tài xế khỏi các chuyến xung đột.",
+                    "success"
+                );
             }
 
             fetchAll();
@@ -421,9 +452,9 @@ export default function NotificationsWidget() {
             // Check if error message contains conflict info from backend
             const errMsg = err.message || err.toString();
             if (errMsg.includes("chuyến") || errMsg.includes("conflict")) {
-                alert(`❌ Lỗi khi phê duyệt:\n\n${errMsg}`);
+                pushToast(`Lỗi khi phê duyệt: ${errMsg}`, "error");
             } else {
-                alert("❌ Không thể phê duyệt. Vui lòng thử lại.");
+                pushToast("Không thể phê duyệt. Vui lòng thử lại.", "error");
             }
         } finally {
             setIdBusy(`approval-${historyId}`, false);
@@ -433,7 +464,7 @@ export default function NotificationsWidget() {
     const handleReject = async (historyId) => {
         const note = prompt("Lý do từ chối:");
         if (!note) {
-            alert("Vui lòng nhập lý do từ chối");
+            pushToast("Vui lòng nhập lý do từ chối", "error");
             return;
         }
 
@@ -443,13 +474,46 @@ export default function NotificationsWidget() {
                 method: "POST",
                 body: { userId: Number(userId), note },
             });
-            alert("Đã từ chối yêu cầu");
+            pushToast("Đã từ chối yêu cầu", "success");
             fetchAll();
         } catch (err) {
             console.error("Failed to reject:", err);
-            alert("Không thể từ chối");
+            pushToast("Không thể từ chối. Vui lòng thử lại.", "error");
         } finally {
             setIdBusy(`approval-${historyId}`, false);
+        }
+    };
+
+    // Toast notification system
+    const [toasts, setToasts] = React.useState([]);
+    const pushToast = React.useCallback((msg, kind = "info", ttl = 3000) => {
+        const id = Math.random().toString(36).slice(2);
+        setToasts((a) => [...a, { id, msg, kind }]);
+        setTimeout(() => {
+            setToasts((a) => a.filter((t) => t.id !== id));
+        }, ttl);
+    }, []);
+
+    const handleDeleteNotification = async (approval) => {
+        const deleteKey = `delete-${approval.id}`;
+        setIdBusy(deleteKey, true);
+        try {
+            // Xóa approval history (sẽ tự động xóa notification liên quan)
+            await dismissApproval(approval.id, userId);
+
+            // Đợi một chút để đảm bảo backend đã xóa xong
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // Reload dashboard để cập nhật danh sách
+            await fetchAll();
+
+            // Thông báo toast sau khi xóa thành công
+            pushToast("Đã xóa thông báo", "success");
+        } catch (err) {
+            console.error("Failed to delete notification:", err);
+            pushToast("Không thể xóa thông báo. Vui lòng thử lại.", "error");
+        } finally {
+            setIdBusy(deleteKey, false);
         }
     };
 
@@ -578,43 +642,62 @@ export default function NotificationsWidget() {
                     </div>
                 </div>
 
-                {canApprove && (
-                    <div className="shrink-0 flex items-center gap-2">
-                        <button
-                            disabled={working}
-                            onClick={() => handleApprove(approval.id)}
-                            className={cls(
-                                "inline-flex items-center gap-1.5 rounded-lg border-2 border-sky-500 bg-white text-sky-700 hover:bg-sky-50 hover:shadow-md px-3 py-1.5 text-[12px] font-semibold transition-all duration-200",
-                                working ? "opacity-60 cursor-not-allowed" : "hover:scale-105"
-                            )}
-                            title="Duyệt"
-                        >
-                            {working ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                                <Check className="h-3.5 w-3.5" />
-                            )}
-                            Duyệt
-                        </button>
+                <div className="shrink-0 flex items-center gap-2">
+                    {canApprove && (
+                        <>
+                            <button
+                                disabled={working}
+                                onClick={() => handleApprove(approval.id)}
+                                className={cls(
+                                    "inline-flex items-center gap-1.5 rounded-lg border-2 border-sky-500 bg-white text-sky-700 hover:bg-sky-50 hover:shadow-md px-3 py-1.5 text-[12px] font-semibold transition-all duration-200",
+                                    working ? "opacity-60 cursor-not-allowed" : "hover:scale-105"
+                                )}
+                                title="Duyệt"
+                            >
+                                {working ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                    <Check className="h-3.5 w-3.5" />
+                                )}
+                                Duyệt
+                            </button>
 
-                        <button
-                            disabled={working}
-                            onClick={() => handleReject(approval.id)}
-                            className={cls(
-                                "inline-flex items-center gap-1.5 rounded-lg border-2 border-rose-600 bg-white text-rose-700 hover:bg-rose-50 hover:shadow-md px-3 py-1.5 text-[12px] font-semibold transition-all duration-200",
-                                working ? "opacity-60 cursor-not-allowed" : "hover:scale-105"
-                            )}
-                            title="Từ chối"
-                        >
-                            {working ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                                <X className="h-3.5 w-3.5" />
-                            )}
-                            Từ chối
-                        </button>
-                    </div>
-                )}
+                            <button
+                                disabled={working}
+                                onClick={() => handleReject(approval.id)}
+                                className={cls(
+                                    "inline-flex items-center gap-1.5 rounded-lg border-2 border-rose-600 bg-white text-rose-700 hover:bg-rose-50 hover:shadow-md px-3 py-1.5 text-[12px] font-semibold transition-all duration-200",
+                                    working ? "opacity-60 cursor-not-allowed" : "hover:scale-105"
+                                )}
+                                title="Từ chối"
+                            >
+                                {working ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                    <X className="h-3.5 w-3.5" />
+                                )}
+                                Từ chối
+                            </button>
+                        </>
+                    )}
+
+                    {/* Nút X để xóa thông báo */}
+                    <button
+                        disabled={busyIds.has(`delete-${approval.id}`)}
+                        onClick={() => handleDeleteNotification(approval)}
+                        className={cls(
+                            "inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-700 px-2 py-1.5 text-[12px] transition-all duration-200",
+                            busyIds.has(`delete-${approval.id}`) ? "opacity-60 cursor-not-allowed" : "hover:scale-105"
+                        )}
+                        title="Xóa thông báo"
+                    >
+                        {busyIds.has(`delete-${approval.id}`) ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                            <XCircle className="h-3.5 w-3.5" />
+                        )}
+                    </button>
+                </div>
             </div>
         );
     };
@@ -788,8 +871,37 @@ export default function NotificationsWidget() {
         );
     };
 
+    // Toast component
+    const ToastContainer = () => (
+        <div className="fixed top-4 right-4 z-[9999] space-y-2 pointer-events-none">
+            {toasts.map((t) => (
+                <div
+                    key={t.id}
+                    className={cls(
+                        "pointer-events-auto rounded-lg px-4 py-3 text-sm shadow-lg border min-w-[280px] max-w-md",
+                        t.kind === "success" &&
+                        "bg-emerald-50 border-emerald-300 text-emerald-800",
+                        t.kind === "error" &&
+                        "bg-rose-50 border-rose-300 text-rose-800",
+                        t.kind === "info" &&
+                        "bg-blue-50 border-blue-300 text-blue-800"
+                    )}
+                >
+                    <div className="flex items-center gap-2">
+                        {t.kind === "success" && <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />}
+                        {t.kind === "error" && <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />}
+                        {t.kind === "info" && <Info className="h-4 w-4 text-blue-600 shrink-0" />}
+                        <span className="font-medium">{t.msg}</span>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+
     return (
         <div className={isPageMode ? "min-h-screen" : "relative"}>
+            <ToastContainer />
+
             {/* Bell Icon Button - Only show in widget mode */}
             {!isPageMode && (
                 <button
@@ -1435,7 +1547,7 @@ function ConflictResolutionModal({ conflicts, driverId, approval, onResolve }) {
         });
 
         if (missingReplacements.length > 0) {
-            alert(`⚠️ Vui lòng chọn tài xế thay thế cho ${missingReplacements.length} chuyến`);
+            pushToast(`Vui lòng chọn tài xế thay thế cho ${missingReplacements.length} chuyến`, "error");
             return;
         }
 

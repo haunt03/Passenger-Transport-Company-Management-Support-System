@@ -210,6 +210,10 @@ export default function UserDetailPage() {
         branchId: branchId ? Number(branchId) : undefined,
         roleId: roleId ? Number(roleId) : undefined,
         status,
+        fullName: fullName?.trim(),
+        email: email?.trim(),
+        phone: phone?.trim(),
+        address: address?.trim(),
       });
       setShowSuccess(true);
       setTimeout(() => navigate(-1), 1500);

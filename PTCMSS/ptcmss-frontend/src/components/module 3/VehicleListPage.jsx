@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { listVehicles, createVehicle, updateVehicle, listVehicleCategories } from "../../api/vehicles";
+import { listVehicles, createVehicle, updateVehicle, listVehicleCategories, getVehicleTrips } from "../../api/vehicles";
 import { listBranches } from "../../api/branches";
 import { getEmployeeByUserId } from "../../api/employees";
 import { getCurrentRole, getStoredUserId, ROLES } from "../../utils/session";
@@ -88,10 +88,10 @@ const VEHICLE_STATUS = {
 };
 
 const STATUS_LABEL = {
-    AVAILABLE: "Sẵn sàng",
-    INUSE: "Đang sử dụng",
+    AVAILABLE: "Hoạt động",
+    INUSE: "Hoạt động",
     MAINTENANCE: "Bảo trì",
-    INACTIVE: "Không hoạt động",
+    INACTIVE: "Ngừng hoạt động",
 };
 
 function VehicleStatusBadge({ status }) {
@@ -968,10 +968,10 @@ function FilterBar({
                         className="bg-transparent outline-none text-[13px] text-slate-700 flex-1"
                     >
                         <option value="">Tất cả trạng thái</option>
-                        <option value="AVAILABLE">Sẵn sàng</option>
-                        <option value="INUSE">Đang sử dụng</option>
+                        <option value="AVAILABLE">Hoạt động</option>
+                        <option value="INUSE">Hoạt động</option>
                         <option value="MAINTENANCE">Bảo trì</option>
-                        <option value="INACTIVE">Không hoạt động</option>
+                        <option value="INACTIVE">Ngừng hoạt động</option>
                     </select>
                 </div>
 
@@ -1103,6 +1103,7 @@ function VehicleTable({
                           isAccountant = false,
                           isConsultant = false,
                           vehicleAvailability = {},
+                          vehicleOngoingTrips = {},
                           timeFilterStart = "",
                           timeFilterEnd = "",
                       }) {
@@ -1178,7 +1179,8 @@ function VehicleTable({
                         {/* Trạng thái */}
                         <td className="px-3 py-2 whitespace-nowrap">
                             <div className="flex flex-col gap-1">
-                                <VehicleStatusBadge status={v.status} />
+                                {/* Nếu xe đang trong chuyến, hiển thị INUSE thay vì status gốc */}
+                                <VehicleStatusBadge status={vehicleOngoingTrips[v.id] ? "INUSE" : v.status} />
                                 {/* Availability badge for Consultant with time filter */}
                                 {isConsultant && timeFilterStart && timeFilterEnd && vehicleAvailability[v.id] && (
                                     <span className={cls(
@@ -1429,6 +1431,7 @@ export default function VehicleListPage({ readOnly: readOnlyProp = false }) {
     const [timeFilterStart, setTimeFilterStart] = React.useState("");
     const [timeFilterEnd, setTimeFilterEnd] = React.useState("");
     const [vehicleAvailability, setVehicleAvailability] = React.useState({}); // { vehicleId: { available: boolean, reason: string } }
+    const [vehicleOngoingTrips, setVehicleOngoingTrips] = React.useState({}); // { vehicleId: boolean } - true nếu xe đang trong chuyến
 
     // refresh state
     const [loadingRefresh, setLoadingRefresh] = React.useState(false);
@@ -1482,16 +1485,45 @@ export default function VehicleListPage({ readOnly: readOnlyProp = false }) {
     React.useEffect(() => {
         (async () => {
             try {
-                // Skip loading categories/branches lists for read-only roles to avoid 403 errors
+                // Một số role read-only (ví dụ Consultant) không có quyền gọi API list branches/categories → dễ bị 403.
+                // Tuy nhiên, Kế toán vẫn cần dữ liệu loại xe để filter, nên chỉ skip metadata cho Consultant.
+                const shouldLoadMeta = !isConsultant;
+
                 const [brData, catData, vehData] = await Promise.all([
-                    isReadOnly ? Promise.resolve({ content: [] }) : listBranches({ size: 1000 }).catch(() => ({ content: [] })),
-                    isReadOnly ? Promise.resolve([]) : listVehicleCategories().catch(() => []),
+                    shouldLoadMeta
+                        ? listBranches({ size: 1000 }).catch(() => ({ content: [] }))
+                        : Promise.resolve({ content: [] }),
+                    shouldLoadMeta
+                        ? listVehicleCategories().catch(() => [])
+                        : Promise.resolve([]),
                     listVehicles().catch(() => []),
                 ]);
                 const brs = Array.isArray(brData) ? brData : (brData?.items || brData?.content || []);
                 setBranches(brs.map(b => ({ id: b.id, name: b.branchName || b.name || b.branch_name })));
                 setCategories((catData || []).map(c => ({ id: c.id, name: c.categoryName || c.name, seats: c.seats, status: c.status })));
-                setVehicles((vehData || []).map(mapVehicle));
+                const mappedVehicles = (vehData || []).map(mapVehicle);
+                setVehicles(mappedVehicles);
+
+                // Check xe đang trong chuyến (ongoing trips)
+                const ongoingTripsMap = {};
+                await Promise.all(mappedVehicles.map(async (v) => {
+                    try {
+                        const trips = await getVehicleTrips(v.id);
+                        const tripList = Array.isArray(trips) ? trips : (trips?.data || trips?.content || []);
+                        // Check xem có trip nào đang ONGOING/IN_PROGRESS không
+                        const hasOngoingTrip = tripList.some(trip => {
+                            const status = trip.status || trip.tripStatus;
+                            return status === "ONGOING" || status === "IN_PROGRESS" || status === "ASSIGNED";
+                        });
+                        if (hasOngoingTrip) {
+                            ongoingTripsMap[v.id] = true;
+                        }
+                    } catch (err) {
+                        // Ignore errors khi check trips
+                        console.warn(`Failed to check trips for vehicle ${v.id}:`, err);
+                    }
+                }));
+                setVehicleOngoingTrips(ongoingTripsMap);
             } catch { }
         })();
     }, [mapVehicle]);
@@ -1512,8 +1544,19 @@ export default function VehicleListPage({ readOnly: readOnlyProp = false }) {
 
         const afterFilter = vehicles.filter((v) => {
             if (bf && String(v.branch_id) !== bf) return false;
-            if (cf && String(v.category_id) !== cf) return false;
-            if (statusFilter && v.status !== statusFilter) return false;
+            // Sửa filter categoryId: so sánh number với number hoặc string với string
+            if (cf) {
+                const vCategoryId = v.category_id != null ? String(v.category_id) : "";
+                if (vCategoryId !== cf) return false;
+            }
+            // Filter status: nếu xe đang trong chuyến, coi như INUSE
+            const displayStatus = vehicleOngoingTrips[v.id] ? "INUSE" : v.status;
+            if (statusFilter) {
+                // Nếu filter "AVAILABLE" hoặc "INUSE", cần check cả 2 trường hợp
+                if (statusFilter === "AVAILABLE" && displayStatus !== "AVAILABLE") return false;
+                if (statusFilter === "INUSE" && displayStatus !== "INUSE") return false;
+                if (statusFilter !== "AVAILABLE" && statusFilter !== "INUSE" && displayStatus !== statusFilter) return false;
+            }
             if (q && !String(v.license_plate).toLowerCase().includes(q)) return false;
             return true;
         });
@@ -1556,7 +1599,8 @@ export default function VehicleListPage({ readOnly: readOnlyProp = false }) {
         sortKey,
         sortDir,
         isManager,
-        managerBranchId
+        managerBranchId,
+        vehicleOngoingTrips
     ]);
 
     // total pages
@@ -1724,6 +1768,7 @@ export default function VehicleListPage({ readOnly: readOnlyProp = false }) {
                     isAccountant={isAccountant}
                     isConsultant={isConsultant}
                     vehicleAvailability={vehicleAvailability}
+                    vehicleOngoingTrips={vehicleOngoingTrips}
                     timeFilterStart={timeFilterStart}
                     timeFilterEnd={timeFilterEnd}
                 />

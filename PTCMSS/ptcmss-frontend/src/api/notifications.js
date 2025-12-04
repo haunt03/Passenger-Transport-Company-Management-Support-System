@@ -130,3 +130,36 @@ export function deleteNotification(notificationId, userId) {
     });
 }
 
+/**
+ * Delete notification by approval type and related entity ID
+ * DELETE /api/notifications/by-approval?approvalType=...&relatedEntityId=...&userId=...
+ */
+export function deleteNotificationByApproval(approvalType, relatedEntityId, userId) {
+    const resolvedUserId = userId ?? getStoredUserId();
+    if (!resolvedUserId) {
+        throw new Error("USER_ID_REQUIRED");
+    }
+    const params = new URLSearchParams({
+        approvalType,
+        relatedEntityId: String(relatedEntityId),
+        userId: String(resolvedUserId),
+    });
+    return apiFetch(`/api/notifications/by-approval?${params.toString()}`, {
+        method: "DELETE",
+    });
+}
+
+/**
+ * Dismiss approval (delete approval history and related notification)
+ * DELETE /api/notifications/approvals/{approvalHistoryId}?userId=...
+ */
+export function dismissApproval(approvalHistoryId, userId) {
+    const resolvedUserId = userId ?? getStoredUserId();
+    if (!resolvedUserId) {
+        throw new Error("USER_ID_REQUIRED");
+    }
+    return apiFetch(`/api/notifications/approvals/${approvalHistoryId}?userId=${resolvedUserId}`, {
+        method: "DELETE",
+    });
+}
+

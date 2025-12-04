@@ -75,9 +75,10 @@ export function deleteVehicleCategory(id) {
     });
 }
 
-export function listVehiclesByBranch(branchId) {
+export function listVehiclesByBranch(branchId, driverId = null) {
     if (branchId == null || branchId === "") throw new Error("BRANCH_ID_REQUIRED");
-    return apiFetch(`/api/vehicles/branch/${branchId}`);
+    const params = driverId != null ? `?driverId=${driverId}` : "";
+    return apiFetch(`/api/vehicles/branch/${branchId}${params}`);
 }
 
 // ==================== Vehicle History APIs ====================

@@ -39,6 +39,7 @@ export default function TripExpenseModal({
                                              open,
                                              tripId,
                                              tripLabel,
+                                             vehicleId,
                                              onClose,
                                              onSubmitted,
                                          }) {
@@ -143,7 +144,10 @@ export default function TripExpenseModal({
             if (userId) {
                 expenseFormData.append("requesterUserId", String(userId));
             }
-            // Note: vehicleId can be added if available from trip context
+            // Add vehicleId from trip context if available
+            if (vehicleId != null) {
+                expenseFormData.append("vehicleId", String(vehicleId));
+            }
 
             // Add files (ExpenseRequestController expects "files" parameter)
             files.forEach((fObj) => {

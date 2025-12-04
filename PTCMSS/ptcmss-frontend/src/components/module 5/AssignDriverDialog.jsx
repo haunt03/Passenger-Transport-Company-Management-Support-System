@@ -56,7 +56,13 @@ export default function AssignDriverDialog({
         React.useState(false);
 
     const tripId = order?.tripId || order?.id;
+    const tripIds = order?.tripIds; // Danh sách trips nếu có nhiều xe
     const bookingId = order?.bookingId;
+    const vehicleCount = order?.vehicle_count || 1; // Số lượng xe trong booking
+
+    // Tính số trips chưa gán (nếu có nhiều xe)
+    const [unassignedTripCount, setUnassignedTripCount] = React.useState(0);
+    const [assignToAllTrips, setAssignToAllTrips] = React.useState(true); // Mặc định gán cho tất cả
 
     // Fetch gợi ý khi popup mở
     React.useEffect(() => {
@@ -67,6 +73,17 @@ export default function AssignDriverDialog({
             setError("");
             setDriverId("");
             setVehicleId("");
+
+            // Tính số trips chưa gán từ tripIds (đã được lọc từ OrderDetailPage)
+            if (tripIds && tripIds.length > 0) {
+                setUnassignedTripCount(tripIds.length);
+                // Nếu có nhiều hơn 1 trip chưa gán, mặc định gán cho tất cả
+                setAssignToAllTrips(tripIds.length > 1);
+            } else {
+                setUnassignedTripCount(1);
+                setAssignToAllTrips(false); // Chỉ gán cho 1 trip
+            }
+
             try {
                 const data = await getAssignmentSuggestions(tripId);
 
@@ -139,6 +156,16 @@ export default function AssignDriverDialog({
     const canConfirm =
         driverId && vehicleId && !posting;
 
+    // Helper: Trích xuất message lỗi từ response
+    const extractErrorMessage = (err) => {
+        // Thử lấy message từ các cấu trúc response khác nhau
+        const msg = err?.response?.data?.message
+            || err?.response?.data?.error
+            || err?.message
+            || "Lỗi không xác định";
+        return msg;
+    };
+
     // Gán thủ công
     const doAssignManual = async () => {
         if (
@@ -148,12 +175,26 @@ export default function AssignDriverDialog({
         )
             return;
         setPosting(true);
+        setError(""); // Clear previous error
         try {
             // Check if trip already has assignment (reassign) or new assignment
             const isReassign = order?.driverId || order?.vehicleId;
 
+            // Xác định trips cần gán
+            let targetTripIds = undefined;
+            if (!assignToAllTrips && tripId) {
+                // Chỉ gán cho 1 trip cụ thể
+                targetTripIds = [Number(tripId)];
+            } else if (assignToAllTrips && tripIds && tripIds.length > 0) {
+                // Gán cho tất cả trips
+                targetTripIds = tripIds.map(id => Number(id));
+            } else if (tripId) {
+                // Fallback: gán cho 1 trip
+                targetTripIds = [Number(tripId)];
+            }
+
             if (isReassign && tripId) {
-                // Use reassign API
+                // Use reassign API - chỉ reassign 1 trip tại một thời điểm
                 const result = await reassignTrips({
                     tripId: Number(tripId),
                     driverId: Number(driverId),
@@ -170,10 +211,10 @@ export default function AssignDriverDialog({
                     response: result,
                 });
             } else {
-                // Use assign API
+                // Use assign API - có thể gán cho nhiều trips
                 const result = await assignTrips({
                     bookingId: Number(bookingId),
-                    tripIds: tripId ? [Number(tripId)] : undefined,
+                    tripIds: targetTripIds, // undefined = gán tất cả, array = gán các trips được chọn
                     driverId: Number(driverId),
                     vehicleId: Number(vehicleId),
                     autoAssign: false,
@@ -181,7 +222,8 @@ export default function AssignDriverDialog({
 
                 onAssigned?.({
                     type: "manual",
-                    tripId,
+                    tripId: tripId,
+                    tripIds: targetTripIds,
                     bookingId,
                     driverId: Number(driverId),
                     vehicleId: Number(vehicleId),
@@ -190,10 +232,9 @@ export default function AssignDriverDialog({
             }
             onClose?.();
         } catch (e) {
-            console.error(e);
-            alert(
-                "Gán chuyến thất bại. Vui lòng thử lại."
-            );
+            console.error("❌ Gán chuyến thất bại:", e);
+            const errorMsg = extractErrorMessage(e);
+            setError(`Gán chuyến thất bại: ${errorMsg}`);
         } finally {
             setPosting(false);
         }
@@ -203,25 +244,36 @@ export default function AssignDriverDialog({
     const doAssignAuto = async () => {
         if (!bookingId) return;
         setAutoPosting(true);
+        setError(""); // Clear previous error
         try {
+            // Xác định trips cần gán: nếu có nhiều trips (nhiều xe), gán cho tất cả
+            let targetTripIds = undefined;
+            if (tripIds && tripIds.length > 0) {
+                // Gán cho tất cả trips (nhiều xe)
+                targetTripIds = tripIds.map(id => Number(id));
+            } else if (tripId) {
+                // Chỉ có 1 trip
+                targetTripIds = [Number(tripId)];
+            }
+
             const result = await assignTrips({
                 bookingId: Number(bookingId),
-                tripIds: tripId ? [Number(tripId)] : undefined,
+                tripIds: targetTripIds, // undefined = gán tất cả, array = gán các trips được chọn
                 autoAssign: true,
             });
 
             onAssigned?.({
                 type: "auto",
                 tripId,
+                tripIds: targetTripIds,
                 bookingId,
                 response: result,
             });
             onClose?.();
         } catch (e) {
-            console.error(e);
-            alert(
-                "Tự động gán thất bại. Vui lòng thử lại."
-            );
+            console.error("❌ Tự động gán thất bại:", e);
+            const errorMsg = extractErrorMessage(e);
+            setError(`Tự động gán thất bại: ${errorMsg}`);
         } finally {
             setAutoPosting(false);
         }
@@ -268,7 +320,7 @@ export default function AssignDriverDialog({
                             </span>
                             <span className="font-mono text-slate-900 font-medium">
                                 {fmtDateTime(
-                                    order?.pickup_time
+                                    order?.pickup_time || order?.pickupTime
                                 )}
                             </span>
                         </div>
@@ -280,7 +332,10 @@ export default function AssignDriverDialog({
                             </span>
                             <span className="text-slate-900 font-medium">
                                 {order?.vehicle_type ||
+                                    order?.vehicleType ||
+                                    summary?.vehicleType ||
                                     "—"}
+                                {vehicleCount > 1 && ` (${vehicleCount} xe)`}
                             </span>
                         </div>
 
@@ -291,10 +346,40 @@ export default function AssignDriverDialog({
                             </span>
                             <span className="text-slate-900 font-medium">
                                 {order?.branch_name ||
+                                    order?.branchName ||
+                                    summary?.branchName ||
                                     "—"}
                             </span>
                         </div>
                     </div>
+
+                    {/* Thông báo nếu có nhiều chuyến chưa gán */}
+                    {unassignedTripCount > 1 && (
+                        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800 flex items-start gap-2">
+                            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                            <div className="flex-1">
+                                <div className="font-medium mb-1">
+                                    Còn {unassignedTripCount} chuyến chưa gán tài xế/xe
+                                </div>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={assignToAllTrips}
+                                        onChange={(e) => setAssignToAllTrips(e.target.checked)}
+                                        className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                                    />
+                                    <span>
+                                        Gán cùng tài xế/xe cho tất cả {unassignedTripCount} chuyến còn lại
+                                    </span>
+                                </label>
+                                {!assignToAllTrips && (
+                                    <div className="mt-1 text-[11px] text-amber-700">
+                                        (Chỉ gán cho chuyến đầu tiên trong danh sách chưa gán)
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Body */}
@@ -412,9 +497,10 @@ export default function AssignDriverDialog({
                                                             )}
                                                         </div>
 
-                                                        {/* score */}
+                                                        {/* score - chỉ hiển thị nếu có lịch sử với khách hàng */}
                                                         {typeof s?.score ===
-                                                            "number" && (
+                                                            "number" &&
+                                                            s?.driver?.hasHistoryWithCustomer && (
                                                                 <div className="ml-auto flex items-center gap-1 text-[11px] text-amber-600 font-medium">
                                                                     <BadgeCheck className="h-4 w-4 text-amber-600" />
                                                                     <span>
@@ -496,7 +582,7 @@ export default function AssignDriverDialog({
                                                     d.id
                                                 }
                                             >
-                                                {d.name}{" "}
+                                                {d.hasHistoryWithCustomer ? "✓ " : ""}{d.name}{" "}
                                                 {d.tripsToday != null
                                                     ? `(${d.tripsToday} chuyến hôm nay)`
                                                     : ""}

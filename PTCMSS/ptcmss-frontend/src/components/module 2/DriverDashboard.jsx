@@ -345,19 +345,88 @@ function TripCard({
                 Quãng đường
               </div>
               <div className="text-slate-900 leading-snug font-semibold">
-                {t.distance ? `${Number(t.distance).toFixed(1)} km` : "—"}
+                {t.distance != null && t.distance !== undefined
+                    ? `${Number(t.distance).toFixed(1)} km`
+                    : "—"}
               </div>
             </div>
           </div>
         </div>
 
+        {/* Driver/Vehicle & Payment Info */}
+        {(t.driver_name || t.vehicle_plate || (t.total_cost && t.total_cost > 0)) && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6 pt-5 border-t border-slate-200">
+              {/* Driver & Vehicle Info */}
+              {(t.driver_name || t.vehicle_plate) && (
+                  <div className="space-y-3">
+                    <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-2">
+                      Thông tin điều phối
+                    </div>
+                    {t.driver_name && (
+                        <div className="flex items-start gap-2 text-sm">
+                          <User className="h-4 w-4 text-sky-600 shrink-0 mt-0.5" />
+                          <div>
+                            <div className="text-slate-400 text-[11px] mb-0.5">Tài xế</div>
+                            <div className="text-slate-900 font-medium">{t.driver_name}</div>
+                            {t.driver_phone && (
+                                <div className="text-slate-600 text-xs mt-0.5">{t.driver_phone}</div>
+                            )}
+                          </div>
+                        </div>
+                    )}
+                    {t.vehicle_plate && (
+                        <div className="flex items-start gap-2 text-sm">
+                          <MapPin className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                          <div>
+                            <div className="text-slate-400 text-[11px] mb-0.5">Biển số xe</div>
+                            <div className="text-slate-900 font-medium">
+                              {t.vehicle_plate}
+                              {t.vehicle_model && ` - ${t.vehicle_model}`}
+                            </div>
+                          </div>
+                        </div>
+                    )}
+                  </div>
+              )}
+
+              {/* Payment Info */}
+              {t.total_cost && t.total_cost > 0 && (
+                  <div className="space-y-3">
+                    <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-2">
+                      Thông tin thanh toán
+                    </div>
+                    <div className="grid grid-cols-3 gap-3 text-sm">
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+                        <div className="text-[11px] text-slate-500 mb-1">Tổng tiền</div>
+                        <div className="text-base font-bold text-slate-900 tabular-nums">
+                          {Number(t.total_cost || 0).toLocaleString("vi-VN")} đ
+                        </div>
+                      </div>
+                      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2">
+                        <div className="text-[11px] text-emerald-600 mb-1">Đã thu</div>
+                        <div className="text-base font-bold text-emerald-700 tabular-nums">
+                          {Number(t.paid_amount || 0).toLocaleString("vi-VN")} đ
+                        </div>
+                      </div>
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-2">
+                        <div className="text-[11px] text-amber-600 mb-1">Còn lại</div>
+                        <div className="text-base font-bold text-amber-700 tabular-nums">
+                          {Number(t.remaining_amount || 0).toLocaleString("vi-VN")} đ
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+              )}
+            </div>
+        )}
+
         {/* actions */}
         {isCurrent ? (
             <div className="flex flex-col gap-3 pt-5 border-t border-slate-200">
-              {!isTripToday && (
+              {!isTripToday && phase !== "ON_ROUTE" && phase !== "PICKED" && (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 text-amber-700 px-3 py-2 text-xs flex items-center gap-2">
                     <AlertCircle className="h-4 w-4" />
-                    <span>Chỉ có thể cập nhật trạng thái chuyến trong ngày diễn ra</span>
+                    <span>Chỉ có thể bắt đầu chuyến trong ngày diễn ra. Chuyến đang diễn ra có thể hoàn thành bất cứ lúc nào.</span>
                   </div>
               )}
               <div className="flex flex-wrap gap-3">
@@ -380,7 +449,7 @@ function TripCard({
                     loading={false}
                 />
                 <ActionButton
-                    active={phase === "PICKED" && isTripToday}
+                    active={phase === "PICKED" || phase === "ON_ROUTE"}
                     color="finish"
                     icon={<Flag className="h-4 w-4 shrink-0 text-amber-700" />}
                     label="Hoàn thành chuyến"
@@ -473,39 +542,82 @@ export default function DriverDashboard() {
             customerName: dash.customerName,
             customerPhone: dash.customerPhone,
             distance: dash.distance,
+            driverName: dash.driverName,
+            driverPhone: dash.driverPhone,
+            vehiclePlate: dash.vehiclePlate,
+            vehicleModel: dash.vehicleModel,
+            totalCost: dash.totalCost,
+            paidAmount: dash.paidAmount,
+            remainingAmount: dash.remainingAmount,
           };
         }
       }
       setTrip(mapped);
 
-      // Load upcoming trips
+      // Load schedule and calculate statistics
       try {
         const schedule = await getDriverSchedule(driverId);
-        const upcoming = Array.isArray(schedule)
-            ? schedule
-                .filter((t) => {
-                  // Filter for today's trips only
-                  const tripDate = new Date(t.startTime || t.start_time);
-                  const today = new Date();
-                  return (
-                      tripDate.getDate() === today.getDate() &&
-                      tripDate.getMonth() === today.getMonth() &&
-                      tripDate.getFullYear() === today.getFullYear() &&
-                      t.status === "SCHEDULED"
-                  );
-                })
-                .slice(0, 10) // Show max 10 today's trips
-                .map((t) => ({
-                  tripId: t.tripId || t.trip_id,
-                  pickupAddress: t.startLocation || t.start_location || "—",
-                  dropoffAddress: t.endLocation || t.end_location || "—",
-                  pickupTime: t.startTime || t.start_time,
-                  customerName: t.customerName || t.customer_name,
-                  status: t.status || "SCHEDULED",
-                }))
-            : [];
-        setUpcomingTrips(upcoming);
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+
+        if (Array.isArray(schedule)) {
+          // Calculate tripsToday - count all trips today (including COMPLETED, ONGOING, etc.)
+          const tripsToday = schedule.filter((t) => {
+            const tripDate = new Date(t.startTime || t.start_time);
+            return (
+                tripDate.getDate() === today.getDate() &&
+                tripDate.getMonth() === today.getMonth() &&
+                tripDate.getFullYear() === today.getFullYear()
+            );
+          }).length;
+
+          // Calculate tripsThisMonth - count all trips in current month
+          const tripsThisMonth = schedule.filter((t) => {
+            const tripDate = new Date(t.startTime || t.start_time);
+            return (
+                tripDate.getMonth() === currentMonth &&
+                tripDate.getFullYear() === currentYear
+            );
+          }).length;
+
+          // Update stats
+          setStats((prev) => ({
+            ...prev,
+            tripsToday,
+            tripsThisMonth,
+          }));
+
+          // Filter upcoming trips for display
+          const upcoming = schedule
+              .filter((t) => {
+                // Filter for today's trips only
+                const tripDate = new Date(t.startTime || t.start_time);
+                const isToday = (
+                    tripDate.getDate() === today.getDate() &&
+                    tripDate.getMonth() === today.getMonth() &&
+                    tripDate.getFullYear() === today.getFullYear()
+                );
+                // Bao gồm cả SCHEDULED và ASSIGNED (đã phân xe)
+                const validStatus = t.status === "SCHEDULED" || t.status === "ASSIGNED";
+                return isToday && validStatus;
+              })
+              .slice(0, 10) // Show max 10 today's trips
+              .map((t) => ({
+                tripId: t.tripId || t.trip_id,
+                pickupAddress: t.startLocation || t.start_location || "—",
+                dropoffAddress: t.endLocation || t.end_location || "—",
+                pickupTime: t.startTime || t.start_time,
+                customerName: t.customerName || t.customer_name,
+                status: t.status || "SCHEDULED",
+              }));
+          setUpcomingTrips(upcoming);
+        } else {
+          setUpcomingTrips([]);
+        }
       } catch (err) {
+        console.error("Error loading schedule:", err);
         setUpcomingTrips([]);
       }
 
@@ -704,6 +816,13 @@ export default function DriverDashboard() {
         customer_name: trip.customerName,
         customer_phone: trip.customerPhone,
         distance: trip.distance,
+        driver_name: trip.driverName,
+        driver_phone: trip.driverPhone,
+        vehicle_plate: trip.vehiclePlate,
+        vehicle_model: trip.vehicleModel,
+        total_cost: trip.totalCost,
+        paid_amount: trip.paidAmount,
+        remaining_amount: trip.remainingAmount,
         note: null,
       }
       : null;

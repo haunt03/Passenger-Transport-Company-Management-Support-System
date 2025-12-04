@@ -2,7 +2,7 @@ import React from "react";
 import { Building2, ArrowLeft, Save, ShieldCheck, RefreshCw, X, MapPin } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getBranch, updateBranch } from "../../api/branches";
-import { listEmployeesByRole } from "../../api/employees";
+import { listEmployeesByRole, getAvailableManagers } from "../../api/employees";
 import { listUsers, listRoles } from "../../api/users";
 import ProvinceAutocomplete from "../common/ProvinceAutocomplete";
 
@@ -94,7 +94,18 @@ export default function AdminBranchDetailPage() {
 
   React.useEffect(() => {
     (async () => {
-      // Try Employee API first; fallback to Roles + Users
+      // Lấy danh sách managers chưa được gán (hoặc đang quản lý chi nhánh hiện tại)
+      try {
+        const emps = await getAvailableManagers(Number(branchId));
+        if (Array.isArray(emps)) {
+          const arr = emps.map((e) => ({ id: e.userId, name: e.userFullName || "", email: e.email || "" }));
+          setManagers(arr);
+          return;
+        }
+      } catch (err) {
+        console.error("Failed to load available managers:", err);
+      }
+      // Fallback: lấy tất cả managers nếu API mới không hoạt động
       try {
         const emps = await listEmployeesByRole("Manager");
         if (Array.isArray(emps) && emps.length >= 0) {
@@ -113,7 +124,7 @@ export default function AdminBranchDetailPage() {
         }
       } catch {}
     })();
-  }, []);
+  }, [branchId]);
 
   const validateBranchName = React.useCallback((nameStr) => {
     const cleaned = nameStr.trim();

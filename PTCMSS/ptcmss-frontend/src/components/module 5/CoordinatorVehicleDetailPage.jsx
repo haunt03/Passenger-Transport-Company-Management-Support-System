@@ -158,7 +158,7 @@ export default function CoordinatorVehicleDetailPage() {
                 {/* Toast */}
                 {toast && (
                     <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg ${toast.type === "success" ? "bg-emerald-500 text-white" : "bg-rose-500 text-white"
-                        }`}>
+                    }`}>
                         {toast.type === "success" ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
                         <span>{toast.message}</span>
                         <button onClick={() => setToast(null)} className="ml-2">
@@ -229,12 +229,12 @@ export default function CoordinatorVehicleDetailPage() {
                             <div className="flex items-center gap-3">
                                 <Gauge className="h-5 w-5 text-slate-400" />
                                 <span className="text-slate-600 min-w-[100px]">Loại xe:</span>
-                                <span className="text-slate-900">{vehicle?.vehicleCategory?.name || vehicle?.categoryName || "—"}</span>
+                                <span className="text-slate-900">{vehicle?.categoryName || vehicle?.vehicleCategory?.name || "—"}</span>
                             </div>
                             <div className="flex items-center gap-3">
                                 <CarFront className="h-5 w-5 text-slate-400" />
                                 <span className="text-slate-600 min-w-[100px]">Hãng/Model:</span>
-                                <span className="text-slate-900">{vehicle?.brand} {vehicle?.model}</span>
+                                <span className="text-slate-900">{vehicle?.brand || "—"} {vehicle?.model || ""}</span>
                             </div>
                             <div className="flex items-center gap-3">
                                 <MapPin className="h-5 w-5 text-slate-400" />
@@ -321,7 +321,7 @@ export default function CoordinatorVehicleDetailPage() {
                                             : vehicle?.status === "MAINTENANCE"
                                                 ? "bg-orange-50 text-orange-700"
                                                 : "bg-slate-100 text-slate-600"
-                                        }`}>
+                                    }`}>
                                         {vehicle?.status === "INUSE"
                                             ? "Đang sử dụng"
                                             : STATUS_OPTIONS.find(o => o.value === vehicle?.status)?.label || vehicle?.status || "—"}

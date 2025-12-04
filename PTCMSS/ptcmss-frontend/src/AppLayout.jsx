@@ -16,6 +16,7 @@ import {
     Shield,
     LayoutDashboard,
     Briefcase,
+    AlertTriangle,
 } from "lucide-react";
 import { logout as apiLogout } from "./api/auth";
 import {
@@ -41,12 +42,14 @@ const SIDEBAR_ITEMS_BY_ROLE = {
         { label: "Danh sách xe", to: "/consultant/vehicles", icon: CarFront },
         { label: "Danh sách tài xế", to: "/consultant/drivers", icon: Users },
     ],
-    // Driver (Tài xế - 6 options)
+    // Driver (Tài xế - 8 options)
     [ROLES.DRIVER]: [
         { label: "Bảng điều khiển", to: "/driver/dashboard", icon: LayoutDashboard },
         { label: "Lịch làm việc", to: "/driver/schedule", icon: CalendarClock },
         { label: "Danh sách chuyến", to: "/driver/trips-list", icon: ClipboardList },
+        { label: "Báo cáo sự cố", to: "/driver/report-incident", icon: AlertTriangle },
         { label: "Xin nghỉ phép", to: "/driver/leave-request", icon: CalendarClock },
+        { label: "Yêu cầu thanh toán chi phí", to: "/driver/expense-request", icon: DollarSign },
         { label: "Danh sách yêu cầu", to: "/driver/requests", icon: ClipboardList },
         { label: "Hồ sơ tài xế", to: "/driver/profile", icon: Users },
     ],
@@ -60,12 +63,13 @@ const SIDEBAR_ITEMS_BY_ROLE = {
         { label: "Tạo yêu cầu thanh toán", to: "/dispatch/expense-request", icon: DollarSign },
         { label: "Đánh giá tài xế", to: "/dispatch/ratings", icon: BarChart3 },
     ],
-    // Accountant (Kế toán - 7 options)
+    // Accountant (Kế toán - 8 options)
     [ROLES.ACCOUNTANT]: [
         { label: "Bảng điều khiển", to: "/accounting", icon: LayoutDashboard },
         { label: "Báo cáo doanh thu", to: "/accounting/revenue-report", icon: BarChart3 },
         { label: "Báo cáo chi phí", to: "/accounting/expenses", icon: DollarSign },
         { label: "Danh sách hóa đơn", to: "/accounting/invoices", icon: ClipboardList },
+        { label: "Duyệt yêu cầu chi phí", to: "/accounting/expense-requests", icon: DollarSign },
         { label: "Danh sách đơn hàng", to: "/accountant/orders", icon: ClipboardList },
         { label: "Danh sách nhân viên", to: "/accountant/users", icon: Users },
         { label: "Danh sách xe", to: "/accountant/vehicles", icon: CarFront },
@@ -162,6 +166,7 @@ import DemoAssign from "./DemoAssign.jsx";
 import AccountantDashboard from "./components/module 6/AccountantDashboard.jsx";
 import InvoiceManagement from "./components/module 6/InvoiceManagement.jsx";
 import ExpenseReportPage from "./components/module 6/ExpenseReportPage.jsx";
+import ExpenseRequestManagementPage from "./components/module 6/ExpenseRequestManagementPage.jsx";
 import ReportRevenuePage from "./components/module 6/ReportRevenuePage.jsx";
 
 /* Module 7 – Báo cáo & Phân tích */
@@ -301,7 +306,8 @@ function Topbar() {
                     }
                 }
             } catch (error) {
-                console.error("Failed to load avatar:", error);
+                // Silently ignore avatar loading errors to avoid console spam
+                // Avatar is optional and errors shouldn't disrupt the app
             }
         };
 
@@ -347,15 +353,21 @@ function Topbar() {
         navigate("/me/profile");
     };
 
+    const currentRole = getCurrentRole();
+    const shouldShowNotifications =
+        currentRole === ROLES.CONSULTANT ||
+        currentRole === ROLES.COORDINATOR ||
+        currentRole === ROLES.ACCOUNTANT;
+
     return (
         <header className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-6 py-3.5 shadow-sm">
             {/* Left side - empty or can add breadcrumb later */}
             <div className="flex-1"></div>
 
-            {/* Right side - bell + user chip + logout */}
+            {/* Right side - bell (một số role) + user chip + logout */}
             <div className="flex items-center gap-2.5">
-                {/* bell - WebSocket Notifications */}
-                <NotificationsWidget />
+                {/* bell - WebSocket Notifications (chỉ cho các role tham gia điều phối/thu chi) */}
+                {shouldShowNotifications && <NotificationsWidget />}
 
                 {/* user chip */}
                 <button
@@ -682,6 +694,14 @@ export default function AppLayout() {
                             </ProtectedRoute>
                         }
                     />
+                    <Route
+                        path="/driver/expense-request"
+                        element={
+                            <ProtectedRoute roles={[ROLES.DRIVER]}>
+                                <ExpenseRequestForm />
+                            </ProtectedRoute>
+                        }
+                    />
 
                     {/* Phương tiện */}
                     <Route
@@ -939,6 +959,14 @@ export default function AppLayout() {
                         element={
                             <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.ACCOUNTANT]}>
                                 <ExpenseReportPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/accounting/expense-requests"
+                        element={
+                            <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.ACCOUNTANT]}>
+                                <ExpenseRequestManagementPage />
                             </ProtectedRoute>
                         }
                     />

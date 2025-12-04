@@ -5,6 +5,7 @@ import { listDriversByBranch, getDriverSchedule } from "../../api/drivers";
 import { getBranchByUserId } from "../../api/branches";
 import { getCurrentRole, getStoredUserId, ROLES } from "../../utils/session";
 import Pagination from "../common/Pagination";
+import UserAvatar from "../common/UserAvatar";
 
 export default function CoordinatorDriverListPage({ readOnly = false }) {
     const navigate = useNavigate();
@@ -12,6 +13,8 @@ export default function CoordinatorDriverListPage({ readOnly = false }) {
     const userId = useMemo(() => getStoredUserId(), []);
     const isBranchScoped = role === ROLES.MANAGER || role === ROLES.COORDINATOR || role === ROLES.CONSULTANT;
     const isConsultant = role === ROLES.CONSULTANT;
+    // Cả Tư vấn viên và Điều phối viên đều có thể dùng filter kiểm tra tài xế rảnh
+    const canUseAvailabilityFilter = isConsultant || role === ROLES.COORDINATOR;
 
     const [drivers, setDrivers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -20,7 +23,7 @@ export default function CoordinatorDriverListPage({ readOnly = false }) {
     const [totalPages, setTotalPages] = useState(1);
     const pageSize = 10;
 
-    // Time filter for Consultant (to check driver availability)
+    // Time filter để kiểm tra tài xế rảnh (cho Tư vấn viên & Điều phối viên)
     const [timeFilterStart, setTimeFilterStart] = useState("");
     const [timeFilterEnd, setTimeFilterEnd] = useState("");
     const [driverAvailability, setDriverAvailability] = useState({}); // { driverId: { available: boolean, reason: string } }
@@ -75,9 +78,9 @@ export default function CoordinatorDriverListPage({ readOnly = false }) {
         fetchDrivers();
     }, [currentPage, searchQuery, branchId, branchLoading]);
 
-    // Check driver availability when time filter is set (for Consultant)
+    // Check driver availability when time filter is set
     useEffect(() => {
-        if (!isConsultant || !timeFilterStart || !timeFilterEnd || !drivers.length) {
+        if (!canUseAvailabilityFilter || !timeFilterStart || !timeFilterEnd || !drivers.length) {
             setDriverAvailability({});
             return;
         }
@@ -122,7 +125,7 @@ export default function CoordinatorDriverListPage({ readOnly = false }) {
         };
 
         checkAvailability();
-    }, [isConsultant, timeFilterStart, timeFilterEnd, drivers]);
+    }, [canUseAvailabilityFilter, timeFilterStart, timeFilterEnd, drivers]);
 
     const fetchDrivers = async () => {
         if (!branchId) {
@@ -254,8 +257,8 @@ export default function CoordinatorDriverListPage({ readOnly = false }) {
                             )}
                         </div>
 
-                        {/* Row 2: Time filter for Consultant */}
-                        {isConsultant && (
+                        {/* Row 2: Time filter for checking availability */}
+                        {canUseAvailabilityFilter && (
                             <div className="flex flex-col sm:flex-row items-center gap-3 pt-3 border-t border-slate-200">
                                 <span className="text-sm text-slate-600 font-medium">Kiểm tra tài xế rảnh:</span>
                                 <div className="flex items-center gap-2">
@@ -368,9 +371,11 @@ export default function CoordinatorDriverListPage({ readOnly = false }) {
                                         <tr key={driver.id} className="hover:bg-slate-50 transition-colors">
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#0079BC] to-sky-600 flex items-center justify-center text-white font-semibold text-sm">
-                                                        {driver.fullName?.charAt(0) || "?"}
-                                                    </div>
+                                                    <UserAvatar
+                                                        name={driver.fullName}
+                                                        avatar={driver.avatar}
+                                                        size={40}
+                                                    />
                                                     <div>
                                                         <div className="font-medium text-slate-900">{driver.fullName}</div>
                                                         <div className="text-xs text-slate-500">ID: {driver.id}</div>

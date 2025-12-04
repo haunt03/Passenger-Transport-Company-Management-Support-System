@@ -43,6 +43,7 @@ const fmtDateTime = (isoLike) => {
 
 const STATUS_FROM_BACKEND = {
   SCHEDULED: "NOT_STARTED",
+  ASSIGNED: "NOT_STARTED", // ASSIGNED = đã phân xe/tài xế, nhưng vẫn chưa bắt đầu
   ONGOING: "IN_PROGRESS",
   COMPLETED: "COMPLETED",
 };
@@ -59,9 +60,12 @@ function normalizeTripDetail(payload) {
     dropoff_time: payload.endTime || payload.end_time || "",
     customer_name: payload.customerName || "",
     customer_phone: payload.customerPhone || "",
+    vehicle_id: payload.vehicleId || null,
     vehicle_plate: payload.vehiclePlate || "Chưa gán xe",
     vehicle_type: payload.vehicleModel || "",
     booking_note: payload.bookingNote || "",
+    hire_type: payload.hireType || "", // ONE_WAY, ROUND_TRIP, DAILY, MULTI_DAY
+    hire_type_name: payload.hireTypeName || "", // "Một chiều", "Hai chiều", etc.
     total_cost: payload.totalCost || 0,
     deposit_amount: payload.depositAmount || 0,
     remaining_amount: payload.remainingAmount || 0,
@@ -194,6 +198,10 @@ function ProgressSteps({ status }) {
 }
 
 function TripMetaCard({ trip }) {
+  const isOneWay = trip.hire_type === "ONE_WAY";
+  const isRoundTrip = trip.hire_type === "ROUND_TRIP";
+  const isDaily = trip.hire_type === "DAILY" || trip.hire_type === "MULTI_DAY";
+
   return (
       <div className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-4 shadow-inner">
         <div className="text-[11px] uppercase tracking-wide text-slate-500 flex items-center gap-2 font-medium">
@@ -204,6 +212,28 @@ function TripMetaCard({ trip }) {
           <div>
             <div className="text-xs text-slate-500">Mã chuyến</div>
             <div className="font-semibold text-slate-900">{trip.code}</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">Hình thức thuê</div>
+            <div className="flex items-center gap-2">
+              {trip.hire_type_name ? (
+                  <span className={cls(
+                      "px-2.5 py-1 rounded-full text-xs font-semibold border",
+                      isOneWay && "bg-blue-50 text-blue-700 border-blue-200",
+                      isRoundTrip && "bg-emerald-50 text-emerald-700 border-emerald-200",
+                      isDaily && "bg-purple-50 text-purple-700 border-purple-200"
+                  )}>
+                {trip.hire_type_name}
+              </span>
+              ) : (
+                  <span className="text-slate-500">—</span>
+              )}
+              {isRoundTrip && (
+                  <span className="text-[11px] text-emerald-600 font-medium">
+                (Sẽ quay lại điểm đón)
+              </span>
+              )}
+            </div>
           </div>
           <div>
             <div className="text-xs text-slate-500">Khách hàng</div>
@@ -234,12 +264,29 @@ function TripMetaCard({ trip }) {
   );
 }
 
-function RouteCard({ pickupLocation, dropoffLocation, pickupTime, dropoffTime }) {
+function RouteCard({ pickupLocation, dropoffLocation, pickupTime, dropoffTime, hireType, hireTypeName }) {
+  const isOneWay = hireType === "ONE_WAY";
+  const isRoundTrip = hireType === "ROUND_TRIP";
+  const isDaily = hireType === "DAILY" || hireType === "MULTI_DAY";
+
   return (
       <div className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-4 shadow-inner">
-        <div className="flex items-center gap-2 text-slate-600 text-xs font-medium uppercase tracking-wide">
-          <Navigation className="h-4 w-4 text-sky-600" />
-          Lộ trình
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-slate-600 text-xs font-medium uppercase tracking-wide">
+            <Navigation className="h-4 w-4 text-sky-600" />
+            Lộ trình
+          </div>
+          {/* Badge hiển thị loại chuyến */}
+          {hireTypeName && (
+              <div className={cls(
+                  "px-2.5 py-1 rounded-full text-[11px] font-semibold border",
+                  isOneWay && "bg-blue-50 text-blue-700 border-blue-200",
+                  isRoundTrip && "bg-emerald-50 text-emerald-700 border-emerald-200",
+                  isDaily && "bg-purple-50 text-purple-700 border-purple-200"
+              )}>
+                {hireTypeName}
+              </div>
+          )}
         </div>
         <div className="flex flex-col md:flex-row md:items-start gap-6">
           <div className="flex-1 flex gap-3">
@@ -260,18 +307,38 @@ function RouteCard({ pickupLocation, dropoffLocation, pickupTime, dropoffTime })
               <div>
                 <div className="text-[11px] text-slate-500 mb-1 flex items-center gap-1 font-medium">
                   <MapPin className="h-3.5 w-3.5 text-rose-600" />
-                  Điểm trả
+                  {isOneWay ? "Điểm đến" : isRoundTrip ? "Điểm đến (sẽ quay lại)" : "Điểm đến"}
                 </div>
                 <div className="font-semibold text-slate-900">{dropoffLocation || "—"}</div>
                 <div className="text-xs text-slate-500">
-                  Kết thúc: {dropoffTime ? fmtDateTime(dropoffTime) : "Sau khi đón khách"}
+                  {isOneWay
+                      ? `Kết thúc: ${dropoffTime ? fmtDateTime(dropoffTime) : "Sau khi đón khách"}`
+                      : isRoundTrip
+                          ? `Về lại: ${dropoffTime ? fmtDateTime(dropoffTime) : "Sau khi đến điểm đến"}`
+                          : `Kết thúc: ${dropoffTime ? fmtDateTime(dropoffTime) : "Sau khi đón khách"}`
+                  }
                 </div>
               </div>
             </div>
           </div>
           <div className="rounded-xl border border-amber-200 bg-amber-50 text-amber-800 p-3 text-xs flex items-start gap-2">
             <AlertTriangle className="h-4 w-4" />
-            <span>Đến điểm đón đúng giờ và gọi khách trước ~10 phút.</span>
+            <div className="flex-1">
+              <div className="font-medium mb-1">
+                {isOneWay
+                    ? "Chuyến một chiều"
+                    : isRoundTrip
+                        ? "Chuyến hai chiều - sẽ quay lại điểm đón"
+                        : "Chuyến theo ngày"
+                }
+              </div>
+              <span>Đến điểm đón đúng giờ và gọi khách trước ~10 phút.</span>
+              {isRoundTrip && (
+                  <div className="mt-1 text-[11px] text-amber-700">
+                    ⚠️ Sau khi đến điểm đến, quay lại điểm đón ban đầu.
+                  </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -383,9 +450,26 @@ export default function DriverTripDetailPage() {
     return tripDate > today;
   }, [trip?.pickup_time]);
 
-  // Chỉ được cập nhật nếu: chuyến HÔM NAY + chưa hoàn thành
+  // Chỉ được cập nhật nếu:
+  // 1. Chuyến đang diễn ra (IN_PROGRESS) - cho phép hoàn thành bất kể ngày bắt đầu
+  // 2. HOẶC chuyến HÔM NAY + chưa hoàn thành (cho phép bắt đầu)
   const isCompleted = trip?.status === "COMPLETED";
-  const canUpdateStatus = isTripToday && !isTripFuture && !isCompleted;
+  const isInProgress = trip?.status === "IN_PROGRESS";
+  // Cho phép cập nhật nếu: (đang diễn ra) HOẶC (hôm nay + chưa hoàn thành + không phải tương lai)
+  const canUpdateStatus = (isInProgress || (isTripToday && !isTripFuture)) && !isCompleted;
+
+  // Cho phép báo cáo chi phí: chuyến đã bắt đầu (IN_PROGRESS hoặc COMPLETED) và trong vòng 7 ngày gần đây
+  const canReportExpense = React.useMemo(() => {
+    if (!trip?.pickup_time) return false;
+    const tripDate = new Date(trip.pickup_time);
+    const today = new Date();
+    const daysDiff = Math.floor((today - tripDate) / (1000 * 60 * 60 * 24));
+
+    // Cho phép báo cáo chi phí nếu:
+    // 1. Chuyến đang IN_PROGRESS hoặc COMPLETED
+    // 2. Chuyến trong vòng 7 ngày gần đây (bao gồm cả tương lai)
+    return (trip.status === "IN_PROGRESS" || trip.status === "COMPLETED") && daysDiff >= -1 && daysDiff <= 7;
+  }, [trip?.pickup_time, trip?.status]);
 
   const requestStatusChange = () => {
     if (!stepInfo || actionLoading || detailLoading || !canUpdateStatus) return;
@@ -527,8 +611,8 @@ export default function DriverTripDetailPage() {
                       </button>
                   ) : null}
 
-                  {/* Nút Báo cáo chi phí - chỉ khi HÔM NAY + chưa hoàn thành */}
-                  {canUpdateStatus && (
+                  {/* Nút Báo cáo chi phí - cho phép khi chuyến đã bắt đầu (IN_PROGRESS hoặc COMPLETED) trong vòng 7 ngày */}
+                  {canReportExpense && (
                       <button
                           onClick={() => setExpenseOpen(true)}
                           className="rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm text-slate-700 px-4 py-2 flex items-center justify-center gap-2 shadow-sm"
@@ -553,6 +637,8 @@ export default function DriverTripDetailPage() {
                     dropoffLocation={trip.dropoff_location}
                     pickupTime={trip.pickup_time}
                     dropoffTime={trip.dropoff_time}
+                    hireType={trip.hire_type}
+                    hireTypeName={trip.hire_type_name}
                 />
               </div>
 
@@ -625,6 +711,7 @@ export default function DriverTripDetailPage() {
                   open={expenseOpen}
                   tripId={trip?.id}
                   tripLabel={tripRouteLabel}
+                  vehicleId={trip?.vehicle_id}
                   onClose={() => setExpenseOpen(false)}
                   onSubmitted={handleExpenseSubmitted}
               />

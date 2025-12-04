@@ -139,7 +139,21 @@ export default function PendingTripsPage() {
     };
 
     const handleAssignClick = (trip) => {
-        setSelectedTrip(trip);
+        // Với các booking có nhiều xe (nhiều trip), PendingTrips API sẽ trả về nhiều dòng cùng bookingId.
+        // Khi bấm "Gán chuyến" trên một dòng, ta gom tất cả trip chưa gán của booking đó
+        // để có thể gán cùng tài xế/xe cho toàn bộ (giống OrderDetailPage).
+        const sameBookingTrips = pendingTrips.filter(
+            (t) => t.bookingId === trip.bookingId
+        );
+        const tripIds = sameBookingTrips
+            .map((t) => t.tripId)
+            .filter((id) => id != null);
+
+        setSelectedTrip({
+            ...trip,
+            tripIds,
+            vehicleCount: tripIds.length || 1,
+        });
         setAssignDialogOpen(true);
     };
 
@@ -252,9 +266,11 @@ export default function PendingTripsPage() {
                     open={assignDialogOpen}
                     order={{
                         tripId: selectedTrip.tripId,
+                        tripIds: selectedTrip.tripIds && selectedTrip.tripIds.length > 0 ? selectedTrip.tripIds : undefined,
                         bookingId: selectedTrip.bookingId,
                         pickup_time: selectedTrip.startTime,
                         branch_name: selectedTrip.branchName,
+                        vehicle_count: selectedTrip.vehicleCount || (selectedTrip.tripIds ? selectedTrip.tripIds.length : 1),
                         route: `${selectedTrip.startLocation || '?'} → ${selectedTrip.endLocation || '?'}`,
                     }}
                     onClose={() => setAssignDialogOpen(false)}

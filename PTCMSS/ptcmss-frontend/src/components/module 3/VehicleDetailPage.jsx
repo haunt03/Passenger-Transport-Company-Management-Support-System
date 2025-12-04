@@ -202,7 +202,7 @@ function TabBar({ active, setActive }) {
 }
 
 /* ---------------- Tab 1: Hồ sơ xe ---------------- */
-function VehicleProfileTab({ form, setForm, onSave, dirty, readOnly = false }) {
+function VehicleProfileTab({ form, setForm, onSave, dirty, readOnly = false, isCoordinator = false }) {
     const numericOnly = (s) => s.replace(/[^0-9]/g, "");
 
     const handleChange = (field) => (e) => {
@@ -252,7 +252,7 @@ function VehicleProfileTab({ form, setForm, onSave, dirty, readOnly = false }) {
                         <div className="text-[12px] text-slate-600 mb-1">
                             Danh mục xe
                         </div>
-                        {readOnly ? (
+                        {readOnly || isCoordinator ? (
                             <input
                                 className="rounded-md border border-slate-300 bg-slate-100 px-3 py-2 text-[13px] text-slate-500 font-medium cursor-not-allowed w-full"
                                 value={form.category_name || "—"}
@@ -364,13 +364,23 @@ function VehicleProfileTab({ form, setForm, onSave, dirty, readOnly = false }) {
                         <div className="text-[12px] text-slate-600 mb-1">
                             Ngày đăng kiểm tiếp theo
                         </div>
-                        <input
-                            type="date"
-                            className="rounded-md border border-slate-300 bg-slate-100 px-3 py-2 text-[13px] text-slate-500 font-medium cursor-not-allowed"
-                            value={form.reg_due_date || ""}
-                            readOnly
-                            disabled
-                        />
+                        {readOnly ? (
+                            <input
+                                type="date"
+                                className="rounded-md border border-slate-300 bg-slate-100 px-3 py-2 text-[13px] text-slate-500 font-medium cursor-not-allowed"
+                                value={form.reg_due_date || ""}
+                                readOnly
+                                disabled
+                            />
+                        ) : (
+                            <input
+                                type="date"
+                                className={inputCls}
+                                value={form.reg_due_date || ""}
+                                onChange={handleChange("reg_due_date")}
+                                disabled={readOnly}
+                            />
+                        )}
                     </div>
 
                     {/* Hết hạn bảo hiểm TNDS */}
@@ -728,6 +738,7 @@ export default function VehicleDetailPage() {
     const currentRole = React.useMemo(() => getCurrentRole(), []);
     const isAccountant = currentRole === ROLES.ACCOUNTANT;
     const isConsultant = currentRole === ROLES.CONSULTANT;
+    const isCoordinator = currentRole === ROLES.COORDINATOR;
     const isReadOnly = isAccountant || isConsultant;
 
     const [initialVehicle, setInitialVehicle] = React.useState({
@@ -1010,6 +1021,7 @@ export default function VehicleDetailPage() {
                     onSave={handleSaveProfile}
                     dirty={dirty}
                     readOnly={isReadOnly}
+                    isCoordinator={isCoordinator}
                 />
             ) : null}
 

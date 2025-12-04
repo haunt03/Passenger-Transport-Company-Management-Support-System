@@ -147,12 +147,12 @@ export default function CoordinatorOrderListPage() {
                 });
             }
 
-            // Client-side filter for assigned/unassigned status
-            // Backend doesn't support hasTrip parameter yet
+            // Client-side filter cho trạng thái đã gắn / chưa gắn chuyến
+            // Backend đã trả về field boolean isAssigned (tất cả trips đã gắn tài xế + xe)
             if (filterStatus === "ASSIGNED") {
-                content = content.filter(order => order.tripId != null && order.tripId !== "");
+                content = content.filter(order => order.isAssigned === true);
             } else if (filterStatus === "UNASSIGNED") {
-                content = content.filter(order => order.tripId == null || order.tripId === "");
+                content = content.filter(order => !order.isAssigned);
             }
 
             // Use backend total pages if no filter, otherwise calculate from filtered content

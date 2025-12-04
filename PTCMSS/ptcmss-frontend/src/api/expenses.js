@@ -13,8 +13,9 @@ export function getDriverExpenseRequests(driverId) {
 }
 
 // Get pending expense requests (for accountant)
-export function getPendingExpenseRequests() {
-    return apiFetch("/api/expense-requests/pending");
+export function getPendingExpenseRequests(branchId = null) {
+    const params = branchId ? `?branchId=${branchId}` : "";
+    return apiFetch(`/api/expense-requests/pending${params}`);
 }
 
 // Get all expense requests with filters

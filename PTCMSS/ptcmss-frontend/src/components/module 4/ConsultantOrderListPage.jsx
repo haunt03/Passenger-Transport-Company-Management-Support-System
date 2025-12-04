@@ -78,6 +78,17 @@ const fmtVND = (n) =>
     new Intl.NumberFormat("vi-VN").format(Math.max(0, Number(n || 0))) +
     " đ";
 
+// Chuẩn hoá trạng thái để so sánh/filter (loại bỏ khoảng trắng, dấu, ký tự đặc biệt)
+const normalizeStatusValue = (value) => {
+    if (!value) return "";
+    return String(value)
+        .trim()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") // remove accents
+        .replace(/[^a-zA-Z0-9]/g, "") // remove non-alphanumeric (spaces, underscores…)
+        .toUpperCase();
+};
+
 /* --------------------------------------------------------- */
 /* Toast system (light)                                      */
 /* --------------------------------------------------------- */
@@ -152,10 +163,20 @@ const ORDER_STATUS_STYLE = {
     CANCELLED: "bg-rose-50 text-rose-700 ring-1 ring-rose-200",
 };
 
-function OrderStatusPill({ status }) {
-    // Normalize status: IN_PROGRESS -> INPROGRESS, etc.
-    const normalizedStatus = status ? status.replace(/_/g, '').toUpperCase() : 'DRAFT';
-    const label = ORDER_STATUS_LABEL[normalizedStatus] || ORDER_STATUS_LABEL[status] || status;
+function OrderStatusPill({ status, order }) {
+    // Normalize status regardless of format (IN_PROGRESS, Đang thực hiện, ...)
+    let normalizedStatus = normalizeStatusValue(status) || 'DRAFT';
+
+    // Override: Nếu trạng thái là COMPLETED nhưng chưa thanh toán đủ → hiển thị INPROGRESS
+    if (normalizedStatus === 'COMPLETED' && order) {
+        const paidAmount = Number(order.paid_amount || 0);
+        const quotedPrice = Number(order.quoted_price || 0);
+        if (paidAmount < quotedPrice) {
+            normalizedStatus = 'INPROGRESS';
+        }
+    }
+
+    const label = ORDER_STATUS_LABEL[normalizedStatus] || ORDER_STATUS_LABEL[status] || status || ORDER_STATUS_LABEL.DRAFT;
     const style = ORDER_STATUS_STYLE[normalizedStatus] || ORDER_STATUS_STYLE[status] || ORDER_STATUS_STYLE.DRAFT;
     return (
         <span
@@ -549,7 +570,7 @@ function OrdersTable({
 
                         {/* Trạng thái - Vietnamese labels */}
                         <td className="px-3 py-2 text-[13px] whitespace-nowrap">
-                            <OrderStatusPill status={o.status} />
+                            <OrderStatusPill status={o.status} order={o} />
                         </td>
 
                         {/* Actions - Always show "Chi tiết", hide "Sửa" for Manager/Accountant */}
@@ -701,7 +722,7 @@ function OrderDetailModal({ open, order, onClose }) {
                         <div className="flex flex-wrap items-center gap-2 text-[15px] font-semibold text-slate-900">
                             <ClipboardList className="h-5 w-5 text-sky-600" />
                             <span>Đơn hàng {order.code}</span>
-                            <OrderStatusPill status={order.status} />
+                            <OrderStatusPill status={order.status} order={order} />
                         </div>
 
                         <div className="text-[11px] text-slate-500 mt-1 flex flex-wrap gap-3">
@@ -1241,6 +1262,7 @@ function OrderFormModal({
                                             initialOrder?.status ||
                                             "DRAFT"
                                         }
+                                        order={initialOrder}
                                     />
                                 </>
                             ) : (
@@ -1717,10 +1739,15 @@ export default function ConsultantOrdersPage() {
     const location = useLocation();
     const navigate = useNavigate();
 
-    // Check current user role
+    // Check current user role + basic session info
+    const currentUserId = React.useMemo(() => getStoredUserId(), []);
     const currentRole = React.useMemo(() => getCurrentRole(), []);
+    const isConsultant = currentRole === ROLES.CONSULTANT;
     const isManager = currentRole === ROLES.MANAGER;
     const isAccountant = currentRole === ROLES.ACCOUNTANT;
+
+    const [employeeInfo, setEmployeeInfo] = React.useState(null);
+    const [employeeFetchDone, setEmployeeFetchDone] = React.useState(!isConsultant && !isAccountant);
 
     // filters
     const [statusFilter, setStatusFilter] = React.useState("");
@@ -1743,69 +1770,236 @@ export default function ConsultantOrdersPage() {
         })();
     }, []);
 
+    // Load employee info (to know consultant/accountant branch)
+    React.useEffect(() => {
+        if ((!isConsultant && !isAccountant) || !currentUserId) {
+            setEmployeeFetchDone(true);
+            return;
+        }
+        let cancelled = false;
+        setEmployeeFetchDone(false);
+        (async () => {
+            try {
+                const resp = await getEmployeeByUserId(currentUserId);
+                const data = resp?.data || resp;
+                if (!cancelled) {
+                    setEmployeeInfo(data || null);
+
+                    // Nếu không có branchId trong employee, thử lấy từ profile hoặc branch API
+                    if (!data?.branchId && (isConsultant || isAccountant)) {
+                        try {
+                            const { getMyProfile } = await import("../../api/profile");
+                            const { getBranchByUserId } = await import("../../api/branches");
+                            const profile = await getMyProfile();
+                            let branchId = profile?.branchId || profile?.branch?.id || profile?.branch?.branchId;
+
+                            if (!branchId) {
+                                const branch = await getBranchByUserId(currentUserId);
+                                branchId = branch?.id || branch?.branchId;
+                            }
+
+                            if (branchId && !cancelled) {
+                                setEmployeeInfo(prev => ({
+                                    ...prev,
+                                    branchId: Number(branchId)
+                                }));
+                            }
+                        } catch (err2) {
+                            console.warn("Could not get branch from profile/API:", err2);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to load employee info", err);
+                if (!cancelled) {
+                    setEmployeeInfo(null);
+                }
+            } finally {
+                if (!cancelled) {
+                    setEmployeeFetchDone(true);
+                }
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [isConsultant, isAccountant, currentUserId]);
+
+    const scopedBranchId = React.useMemo(() => {
+        return (isConsultant || isAccountant) ? (employeeInfo?.branchId ?? null) : null;
+    }, [isConsultant, isAccountant, employeeInfo]);
+
+    React.useEffect(() => {
+        if (scopedBranchId) {
+            setDefaultBranchId(scopedBranchId);
+        }
+    }, [scopedBranchId]);
+
+    const mapApiBookings = React.useCallback((response) => {
+        let list = [];
+        if (Array.isArray(response)) {
+            list = response;
+        } else if (Array.isArray(response?.content)) {
+            list = response.content;
+        } else if (Array.isArray(response?.data)) {
+            list = response.data;
+        } else if (Array.isArray(response?.data?.content)) {
+            list = response.data.content;
+        } else if (Array.isArray(response?.items)) {
+            list = response.items;
+        }
+
+        return (list || []).map((b) => {
+            const bookingBranchId =
+                b.branchId ||
+                (b.branch && (b.branch.id || b.branch.branchId)) ||
+                null;
+
+            const customerId =
+                b.customerId ||
+                (b.customer && (b.customer.id || b.customer.customerId)) ||
+                null;
+
+            const paidAmount =
+                b.paidAmount || b.paid_amount || 0;
+            const quotedPrice =
+                b.totalCost || b.totalPrice || b.total || 0;
+
+            // Chuẩn hoá status giống như hiển thị ở pill:
+            // 1. Backend có thể trả IN_PROGRESS (có dấu gạch dưới) → chuẩn hóa thành INPROGRESS
+            // 2. Nếu backend trả COMPLETED nhưng chưa thu đủ tiền → coi là INPROGRESS để filter cho nhất quán.
+            let rawStatus = b.status || "PENDING";
+            const normalizedRawStatus = normalizeStatusValue(rawStatus);
+
+            // Map các status về format chuẩn của frontend
+            if (normalizedRawStatus === "INPROGRESS") {
+                rawStatus = ORDER_STATUS.INPROGRESS;
+            } else if (normalizedRawStatus === "COMPLETED") {
+                // Nếu COMPLETED nhưng chưa thu đủ tiền → coi là INPROGRESS
+                if (Number(paidAmount || 0) < Number(quotedPrice || 0)) {
+                    rawStatus = ORDER_STATUS.INPROGRESS;
+                } else {
+                    rawStatus = ORDER_STATUS.COMPLETED;
+                }
+            } else if (normalizedRawStatus === "PENDING") {
+                rawStatus = ORDER_STATUS.PENDING;
+            } else if (normalizedRawStatus === "CONFIRMED") {
+                rawStatus = ORDER_STATUS.CONFIRMED;
+            } else if (normalizedRawStatus === "CANCELLED") {
+                rawStatus = ORDER_STATUS.CANCELLED;
+            } else if (normalizedRawStatus === "ASSIGNED") {
+                rawStatus = ORDER_STATUS.ASSIGNED;
+            } else if (normalizedRawStatus === "QUOTATIONSENT") {
+                rawStatus = ORDER_STATUS.QUOTATION_SENT;
+            } else if (normalizedRawStatus === "DRAFT") {
+                rawStatus = ORDER_STATUS.DRAFT;
+            } else {
+                // Fallback: giữ nguyên status nếu không match
+                rawStatus = rawStatus.toUpperCase();
+            }
+
+            return {
+                id: b.id || b.bookingId,
+                code:
+                    b.bookingCode ||
+                    b.code ||
+                    (b.id ? `ORD-${b.id}` : `ORD-${b.bookingId || "?"}`),
+                status: rawStatus,
+                customer_name:
+                    b.customerName ||
+                    (b.customer &&
+                        (b.customer.fullName || b.customer.name)) ||
+                    "—",
+                customer_phone:
+                    b.customerPhone ||
+                    (b.customer && b.customer.phone) ||
+                    "—",
+                customer_email:
+                    b.customerEmail ||
+                    (b.customer && b.customer.email) ||
+                    "",
+                pickup:
+                    (b.routeSummary || b.pickupLocation || "").split(" → ")[0] ||
+                    b.startLocation ||
+                    "",
+                dropoff:
+                    (b.routeSummary || b.dropoffLocation || "").split(" → ")[1] ||
+                    b.endLocation ||
+                    "",
+                pickup_time: b.startDate || b.pickupTime || b.startTime,
+                dropoff_eta:
+                    b.endDate || b.dropoffTime || b.endTime || b.startDate,
+                vehicle_category: b.vehicleCategory || "",
+                vehicle_category_id: b.vehicleCategoryId || "",
+                vehicle_count: b.vehicleCount || b.quantity || 1,
+                pax_count: b.passengerCount || b.paxCount || 0,
+                estimated_cost: b.estimatedCost || b.estimated_cost || 0,
+                deposit_amount:
+                    b.depositAmount || b.deposit_amount || b.deposit || 0,
+                paid_amount: paidAmount,
+                quoted_price: quotedPrice,
+                discount_amount: b.discountAmount || b.discount || 0,
+                notes: b.notes || b.note || "",
+                branchId: bookingBranchId,
+                customerId: customerId,
+            };
+        });
+    }, []);
+
+    const fetchBookings = React.useCallback(async () => {
+        // Chờ employeeInfo được load xong trước khi kiểm tra
+        if ((isConsultant || isAccountant) && !employeeFetchDone) {
+            // Chưa load xong, đợi thêm
+            return null;
+        }
+
+        if ((isConsultant || isAccountant) && scopedBranchId == null) {
+            if (employeeFetchDone && !employeeInfo?.branchId) {
+                throw new Error("Không xác định được chi nhánh của bạn. Vui lòng liên hệ quản trị viên để được gán vào chi nhánh.");
+            }
+            return null;
+        }
+
+        // Debug: Log thông tin branch để kiểm tra
+        const branchIdToFilter = (isConsultant || isAccountant) ? scopedBranchId : undefined;
+        console.log("[ConsultantOrderListPage] Fetching bookings:", {
+            role: isConsultant ? "CONSULTANT" : (isAccountant ? "ACCOUNTANT" : "OTHER"),
+            userId: currentUserId,
+            employeeBranchId: employeeInfo?.branchId,
+            scopedBranchId: scopedBranchId,
+            branchIdToFilter: branchIdToFilter,
+        });
+
+        const response = await listBookings({
+            branchId: branchIdToFilter,
+        });
+
+        const mapped = mapApiBookings(response);
+
+        // Debug: Log số lượng đơn và branchId của từng đơn
+        console.log("[ConsultantOrderListPage] Fetched bookings:", {
+            total: mapped.length,
+            bookings: mapped.map(b => ({
+                code: b.code,
+                branchId: b.branchId,
+                status: b.status,
+            })),
+        });
+
+        return mapped;
+    }, [isConsultant, isAccountant, scopedBranchId, mapApiBookings, employeeFetchDone, employeeInfo, currentUserId]);
+
     // load from backend on mount
     React.useEffect(() => {
-        let mounted = true;
+        let cancelled = false;
         const load = async () => {
             try {
-                const response = await listBookings({});
-                if (!mounted) return;
-
-                // Handle different response formats
-                let list = [];
-                if (Array.isArray(response)) {
-                    list = response;
-                } else if (Array.isArray(response?.content)) {
-                    list = response.content;
-                } else if (Array.isArray(response?.data)) {
-                    list = response.data;
-                } else if (Array.isArray(response?.data?.content)) {
-                    list = response.data.content;
-                } else if (Array.isArray(response?.items)) {
-                    list = response.items;
-                }
-
-                console.log("Loaded bookings:", list);
-
-                const mapped = list.map(b => {
-                    // Extract branchId from multiple sources
-                    const branchId = b.branchId
-                        || (b.branch && (b.branch.id || b.branch.branchId))
-                        || null;
-
-                    // Extract customerId from multiple sources
-                    const customerId = b.customerId
-                        || (b.customer && (b.customer.id || b.customer.customerId))
-                        || null;
-
-                    return {
-                        id: b.id || b.bookingId,
-                        code: b.bookingCode || b.code || (b.id ? `ORD-${b.id}` : `ORD-${b.bookingId || "?"}`),
-                        status: b.status || "PENDING",
-                        customer_name: b.customerName || (b.customer && (b.customer.fullName || b.customer.name)) || "—",
-                        customer_phone: b.customerPhone || (b.customer && b.customer.phone) || "—",
-                        customer_email: b.customerEmail || (b.customer && b.customer.email) || "",
-                        pickup: (b.routeSummary || b.pickupLocation || "").split(" → ")[0] || (b.startLocation || ""),
-                        dropoff: (b.routeSummary || b.dropoffLocation || "").split(" → ")[1] || (b.endLocation || ""),
-                        pickup_time: b.startDate || b.pickupTime || b.startTime,
-                        dropoff_eta: b.endDate || b.dropoffTime || b.endTime || b.startDate,
-                        vehicle_category: b.vehicleCategory || "",
-                        vehicle_category_id: b.vehicleCategoryId || "",
-                        vehicle_count: b.vehicleCount || b.quantity || 1,
-                        pax_count: b.passengerCount || b.paxCount || 0,
-                        estimated_cost: b.estimatedCost || b.estimated_cost || 0,
-                        deposit_amount: b.depositAmount || b.deposit_amount || b.deposit || 0,
-                        paid_amount: b.paidAmount || b.paid_amount || 0,
-                        quoted_price: b.totalCost || b.totalPrice || b.total || 0,
-                        discount_amount: b.discountAmount || b.discount || 0,
-                        notes: b.notes || b.note || "",
-                        branchId: branchId,
-                        customerId: customerId,
-                    };
-                });
+                const mapped = await fetchBookings();
+                if (!mapped || cancelled) return;
                 setOrders(mapped);
                 setLoadError(null);
             } catch (e) {
+                if (cancelled) return;
                 console.error("Failed to load orders:", e);
                 const errorMsg = e?.data?.message || e?.response?.data?.message || e?.message || "Lỗi không xác định";
                 setLoadError("Không thể tải danh sách đơn hàng: " + errorMsg);
@@ -1814,74 +2008,33 @@ export default function ConsultantOrdersPage() {
             }
         };
         load();
-        return () => { mounted = false; };
-    }, [push]);
+        return () => { cancelled = true; };
+    }, [fetchBookings, push]);
 
     // if navigated back with refresh flag, reload list then clear state
     React.useEffect(() => {
         const st = location.state;
-        if (st && st.refresh) {
-            (async () => {
-                try {
-                    const response = await listBookings({});
-
-                    // Handle different response formats
-                    let list = [];
-                    if (Array.isArray(response)) {
-                        list = response;
-                    } else if (Array.isArray(response?.content)) {
-                        list = response.content;
-                    } else if (Array.isArray(response?.data)) {
-                        list = response.data;
-                    } else if (Array.isArray(response?.data?.content)) {
-                        list = response.data.content;
-                    } else if (Array.isArray(response?.items)) {
-                        list = response.items;
-                    }
-
-                    const mapped = list.map(b => {
-                        const branchId = b.branchId
-                            || (b.branch && (b.branch.id || b.branch.branchId))
-                            || null;
-                        const customerId = b.customerId
-                            || (b.customer && (b.customer.id || b.customer.customerId))
-                            || null;
-
-                        return {
-                            id: b.id || b.bookingId,
-                            code: b.bookingCode || b.code || (b.id ? `ORD-${b.id}` : `ORD-${b.bookingId || "?"}`),
-                            status: b.status || "PENDING",
-                            customer_name: b.customerName || (b.customer && (b.customer.fullName || b.customer.name)) || "—",
-                            customer_phone: b.customerPhone || (b.customer && b.customer.phone) || "—",
-                            customer_email: b.customerEmail || (b.customer && b.customer.email) || "",
-                            pickup: (b.routeSummary || b.pickupLocation || "").split(" → ")[0] || (b.startLocation || ""),
-                            dropoff: (b.routeSummary || b.dropoffLocation || "").split(" → ")[1] || (b.endLocation || ""),
-                            pickup_time: b.startDate || b.pickupTime || b.startTime,
-                            dropoff_eta: b.endDate || b.dropoffTime || b.endTime || b.startDate,
-                            vehicle_category: b.vehicleCategory || "",
-                            vehicle_category_id: b.vehicleCategoryId || "",
-                            vehicle_count: b.vehicleCount || b.quantity || 1,
-                            pax_count: b.passengerCount || b.paxCount || 0,
-                            estimated_cost: b.estimatedCost || b.estimated_cost || 0,
-                            deposit_amount: b.depositAmount || b.deposit_amount || b.deposit || 0,
-                            paid_amount: b.paidAmount || b.paid_amount || 0,
-                            quoted_price: b.totalCost || b.totalPrice || b.total || 0,
-                            discount_amount: b.discountAmount || b.discount || 0,
-                            notes: b.notes || b.note || "",
-                            branchId: branchId,
-                            customerId: customerId,
-                        };
-                    });
+        if (!(st && st.refresh)) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const mapped = await fetchBookings();
+                if (!cancelled && mapped) {
                     setOrders(mapped);
                     if (st.toast) push(st.toast, "success");
-                } catch (err) {
+                }
+            } catch (err) {
+                if (!cancelled) {
                     console.error("Failed to refresh orders:", err);
                 }
-                // clear navigation state
-                navigate(location.pathname, { replace: true, state: {} });
-            })();
-        }
-    }, [location, navigate, push]);
+            } finally {
+                if (!cancelled) {
+                    navigate(location.pathname, { replace: true, state: {} });
+                }
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [location, navigate, push, fetchBookings]);
 
     // paging / sort
     const [sortKey, setSortKey] =
@@ -1913,9 +2066,9 @@ export default function ConsultantOrdersPage() {
         const q = searchText.trim().toLowerCase();
 
         const afterFilter = orders.filter((o) => {
-            // Normalize status for comparison
-            const normalizedOrderStatus = o.status ? o.status.replace(/_/g, '').toUpperCase() : '';
-            const normalizedFilter = statusFilter ? statusFilter.replace(/_/g, '').toUpperCase() : '';
+            // Normalize status for comparison (handles IN_PROGRESS vs Đang thực hiện, etc.)
+            const normalizedOrderStatus = normalizeStatusValue(o.status);
+            const normalizedFilter = normalizeStatusValue(statusFilter);
             if (normalizedFilter && normalizedOrderStatus !== normalizedFilter)
                 return false;
             if (
@@ -1942,6 +2095,7 @@ export default function ConsultantOrdersPage() {
         });
 
         const arr = [...afterFilter];
+        // Mặc định: đơn mới nhất lên đầu (pickup_time desc) nếu chưa chọn sort khác
         arr.sort((a, b) => {
             let A, B;
             if (sortKey === "code") {
@@ -1960,6 +2114,7 @@ export default function ConsultantOrdersPage() {
                 A = a.status;
                 B = b.status;
             } else {
+                // default sort theo pickup_time (ngày đi)
                 A = a.pickup_time;
                 B = b.pickup_time;
             }
@@ -2052,36 +2207,24 @@ export default function ConsultantOrdersPage() {
     };
 
     // refresh from backend
-    const handleRefresh = async () => {
+    const handleRefresh = React.useCallback(async () => {
+        if (isConsultant && scopedBranchId == null) {
+            push("Chưa xác định được chi nhánh để lọc danh sách đơn hàng", "error");
+            return;
+        }
         setLoadingRefresh(true);
         try {
-            const list = await listBookings({});
-            const mapped = (list || []).map(b => ({
-                id: b.id,
-                code: `ORD-${b.id}`,
-                status: b.status || "PENDING",
-                customer_name: b.customerName,
-                customer_phone: b.customerPhone,
-                pickup: (b.routeSummary || "").split(" → ")[0] || "",
-                dropoff: (b.routeSummary || "").split(" → ")[1] || "",
-                pickup_time: b.startDate,
-                dropoff_eta: b.startDate,
-                vehicle_category: "",
-                vehicle_category_id: "",
-                vehicle_count: 1,
-                pax_count: 0,
-                quoted_price: b.totalCost,
-                discount_amount: 0,
-                notes: "",
-            }));
-            setOrders(mapped);
-            push("Đã làm mới danh sách đơn hàng", "success");
+            const mapped = await fetchBookings();
+            if (mapped) {
+                setOrders(mapped);
+                push("Đã làm mới danh sách đơn hàng", "success");
+            }
         } catch (e) {
             push("Không tải được danh sách đơn hàng", "error");
         } finally {
             setLoadingRefresh(false);
         }
-    };
+    }, [fetchBookings, isConsultant, scopedBranchId, push]);
 
     /**
      * khi form create / edit bấm lưu,

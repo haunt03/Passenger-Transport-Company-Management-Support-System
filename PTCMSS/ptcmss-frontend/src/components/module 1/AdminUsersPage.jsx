@@ -1,10 +1,11 @@
 ﻿import React from "react";
 import { useNavigate } from "react-router-dom";
-import { listUsers, listUsersByBranch, listRoles, toggleUserStatus } from "../../api/users";
+import { listUsers, listUsersByBranch, listRoles } from "../../api/users";
 import { listEmployeesByRole, listEmployees, listEmployeesByBranch } from "../../api/employees";
 import { RefreshCw, Edit2, ShieldCheck, Users, Search, Filter, Mail, Phone, Shield, UserPlus } from "lucide-react";
 import { getCurrentRole, getStoredUserId, ROLES } from "../../utils/session";
 import Pagination from "../common/Pagination";
+import UserAvatar from "../common/UserAvatar";
 
 const cls = (...a) => a.filter(Boolean).join(" ");
 
@@ -185,6 +186,8 @@ export default function AdminUsersPage() {
         branchId: emp.branchId,
         branchName: emp.branchName,
         status: emp.status,
+        // Avatar path lấy từ backend (userAvatar) nếu có
+        avatar: emp.userAvatar || emp.avatar || emp.avatarUrl,
       }));
       setAllUsers(mapped);
     } finally {
@@ -271,13 +274,6 @@ export default function AdminUsersPage() {
       }
     })();
   }, [isManagerView]);
-
-  const onToggle = async (id) => {
-    try {
-      await toggleUserStatus(id);
-      await onRefresh();
-    } catch { /* empty */ }
-  };
 
   const BRAND_COLOR = "#0079BC";
 
@@ -468,7 +464,10 @@ export default function AdminUsersPage() {
                 ) : currentUsers.map(u => (
                     <tr key={u.id} className="hover:bg-gradient-to-r hover:from-slate-50 hover:to-white transition-colors group">
                       <td className="px-6 py-4">
-                        <div className="font-semibold text-slate-900">{u.fullName}</div>
+                        <div className="flex items-center gap-3">
+                          <UserAvatar name={u.fullName} avatar={u.avatar} size={32} />
+                          <div className="font-semibold text-slate-900">{u.fullName}</div>
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2 text-slate-700">
@@ -496,26 +495,15 @@ export default function AdminUsersPage() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {/* Chỉ Admin và Manager mới có nút Chỉnh sửa và Vô hiệu hóa */}
+                          {/* Chỉ Admin và Manager mới có nút Chỉnh sửa */}
                           {!isAccountantView ? (
-                              <>
-                                <button
-                                    onClick={() => navigate(`/admin/users/${u.id}`)}
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 hover:border-[#0079BC]/50 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition-all active:scale-[0.98] group-hover:shadow-md"
-                                >
-                                  <Edit2 className="h-3.5 w-3.5" />
-                                  Chỉnh sửa
-                                </button>
-                                <button
-                                    onClick={() => onToggle(u.id)}
-                                    className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium shadow-sm transition-all active:scale-[0.98] ${u.status === "ACTIVE"
-                                        ? "border-sky-300 bg-sky-50 text-sky-700 hover:bg-sky-100"
-                                        : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                                    }`}
-                                >
-                                  {u.status === "ACTIVE" ? "Vô hiệu hóa" : "Kích hoạt"}
-                                </button>
-                              </>
+                              <button
+                                  onClick={() => navigate(`/admin/users/${u.id}`)}
+                                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 hover:border-[#0079BC]/50 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition-all active:scale-[0.98] group-hover:shadow-md"
+                              >
+                                <Edit2 className="h-3.5 w-3.5" />
+                                Chỉnh sửa
+                              </button>
                           ) : (
                               <span className="text-xs text-slate-400 italic">Chỉ xem</span>
                           )}

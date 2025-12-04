@@ -12,6 +12,7 @@ import {
 import { createExpenseRequest } from "../../api/expenses";
 import { listVehiclesByBranch } from "../../api/vehicles";
 import { listBranches, getBranchByUserId } from "../../api/branches";
+import { getDriverProfileByUser } from "../../api/drivers";
 import { getCurrentRole, getStoredUserId, ROLES } from "../../utils/session";
 
 const EXPENSE_TYPES = [
@@ -62,6 +63,7 @@ export default function ExpenseRequestForm() {
     const [vehicleOptions, setVehicleOptions] = React.useState([]);
     const [vehicleLoading, setVehicleLoading] = React.useState(false);
     const [vehicleError, setVehicleError] = React.useState("");
+    const [driverId, setDriverId] = React.useState(null);
 
     const [amountInput, setAmountInput] = React.useState("");
     const [notes, setNotes] = React.useState("");
@@ -105,6 +107,20 @@ export default function ExpenseRequestForm() {
                     }
                     setBranchId(mapped.id);
                     setBranchName(mapped.name);
+
+                    // Nếu là Driver, lấy driverId để filter xe
+                    if (role === ROLES.DRIVER) {
+                        try {
+                            const driverProfile = await getDriverProfileByUser(Number(userId));
+                            if (cancelled) return;
+                            if (driverProfile?.driverId) {
+                                setDriverId(driverProfile.driverId);
+                            }
+                        } catch (err) {
+                            console.warn("Could not get driver profile:", err);
+                            // Không throw error, chỉ log warning
+                        }
+                    }
                 } else {
                     const res = await listBranches({ page: 0, size: 100 });
                     if (cancelled) return;
@@ -135,7 +151,7 @@ export default function ExpenseRequestForm() {
         return () => {
             cancelled = true;
         };
-    }, [branchScoped, userId]);
+    }, [branchScoped, userId, role]);
 
     React.useEffect(() => {
         if (!branchId) {
@@ -148,7 +164,8 @@ export default function ExpenseRequestForm() {
             setVehicleError("");
             setVehicleLoading(true);
             try {
-                const list = await listVehiclesByBranch(Number(branchId));
+                // Nếu là Driver và có driverId, chỉ lấy xe mà driver đã lái
+                const list = await listVehiclesByBranch(Number(branchId), driverId || null);
                 if (cancelled) return;
                 const mapped = (Array.isArray(list) ? list : []).map((v) => ({
                     id: String(v.id ?? v.vehicleId ?? ""),
@@ -175,7 +192,7 @@ export default function ExpenseRequestForm() {
         return () => {
             cancelled = true;
         };
-    }, [branchId]);
+    }, [branchId, driverId]);
 
     const onAmountChange = (e) => {
         setError("");

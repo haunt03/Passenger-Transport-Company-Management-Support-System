@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { CarFront, Search, Eye, AlertCircle, RefreshCw, Loader2 } from "lucide-react";
-import { listVehiclesByBranch } from "../../api/vehicles";
+import { CarFront, Search, Eye, AlertCircle, RefreshCw, Loader2, Calendar, CheckCircle2, X } from "lucide-react";
+import { listVehiclesByBranch, getVehicleTrips } from "../../api/vehicles";
 import { getBranchByUserId } from "../../api/branches";
 import { getCurrentRole, getStoredUserId, ROLES } from "../../utils/session";
 import Pagination from "../common/Pagination";
@@ -18,6 +18,11 @@ export default function CoordinatorVehicleListPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const pageSize = 10;
+
+    // Time filter để kiểm tra xe rảnh
+    const [timeFilterStart, setTimeFilterStart] = useState("");
+    const [timeFilterEnd, setTimeFilterEnd] = useState("");
+    const [vehicleAvailability, setVehicleAvailability] = useState({}); // { vehicleId: { available, reason } }
 
     // Branch state
     const [branchId, setBranchId] = useState(null);
@@ -68,6 +73,51 @@ export default function CoordinatorVehicleListPage() {
         if (isBranchScoped && !branchId) return;
         fetchVehicles();
     }, [currentPage, searchQuery, branchId, branchLoading]);
+
+    // Kiểm tra xe rảnh theo khoảng thời gian khi đã chọn filter
+    useEffect(() => {
+        if (!timeFilterStart || !timeFilterEnd || !vehicles.length) {
+            setVehicleAvailability({});
+            return;
+        }
+
+        const checkAvailability = async () => {
+            const startTime = new Date(timeFilterStart + "T00:00:00");
+            const endTime = new Date(timeFilterEnd + "T23:59:59");
+            const map = {};
+
+            for (const v of vehicles) {
+                try {
+                    const tripsResponse = await getVehicleTrips(v.id);
+                    const trips = tripsResponse?.trips || tripsResponse || [];
+                    const hasConflict = trips.some((trip) => {
+                        if (!trip.startTime || trip.status === "COMPLETED" || trip.status === "CANCELLED") {
+                            return false;
+                        }
+                        const tripStart = new Date(trip.startTime);
+                        const tripEnd = trip.endTime
+                            ? new Date(trip.endTime)
+                            : new Date(tripStart.getTime() + 8 * 60 * 60 * 1000);
+                        return tripStart <= endTime && tripEnd >= startTime;
+                    });
+                    map[v.id] = {
+                        available: !hasConflict,
+                        reason: hasConflict ? "Có chuyến trong khoảng thời gian này" : "Rảnh",
+                    };
+                } catch (err) {
+                    console.error(`Error checking availability for vehicle ${v.id}:`, err);
+                    map[v.id] = {
+                        available: false,
+                        reason: "Lỗi kiểm tra",
+                    };
+                }
+            }
+
+            setVehicleAvailability(map);
+        };
+
+        checkAvailability();
+    }, [timeFilterStart, timeFilterEnd, vehicles]);
 
     const fetchVehicles = async () => {
         if (!branchId) {
@@ -159,44 +209,90 @@ export default function CoordinatorVehicleListPage() {
                     </div>
                 )}
 
-                {/* Search + Branch Info */}
+                {/* Search + Branch Info + Time filter */}
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6">
-                    <div className="flex flex-col sm:flex-row gap-4">
-                        <div className="flex-1 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5">
-                            <Search className="h-5 w-5 text-slate-400" />
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => {
-                                    setSearchQuery(e.target.value);
-                                    setCurrentPage(1);
-                                }}
-                                placeholder="Tìm kiếm xe theo biển số, loại xe..."
-                                className="flex-1 bg-transparent outline-none text-slate-700 placeholder:text-slate-400"
-                            />
+                    <div className="flex flex-col gap-4">
+                        <div className="flex flex-col sm:flex-row gap-4">
+                            <div className="flex-1 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5">
+                                <Search className="h-5 w-5 text-slate-400" />
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => {
+                                        setSearchQuery(e.target.value);
+                                        setCurrentPage(1);
+                                    }}
+                                    placeholder="Tìm kiếm xe theo biển số, loại xe..."
+                                    className="flex-1 bg-transparent outline-none text-slate-700 placeholder:text-slate-400"
+                                />
+                            </div>
+
+                            {/* Refresh */}
+                            <button
+                                onClick={() => fetchVehicles()}
+                                disabled={loading || branchLoading}
+                                className="px-4 py-2 rounded-lg text-sm font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors flex items-center gap-2 disabled:opacity-50"
+                            >
+                                {loading ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <RefreshCw className="h-4 w-4" />
+                                )}
+                                Refresh
+                            </button>
+
+                            {/* Branch info */}
+                            {isBranchScoped && branchName && (
+                                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-sky-50 text-sky-700 text-sm">
+                                    <span className="font-medium">Chi nhánh:</span>
+                                    <span>{branchName}</span>
+                                </div>
+                            )}
                         </div>
 
-                        {/* Refresh */}
-                        <button
-                            onClick={() => fetchVehicles()}
-                            disabled={loading || branchLoading}
-                            className="px-4 py-2 rounded-lg text-sm font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors flex items-center gap-2 disabled:opacity-50"
-                        >
-                            {loading ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                                <RefreshCw className="h-4 w-4" />
-                            )}
-                            Refresh
-                        </button>
-
-                        {/* Branch info */}
-                        {isBranchScoped && branchName && (
-                            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-sky-50 text-sky-700 text-sm">
-                                <span className="font-medium">Chi nhánh:</span>
-                                <span>{branchName}</span>
+                        {/* Time filter để kiểm tra xe rảnh */}
+                        <div className="flex flex-col sm:flex-row items-center gap-3 pt-3 border-t border-slate-200">
+                            <span className="text-sm text-slate-600 font-medium">Kiểm tra xe rảnh:</span>
+                            <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm">
+                                    <Calendar className="h-4 w-4 text-slate-400" />
+                                    <input
+                                        type="date"
+                                        className="bg-transparent outline-none"
+                                        value={timeFilterStart}
+                                        onChange={(e) => setTimeFilterStart(e.target.value)}
+                                    />
+                                </div>
+                                <span className="text-slate-400 text-sm">→</span>
+                                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm">
+                                    <Calendar className="h-4 w-4 text-slate-400" />
+                                    <input
+                                        type="date"
+                                        className="bg-transparent outline-none"
+                                        value={timeFilterEnd}
+                                        onChange={(e) => setTimeFilterEnd(e.target.value)}
+                                    />
+                                </div>
+                                {(timeFilterStart || timeFilterEnd) && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setTimeFilterStart("");
+                                            setTimeFilterEnd("");
+                                        }}
+                                        className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700"
+                                    >
+                                        <X className="h-3 w-3" /> Xoá lọc
+                                    </button>
+                                )}
                             </div>
-                        )}
+                            {timeFilterStart && timeFilterEnd && (
+                                <div className="flex items-center gap-2 text-xs text-slate-500">
+                                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                                    <span>Đang hiển thị trạng thái bận/rảnh theo khoảng thời gian đã chọn.</span>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -223,6 +319,9 @@ export default function CoordinatorVehicleListPage() {
                                         Loại xe
                                     </th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                        Số ghế
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
                                         Hãng xe
                                     </th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
@@ -241,8 +340,8 @@ export default function CoordinatorVehicleListPage() {
                                 </thead>
                                 <tbody className="divide-y divide-slate-200">
                                 {vehicles.map((vehicle) => {
-                                    const inspectionStatus = getInspectionStatus(vehicle.inspectionExpiryDate);
-                                    const insuranceStatus = getInsuranceStatus(vehicle.insuranceExpiryDate);
+                                    const inspectionStatus = getInspectionStatus(vehicle.inspectionExpiry || vehicle.inspectionExpiryDate);
+                                    const insuranceStatus = getInsuranceStatus(vehicle.insuranceExpiry || vehicle.insuranceExpiryDate);
                                     return (
                                         <tr key={vehicle.id} className="hover:bg-slate-50 transition-colors">
                                             <td className="px-4 py-3">
@@ -257,10 +356,13 @@ export default function CoordinatorVehicleListPage() {
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3 text-sm text-slate-700">
-                                                {vehicle.vehicleCategory?.name || "—"}
+                                                {vehicle.categoryName || vehicle.vehicleCategory?.name || "—"}
                                             </td>
                                             <td className="px-4 py-3 text-sm text-slate-700">
-                                                {vehicle.brand || "—"}
+                                                {vehicle.capacity != null ? vehicle.capacity : "—"}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-slate-700">
+                                                {vehicle.brand || vehicle.model || "—"}
                                             </td>
                                             <td className="px-4 py-3">
                                                     <span className={`text-sm font-medium ${inspectionStatus.color}`}>
@@ -272,7 +374,8 @@ export default function CoordinatorVehicleListPage() {
                                                         {insuranceStatus.text}
                                                     </span>
                                             </td>
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 text-sm">
+                                                <div className="flex flex-col gap-1">
                                                     <span
                                                         className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${vehicle.status === "AVAILABLE"
                                                             ? "bg-green-50 text-green-700"
@@ -291,6 +394,17 @@ export default function CoordinatorVehicleListPage() {
                                                                     ? "Bảo trì"
                                                                     : "Không hoạt động"}
                                                     </span>
+                                                    {timeFilterStart && timeFilterEnd && vehicleAvailability[vehicle.id] && (
+                                                        <span
+                                                            className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${vehicleAvailability[vehicle.id].available
+                                                                ? "bg-emerald-50 text-emerald-700"
+                                                                : "bg-amber-50 text-amber-700"
+                                                            }`}
+                                                        >
+                                                                {vehicleAvailability[vehicle.id].available ? "Rảnh" : "Bận"}
+                                                            </span>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center justify-center">

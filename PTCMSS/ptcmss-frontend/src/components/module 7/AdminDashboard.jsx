@@ -9,6 +9,7 @@ import {
     Calendar,
     Building2,
     BarChart3,
+    CarFront,
 } from "lucide-react";
 import {
     BarChart,
@@ -31,6 +32,7 @@ import {
     getRevenueTrend,
     getBranchComparison,
     getTopRoutes,
+    getTopVehicleCategories,
     getPendingApprovals,
     exportDashboardReport,
 } from "../../api/dashboards";
@@ -101,6 +103,7 @@ export default function AdminDashboard() {
     const [revenueTrend, setRevenueTrend] = React.useState([]);
     const [branchComparison, setBranchComparison] = React.useState([]);
     const [topRoutes, setTopRoutes] = React.useState([]);
+    const [topVehicleCategories, setTopVehicleCategories] = React.useState([]);
     const [pendingApprovals, setPendingApprovals] = React.useState([]);
 
     // Load all dashboard data
@@ -116,6 +119,10 @@ export default function AdminDashboard() {
                     console.warn("Top routes API failed, returning empty array:", err);
                     return [];
                 }),
+                getTopVehicleCategories({ period }).catch(err => {
+                    console.warn("Top vehicle categories API failed, returning empty array:", err);
+                    return [];
+                }),
                 getPendingApprovals().catch(err => {
                     console.warn("Pending approvals API failed, returning empty array:", err);
                     return [];
@@ -127,6 +134,7 @@ export default function AdminDashboard() {
                 trendResult,
                 branchResult,
                 routesResult,
+                vehicleCategoriesResult,
                 approvalsResult,
             ] = results;
 
@@ -135,6 +143,7 @@ export default function AdminDashboard() {
             const trendData = trendResult.status === 'fulfilled' ? trendResult.value : [];
             const branchData = branchResult.status === 'fulfilled' ? branchResult.value : [];
             const routesData = routesResult.status === 'fulfilled' ? routesResult.value : [];
+            const vehicleCategoriesData = vehicleCategoriesResult.status === 'fulfilled' ? vehicleCategoriesResult.value : [];
             const approvalsData = approvalsResult.status === 'fulfilled' ? approvalsResult.value : [];
 
             // KPIs
@@ -149,6 +158,7 @@ export default function AdminDashboard() {
             setRevenueTrend(trendData || []);
             setBranchComparison(branchData || []);
             setTopRoutes(routesData || []);
+            setTopVehicleCategories(vehicleCategoriesData || []);
 
             // Approvals
             setPendingApprovals(approvalsData || []);
@@ -344,8 +354,51 @@ export default function AdminDashboard() {
                         </div>
                     </div>
 
-                    {/* TOP ROUTES & PENDING APPROVALS */}
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+                    {/* TOP VEHICLE CATEGORIES & TOP ROUTES */}
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 mb-5">
+                        {/* TOP VEHICLE CATEGORIES */}
+                        <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                            <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 text-sm text-slate-600 flex items-center gap-2">
+                                <CarFront className="h-4 w-4 text-sky-600" />
+                                <span className="font-medium text-slate-700">
+                                    Top Loại Xe Được Sử Dụng Nhiều Nhất
+                                </span>
+                            </div>
+                            <div className="p-4">
+                                {topVehicleCategories && topVehicleCategories.length > 0 ? (
+                                    <div className="space-y-3">
+                                        {topVehicleCategories.map((cat, index) => (
+                                            <div
+                                                key={cat.categoryId || index}
+                                                className="flex items-center gap-3 p-3 rounded-lg bg-sky-50 border border-sky-200"
+                                            >
+                                                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center font-semibold text-sm">
+                                                    {index + 1}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-sm font-medium text-slate-900">
+                                                        {cat.categoryName}
+                                                    </div>
+                                                    <div className="text-xs text-slate-500">
+                                                        {cat.seats} chỗ · {cat.bookingCount} đơn · {cat.totalVehiclesBooked} xe đặt
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-sm font-semibold text-sky-700">
+                                                        {cat.tripCount} chuyến
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-8 text-slate-500 text-sm">
+                                        Không có dữ liệu
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
                         {/* TOP ROUTES */}
                         <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                             <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 text-sm text-slate-600 flex items-center gap-2">
@@ -383,55 +436,55 @@ export default function AdminDashboard() {
                                 )}
                             </div>
                         </div>
+                    </div>
 
-                        {/* PENDING APPROVALS */}
-                        <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                            <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 text-sm text-slate-600 flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <Calendar className="h-4 w-4 text-amber-600" />
-                                    <span className="font-medium text-slate-700">
+                    {/* PENDING APPROVALS */}
+                    <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                        <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 text-sm text-slate-600 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-amber-600" />
+                                <span className="font-medium text-slate-700">
                                         Yêu Cầu Chờ Duyệt
                                     </span>
-                                </div>
-                                <span className="text-xs text-slate-500">
+                            </div>
+                            <span className="text-xs text-slate-500">
                                     {pendingApprovals.length} mục
                                 </span>
-                            </div>
-                            <div className="p-4 max-h-[400px] overflow-y-auto">
-                                {pendingApprovals && pendingApprovals.length > 0 ? (
-                                    <div className="space-y-2">
-                                        {pendingApprovals.map((approval, index) => (
-                                            <div
-                                                key={approval.historyId || index}
-                                                className="p-3 rounded-lg bg-amber-50 border border-amber-200"
-                                            >
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="text-sm font-medium text-slate-900">
-                                                            {approval.approvalType}
-                                                        </div>
-                                                        <div className="text-xs text-slate-600 mt-1">
-                                                            Người yêu cầu: {approval.requesterName}
-                                                        </div>
-                                                        {approval.branchName && (
-                                                            <div className="text-xs text-slate-500 mt-0.5">
-                                                                Chi nhánh: {approval.branchName}
-                                                            </div>
-                                                        )}
+                        </div>
+                        <div className="p-4 max-h-[400px] overflow-y-auto">
+                            {pendingApprovals && pendingApprovals.length > 0 ? (
+                                <div className="space-y-2">
+                                    {pendingApprovals.map((approval, index) => (
+                                        <div
+                                            key={approval.historyId || index}
+                                            className="p-3 rounded-lg bg-amber-50 border border-amber-200"
+                                        >
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-sm font-medium text-slate-900">
+                                                        {approval.approvalType}
                                                     </div>
-                                                    <div className="text-xs text-slate-500 whitespace-nowrap">
-                                                        {new Date(approval.requestedAt).toLocaleDateString("vi-VN")}
+                                                    <div className="text-xs text-slate-600 mt-1">
+                                                        Người yêu cầu: {approval.requesterName}
                                                     </div>
+                                                    {approval.branchName && (
+                                                        <div className="text-xs text-slate-500 mt-0.5">
+                                                            Chi nhánh: {approval.branchName}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="text-xs text-slate-500 whitespace-nowrap">
+                                                    {new Date(approval.requestedAt).toLocaleDateString("vi-VN")}
                                                 </div>
                                             </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="text-center py-8 text-slate-500 text-sm">
-                                        Không có yêu cầu chờ duyệt
-                                    </div>
-                                )}
-                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-8 text-slate-500 text-sm">
+                                    Không có yêu cầu chờ duyệt
+                                </div>
+                            )}
                         </div>
                     </div>
                 </>
