@@ -1,18 +1,18 @@
-package org.example.ptcmssbackend.entity;
+                package org.example.ptcmssbackend.entity;
 
-import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
-import lombok.*;
-import org.example.ptcmssbackend.enums.AlertType;
-import org.example.ptcmssbackend.enums.AlertSeverity;
-import org.hibernate.annotations.CreationTimestamp;
+                import jakarta.persistence.*;
+                import jakarta.validation.constraints.NotNull;
+                import jakarta.validation.constraints.Size;
+                import lombok.*;
+                import org.example.ptcmssbackend.enums.AlertSeverity;
+                import org.example.ptcmssbackend.enums.AlertType;
+                import org.hibernate.annotations.CreationTimestamp;
 
-import java.time.Instant;
+                import java.time.Instant;
 
 /**
  * SystemAlerts - Cảnh báo hệ thống
- *
+ * 
  * Các loại cảnh báo:
  * - VEHICLE_INSPECTION_EXPIRING: Xe sắp hết đăng kiểm
  * - VEHICLE_INSURANCE_EXPIRING: Bảo hiểm xe sắp hết hạn
@@ -65,6 +65,7 @@ public class SystemAlerts {
     private Branches branch;
     
     @Column(name = "isAcknowledged")
+    @Builder.Default
     private Boolean isAcknowledged = false;
     
     @ManyToOne(fetch = FetchType.LAZY)
