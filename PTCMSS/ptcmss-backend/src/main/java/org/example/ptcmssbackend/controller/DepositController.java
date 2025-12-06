@@ -29,7 +29,7 @@ public class DepositController {
 
     @Operation(summary = "Tạo cọc cho booking", description = "Tạo một khoản cọc/thanh toán cho booking. Tự động tạo receipt number nếu paymentMethod = CASH")
     @PostMapping("/bookings/{bookingId}")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT','CONSULTANT','COORDINATOR','DRIVER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT','CONSULTANT','DRIVER')")
     public ResponseEntity<ApiResponse<InvoiceResponse>> createDeposit(
             @Parameter(description = "ID của booking", required = true) @PathVariable Integer bookingId,
             @Valid @RequestBody CreateInvoiceRequest request) {
