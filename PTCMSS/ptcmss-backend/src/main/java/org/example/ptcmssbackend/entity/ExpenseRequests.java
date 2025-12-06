@@ -9,9 +9,6 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-
 @Getter
 @Setter
 @Entity
@@ -46,14 +43,6 @@ public class ExpenseRequests {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private ExpenseRequestStatus status = ExpenseRequestStatus.PENDING;
-
-    @ElementCollection
-    @CollectionTable(
-            name = "expense_request_attachments",
-            joinColumns = @JoinColumn(name = "expenseRequestId")
-    )
-    @Column(name = "fileUrl")
-    private List<String> attachments = new ArrayList<>();
 
     @CreationTimestamp
     @Column(name = "createdAt", updatable = false)
