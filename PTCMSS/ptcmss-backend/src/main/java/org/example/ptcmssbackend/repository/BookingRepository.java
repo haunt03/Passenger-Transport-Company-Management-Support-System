@@ -27,6 +27,13 @@ public interface BookingRepository extends JpaRepository<Bookings, Integer> {
     // Tìm booking theo customer phone
     @Query("SELECT b FROM Bookings b WHERE b.customer.phone = :phone")
     List<Bookings> findByCustomerPhone(@Param("phone") String phone);
+    
+    // Tìm booking theo customer ID với phân trang
+    @Query("SELECT b FROM Bookings b WHERE b.customer.id = :customerId ORDER BY b.createdAt DESC")
+    Page<Bookings> findByCustomerId(@Param("customerId") Integer customerId, Pageable pageable);
+    
+    // Tìm booking theo customer ID (không phân trang)
+    List<Bookings> findByCustomer_IdOrderByCreatedAtDesc(Integer customerId);
 
     // Tìm booking theo bookingId hoặc customer phone (search)
     @Query("SELECT b FROM Bookings b WHERE " +

@@ -23,7 +23,7 @@ public class BookingVehicleDetails implements Serializable {
     @MapsId("vehicleCategoryId")
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "vehicleCategoryId", nullable = false)
-    private org.example.ptcmssbackend.entity.VehicleCategoryPricing vehicleCategory;
+    private VehicleCategoryPricing vehicleCategory;
 
     @NotNull
     @Column(name = "quantity", nullable = false)
