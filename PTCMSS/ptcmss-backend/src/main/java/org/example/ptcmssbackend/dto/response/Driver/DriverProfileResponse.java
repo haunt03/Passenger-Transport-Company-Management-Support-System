@@ -17,6 +17,7 @@ public class DriverProfileResponse {
     private String email;
     private String phone;
     private String address;
+    private String avatar; // URL của ảnh đại diện
     private String branchName;
     private String licenseNumber;
     private String licenseClass;
@@ -24,7 +25,7 @@ public class DriverProfileResponse {
     private DriverStatus status;
     private String note;
     private LocalDate healthCheckDate;
-
+    
     // Thống kê
     private Long totalTrips; // Tổng số chuyến đã hoàn thành
     private Double totalKm; // Tổng km (tùy chọn, có thể null nếu không có dữ liệu)
@@ -35,6 +36,7 @@ public class DriverProfileResponse {
         this.email = driver.getEmployee().getUser().getEmail();
         this.phone = driver.getEmployee().getUser().getPhone();
         this.address = driver.getEmployee().getUser().getAddress();
+        this.avatar = driver.getEmployee().getUser().getAvatar();
         this.branchName = driver.getBranch().getBranchName();
         this.licenseNumber = driver.getLicenseNumber();
         this.licenseClass = driver.getLicenseClass();

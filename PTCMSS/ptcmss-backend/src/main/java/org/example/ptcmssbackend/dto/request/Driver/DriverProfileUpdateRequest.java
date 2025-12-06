@@ -21,6 +21,9 @@ public class DriverProfileUpdateRequest {
     @Schema(description = "Ngày kiểm tra sức khỏe gần nhất", example = "2025-10-01")
     private LocalDate healthCheckDate;
 
+    @Schema(description = "Số giấy phép lái xe", example = "DN-D001")
+    private String licenseNumber;
+
     @Schema(description = "Hạng giấy phép lái xe", example = "D")
     private String licenseClass;
 

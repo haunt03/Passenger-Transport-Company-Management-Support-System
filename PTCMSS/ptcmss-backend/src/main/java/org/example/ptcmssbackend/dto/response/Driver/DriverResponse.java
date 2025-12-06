@@ -15,6 +15,7 @@ public class DriverResponse {
     private Integer id;
     private String fullName;
     private String phone;
+    private String avatar; // ảnh đại diện user (nếu có)
     private String branchName;
     private String licenseNumber;
     private String licenseClass;
@@ -28,6 +29,7 @@ public class DriverResponse {
         this.id = driver.getId();
         this.fullName = driver.getEmployee().getUser().getFullName();
         this.phone = driver.getEmployee().getUser().getPhone();
+        this.avatar = driver.getEmployee().getUser().getAvatar();
         this.branchName = driver.getBranch().getBranchName();
         this.licenseNumber = driver.getLicenseNumber();
         this.licenseClass = driver.getLicenseClass();
@@ -37,4 +39,7 @@ public class DriverResponse {
         this.note = driver.getNote();
         this.status = driver.getStatus().name();
     }
+
+
 }
+

@@ -26,6 +26,7 @@ import org.example.ptcmssbackend.enums.TripStatus;
 import org.example.ptcmssbackend.repository.*;
 import org.example.ptcmssbackend.service.ApprovalService;
 import org.example.ptcmssbackend.service.DriverService;
+import org.example.ptcmssbackend.service.WebSocketNotificationService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,7 +34,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -52,70 +52,71 @@ public class DriverServiceImpl implements DriverService {
     private final ApprovalService approvalService;
     private final DriverRatingsRepository driverRatingsRepository;
     private final org.example.ptcmssbackend.service.GraphHopperService graphHopperService;
-    private final org.example.ptcmssbackend.repository.InvoiceRepository invoiceRepository;
+    private final InvoiceRepository invoiceRepository;
+    private final WebSocketNotificationService webSocketNotificationService;
 
     @Override
     @Transactional(readOnly = true)
     public DriverDashboardResponse getDashboard(Integer driverId) {
         log.info("[DriverDashboard] Fetching dashboard for driver {}", driverId);
         var driverTrips = tripDriverRepository.findAllByDriverId(driverId);
-
+        
         // Lấy ngày hôm nay để ưu tiên chuyến hôm nay
         LocalDate today = LocalDate.now(ZoneId.systemDefault());
-
+        
         return driverTrips.stream()
                 .filter(td -> {
                     TripStatus status = td.getTrip().getStatus();
                     // Bao gồm SCHEDULED, ASSIGNED (đã phân xe), và ONGOING
-                    return status == TripStatus.SCHEDULED
-                            || status == TripStatus.ASSIGNED
+                    return status == TripStatus.SCHEDULED 
+                            || status == TripStatus.ASSIGNED 
                             || status == TripStatus.ONGOING;
                 })
                 .sorted((td1, td2) -> {
                     // Ưu tiên: 1) Chuyến hôm nay, 2) Chuyến sớm nhất
                     var trip1 = td1.getTrip();
                     var trip2 = td2.getTrip();
-
+                    
                     Instant start1 = trip1.getStartTime();
                     Instant start2 = trip2.getStartTime();
-
+                    
                     if (start1 == null && start2 == null) return 0;
                     if (start1 == null) return 1;
                     if (start2 == null) return -1;
-
+                    
                     LocalDate date1 = start1.atZone(ZoneId.systemDefault()).toLocalDate();
                     LocalDate date2 = start2.atZone(ZoneId.systemDefault()).toLocalDate();
-
+                    
                     boolean isToday1 = date1.equals(today);
                     boolean isToday2 = date2.equals(today);
-
+                    
                     // Ưu tiên chuyến hôm nay
                     if (isToday1 && !isToday2) return -1;
                     if (!isToday1 && isToday2) return 1;
-
+                    
                     // Nếu cùng ngày hoặc cả hai không phải hôm nay, sắp xếp theo thời gian
                     return start1.compareTo(start2);
                 })
                 .findFirst()
                 .map(td -> {
                     var trip = td.getTrip();
-                    log.info("[DriverDashboard] Trip ID: {}, Status: {}, StartTime: {}",
+                    log.info("[DriverDashboard] Trip ID: {}, Status: {}, StartTime: {}", 
                             trip.getId(), trip.getStatus(), trip.getStartTime());
-
+                    
                     var booking = trip.getBooking();
                     log.info("[DriverDashboard] Booking: {}", booking != null ? booking.getId() : "null");
-
+                    
                     var customer = booking != null ? booking.getCustomer() : null;
                     var customerName = customer != null ? customer.getFullName() : null;
                     var customerPhone = customer != null ? customer.getPhone() : null;
                     log.info("[DriverDashboard] Customer: {} - {}", customerName, customerPhone);
-
+                    
                     // Lấy thông tin driver và vehicle
                     String driverName = null;
                     String driverPhone = null;
                     String vehiclePlate = null;
                     String vehicleModel = null;
-
+                    
                     List<TripDrivers> tripDrivers = tripDriverRepository.findByTripId(trip.getId());
                     if (!tripDrivers.isEmpty()) {
                         Drivers driver = tripDrivers.get(0).getDriver();
@@ -124,7 +125,7 @@ public class DriverServiceImpl implements DriverService {
                             driverPhone = driver.getEmployee().getUser().getPhone();
                         }
                     }
-
+                    
                     List<TripVehicles> tripVehicles = tripVehicleRepository.findByTripId(trip.getId());
                     if (!tripVehicles.isEmpty()) {
                         Vehicles vehicle = tripVehicles.get(0).getVehicle();
@@ -133,14 +134,14 @@ public class DriverServiceImpl implements DriverService {
                             vehicleModel = vehicle.getModel();
                         }
                     }
-
+                    
                     // Lấy thông tin giá tiền từ booking (giống như BookingService)
-                    java.math.BigDecimal totalCost = booking != null && booking.getTotalCost() != null
-                            ? booking.getTotalCost()
+                    java.math.BigDecimal totalCost = booking != null && booking.getTotalCost() != null 
+                            ? booking.getTotalCost() 
                             : java.math.BigDecimal.ZERO;
                     java.math.BigDecimal paidAmount = java.math.BigDecimal.ZERO;
                     java.math.BigDecimal remainingAmount = totalCost;
-
+                    
                     if (booking != null) {
                         // Tính paidAmount từ payment_history đã CONFIRMED (giống BookingService)
                         paidAmount = invoiceRepository.calculateConfirmedPaidAmountByBookingId(booking.getId());
@@ -150,7 +151,7 @@ public class DriverServiceImpl implements DriverService {
                             remainingAmount = java.math.BigDecimal.ZERO;
                         }
                     }
-
+                    
                     // Lấy distance từ trip, nếu null thì tìm từ trips khác trong cùng booking
                     java.math.BigDecimal distance = trip.getDistance();
                     if (distance == null && booking != null) {
@@ -159,23 +160,23 @@ public class DriverServiceImpl implements DriverService {
                         for (Trips otherTrip : allTrips) {
                             if (otherTrip.getDistance() != null && otherTrip.getDistance().compareTo(java.math.BigDecimal.ZERO) > 0) {
                                 distance = otherTrip.getDistance();
-                                log.info("[DriverDashboard] Using distance from trip {} for trip {}: {} km",
+                                log.info("[DriverDashboard] Using distance from trip {} for trip {}: {} km", 
                                         otherTrip.getId(), trip.getId(), distance);
                                 break;
                             }
                         }
-
+                        
                         // Nếu vẫn không có, tính từ startLocation và endLocation
                         if (distance == null && trip.getStartLocation() != null && trip.getEndLocation() != null) {
                             try {
                                 var distanceResult = graphHopperService.calculateDistance(
-                                        trip.getStartLocation(),
+                                        trip.getStartLocation(), 
                                         trip.getEndLocation()
                                 );
                                 if (distanceResult != null && distanceResult.getDistanceKm() != null) {
                                     distance = java.math.BigDecimal.valueOf(distanceResult.getDistanceKm());
                                     log.info("[DriverDashboard] Calculated distance for trip {}: {} km", trip.getId(), distance);
-
+                                    
                                     // Lưu distance vào trip để dùng lần sau
                                     trip.setDistance(distance);
                                     tripRepository.save(trip);
@@ -185,15 +186,15 @@ public class DriverServiceImpl implements DriverService {
                                 log.warn("[DriverDashboard] Failed to calculate distance for trip {}: {}", trip.getId(), e.getMessage());
                             }
                         }
-
+                        
                         if (distance == null) {
                             log.debug("[DriverDashboard] Trip {} has no distance and cannot calculate from locations", trip.getId());
                         }
                     }
                     log.info("[DriverDashboard] Trip {} distance: {}", trip.getId(), distance);
-                    log.info("[DriverDashboard] Driver: {}, Vehicle: {}, TotalCost: {}, Paid: {}, Remaining: {}",
+                    log.info("[DriverDashboard] Driver: {}, Vehicle: {}, TotalCost: {}, Paid: {}, Remaining: {}", 
                             driverName, vehiclePlate, totalCost, paidAmount, remainingAmount);
-
+                    
                     return new DriverDashboardResponse(
                             trip.getId(),
                             trip.getStartLocation(),
@@ -217,7 +218,7 @@ public class DriverServiceImpl implements DriverService {
     }
 
     @Override
-    public List<DriverScheduleResponse> getSchedule(Integer driverId, java.time.Instant startDate, java.time.Instant endDate) {
+    public List<DriverScheduleResponse> getSchedule(Integer driverId, Instant startDate, Instant endDate) {
         log.info("[DriverSchedule] Loading schedule for driver {} from {} to {}", driverId, startDate, endDate);
         List<TripDrivers> trips;
         if (startDate != null || endDate != null) {
@@ -232,7 +233,7 @@ public class DriverServiceImpl implements DriverService {
                     var ratingOpt = driverRatingsRepository.findByTrip_Id(trip.getId());
                     var rating = ratingOpt.map(r -> r.getOverallRating()).orElse(null);
                     var ratingComment = ratingOpt.map(r -> r.getComment()).orElse(null);
-
+                    
                     // Lấy hireType từ booking
                     var booking = trip.getBooking();
                     String hireType = null;
@@ -241,7 +242,7 @@ public class DriverServiceImpl implements DriverService {
                         hireType = booking.getHireType().getCode();
                         hireTypeName = booking.getHireType().getName();
                     }
-
+                    
                     return DriverScheduleResponse.builder()
                             .tripId(trip.getId())
                             .startLocation(trip.getStartLocation())
@@ -263,16 +264,16 @@ public class DriverServiceImpl implements DriverService {
         log.info("[DriverProfile] Loading profile for driver {}", driverId);
         var driver = driverRepository.findById(driverId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy tài xế"));
-
+        
         DriverProfileResponse response = new DriverProfileResponse(driver);
-
+        
         // Tính thống kê: Tổng số chuyến đã hoàn thành
         long totalTrips = tripDriverRepository.findAllByDriverId(driverId).stream()
-                .filter(td -> td.getTrip().getStatus() != null &&
-                        td.getTrip()
-                                .getStatus()
-                                .name()
-                                .equals("COMPLETED"))
+                .filter(td -> td.getTrip().getStatus() != null && 
+                             td.getTrip()
+                                     .getStatus()
+                                     .name()
+                                     .equals("COMPLETED"))
                 .count();
         response.setTotalTrips(totalTrips);
         response.setTotalKm(null);
@@ -286,7 +287,7 @@ public class DriverServiceImpl implements DriverService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy nhân viên cho người dùng này"));
         var driver = driverRepository.findByEmployee_EmployeeId(employee.getEmployeeId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy tài xế cho nhân viên này"));
-
+        
         // Sử dụng getProfile để có thống kê
         return getProfile(driver.getId());
     }
@@ -305,31 +306,33 @@ public class DriverServiceImpl implements DriverService {
         // Cập nhật thông tin driver
         if (request.getNote() != null) driver.setNote(request.getNote());
         if (request.getHealthCheckDate() != null) driver.setHealthCheckDate(request.getHealthCheckDate());
+        if (request.getLicenseNumber() != null) driver.setLicenseNumber(request.getLicenseNumber());
         if (request.getLicenseClass() != null) driver.setLicenseClass(request.getLicenseClass());
         if (request.getLicenseExpiry() != null) driver.setLicenseExpiry(request.getLicenseExpiry());
-        if (request.getStatus() != null) {
+        // Chỉ validate và cập nhật status nếu có giá trị hợp lệ (không null và không rỗng)
+        if (request.getStatus() != null && !request.getStatus().trim().isEmpty()) {
             try {
-                org.example.ptcmssbackend.enums.DriverStatus newStatus =
-                        org.example.ptcmssbackend.enums.DriverStatus.valueOf(request.getStatus());
-
+                DriverStatus newStatus =
+                    DriverStatus.valueOf(request.getStatus().trim());
+                
                 // VALIDATION: Kiểm tra quyền của user hiện tại
-                org.springframework.security.core.Authentication auth =
-                        org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+                org.springframework.security.core.Authentication auth = 
+                    org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
                 boolean isCoordinator = auth != null && auth.getAuthorities().stream()
-                        .anyMatch(a -> a.getAuthority().equals("ROLE_COORDINATOR"));
-
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_COORDINATOR"));
+                
                 // Coordinator chỉ được chuyển tài xế sang ACTIVE hoặc INACTIVE
                 if (isCoordinator) {
-                    if (newStatus != org.example.ptcmssbackend.enums.DriverStatus.ACTIVE &&
-                            newStatus != org.example.ptcmssbackend.enums.DriverStatus.INACTIVE) {
+                    if (newStatus != DriverStatus.ACTIVE &&
+                        newStatus != DriverStatus.INACTIVE) {
                         throw new RuntimeException("Điều phối viên chỉ được phép chuyển tài xế sang trạng thái 'Hoạt động' (ACTIVE) hoặc 'Không hoạt động' (INACTIVE).");
                     }
                     // Coordinator không được thay đổi trạng thái nếu tài xế đang ON_TRIP
-                    if (driver.getStatus() == org.example.ptcmssbackend.enums.DriverStatus.ON_TRIP) {
+                    if (driver.getStatus() == DriverStatus.ON_TRIP) {
                         throw new RuntimeException("Không thể thay đổi trạng thái khi tài xế đang trong chuyến đi.");
                     }
                 }
-
+                
                 log.info("[DriverProfile] Updating driver {} status from {} to {}", driverId, driver.getStatus(), newStatus);
                 driver.setStatus(newStatus);
             } catch (IllegalArgumentException e) {
@@ -343,6 +346,7 @@ public class DriverServiceImpl implements DriverService {
     }
 
     @Override
+    @Transactional
     public DriverDayOffResponse requestDayOff(Integer driverId, DriverDayOffRequest request) {
         log.info("[DriverDayOff] Request day off for driver {}", driverId);
         var driver = driverRepository.findById(driverId)
@@ -357,22 +361,24 @@ public class DriverServiceImpl implements DriverService {
 
         var saved = driverDayOffRepository.save(dayOff);
 
-        // Tạo approval request để điều phối viên duyệt
-        try {
-            var user = driver.getEmployee().getUser();
-            var branch = driver.getBranch();
-            approvalService.createApprovalRequest(
-                    ApprovalType.DRIVER_DAY_OFF,
-                    saved.getId(),
-                    user,
-                    request.getReason(),
-                    branch
-            );
-            log.info("[DriverDayOff] Created approval request for day off {}", saved.getId());
-        } catch (Exception e) {
-            log.error("[DriverDayOff] Failed to create approval request: {}", e.getMessage());
+        // Tạo approval request để điều phối viên duyệt (rollback nếu thiếu thông tin bắt buộc)
+        var employee = driver.getEmployee();
+        var user = employee != null ? employee.getUser() : null;
+        var branch = driver.getBranch();
+        if (user == null || branch == null) {
+            log.error("[DriverDayOff] Missing user or branch for driver {}, cannot create approval", driverId);
+            throw new RuntimeException("Không thể tạo yêu cầu phê duyệt vì thiếu thông tin tài xế/chi nhánh");
         }
 
+        approvalService.createApprovalRequest(
+                ApprovalType.DRIVER_DAY_OFF,
+                saved.getId(),
+                user,
+                request.getReason(),
+                branch
+        );
+        log.info("[DriverDayOff] Created approval request for day off {}", saved.getId());
+        
         return new DriverDayOffResponse(saved);
     }
 
@@ -384,33 +390,33 @@ public class DriverServiceImpl implements DriverService {
                 .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt())) // Mới nhất trước
                 .collect(java.util.stream.Collectors.toList());
     }
-
+    
     @Override
     @Transactional
     public void cancelDayOffRequest(Integer dayOffId, Integer driverId) {
         log.info("[DriverDayOff] Driver {} cancelling day off request {}", driverId, dayOffId);
-
+        
         DriverDayOff dayOff = driverDayOffRepository.findById(dayOffId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy yêu cầu nghỉ phép"));
-
+        
         // Kiểm tra quyền: chỉ tài xế tạo yêu cầu mới được hủy
         if (!dayOff.getDriver().getId().equals(driverId)) {
             throw new RuntimeException("Bạn không có quyền hủy yêu cầu này");
         }
-
+        
         // Chỉ cho phép hủy yêu cầu đang PENDING hoặc APPROVED
         if (dayOff.getStatus() == DriverDayOffStatus.REJECTED) {
             throw new RuntimeException("Không thể hủy yêu cầu đã bị từ chối");
         }
-
+        
         if (dayOff.getStatus() == DriverDayOffStatus.CANCELLED) {
             throw new RuntimeException("Yêu cầu đã được hủy trước đó");
         }
-
+        
         // Cập nhật trạng thái
         dayOff.setStatus(DriverDayOffStatus.CANCELLED);
         driverDayOffRepository.save(dayOff);
-
+        
         // Cập nhật trạng thái tài xế về ACTIVE nếu đang OFF_DUTY
         Drivers driver = dayOff.getDriver();
         if (driver.getStatus() == DriverStatus.OFF_DUTY) {
@@ -418,7 +424,7 @@ public class DriverServiceImpl implements DriverService {
             driverRepository.save(driver);
             log.info("[DriverDayOff] Driver {} status changed from OFF_DUTY to ACTIVE", driverId);
         }
-
+        
         log.info("[DriverDayOff] Day off request {} cancelled successfully", dayOffId);
     }
 
@@ -498,6 +504,54 @@ public class DriverServiceImpl implements DriverService {
 
         var saved = tripIncidentRepository.save(incident);
 
+        // Notify coordinators cùng chi nhánh qua websocket
+        try {
+            Integer branchId = trip.getBooking() != null && trip.getBooking().getBranch() != null
+                    ? trip.getBooking().getBranch().getId()
+                    : null;
+
+            String title = "Báo cáo sự cố chuyến " + request.getTripId();
+            String msg = "Tài xế " + driver.getId() + " báo: " + request.getDescription();
+
+            if (branchId != null) {
+                var coordinators = employeeRepository.findByRoleNameAndBranchId("Coordinator", branchId);
+                var managers = employeeRepository.findByRoleNameAndBranchId("Manager", branchId);
+
+                java.util.Set<Integer> notifiedUserIds = new java.util.HashSet<>();
+
+                if (coordinators != null) {
+                    coordinators.stream()
+                            .filter(e -> e.getUser() != null)
+                            .forEach(e -> {
+                                Integer uid = e.getUser().getId();
+                                if (notifiedUserIds.add(uid)) {
+                                    webSocketNotificationService.sendUserNotification(uid, title, msg, "WARN");
+                                }
+                            });
+                }
+
+                if (managers != null) {
+                    managers.stream()
+                            .filter(e -> e.getUser() != null)
+                            .forEach(e -> {
+                                Integer uid = e.getUser().getId();
+                                if (notifiedUserIds.add(uid)) {
+                                    webSocketNotificationService.sendUserNotification(uid, title, msg, "WARN");
+                                }
+                            });
+                }
+
+                if (notifiedUserIds.isEmpty()) {
+                    // fallback: gửi global nếu không tìm thấy điều phối/manager
+                    webSocketNotificationService.sendGlobalNotification(title, msg, "WARN");
+                }
+            } else {
+                webSocketNotificationService.sendGlobalNotification(title, msg, "WARN");
+            }
+        } catch (Exception e) {
+            log.warn("[TripIncident] Failed to send websocket notification for trip {}: {}", request.getTripId(), e.getMessage());
+        }
+
         return new TripIncidentResponse(saved);
     }
 
@@ -536,8 +590,9 @@ public class DriverServiceImpl implements DriverService {
     public List<DriverResponse> getDriversByBranchId(Integer branchId) {
         log.info("[Driver] Get drivers by branch {}", branchId);
 
-        var branch = branchRepository.findById(branchId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy chi nhánh"));
+        if (!branchRepository.existsById(branchId)) {
+            throw new RuntimeException("Không tìm thấy chi nhánh");
+        }
         return driverRepository.findAllByBranchId(branchId);
     }
 }
