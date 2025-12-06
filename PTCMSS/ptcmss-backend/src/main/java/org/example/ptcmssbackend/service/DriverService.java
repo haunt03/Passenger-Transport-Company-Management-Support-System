@@ -4,12 +4,7 @@ import org.example.ptcmssbackend.dto.request.Driver.CreateDriverRequest;
 import org.example.ptcmssbackend.dto.request.Driver.DriverDayOffRequest;
 import org.example.ptcmssbackend.dto.request.Driver.DriverProfileUpdateRequest;
 import org.example.ptcmssbackend.dto.request.Driver.ReportIncidentRequest;
-import org.example.ptcmssbackend.dto.response.Driver.DriverDashboardResponse;
-import org.example.ptcmssbackend.dto.response.Driver.DriverDayOffResponse;
-import org.example.ptcmssbackend.dto.response.Driver.DriverProfileResponse;
-import org.example.ptcmssbackend.dto.response.Driver.DriverResponse;
-import org.example.ptcmssbackend.dto.response.Driver.DriverScheduleResponse;
-import org.example.ptcmssbackend.dto.response.Driver.TripIncidentResponse;
+import org.example.ptcmssbackend.dto.response.Driver.*;
 
 import java.util.List;
 

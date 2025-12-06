@@ -74,7 +74,7 @@ public class VehicleController {
                         .data(pageResponse)
                         .build());
             }
-
+            
             // Nếu không có pagination, trả về list như cũ (backward compatible)
             List<VehicleResponse> list;
             if (licensePlate != null && !licensePlate.isBlank()) {
@@ -256,9 +256,19 @@ public class VehicleController {
 
     @Operation(summary = "Lọc xe theo chi nhánh", description = "Lấy danh sách xe theo chi nhánh")
     @GetMapping("/branch/{branchId}")
-    public ResponseEntity<?> getVehiclesByBranch(@PathVariable Integer branchId) {
+    public ResponseEntity<?> getVehiclesByBranch(
+            @PathVariable Integer branchId,
+            @RequestParam(required = false) Integer driverId
+    ) {
         try {
-            List<VehicleResponse> vehicles = vehicleService.getVehiclesByBranch(branchId);
+            List<VehicleResponse> vehicles;
+            if (driverId != null) {
+                // Nếu có driverId, chỉ trả về xe mà driver đã lái
+                vehicles = vehicleService.getVehiclesByBranchAndDriver(branchId, driverId);
+            } else {
+                // Nếu không có driverId, trả về tất cả xe của branch
+                vehicles = vehicleService.getVehiclesByBranch(branchId);
+            }
             return ResponseEntity.ok(vehicles);
         } catch (Exception ex) {
             log.error("[Vehicle] Error get vehicles for branch {}: {}", branchId, ex.getMessage());

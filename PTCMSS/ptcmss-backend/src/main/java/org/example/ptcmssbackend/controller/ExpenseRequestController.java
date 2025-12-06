@@ -35,7 +35,7 @@ public class ExpenseRequestController {
         ExpenseRequestResponse response = expenseRequestService.createExpenseRequest(request);
         return ResponseEntity.ok(new ResponseData<>(HttpStatus.OK.value(), "Create expense request successfully", response));
     }
-
+    
     /**
      * Lấy danh sách yêu cầu thanh toán theo driver ID
      */
@@ -48,15 +48,17 @@ public class ExpenseRequestController {
         List<ExpenseRequestResponse> list = expenseRequestService.getByDriverId(driverId);
         return ResponseEntity.ok(new ResponseData<>(HttpStatus.OK.value(), "Success", list));
     }
-
+    
     /**
      * Lấy danh sách yêu cầu chờ duyệt - Kế toán và Manager duyệt
      */
     @GetMapping("/pending")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT')")
-    public ResponseEntity<ResponseData<List<ExpenseRequestResponse>>> getPending() {
-        log.info("[ExpenseRequest] get pending requests");
-        List<ExpenseRequestResponse> list = expenseRequestService.getPendingRequests();
+    public ResponseEntity<ResponseData<List<ExpenseRequestResponse>>> getPending(
+            @RequestParam(required = false) Integer branchId
+    ) {
+        log.info("[ExpenseRequest] get pending requests - branchId: {}", branchId);
+        List<ExpenseRequestResponse> list = expenseRequestService.getPendingRequests(branchId);
         return ResponseEntity.ok(new ResponseData<>(HttpStatus.OK.value(), "Success", list));
     }
 

@@ -19,16 +19,28 @@ public class UserServiceDetail implements UserDetailsService {
     /**
      * Hàm này được Spring Security tự động gọi khi xác thực user.
      * Nó sẽ tìm user trong DB và trả về đối tượng UserDetails (chính là entity Users của bạn).
+     * Hỗ trợ tìm bằng username hoặc email.
      */
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        log.info("[UserDetailsService] Loading user by username: {}", username);
+        log.info("[UserDetailsService] Loading user by username/email: {}", username);
 
+        // Thử tìm bằng username trước
         Users user = userRepository.findByUsername(username)
-                .orElseThrow(() -> {
-                    log.warn("⚠️ [UserDetailsService] User not found with username: {}", username);
-                    return new UsernameNotFoundException("User not found with username: " + username);
-                });
+                .orElse(null);
+        
+        // Nếu không tìm thấy, thử tìm bằng email
+        if (user == null) {
+            log.info("[UserDetailsService] User not found by username, trying email: {}", username);
+            user = userRepository.findByEmail(username)
+                    .orElse(null);
+        }
+        
+        // Nếu vẫn không tìm thấy, throw exception
+        if (user == null) {
+            log.warn("⚠️ [UserDetailsService] User not found with username or email: {}", username);
+            throw new UsernameNotFoundException("User not found with username or email: " + username);
+        }
 
         log.info("[UserDetailsService] User loaded successfully: {} (Role: {})",
                 user.getUsername(),
