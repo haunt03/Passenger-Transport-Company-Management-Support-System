@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.ptcmssbackend.dto.request.User.CreateUserRequest;
 import org.example.ptcmssbackend.dto.request.User.UpdateUserRequest;
+import org.example.ptcmssbackend.dto.request.User.ChangePasswordRequest;
 import org.example.ptcmssbackend.dto.response.User.UserResponse;
 import org.example.ptcmssbackend.entity.Branches;
 import org.example.ptcmssbackend.entity.Employees;
@@ -21,6 +22,7 @@ import org.example.ptcmssbackend.service.UserService;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
@@ -42,7 +44,8 @@ public class UserServiceImpl implements UserService {
     private final BranchesRepository branchesRepository;
     private final EmployeeRepository employeeRepository;
     private final EmailService emailService;
-    private final LocalImageService localImageService; //
+    private final LocalImageService localImageService;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     @Transactional
@@ -94,9 +97,9 @@ public class UserServiceImpl implements UserService {
                 employee.setBranch(branch);
                 employee.setRole(role);
                 employee.setStatus(EmployeeStatus.ACTIVE); // Mặc định ACTIVE
-
+                
                 Employees savedEmployee = employeeRepository.save(employee);
-                log.info("Employee created automatically with ID: {} for user ID: {} in branch ID: {}",
+                log.info("Employee created automatically with ID: {} for user ID: {} in branch ID: {}", 
                         savedEmployee.getEmployeeId(), savedUser.getId(), branch.getId());
             } else {
                 log.warn("User {} is already an employee, skipping employee creation", savedUser.getId());
@@ -115,6 +118,7 @@ public class UserServiceImpl implements UserService {
             emailService.sendVerificationEmail(
                     user.getEmail(),
                     user.getFullName(),
+                    user.getUsername(), // Truyền username vào email
                     verificationUrl
             );
             log.info("Verification email sent successfully");
@@ -133,9 +137,9 @@ public class UserServiceImpl implements UserService {
     public Integer updateUser(Integer id, UpdateUserRequest request) {
         Users user = usersRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
-
+        
         // Chỉ Admin mới được gọi method này (đã check ở Controller)
-
+        
         // Validation: Kiểm tra phone trùng với user khác (trừ chính user hiện tại)
         if (request.getPhone() != null && !request.getPhone().trim().isEmpty()) {
             String phone = request.getPhone().trim();
@@ -144,7 +148,7 @@ public class UserServiceImpl implements UserService {
                 throw new RuntimeException("Số điện thoại đã được sử dụng bởi người dùng khác. Vui lòng sử dụng số điện thoại khác.");
             }
         }
-
+        
         // Validation: Kiểm tra email trùng với user khác (trừ chính user hiện tại)
         if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
             String email = request.getEmail().trim();
@@ -153,7 +157,7 @@ public class UserServiceImpl implements UserService {
                 throw new RuntimeException("Email đã được sử dụng bởi người dùng khác. Vui lòng sử dụng email khác.");
             }
         }
-
+        
         // Admin có thể cập nhật tất cả thông tin
         user.setFullName(request.getFullName());
         if (request.getEmail() != null) {
@@ -165,23 +169,30 @@ public class UserServiceImpl implements UserService {
         if (request.getAddress() != null) {
             user.setAddress(request.getAddress().trim());
         }
-
+        
         // Cập nhật role
         if (request.getRoleId() != null) {
             Roles role = rolesRepository.findById(request.getRoleId())
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy vai trò"));
             user.setRole(role);
+            
+            // Đồng bộ role sang employee (nếu có)
+            Employees employee = employeeRepository.findByUserId(id).orElse(null);
+            if (employee != null) {
+                employee.setRole(role);
+                employeeRepository.save(employee);
+            }
         }
-
+        
         // Cập nhật status
         if (request.getStatus() != null)
             user.setStatus(request.getStatus());
-
+        
         // Cập nhật branch (nếu có)
         if (request.getBranchId() != null) {
             Branches branch = branchesRepository.findById(request.getBranchId())
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy chi nhánh"));
-
+            
             // Tìm hoặc tạo employee record
             Employees employee = employeeRepository.findByUserId(id).orElse(null);
             if (employee != null) {
@@ -189,7 +200,7 @@ public class UserServiceImpl implements UserService {
                 employeeRepository.save(employee);
             }
         }
-
+        
         try {
             usersRepository.save(user);
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
@@ -203,7 +214,7 @@ public class UserServiceImpl implements UserService {
                 throw new RuntimeException("Dữ liệu không hợp lệ hoặc đã tồn tại trong hệ thống: " + (e.getCause() != null ? e.getCause().getMessage() : e.getMessage()));
             }
         }
-
+        
         return user.getId();
     }
 
@@ -212,9 +223,9 @@ public class UserServiceImpl implements UserService {
     public Integer updateProfile(Integer id, org.example.ptcmssbackend.dto.request.User.UpdateProfileRequest request) {
         Users user = usersRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
-
+        
         // Chỉ cho phép user tự cập nhật profile của mình (đã check ở Controller)
-
+        
         // Validation: Kiểm tra phone trùng với user khác (trừ chính user hiện tại)
         if (request.getPhone() != null && !request.getPhone().trim().isEmpty()) {
             String phone = request.getPhone().trim();
@@ -224,12 +235,12 @@ public class UserServiceImpl implements UserService {
             }
             user.setPhone(phone);
         }
-
+        
         // Cập nhật address
         if (request.getAddress() != null) {
             user.setAddress(request.getAddress().trim());
         }
-
+        
         try {
             usersRepository.save(user);
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
@@ -240,8 +251,36 @@ public class UserServiceImpl implements UserService {
                 throw new RuntimeException("Dữ liệu không hợp lệ: " + (e.getCause() != null ? e.getCause().getMessage() : e.getMessage()));
             }
         }
-
+        
         return user.getId();
+    }
+
+    @Override
+    @Transactional
+    public void changePassword(Integer id, ChangePasswordRequest request) {
+        Users user = usersRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
+        
+        // Kiểm tra mật khẩu hiện tại
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
+            throw new RuntimeException("Mật khẩu hiện tại không đúng");
+        }
+        
+        // Kiểm tra mật khẩu mới và xác nhận mật khẩu khớp nhau
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new RuntimeException("Mật khẩu mới và xác nhận mật khẩu không khớp");
+        }
+        
+        // Kiểm tra mật khẩu mới khác mật khẩu hiện tại
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPasswordHash())) {
+            throw new RuntimeException("Mật khẩu mới phải khác mật khẩu hiện tại");
+        }
+        
+        // Cập nhật mật khẩu mới
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        usersRepository.save(user);
+        
+        log.info("Password changed successfully for user ID: {}", id);
     }
 
     @Override
@@ -294,14 +333,14 @@ public class UserServiceImpl implements UserService {
     public void toggleUserStatus(Integer id) {
         Users user = usersRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
-
+        
         // Validation: Không cho phép vô hiệu hóa admin
         if (user.getRole() != null && "ADMIN".equals(user.getRole().getRoleName())) {
             if (user.getStatus() == UserStatus.ACTIVE) {
                 throw new RuntimeException("Không thể vô hiệu hóa tài khoản Admin. Phải có ít nhất một tài khoản Admin hoạt động trong hệ thống.");
             }
         }
-
+        
         user.setStatus(user.getStatus() == UserStatus.ACTIVE ? UserStatus.INACTIVE : UserStatus.ACTIVE);
         usersRepository.save(user);
     }
