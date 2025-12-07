@@ -1,6 +1,9 @@
 package org.example.ptcmssbackend.dto.response.Trip;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.example.ptcmssbackend.entity.Bookings;
 import org.example.ptcmssbackend.entity.Trips;
 

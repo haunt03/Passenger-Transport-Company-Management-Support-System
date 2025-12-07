@@ -68,32 +68,6 @@ public class Invoices {
     @Column(name = "subtotal", precision = 18, scale = 2)
     private BigDecimal subtotal;
 
-    @Size(max = 50)
-    @Column(name = "paymentMethod", length = 50)
-    private String paymentMethod;
-
-    // Bank transfer info
-    @Size(max = 100)
-    @Column(name = "bankName", length = 100)
-    private String bankName;
-
-    @Size(max = 50)
-    @Column(name = "bankAccount", length = 50)
-    private String bankAccount;
-
-    @Size(max = 50)
-    @Column(name = "referenceNumber", length = 50)
-    private String referenceNumber;
-
-    // Cash info
-    @Size(max = 100)
-    @Column(name = "cashierName", length = 100)
-    private String cashierName;
-
-    @Size(max = 50)
-    @Column(name = "receiptNumber", length = 50)
-    private String receiptNumber;
-
     @Enumerated(EnumType.STRING)
     @Column(name = "paymentStatus")
     private PaymentStatus paymentStatus= PaymentStatus.UNPAID;

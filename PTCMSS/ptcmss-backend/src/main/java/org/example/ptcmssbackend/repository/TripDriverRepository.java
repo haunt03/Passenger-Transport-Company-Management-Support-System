@@ -9,23 +9,22 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 
 @Repository
 public interface TripDriverRepository extends JpaRepository<TripDrivers, TripDriverId> {
-    @Query("SELECT td FROM TripDrivers td JOIN FETCH td.trip WHERE td.driver.id = :driverId ORDER BY td.trip.startTime DESC")
+    @Query("SELECT DISTINCT td FROM TripDrivers td JOIN FETCH td.trip WHERE td.driver.id = :driverId ORDER BY td.trip.startTime DESC")
     List<TripDrivers> findAllByDriverId(@Param("driverId") Integer driverId);
-
-    @Query("SELECT td FROM TripDrivers td JOIN FETCH td.trip " +
-            "WHERE td.driver.id = :driverId " +
-            "AND (:startDate IS NULL OR td.trip.startTime >= :startDate) " +
-            "AND (:endDate IS NULL OR td.trip.startTime <= :endDate) " +
-            "ORDER BY td.trip.startTime DESC")
+    
+    @Query("SELECT DISTINCT td FROM TripDrivers td JOIN FETCH td.trip " +
+           "WHERE td.driver.id = :driverId " +
+           "AND (:startDate IS NULL OR td.trip.startTime >= :startDate) " +
+           "AND (:endDate IS NULL OR td.trip.startTime <= :endDate) " +
+           "ORDER BY td.trip.startTime DESC")
     List<TripDrivers> findAllByDriverIdAndDateRange(
             @Param("driverId") Integer driverId,
             @Param("startDate") Instant startDate,
             @Param("endDate") Instant endDate);
-
+    
     // Tìm TripDrivers theo tripId
     @Query("SELECT td FROM TripDrivers td JOIN FETCH td.driver JOIN FETCH td.trip WHERE td.trip.id = :tripId")
     List<TripDrivers> findByTripId(@Param("tripId") Integer tripId);
@@ -39,26 +38,23 @@ public interface TripDriverRepository extends JpaRepository<TripDrivers, TripDri
 
     // Kiểm tra driver có được gán vào trip cụ thể không
     boolean existsByTrip_IdAndDriver_Id(Integer tripId, Integer driverId);
-
+    
     /**
      * Lấy danh sách TripDrivers theo tripId
      */
     List<TripDrivers> findByTrip_Id(Integer tripId);
-
+    
     /**
      * Tìm các chuyến đi của tài xế trong khoảng thời gian (để kiểm tra conflict với nghỉ phép)
      */
     @Query("SELECT td FROM TripDrivers td JOIN FETCH td.trip t " +
-            "WHERE td.driver.id = :driverId " +
-            "AND t.startTime >= :startDate " +
-            "AND t.startTime < :endDate " +
-            "AND t.status NOT IN ('CANCELLED', 'COMPLETED') " +
-            "ORDER BY t.startTime ASC")
+           "WHERE td.driver.id = :driverId " +
+           "AND t.startTime >= :startDate " +
+           "AND t.startTime < :endDate " +
+           "AND t.status NOT IN ('CANCELLED', 'COMPLETED') " +
+           "ORDER BY t.startTime ASC")
     List<TripDrivers> findConflictingTrips(
             @Param("driverId") Integer driverId,
             @Param("startDate") Instant startDate,
             @Param("endDate") Instant endDate);
-
-    @Query("SELECT td FROM TripDrivers td WHERE td.trip.id = :tripId AND td.driverRole = 'Main Driver'")
-    Optional<TripDrivers> findMainDriverByTripId(@Param("tripId") Integer tripId);
 }

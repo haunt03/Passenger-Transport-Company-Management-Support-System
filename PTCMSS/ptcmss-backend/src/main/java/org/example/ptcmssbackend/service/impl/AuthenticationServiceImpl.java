@@ -42,27 +42,33 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         // Tìm user: thử username trước, nếu không tìm thấy thì thử email
         Users user = userRepository.findByUsername(request.getUsername())
                 .orElse(null);
-
+        
         // Nếu không tìm thấy bằng username, thử tìm bằng email
         if (user == null) {
             log.info("[LOGIN] User not found by username, trying email: {}", request.getUsername());
             user = userRepository.findByEmail(request.getUsername())
                     .orElse(null);
         }
-
+        
         // Nếu vẫn không tìm thấy, throw exception
         if (user == null) {
             log.error("[LOGIN] User not found by username or email: {}", request.getUsername());
             throw new InvalidDataException("Thông tin đăng nhập không hợp lệ");
         }
-
+        
         // Lưu username thực tế để dùng cho authentication
         String actualUsername = user.getUsername();
+        
+        // DEBUG: Log password info
+        log.info("[LOGIN-DEBUG] User found: {}, Status: {}, Email: {}", actualUsername, user.getStatus(), user.getEmail());
+        log.info("[LOGIN-DEBUG] Password hash from DB: {}", user.getPasswordHash());
+        log.info("[LOGIN-DEBUG] Input password: {}", request.getPassword());
+        log.info("[LOGIN-DEBUG] Password matches: {}", passwordEncoder.matches(request.getPassword(), user.getPasswordHash()));
 
         // Kiểm tra user có enabled không
         if (!user.isEnabled()) {
             log.error("[LOGIN] User is disabled: {} (status: {})", actualUsername, user.getStatus());
-            throw new AccessDeniedException("Account is disabled. Please contact administrator.");
+            throw new AccessDeniedException("Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên.");
         }
 
         try {
@@ -113,13 +119,13 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         log.info("Refreshing token");
 
         if (!org.springframework.util.StringUtils.hasLength(refreshToken)) {
-            throw new InvalidDataException("Token must not be blank");
+            throw new InvalidDataException("Token không được để trống");
         }
 
         try {
             String userName = jwtService.extractUsername(refreshToken, REFRESH_TOKEN);
             Users user = userRepository.findByUsername(userName)
-                    .orElseThrow(() -> new InvalidDataException("User not found"));
+                    .orElseThrow(() -> new InvalidDataException("Không tìm thấy người dùng"));
 
             String accessToken = jwtService.generateAccessToken(
                     user.getId(),
@@ -208,7 +214,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             throw new RuntimeException("Không thể thiết lập mật khẩu: " + e.getMessage());
         }
     }
-
+    
 
 
     @Override

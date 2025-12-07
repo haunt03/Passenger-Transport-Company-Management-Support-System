@@ -13,30 +13,38 @@ import java.util.Optional;
 
 @Repository
 public interface CustomerRepository extends JpaRepository<Customers, Integer> {
-
+    
     // Tìm customer theo phone (unique identifier)
     Optional<Customers> findByPhone(String phone);
-
+    
     // Tìm customer theo email
     Optional<Customers> findByEmail(String email);
-
+    
     // Tìm customer theo phone hoặc email
     @Query("SELECT c FROM Customers c WHERE c.phone = :phone OR c.email = :email")
     Optional<Customers> findByPhoneOrEmail(@Param("phone") String phone, @Param("email") String email);
-
+    
     // Tìm customer theo phone (không phân biệt hoa thường)
     @Query("SELECT c FROM Customers c WHERE LOWER(c.phone) = LOWER(:phone)")
     Optional<Customers> findByPhoneIgnoreCase(@Param("phone") String phone);
-
+    
     // Danh sách customer với filter
-    @Query("SELECT c FROM Customers c LEFT JOIN c.createdBy e LEFT JOIN e.branch b WHERE " +
-            "(:keyword IS NULL OR :keyword = '' OR " +
-            "LOWER(c.fullName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(c.phone) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(c.email) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
-            "(:branchId IS NULL OR b.id = :branchId) AND " +
-            "(:fromDate IS NULL OR c.createdAt >= :fromDate) AND " +
-            "(:toDate IS NULL OR c.createdAt <= :toDate)")
+    @Query(value = "SELECT c FROM Customers c LEFT JOIN FETCH c.createdBy e LEFT JOIN FETCH e.branch b WHERE " +
+           "(:keyword IS NULL OR :keyword = '' OR " +
+           "LOWER(c.fullName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(c.phone) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(c.email) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
+           "(:branchId IS NULL OR b.id = :branchId) AND " +
+           "(:fromDate IS NULL OR c.createdAt >= :fromDate) AND " +
+           "(:toDate IS NULL OR c.createdAt <= :toDate)",
+           countQuery = "SELECT COUNT(c) FROM Customers c LEFT JOIN c.createdBy e LEFT JOIN e.branch b WHERE " +
+           "(:keyword IS NULL OR :keyword = '' OR " +
+           "LOWER(c.fullName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(c.phone) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(c.email) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
+           "(:branchId IS NULL OR b.id = :branchId) AND " +
+           "(:fromDate IS NULL OR c.createdAt >= :fromDate) AND " +
+           "(:toDate IS NULL OR c.createdAt <= :toDate)")
     Page<Customers> findWithFilters(
             @Param("keyword") String keyword,
             @Param("branchId") Integer branchId,
@@ -44,3 +52,4 @@ public interface CustomerRepository extends JpaRepository<Customers, Integer> {
             @Param("toDate") Instant toDate,
             Pageable pageable);
 }
+
