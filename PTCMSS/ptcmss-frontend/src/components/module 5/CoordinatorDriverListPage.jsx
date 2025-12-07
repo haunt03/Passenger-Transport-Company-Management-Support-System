@@ -21,6 +21,7 @@ export default function CoordinatorDriverListPage({ readOnly = false }) {
     const [searchQuery, setSearchQuery] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
+    const [totalItems, setTotalItems] = useState(0);
     const pageSize = 10;
 
     // Time filter để kiểm tra tài xế rảnh (cho Tư vấn viên & Điều phối viên)
@@ -159,6 +160,7 @@ export default function CoordinatorDriverListPage({ readOnly = false }) {
 
             setDrivers(paged);
             setTotalPages(total || 1);
+            setTotalItems(driversList.length);
         } catch (error) {
             console.error("Error fetching drivers:", error);
         } finally {
@@ -262,11 +264,11 @@ export default function CoordinatorDriverListPage({ readOnly = false }) {
                             <div className="flex flex-col sm:flex-row items-center gap-3 pt-3 border-t border-slate-200">
                                 <span className="text-sm text-slate-600 font-medium">Kiểm tra tài xế rảnh:</span>
                                 <div className="flex items-center gap-2">
-                                    <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                                        <Calendar className="h-4 w-4 text-slate-400" />
+                                    <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+                                        <Calendar className="h-4 w-4 text-slate-400 shrink-0" />
                                         <input
                                             type="date"
-                                            value={timeFilterStart}
+                                            value={timeFilterStart || ""}
                                             onChange={(e) => {
                                                 const newStart = e.target.value;
                                                 setTimeFilterStart(newStart);
@@ -277,16 +279,16 @@ export default function CoordinatorDriverListPage({ readOnly = false }) {
                                                 }
                                             }}
                                             max={timeFilterEnd || undefined}
-                                            className="bg-transparent outline-none text-sm text-slate-700"
+                                            className="bg-transparent outline-none text-sm text-slate-700 flex-1 cursor-pointer"
                                             title="Từ ngày"
                                         />
                                     </div>
                                     <span className="text-slate-400">→</span>
-                                    <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                                        <Calendar className="h-4 w-4 text-slate-400" />
+                                    <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+                                        <Calendar className="h-4 w-4 text-slate-400 shrink-0" />
                                         <input
                                             type="date"
-                                            value={timeFilterEnd}
+                                            value={timeFilterEnd || ""}
                                             onChange={(e) => {
                                                 const newEnd = e.target.value;
                                                 // Validate: end phải >= start
@@ -298,7 +300,7 @@ export default function CoordinatorDriverListPage({ readOnly = false }) {
                                                 setCurrentPage(1);
                                             }}
                                             min={timeFilterStart || undefined}
-                                            className="bg-transparent outline-none text-sm text-slate-700"
+                                            className="bg-transparent outline-none text-sm text-slate-700 flex-1 cursor-pointer"
                                             title="Đến ngày"
                                         />
                                     </div>
@@ -354,7 +356,7 @@ export default function CoordinatorDriverListPage({ readOnly = false }) {
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
                                         Trạng thái
                                     </th>
-                                    {isConsultant && timeFilterStart && timeFilterEnd && (
+                                    {canUseAvailabilityFilter && timeFilterStart && timeFilterEnd && (
                                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
                                             Rảnh/Bận
                                         </th>
@@ -404,6 +406,7 @@ export default function CoordinatorDriverListPage({ readOnly = false }) {
                                                     <span className="text-slate-400">Chưa cập nhật</span>
                                                 )}
                                             </td>
+                                            {/* Cột Trạng thái: Hiển thị trạng thái hiện tại của tài xế */}
                                             <td className="px-4 py-3">
                                                 {(() => {
                                                     const statusMap = {
@@ -421,8 +424,9 @@ export default function CoordinatorDriverListPage({ readOnly = false }) {
                                                     );
                                                 })()}
                                             </td>
-                                            {/* Availability badge for Consultant with time filter */}
-                                            {isConsultant && timeFilterStart && timeFilterEnd && (
+                                            {/* Cột Rảnh/Bận: Hiển thị trạng thái rảnh/bận theo khoảng thời gian đã chọn trong filter
+                                                    Chỉ hiển thị khi tài xế ở trạng thái sẵn sàng (AVAILABLE/ACTIVE) và đã chọn filter ngày */}
+                                            {canUseAvailabilityFilter && timeFilterStart && timeFilterEnd && (driver.status === "AVAILABLE" || driver.status === "ACTIVE") && (
                                                 <td className="px-4 py-3">
                                                     {driverAvailability[driver.id] ? (
                                                         <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium ${
@@ -473,12 +477,37 @@ export default function CoordinatorDriverListPage({ readOnly = false }) {
                     )}
                 </div>
 
+                {/* Note giải thích về trạng thái */}
+                {canUseAvailabilityFilter && timeFilterStart && timeFilterEnd && (
+                    <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div className="flex items-start gap-3">
+                            <AlertCircle className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+                            <div className="flex-1 text-sm text-slate-700">
+                                <div className="font-semibold text-slate-900 mb-2">Giải thích về trạng thái:</div>
+                                <ul className="space-y-1.5 text-slate-600">
+                                    <li>
+                                        <span className="font-medium text-slate-800">• Cột "Trạng thái":</span> Trạng thái hiện tại của tài xế trong hệ thống (Sẵn sàng/Đang bận/Nghỉ phép/Không hoạt động)
+                                    </li>
+                                    <li>
+                                        <span className="font-medium text-slate-800">• Cột "Rảnh/Bận":</span> Chỉ hiển thị khi tài xế ở trạng thái "Sẵn sàng" hoặc "Hoạt động" và cho biết tài xế có rảnh trong khoảng thời gian đã chọn hay không
+                                    </li>
+                                    <li className="text-xs text-slate-500 mt-2">
+                                        💡 Lưu ý: Tài xế đang "Đang bận", "Nghỉ phép" hoặc "Không hoạt động" sẽ không hiển thị cột "Rảnh/Bận" vì đã rõ là không thể sử dụng
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Pagination */}
                 {totalPages > 1 && (
                     <div className="mt-6">
                         <Pagination
                             currentPage={currentPage}
                             totalPages={totalPages}
+                            itemsPerPage={pageSize}
+                            totalItems={totalItems}
                             onPageChange={setCurrentPage}
                         />
                     </div>

@@ -65,6 +65,10 @@ export default function TrendChart({
                     dataKey={xKey}
                     stroke="#64748b"
                     style={{ fontSize: "12px" }}
+                    interval={0}
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
                 />
                 <YAxis
                     stroke="#64748b"

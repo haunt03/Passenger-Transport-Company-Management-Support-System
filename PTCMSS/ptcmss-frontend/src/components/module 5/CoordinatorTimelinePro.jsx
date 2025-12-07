@@ -1479,4 +1479,3 @@ export default function CoordinatorTimelinePro() {
         </div>
     );
 }
-

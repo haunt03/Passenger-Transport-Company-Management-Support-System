@@ -86,11 +86,11 @@ function Toasts({ toasts }) {
                     className={cls(
                         "rounded-lg px-3 py-2 text-sm shadow border min-w-[220px] bg-white text-gray-800 border-gray-200",
                         t.kind === "success" &&
-                            "bg-emerald-50 border-emerald-400 text-emerald-700",
+                        "bg-emerald-50 border-emerald-400 text-emerald-700",
                         t.kind === "error" &&
-                            "bg-rose-50 border-rose-400 text-rose-700",
+                        "bg-rose-50 border-rose-400 text-rose-700",
                         t.kind === "info" &&
-                            "bg-white border-gray-200 text-gray-800"
+                        "bg-white border-gray-200 text-gray-800"
                     )}
                 >
                     {t.msg}
@@ -248,7 +248,7 @@ export default function ExpenseRequestManagementPage() {
             setModalOpen(false);
             setSelectedRequest(null);
             setModalNote("");
-            
+
             // Reload list sau khi đóng modal
             setTimeout(() => {
                 loadExpenseRequests();
@@ -350,74 +350,74 @@ export default function ExpenseRequestManagementPage() {
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm">
                             <thead className="text-xs text-gray-500 border-b border-gray-200 bg-gray-50">
-                                <tr>
-                                    <th className="px-3 py-2 font-medium text-gray-600 text-xs">ID</th>
-                                    <th className="px-3 py-2 font-medium text-gray-600 text-xs">Loại chi phí</th>
-                                    <th className="px-3 py-2 font-medium text-gray-600 text-xs">Số tiền</th>
-                                    <th className="px-3 py-2 font-medium text-gray-600 text-xs">Chi nhánh</th>
-                                    <th className="px-3 py-2 font-medium text-gray-600 text-xs">Xe</th>
-                                    <th className="px-3 py-2 font-medium text-gray-600 text-xs">Người yêu cầu</th>
-                                    <th className="px-3 py-2 font-medium text-gray-600 text-xs">Ngày tạo</th>
-                                    <th className="px-3 py-2 font-medium text-gray-600 text-xs">Trạng thái</th>
-                                    <th className="px-3 py-2 font-medium text-gray-600 text-xs">Hành động</th>
-                                </tr>
+                            <tr>
+                                <th className="px-3 py-2 font-medium text-gray-600 text-xs">ID</th>
+                                <th className="px-3 py-2 font-medium text-gray-600 text-xs">Loại chi phí</th>
+                                <th className="px-3 py-2 font-medium text-gray-600 text-xs">Số tiền</th>
+                                <th className="px-3 py-2 font-medium text-gray-600 text-xs">Chi nhánh</th>
+                                <th className="px-3 py-2 font-medium text-gray-600 text-xs">Xe</th>
+                                <th className="px-3 py-2 font-medium text-gray-600 text-xs">Người yêu cầu</th>
+                                <th className="px-3 py-2 font-medium text-gray-600 text-xs">Ngày tạo</th>
+                                <th className="px-3 py-2 font-medium text-gray-600 text-xs">Trạng thái</th>
+                                <th className="px-3 py-2 font-medium text-gray-600 text-xs">Hành động</th>
+                            </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200">
-                                {expenseRequests.map((req) => (
-                                    <tr key={req.id} className="hover:bg-gray-50">
-                                        <td className="px-3 py-2 text-sm text-gray-900 font-medium">
-                                            #{req.id}
-                                        </td>
-                                        <td className="px-3 py-2 text-sm text-gray-800">
-                                            {EXPENSE_TYPE_LABELS[req.type] || req.type}
-                                        </td>
-                                        <td className="px-3 py-2 text-sm font-semibold tabular-nums text-gray-900">
-                                            {fmtVND(req.amount || 0)} đ
-                                        </td>
-                                        <td className="px-3 py-2 text-sm text-gray-800">
-                                            {req.branchName || `Chi nhánh #${req.branchId}`}
-                                        </td>
-                                        <td className="px-3 py-2 text-sm text-gray-800">
-                                            {req.vehiclePlate || "—"}
-                                        </td>
-                                        <td className="px-3 py-2 text-sm text-gray-800">
-                                            {req.requesterName || "—"}
-                                        </td>
-                                        <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
-                                            {req.createdAt
-                                                ? new Date(req.createdAt).toLocaleDateString("vi-VN")
-                                                : "—"}
-                                        </td>
-                                        <td className="px-3 py-2 text-sm">
-                                            <StatusBadge status={req.status} />
-                                        </td>
-                                        <td className="px-3 py-2">
-                                            {req.status === "PENDING" && (
-                                                <div className="flex flex-wrap gap-2">
-                                                    <button
-                                                        onClick={() => handleApprove(req)}
-                                                        className="rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2.5 py-1.5 text-[11px] font-medium shadow-sm flex items-center gap-1"
-                                                    >
-                                                        <CheckCircle className="h-3.5 w-3.5" />
-                                                        <span>Duyệt</span>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleReject(req)}
-                                                        className="rounded-lg border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 px-2.5 py-1.5 text-[11px] font-medium shadow-sm flex items-center gap-1"
-                                                    >
-                                                        <XCircle className="h-3.5 w-3.5" />
-                                                        <span>Từ chối</span>
-                                                    </button>
-                                                </div>
-                                            )}
-                                            {req.status !== "PENDING" && (
-                                                <span className="text-xs text-gray-400 italic">
+                            {expenseRequests.map((req) => (
+                                <tr key={req.id} className="hover:bg-gray-50">
+                                    <td className="px-3 py-2 text-sm text-gray-900 font-medium">
+                                        #{req.id}
+                                    </td>
+                                    <td className="px-3 py-2 text-sm text-gray-800">
+                                        {EXPENSE_TYPE_LABELS[req.type] || req.type}
+                                    </td>
+                                    <td className="px-3 py-2 text-sm font-semibold tabular-nums text-gray-900">
+                                        {fmtVND(req.amount || 0)} đ
+                                    </td>
+                                    <td className="px-3 py-2 text-sm text-gray-800">
+                                        {req.branchName || `Chi nhánh #${req.branchId}`}
+                                    </td>
+                                    <td className="px-3 py-2 text-sm text-gray-800">
+                                        {req.vehiclePlate || "—"}
+                                    </td>
+                                    <td className="px-3 py-2 text-sm text-gray-800">
+                                        {req.requesterName || "—"}
+                                    </td>
+                                    <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+                                        {req.createdAt
+                                            ? new Date(req.createdAt).toLocaleDateString("vi-VN")
+                                            : "—"}
+                                    </td>
+                                    <td className="px-3 py-2 text-sm">
+                                        <StatusBadge status={req.status} />
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        {req.status === "PENDING" && (
+                                            <div className="flex flex-wrap gap-2">
+                                                <button
+                                                    onClick={() => handleApprove(req)}
+                                                    className="rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2.5 py-1.5 text-[11px] font-medium shadow-sm flex items-center gap-1"
+                                                >
+                                                    <CheckCircle className="h-3.5 w-3.5" />
+                                                    <span>Duyệt</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => handleReject(req)}
+                                                    className="rounded-lg border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 px-2.5 py-1.5 text-[11px] font-medium shadow-sm flex items-center gap-1"
+                                                >
+                                                    <XCircle className="h-3.5 w-3.5" />
+                                                    <span>Từ chối</span>
+                                                </button>
+                                            </div>
+                                        )}
+                                        {req.status !== "PENDING" && (
+                                            <span className="text-xs text-gray-400 italic">
                                                     Đã xử lý
                                                 </span>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
                             </tbody>
                         </table>
                     </div>
@@ -548,4 +548,3 @@ export default function ExpenseRequestManagementPage() {
         </div>
     );
 }
-

@@ -118,9 +118,16 @@ const RateDriverDialog = ({ trip, onClose, onSuccess, existingRating = null }) =
                         <p className="text-sm text-gray-600 mt-1">
                             Chuyến #{trip.tripId} - {trip.driverName || 'Tài xế'}
                         </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                            {trip.customerName && `Khách hàng: ${trip.customerName}`}
-                        </p>
+                        {trip.customerName && (
+                            <p className="text-xs text-gray-500 mt-1">
+                                Khách hàng: {trip.customerName}
+                            </p>
+                        )}
+                        {trip.customerPhone && (
+                            <p className="text-xs text-gray-500 mt-0.5">
+                                SĐT khách: {trip.customerPhone}
+                            </p>
+                        )}
                         {isReadOnly && existingRating?.ratedAt && (
                             <p className="text-xs text-gray-400 mt-1">
                                 Đánh giá vào: {new Date(existingRating.ratedAt).toLocaleString('vi-VN')}

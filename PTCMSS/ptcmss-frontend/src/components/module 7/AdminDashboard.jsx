@@ -324,33 +324,43 @@ export default function AdminDashboard() {
                             </span>
                         </div>
                         <div className="p-4">
-                            <ResponsiveContainer width="100%" height={300}>
-                                <BarChart data={branchComparison} margin={{ left: 20, right: 10, top: 10, bottom: 10 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                                    <XAxis
-                                        dataKey="branchName"
-                                        stroke="#64748b"
-                                        style={{ fontSize: "12px" }}
-                                    />
-                                    <YAxis
-                                        stroke="#64748b"
-                                        style={{ fontSize: "12px" }}
-                                        tickFormatter={(v) => fmtVND(v)}
-                                        width={80}
-                                    />
-                                    <Tooltip
-                                        formatter={(value) => `${fmtVND(value)} đ`}
-                                        contentStyle={{
-                                            backgroundColor: "white",
-                                            border: "1px solid #e2e8f0",
-                                            borderRadius: "8px",
-                                        }}
-                                    />
-                                    <Legend wrapperStyle={{ fontSize: "12px" }} />
-                                    <Bar dataKey="revenue" name="Doanh thu" fill="#10b981" />
-                                    <Bar dataKey="expense" name="Chi phí" fill="#ef4444" />
-                                </BarChart>
-                            </ResponsiveContainer>
+                            {branchComparison && branchComparison.length > 0 ? (
+                                <ResponsiveContainer width="100%" height={300}>
+                                    <BarChart data={branchComparison} margin={{ left: 20, right: 10, top: 10, bottom: 60 }}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                                        <XAxis
+                                            dataKey="branchName"
+                                            stroke="#64748b"
+                                            style={{ fontSize: "12px" }}
+                                            angle={-45}
+                                            textAnchor="end"
+                                            height={60}
+                                            interval={0}
+                                        />
+                                        <YAxis
+                                            stroke="#64748b"
+                                            style={{ fontSize: "12px" }}
+                                            tickFormatter={(v) => fmtVND(v)}
+                                            width={80}
+                                        />
+                                        <Tooltip
+                                            formatter={(value) => `${fmtVND(value)} đ`}
+                                            contentStyle={{
+                                                backgroundColor: "white",
+                                                border: "1px solid #e2e8f0",
+                                                borderRadius: "8px",
+                                            }}
+                                        />
+                                        <Legend wrapperStyle={{ fontSize: "12px" }} />
+                                        <Bar dataKey="revenue" name="Doanh thu" fill="#10b981" />
+                                        <Bar dataKey="expense" name="Chi phí" fill="#ef4444" />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="text-center py-8 text-slate-500 text-sm">
+                                    Không có dữ liệu chi nhánh
+                                </div>
+                            )}
                         </div>
                     </div>
 
