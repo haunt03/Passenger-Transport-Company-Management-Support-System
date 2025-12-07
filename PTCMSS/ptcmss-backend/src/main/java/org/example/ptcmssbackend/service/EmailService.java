@@ -26,13 +26,14 @@ public class EmailService {
     @Value("${spring.mail.username}")
     private String fromEmail;
 
-    public void sendVerificationEmail(String toEmail, String fullName, String verificationUrl)
+    public void sendVerificationEmail(String toEmail, String fullName, String username, String verificationUrl)
             throws MessagingException, UnsupportedEncodingException {
 
         String subject = "✨ Chào mừng đến TranspoManager - Xác thực tài khoản của bạn";
 
         Map<String, Object> variables = new HashMap<>();
         variables.put("fullName", fullName);
+        variables.put("username", username);
         variables.put("verifyUrl", verificationUrl);
 
         Context context = new Context();
@@ -76,12 +77,12 @@ public class EmailService {
     /**
      * Gửi invoice qua email
      */
-    public void sendInvoiceEmail(String toEmail, String customerName, String invoiceNumber,
+    public void sendInvoiceEmail(String toEmail, String customerName, String invoiceNumber, 
                                  String amount, String dueDate, String invoiceUrl, String note)
             throws MessagingException, UnsupportedEncodingException {
-
+        
         String subject = "Hóa đơn #" + invoiceNumber;
-
+        
         Map<String, Object> variables = new HashMap<>();
         variables.put("customerName", customerName);
         variables.put("invoiceNumber", invoiceNumber);
@@ -89,10 +90,10 @@ public class EmailService {
         variables.put("dueDate", dueDate);
         variables.put("invoiceUrl", invoiceUrl);
         variables.put("note", note);
-
+        
         Context context = new Context();
         context.setVariables(variables);
-
+        
         // Try to use invoice-email template, fallback to simple text
         String htmlContent;
         try {
@@ -101,14 +102,14 @@ public class EmailService {
             // Fallback to simple HTML if template not found
             htmlContent = buildInvoiceEmailHtml(customerName, invoiceNumber, amount, dueDate, note);
         }
-
+        
         MimeMessage message = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, "UTF-8");
         helper.setFrom(fromEmail, "PTCMSS - Hệ thống quản lý vận tải");
         helper.setTo(toEmail);
         helper.setSubject(subject);
         helper.setText(htmlContent, true);
-
+        
         mailSender.send(message);
     }
 
@@ -118,9 +119,9 @@ public class EmailService {
     public void sendDebtReminderEmail(String toEmail, String customerName, String invoiceNumber,
                                       String amount, String dueDate, Integer daysOverdue, String message)
             throws MessagingException, UnsupportedEncodingException {
-
+        
         String subject = "Nhắc nhở thanh toán hóa đơn #" + invoiceNumber;
-
+        
         Map<String, Object> variables = new HashMap<>();
         variables.put("customerName", customerName);
         variables.put("invoiceNumber", invoiceNumber);
@@ -128,24 +129,24 @@ public class EmailService {
         variables.put("dueDate", dueDate);
         variables.put("daysOverdue", daysOverdue);
         variables.put("message", message);
-
+        
         Context context = new Context();
         context.setVariables(variables);
-
+        
         String htmlContent;
         try {
             htmlContent = templateEngine.process("debt-reminder-email", context);
         } catch (Exception e) {
             htmlContent = buildDebtReminderEmailHtml(customerName, invoiceNumber, amount, dueDate, daysOverdue, message);
         }
-
+        
         MimeMessage mimeMessage = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "UTF-8");
         helper.setFrom(fromEmail, "PTCMSS - Hệ thống quản lý vận tải");
         helper.setTo(toEmail);
         helper.setSubject(subject);
         helper.setText(htmlContent, true);
-
+        
         mailSender.send(mimeMessage);
     }
 
@@ -154,14 +155,49 @@ public class EmailService {
      */
     public void sendDebtReminderSMS(String phoneNumber, String invoiceNumber, String amount) {
         // TODO: Integrate with SMS gateway (Twilio, AWS SNS, etc.)
-        log.info("[EmailService] SMS reminder would be sent to {} for invoice {} amount {}",
+        log.info("[EmailService] SMS reminder would be sent to {} for invoice {} amount {}", 
                 phoneNumber, invoiceNumber, amount);
     }
 
     /**
+     * Gửi email thông tin đăng nhập sau khi user tạo mật khẩu thành công
+     */
+    public void sendCredentialsEmail(String toEmail, String fullName, String username, String password)
+            throws MessagingException, UnsupportedEncodingException {
+        
+        String subject = "🔐 Thông tin đăng nhập TranspoManager";
+        
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("fullName", fullName);
+        variables.put("username", username);
+        variables.put("password", password);
+        
+        Context context = new Context();
+        context.setVariables(variables);
+        
+        String htmlContent;
+        try {
+            htmlContent = templateEngine.process("credentials-email", context);
+        } catch (Exception e) {
+            // Fallback to simple HTML if template not found
+            htmlContent = buildCredentialsEmailHtml(fullName, username, password);
+        }
+        
+        MimeMessage message = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, "UTF-8");
+        helper.setFrom(fromEmail, "TranspoManager - Hệ thống quản lý vận tải");
+        helper.setTo(toEmail);
+        helper.setSubject(subject);
+        helper.setText(htmlContent, true);
+        
+        mailSender.send(message);
+        log.info("📧 Đã gửi thông tin đăng nhập đến email: {}", toEmail);
+    }
+    
+    /**
      * Gửi email đơn giản (HTML)
      */
-    public void sendSimpleEmail(String toEmail, String subject, String htmlContent)
+    public void sendSimpleEmail(String toEmail, String subject, String htmlContent) 
             throws MessagingException, UnsupportedEncodingException {
         MimeMessage message = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, "UTF-8");
@@ -169,13 +205,13 @@ public class EmailService {
         helper.setTo(toEmail);
         helper.setSubject(subject);
         helper.setText(htmlContent, true);
-
+        
         mailSender.send(message);
     }
 
     // Helper methods for fallback HTML
-    private String buildInvoiceEmailHtml(String customerName, String invoiceNumber,
-                                         String amount, String dueDate, String note) {
+    private String buildInvoiceEmailHtml(String customerName, String invoiceNumber, 
+                                        String amount, String dueDate, String note) {
         return "<html><body>" +
                 "<h2>Hóa đơn #" + invoiceNumber + "</h2>" +
                 "<p>Kính gửi: " + customerName + "</p>" +
@@ -198,5 +234,21 @@ public class EmailService {
                 "<p>Vui lòng thanh toán sớm để tránh gián đoạn dịch vụ.</p>" +
                 "<p>Trân trọng,<br>PTCMSS</p>" +
                 "</body></html>";
+    }
+
+    private String buildCredentialsEmailHtml(String fullName, String username, String password) {
+        return "<html><body style='font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;'>" +
+                "<div style='max-width: 600px; margin: 0 auto; background-color: white; border-radius: 10px; padding: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);'>" +
+                "<h2 style='color: #0079BC; margin-bottom: 20px;'>🔐 Thông tin đăng nhập TranspoManager</h2>" +
+                "<p>Xin chào <strong>" + fullName + "</strong>,</p>" +
+                "<p>Mật khẩu của bạn đã được thiết lập thành công! Dưới đây là thông tin đăng nhập của bạn:</p>" +
+                "<div style='background-color: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #0079BC;'>" +
+                "<p style='margin: 10px 0;'><strong>Tên đăng nhập:</strong> <code style='background: #e9ecef; padding: 3px 8px; border-radius: 4px;'>" + username + "</code></p>" +
+                "<p style='margin: 10px 0;'><strong>Mật khẩu:</strong> <code style='background: #e9ecef; padding: 3px 8px; border-radius: 4px;'>" + password + "</code></p>" +
+                "</div>" +
+                "<p style='color: #dc3545; font-size: 14px;'>⚠️ <strong>Lưu ý bảo mật:</strong> Vui lòng đổi mật khẩu sau khi đăng nhập lần đầu và không chia sẻ thông tin này với bất kỳ ai.</p>" +
+                "<hr style='border: none; border-top: 1px solid #eee; margin: 20px 0;'>" +
+                "<p style='color: #666; font-size: 12px;'>Trân trọng,<br><strong>TranspoManager - Hệ thống quản lý vận tải</strong></p>" +
+                "</div></body></html>";
     }
 }
