@@ -8,12 +8,18 @@ import org.example.ptcmssbackend.dto.response.Booking.PaymentResponse;
 import org.example.ptcmssbackend.entity.Bookings;
 import org.example.ptcmssbackend.entity.Employees;
 import org.example.ptcmssbackend.entity.Invoices;
+import org.example.ptcmssbackend.entity.Notifications;
 import org.example.ptcmssbackend.enums.InvoiceStatus;
 import org.example.ptcmssbackend.enums.InvoiceType;
 import org.example.ptcmssbackend.enums.PaymentStatus;
+import org.example.ptcmssbackend.entity.PaymentHistory;
+import org.example.ptcmssbackend.enums.PaymentConfirmationStatus;
 import org.example.ptcmssbackend.repository.BookingRepository;
 import org.example.ptcmssbackend.repository.EmployeeRepository;
 import org.example.ptcmssbackend.repository.InvoiceRepository;
+import org.example.ptcmssbackend.repository.PaymentHistoryRepository;
+import org.example.ptcmssbackend.repository.NotificationRepository;
+import org.example.ptcmssbackend.service.AppSettingService;
 import org.example.ptcmssbackend.service.PaymentService;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -33,30 +39,75 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final BookingRepository bookingRepository;
     private final InvoiceRepository invoiceRepository;
+    private final PaymentHistoryRepository paymentHistoryRepository;
     private final EmployeeRepository employeeRepository;
+    private final NotificationRepository notificationRepository;
     private final QrPaymentProperties qrPaymentProperties;
+    private final AppSettingService appSettingService;
     private final org.example.ptcmssbackend.service.WebSocketNotificationService webSocketNotificationService;
 
     @Override
     public PaymentResponse generateQRCode(Integer bookingId, BigDecimal amount, String note, Boolean deposit, Integer employeeId) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Amount must be greater than 0");
+            throw new IllegalArgumentException("Số tiền phải lớn hơn 0");
         }
         Bookings booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng: " + bookingId));
+        Employees createdBy = employeeId != null ? employeeRepository.findById(employeeId).orElse(null) : null;
 
-        Invoices invoice = buildInvoiceSkeleton(booking, amount, Boolean.TRUE.equals(deposit), PaymentStatus.UNPAID);
-        invoice.setPaymentMethod("QR");
-        invoice.setNote(note);
-        if (employeeId != null) {
-            Employees employee = employeeRepository.findById(employeeId).orElse(null);
-            invoice.setCreatedBy(employee);
+        // Validation: Kiểm tra ràng buộc thanh toán
+        if (!Boolean.TRUE.equals(deposit)) {
+            // Chỉ validate cho thanh toán (không phải cọc)
+            BigDecimal remainingAmount = getRemainingAmount(bookingId);
+            BigDecimal totalPendingAmount = getTotalPendingPaymentAmount(bookingId);
+            
+            // Ràng buộc 1: Không được tạo yêu cầu mới nếu đã có yêu cầu PENDING
+            if (totalPendingAmount.compareTo(BigDecimal.ZERO) > 0) {
+                throw new RuntimeException(String.format(
+                    "Không thể tạo yêu cầu thanh toán mới. Đã có yêu cầu thanh toán đang chờ duyệt (tổng %s). Vui lòng đợi kế toán xác nhận các yêu cầu trước.", 
+                    totalPendingAmount));
+            }
+            
+            // Ràng buộc 2: Tổng pending + amount mới <= remaining amount
+            BigDecimal totalWithNewAmount = totalPendingAmount.add(amount);
+            if (totalWithNewAmount.compareTo(remainingAmount) > 0) {
+                throw new RuntimeException(String.format(
+                    "Tổng số tiền yêu cầu (%s) vượt quá số tiền còn lại (%s). Số tiền có thể tạo thêm: %s", 
+                    totalWithNewAmount, remainingAmount, remainingAmount.subtract(totalPendingAmount)));
+            }
         }
-        Invoices saved = invoiceRepository.save(invoice);
 
+        String descriptionPrefix = appSettingService.getValue(AppSettingService.QR_DESCRIPTION_PREFIX);
         String description = StringUtils.hasText(note)
                 ? note
-                : String.format("%s-%d", qrPaymentProperties.getDescriptionPrefix(), bookingId);
+                : String.format("%s-%d", descriptionPrefix, bookingId);
+
+        // Create pending invoice + payment history so accountants can confirm QR transfers
+        Invoices invoice = buildInvoiceSkeleton(booking, amount, Boolean.TRUE.equals(deposit), PaymentStatus.UNPAID);
+        invoice.setNote(description);
+        if (createdBy != null) {
+            invoice.setCreatedBy(createdBy);
+        }
+        Invoices savedInvoice = invoiceRepository.save(invoice);
+
+        PaymentHistory paymentHistory = new PaymentHistory();
+        paymentHistory.setInvoice(savedInvoice);
+        paymentHistory.setPaymentDate(Instant.now());
+        paymentHistory.setAmount(amount);
+        paymentHistory.setPaymentMethod("QR");
+        paymentHistory.setConfirmationStatus(PaymentConfirmationStatus.PENDING);
+        paymentHistory.setNote(description);
+        if (createdBy != null) {
+            paymentHistory.setCreatedBy(createdBy);
+        }
+        PaymentHistory savedHistory = paymentHistoryRepository.save(paymentHistory);
+
+        notifyAccountantsAboutPaymentRequest(
+                booking,
+                amount,
+                Boolean.TRUE.equals(deposit),
+                description
+        );
 
         String qrText = buildQrText(amount, description);
         String qrImageUrl = buildQrImageUrl(amount, description);
@@ -77,24 +128,33 @@ public class PaymentServiceImpl implements PaymentService {
             log.warn("Failed to send WebSocket notification for QR generation", e);
         }
 
-        return mapInvoice(saved).toBuilder()
+        return PaymentResponse.builder()
+                .invoiceId(savedInvoice.getId())
+                .bookingId(bookingId)
+                .amount(amount)
+                .deposit(Boolean.TRUE.equals(deposit))
+                .paymentMethod("QR")
+                .paymentStatus(savedInvoice.getPaymentStatus() != null ? savedInvoice.getPaymentStatus().name() : null)
+                .note(description)
+                .createdAt(savedHistory.getCreatedAt() != null ? savedHistory.getCreatedAt() : savedInvoice.getCreatedAt())
                 .qrText(qrText)
                 .qrImageUrl(qrImageUrl)
                 .expiresAt(expiresAt)
-                .note(description)
+                .paymentId(savedHistory.getId())
+                .confirmationStatus(savedHistory.getConfirmationStatus() != null ? savedHistory.getConfirmationStatus().name() : null)
                 .build();
     }
 
     @Override
     public PaymentResponse createDeposit(Integer bookingId, CreatePaymentRequest request, Integer employeeId) {
         if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Amount must be greater than 0");
+            throw new IllegalArgumentException("Số tiền phải lớn hơn 0");
         }
         Bookings booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng: " + bookingId));
 
-        Invoices invoice = buildInvoiceSkeleton(booking, request.getAmount(), Boolean.TRUE.equals(request.getDeposit()), PaymentStatus.PAID);
-        invoice.setPaymentMethod(StringUtils.hasText(request.getPaymentMethod()) ? request.getPaymentMethod() : "CASH");
+        // Create invoice with UNPAID status initially (waiting for confirmation)
+        Invoices invoice = buildInvoiceSkeleton(booking, request.getAmount(), Boolean.TRUE.equals(request.getDeposit()), PaymentStatus.UNPAID);
         invoice.setNote(request.getNote());
         if (employeeId != null) {
             Employees employee = employeeRepository.findById(employeeId).orElse(null);
@@ -102,40 +162,26 @@ public class PaymentServiceImpl implements PaymentService {
         }
         Invoices saved = invoiceRepository.save(invoice);
 
-        // Send WebSocket notifications for payment
-        try {
-            String customerName = booking.getCustomer() != null ? booking.getCustomer().getFullName() : "Khách hàng";
-            String bookingCode = "ORD-" + bookingId;
-            String paymentType = Boolean.TRUE.equals(request.getDeposit()) ? "Cọc" : "Thanh toán";
-
-            // Global notification
-            webSocketNotificationService.sendGlobalNotification(
-                    paymentType + " thành công",
-                    String.format("%s %s cho đơn %s - %s",
-                            paymentType,
-                            formatAmount(request.getAmount()),
-                            bookingCode,
-                            customerName),
-                    "SUCCESS"
-            );
-
-            // Payment update notification
-            webSocketNotificationService.sendPaymentUpdate(
-                    saved.getId(),
-                    bookingId,
-                    "PAID",
-                    String.format("%s đã được ghi nhận", paymentType)
-            );
-
-            // Booking update notification
-            webSocketNotificationService.sendBookingUpdate(
-                    bookingId,
-                    "PAYMENT_RECEIVED",
-                    String.format("Đã nhận %s %s", paymentType.toLowerCase(), formatAmount(request.getAmount()))
-            );
-        } catch (Exception e) {
-            log.warn("Failed to send WebSocket notification for payment", e);
+        // Create Pending Payment History
+        PaymentHistory history = new PaymentHistory();
+        history.setInvoice(saved);
+        history.setPaymentDate(Instant.now());
+        history.setAmount(request.getAmount());
+        history.setPaymentMethod(StringUtils.hasText(request.getPaymentMethod()) ? request.getPaymentMethod() : "CASH");
+        history.setConfirmationStatus(PaymentConfirmationStatus.PENDING);
+        history.setNote(request.getNote());
+        if (employeeId != null) {
+            Employees employee = employeeRepository.findById(employeeId).orElse(null);
+            history.setCreatedBy(employee);
         }
+        paymentHistoryRepository.save(history);
+
+        notifyAccountantsAboutPaymentRequest(
+                booking,
+                request.getAmount(),
+                Boolean.TRUE.equals(request.getDeposit()),
+                request.getNote()
+        );
 
         return mapInvoice(saved);
     }
@@ -147,16 +193,33 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     public List<PaymentResponse> getPaymentHistory(Integer bookingId) {
-        return invoiceRepository.findByBooking_IdOrderByCreatedAtDesc(bookingId).stream()
-                .map(this::mapInvoice)
+        // Lấy tất cả invoices của booking
+        List<Invoices> invoices = invoiceRepository.findByBooking_IdOrderByCreatedAtDesc(bookingId);
+        
+        // Với mỗi invoice, lấy payment_history và map thành PaymentResponse
+        return invoices.stream()
+                .flatMap(invoice -> {
+                    // Lấy tất cả payment_history của invoice này
+                    List<PaymentHistory> paymentHistories =
+                            paymentHistoryRepository.findByInvoice_IdOrderByPaymentDateDesc(invoice.getId());
+                    
+                    // Nếu có payment_history, trả về payment_history (để có confirmationStatus)
+                    if (!paymentHistories.isEmpty()) {
+                        return paymentHistories.stream()
+                                .map(ph -> mapPaymentHistory(ph, invoice));
+                    } else {
+                        // Nếu không có payment_history, trả về invoice (cho backward compatibility)
+                        return java.util.stream.Stream.of(mapInvoice(invoice));
+                    }
+                })
                 .collect(Collectors.toList());
     }
 
     private String buildQrText(BigDecimal amount, String description) {
         // VietQR format: bank_code|account_number|amount|description
         // This will be used by VietQR API to generate proper EMVCo QR code
-        String bank = valueOrEmpty(qrPaymentProperties.getBankCode());
-        String account = valueOrEmpty(qrPaymentProperties.getAccountNumber());
+        String bank = valueOrEmpty(appSettingService.getValue(AppSettingService.QR_BANK_CODE));
+        String account = valueOrEmpty(appSettingService.getValue(AppSettingService.QR_ACCOUNT_NUMBER));
         String amountStr = amount.stripTrailingZeros().toPlainString();
 
         // Return simple format that VietQR image URL will handle
@@ -171,9 +234,9 @@ public class PaymentServiceImpl implements PaymentService {
                 ? qrPaymentProperties.getTemplate()
                 : "compact";
 
-        String bank = valueOrEmpty(qrPaymentProperties.getBankCode());
-        String account = valueOrEmpty(qrPaymentProperties.getAccountNumber());
-        String accountName = valueOrEmpty(qrPaymentProperties.getAccountName());
+        String bank = valueOrEmpty(appSettingService.getValue(AppSettingService.QR_BANK_CODE));
+        String account = valueOrEmpty(appSettingService.getValue(AppSettingService.QR_ACCOUNT_NUMBER));
+        String accountName = valueOrEmpty(appSettingService.getValue(AppSettingService.QR_ACCOUNT_NAME));
 
         // URL encode parameters
         String encodedInfo = URLEncoder.encode(description, StandardCharsets.UTF_8);
@@ -216,10 +279,122 @@ public class PaymentServiceImpl implements PaymentService {
                 .bookingId(invoice.getBooking() != null ? invoice.getBooking().getId() : null)
                 .amount(invoice.getAmount())
                 .deposit(Boolean.TRUE.equals(invoice.getIsDeposit()))
-                .paymentMethod(invoice.getPaymentMethod())
                 .paymentStatus(invoice.getPaymentStatus() != null ? invoice.getPaymentStatus().name() : null)
                 .note(invoice.getNote())
                 .createdAt(invoice.getCreatedAt())
                 .build();
+    }
+
+    /**
+     * Map PaymentHistory to PaymentResponse (có thêm confirmationStatus và paymentId)
+     */
+    private PaymentResponse mapPaymentHistory(PaymentHistory ph, Invoices invoice) {
+        return PaymentResponse.builder()
+                .invoiceId(invoice.getId())
+                .bookingId(invoice.getBooking() != null ? invoice.getBooking().getId() : null)
+                .amount(ph.getAmount())
+                .deposit(Boolean.TRUE.equals(invoice.getIsDeposit()))
+                .paymentMethod(ph.getPaymentMethod())
+                .paymentStatus(invoice.getPaymentStatus() != null ? invoice.getPaymentStatus().name() : null)
+                .note(ph.getNote() != null ? ph.getNote() : invoice.getNote())
+                .createdAt(ph.getCreatedAt() != null ? ph.getCreatedAt() : invoice.getCreatedAt())
+                // Thêm các field từ payment_history
+                .paymentId(ph.getId())
+                .confirmationStatus(ph.getConfirmationStatus() != null ? ph.getConfirmationStatus().name() : null)
+                .build();
+    }
+
+    private void notifyAccountantsAboutPaymentRequest(Bookings booking,
+                                                      BigDecimal amount,
+                                                      boolean isDeposit,
+                                                      String note) {
+        try {
+            Integer branchId = booking.getBranch() != null ? booking.getBranch().getId() : null;
+            String customerName = booking.getCustomer() != null ? booking.getCustomer().getFullName() : "Khách hàng";
+            String bookingCode = "ORD-" + booking.getId();
+            String paymentType = isDeposit ? "Cọc" : "Thanh toán";
+            String amountStr = formatAmount(amount);
+
+            String title = "Yêu cầu " + paymentType.toLowerCase() + " mới";
+            String message = String.format("Có yêu cầu %s %s cho đơn %s - %s cần xác nhận",
+                    paymentType.toLowerCase(),
+                    amountStr,
+                    bookingCode,
+                    customerName);
+
+            if (StringUtils.hasText(note)) {
+                message = message + String.format(" (%s)", note);
+            }
+
+            if (branchId != null) {
+                try {
+                    List<Employees> accountants = employeeRepository.findByRoleNameAndBranchId("Accountant", branchId);
+                    for (Employees accountant : accountants) {
+                        if (accountant.getUser() != null) {
+                            Notifications notification = new Notifications();
+                            notification.setUser(accountant.getUser());
+                            notification.setTitle(title);
+                            notification.setMessage(message);
+                            notification.setIsRead(false);
+                            notificationRepository.save(notification);
+
+                            webSocketNotificationService.sendUserNotification(
+                                    accountant.getUser().getId(),
+                                    title,
+                                    message,
+                                    "INFO"
+                            );
+                            log.debug("[PaymentService] Sent notification to accountant: {}", accountant.getUser().getUsername());
+                        }
+                    }
+                    if (!accountants.isEmpty()) {
+                        log.info("[PaymentService] Notified {} accountants about payment request for booking {}",
+                                accountants.size(), bookingCode);
+                    }
+                } catch (Exception accErr) {
+                    log.warn("[PaymentService] Failed to notify accountants: {}", accErr.getMessage());
+                }
+            }
+
+            webSocketNotificationService.sendGlobalNotification(title, message, "INFO");
+        } catch (Exception e) {
+            log.warn("Failed to send WebSocket notification for payment", e);
+        }
+    }
+
+    /**
+     * Tính số tiền còn lại của booking cần thu (totalCost - depositAmount)
+     * Đây là số tiền còn lại ban đầu, chưa trừ đi các payment requests PENDING
+     */
+    private BigDecimal getRemainingAmount(Integer bookingId) {
+        Bookings booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng: " + bookingId));
+        BigDecimal totalCost = booking.getTotalCost() != null ? booking.getTotalCost() : BigDecimal.ZERO;
+        BigDecimal depositAmount = booking.getDepositAmount() != null ? booking.getDepositAmount() : BigDecimal.ZERO;
+        return totalCost.subtract(depositAmount);
+    }
+
+    /**
+     * Tính tổng số tiền các payment requests PENDING của booking
+     */
+    private BigDecimal getTotalPendingPaymentAmount(Integer bookingId) {
+        // Tìm tất cả invoices của booking
+        List<Invoices> invoices = invoiceRepository.findByBooking_IdOrderByCreatedAtDesc(bookingId);
+        
+        // Tính tổng payment requests PENDING của tất cả invoices
+        BigDecimal totalPending = BigDecimal.ZERO;
+        for (Invoices invoice : invoices) {
+            List<PaymentHistory> pendingPayments =
+                paymentHistoryRepository.findByInvoice_IdOrderByPaymentDateDesc(invoice.getId())
+                    .stream()
+                    .filter(ph -> ph.getConfirmationStatus() == PaymentConfirmationStatus.PENDING)
+                    .collect(Collectors.toList());
+            
+            for (PaymentHistory ph : pendingPayments) {
+                totalPending = totalPending.add(ph.getAmount() != null ? ph.getAmount() : BigDecimal.ZERO);
+            }
+        }
+        
+        return totalPending;
     }
 }
