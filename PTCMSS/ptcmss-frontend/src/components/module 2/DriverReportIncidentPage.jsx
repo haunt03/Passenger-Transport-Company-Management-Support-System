@@ -1,7 +1,7 @@
 import React from "react";
 import {
     AlertTriangle, MapPin, Clock, FileText, Send, CheckCircle2,
-    XCircle, Loader2, Info, AlertCircle, Shield, Navigation, User, Phone
+    XCircle, Loader2, Info, AlertCircle, Shield, User, Phone
 } from "lucide-react";
 import { getDriverProfileByUser, reportIncident, getDriverDashboard, getDriverSchedule } from "../../api/drivers";
 
@@ -56,6 +56,9 @@ export default function DriverReportIncidentPage() {
     const [description, setDescription] = React.useState("");
     const [submitting, setSubmitting] = React.useState(false);
     const [toast, setToast] = React.useState(null);
+    const [resolvedAddress, setResolvedAddress] = React.useState("");
+    const [locationSuggestions, setLocationSuggestions] = React.useState([]);
+    const [fetchingSuggestions, setFetchingSuggestions] = React.useState(false);
 
     // Format time helper
     const fmtHM = (iso) => {
@@ -70,6 +73,60 @@ export default function DriverReportIncidentPage() {
         } catch {
             return "--:--";
         }
+    };
+
+    // Gợi ý địa điểm (autocomplete) bằng Nominatim/OSM có sẵn
+    React.useEffect(() => {
+        const query = location?.trim();
+        if (!query || query.length < 3) {
+            setLocationSuggestions([]);
+            return;
+        }
+
+        const controller = new AbortController();
+        const timer = setTimeout(async () => {
+            try {
+                setFetchingSuggestions(true);
+                const resp = await fetch(
+                    `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&limit=5`,
+                    { signal: controller.signal }
+                );
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                const mapped = Array.isArray(data)
+                    ? data.map((item) => ({
+                        label: item.display_name,
+                        lat: item.lat,
+                        lon: item.lon,
+                    }))
+                    : [];
+                setLocationSuggestions(mapped);
+            } catch (err) {
+                if (err.name !== "AbortError") {
+                    setLocationSuggestions([]);
+                }
+            } finally {
+                setFetchingSuggestions(false);
+            }
+        }, 400); // debounce để tránh spam API
+
+        return () => {
+            clearTimeout(timer);
+            controller.abort();
+        };
+    }, [location]);
+
+    const handleSelectSuggestion = (sugg) => {
+        if (!sugg) return;
+        const lat = parseFloat(sugg.lat);
+        const lon = parseFloat(sugg.lon);
+        if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
+            setLocation(`${lat.toFixed(6)}, ${lon.toFixed(6)}`);
+        } else {
+            setLocation(sugg.label);
+        }
+        setResolvedAddress(sugg.label || "");
+        setLocationSuggestions([]);
     };
 
     React.useEffect(() => {
@@ -356,7 +413,7 @@ export default function DriverReportIncidentPage() {
                         {/* Trip Selection */}
                         <div>
                             <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
-                                <Navigation className="h-4 w-4 text-slate-400" />
+                                <MapPin className="h-4 w-4 text-slate-400" />
                                 Chọn chuyến đi <span className="text-rose-500">*</span>
                             </label>
 
@@ -579,19 +636,48 @@ export default function DriverReportIncidentPage() {
                         </div>
 
                         {/* Location */}
-                        <div>
+                        <div className="relative">
                             <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
                                 <MapPin className="h-4 w-4 text-slate-400" />
                                 Địa điểm xảy ra sự cố
                             </label>
-                            <input
-                                type="text"
-                                value={location}
-                                onChange={(e) => setLocation(e.target.value)}
-                                placeholder="Ví dụ: Km 15 Quốc lộ 1A, gần cầu Thanh Trì"
-                                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                            />
-                            <p className="text-xs text-slate-500 mt-1">Mô tả vị trí cụ thể để dễ hỗ trợ</p>
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={location}
+                                    onChange={(e) => setLocation(e.target.value)}
+                                    placeholder="Nhập địa điểm, tên đường hoặc tọa độ. Gõ để được gợi ý..."
+                                    className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                />
+                            </div>
+                            {/* <p className="text-xs text-slate-500 mt-1">
+                Nhập địa điểm để nhận gợi ý tự động (autocomplete).
+              </p> */}
+                            {resolvedAddress && (
+                                <p className="text-xs text-emerald-700 mt-1 break-words">
+                                    Địa chỉ: {resolvedAddress}
+                                </p>
+                            )}
+                            {locationSuggestions.length > 0 && (
+                                <div className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-56 overflow-auto">
+                                    {locationSuggestions.map((s, idx) => (
+                                        <button
+                                            key={`${s.lat}-${s.lon}-${idx}`}
+                                            type="button"
+                                            onClick={() => handleSelectSuggestion(s)}
+                                            className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 border-b last:border-b-0 border-slate-100"
+                                        >
+                                            <div className="font-medium text-slate-800 truncate">{s.label}</div>
+                                            <div className="text-xs text-slate-500">
+                                                {s.lat && s.lon ? `${parseFloat(s.lat).toFixed(6)}, ${parseFloat(s.lon).toFixed(6)}` : ""}
+                                            </div>
+                                        </button>
+                                    ))}
+                                    {fetchingSuggestions && (
+                                        <div className="px-3 py-2 text-xs text-slate-500">Đang gợi ý...</div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         {/* Description */}

@@ -75,6 +75,38 @@ function Toasts({ toasts }) {
 /* 1 dòng setting đang có             */
 /* ---------------------------------- */
 function SettingRow({ row, edited, onChangeField, isDirty }) {
+    const isBoolean =
+        normalize(row.valueType) === "boolean" ||
+        ["true", "false"].includes(normalize(edited.value));
+
+    const renderValueInput = () => {
+        if (isBoolean) {
+            const current = normalize(edited.value) === "true" ? "true" : "false";
+            return (
+                <select
+                    value={current}
+                    onChange={(e) =>
+                        onChangeField(row.key, "value", e.target.value)
+                    }
+                    className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500"
+                >
+                    <option value="true">true</option>
+                    <option value="false">false</option>
+                </select>
+            );
+        }
+
+        return (
+            <input
+                value={edited.value}
+                onChange={(e) =>
+                    onChangeField(row.key, "value", e.target.value)
+                }
+                className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500"
+            />
+        );
+    };
+
     return (
         <tr
             className={cls(
@@ -104,13 +136,7 @@ function SettingRow({ row, edited, onChangeField, isDirty }) {
 
             {/* VALUE editable */}
             <td className="px-3 py-3 w-[200px] align-top">
-                <input
-                    value={edited.value}
-                    onChange={(e) =>
-                        onChangeField(row.key, "value", e.target.value)
-                    }
-                    className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500"
-                />
+                {renderValueInput()}
             </td>
 
             {/* DESCRIPTION editable */}

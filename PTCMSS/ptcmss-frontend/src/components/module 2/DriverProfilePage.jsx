@@ -16,8 +16,12 @@ import { getCookie } from "../../utils/cookies";
 import {
   getDriverProfileByUser,
   updateDriverProfile,
+  uploadDriverAvatar,
 } from "../../api/drivers";
+import { getMyProfile } from "../../api/profile";
 import { validatePhone, validateRequired } from "../../utils/validation";
+import UserAvatar from "../../components/common/UserAvatar";
+import { Upload, Camera } from "lucide-react";
 
 /* ===========================================
    Small Helpers
@@ -88,6 +92,10 @@ export default function DriverProfilePage() {
   const [profile, setProfile] = React.useState(null);
   const [phone, setPhone] = React.useState("");
   const [address, setAddress] = React.useState("");
+  const [avatarPreview, setAvatarPreview] = React.useState(null); // Preview URL
+  const [avatarFile, setAvatarFile] = React.useState(null); // File object để upload
+  const [avatarUrl, setAvatarUrl] = React.useState(null); // Fetched avatar blob URL
+  const [uploadingAvatar, setUploadingAvatar] = React.useState(false);
 
   const [phoneError, setPhoneError] = React.useState("");
   const [addressError, setAddressError] = React.useState("");
@@ -113,9 +121,78 @@ export default function DriverProfilePage() {
         const data = await getDriverProfileByUser(userId);
         if (!mounted) return;
 
+        // Nếu không có avatar trong driver profile, thử lấy từ user profile (giống header)
+        let avatarPath = data?.avatar;
+        if (!avatarPath) {
+          try {
+            const userProfile = await getMyProfile();
+            avatarPath = userProfile?.avatar || userProfile?.avatarUrl || userProfile?.imgUrl;
+            // Cập nhật data với avatar từ user profile
+            if (avatarPath) {
+              data.avatar = avatarPath;
+            }
+          } catch (err) {
+            // Silently ignore - avatar is optional
+          }
+        }
+
         setProfile(data);
         setPhone(data.phone || "");
         setAddress(data.address || "");
+        setAvatarPreview(null); // Reset preview khi load lại
+        setAvatarFile(null);
+
+        // Load avatar với auth token (giống header)
+        if (avatarPath) {
+          try {
+            const apiBase = (import.meta?.env?.VITE_API_BASE || "http://localhost:8080").replace(/\/$/, "");
+            const imgPath = avatarPath;
+            const fullUrl = /^https?:\/\//i.test(imgPath)
+                ? imgPath
+                : `${apiBase}${imgPath.startsWith("/") ? "" : "/"}${imgPath}`;
+            const urlWithCacheBuster = `${fullUrl}${fullUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
+
+            // Fetch with auth
+            let token = localStorage.getItem("access_token") || "";
+            if (!token) {
+              try {
+                const parts = document.cookie.split("; ");
+                for (const p of parts) {
+                  const [k, v] = p.split("=");
+                  if (k === "access_token") {
+                    token = decodeURIComponent(v || "");
+                    break;
+                  }
+                }
+              } catch {}
+            }
+            const resp = await fetch(urlWithCacheBuster, {
+              headers: token ? { Authorization: `Bearer ${token}` } : {},
+              credentials: "include",
+              cache: "no-store",
+            });
+
+            console.log("[DriverProfile] Avatar fetch response:", resp.status, resp.ok);
+
+            if (resp.ok && mounted) {
+              const blob = await resp.blob();
+              const blobUrl = URL.createObjectURL(blob);
+              setAvatarUrl(blobUrl);
+            } else if (mounted) {
+              setAvatarUrl(null);
+            }
+          } catch (err) {
+            // Suppress extension-related errors (chrome.runtime.lastError)
+            if (err?.message?.includes("runtime.lastError") ||
+                err?.message?.includes("Receiving end does not exist")) {
+              // Ignore Chrome extension errors
+              return;
+            }
+            if (mounted) setAvatarUrl(null);
+          }
+        } else if (mounted) {
+          setAvatarUrl(null);
+        }
       } catch (err) {
         setError(
             err?.data?.message ||
@@ -128,14 +205,26 @@ export default function DriverProfilePage() {
     }
 
     load();
-    return () => (mounted = false);
+    return () => {
+      mounted = false;
+    };
   }, []);
+
+  // Cleanup avatar blob URL khi component unmount
+  React.useEffect(() => {
+    return () => {
+      if (avatarUrl) {
+        URL.revokeObjectURL(avatarUrl);
+      }
+    };
+  }, [avatarUrl]);
 
   // Check if data has changed
   const dirty =
       profile &&
       (phone !== (profile.phone || "") ||
-          address !== (profile.address || ""));
+          address !== (profile.address || "") ||
+          avatarFile !== null); // Có avatar mới chọn
 
   // Check if form is valid (no errors and has required data)
   const isValid =
@@ -185,20 +274,96 @@ export default function DriverProfilePage() {
       return;
     }
 
-    const payload = {
-      phone: phone.trim(),
-      address: address.trim(),
-    };
-
     try {
       setSaving(true);
+      const userId = getCookie("userId");
+      if (!userId) {
+        push("Không tìm thấy userId", "error");
+        return;
+      }
+
+      // Upload avatar trước nếu có
+      if (avatarFile) {
+        setUploadingAvatar(true);
+        try {
+          await uploadDriverAvatar(parseInt(userId), avatarFile);
+        } catch (err) {
+          push(
+              err?.data?.message || err?.message || "Không thể upload ảnh đại diện",
+              "error"
+          );
+          setUploadingAvatar(false);
+          setSaving(false);
+          return;
+        }
+        setUploadingAvatar(false);
+      }
+
+      // Cập nhật thông tin liên lạc
+      const payload = {
+        phone: phone.trim(),
+        address: address.trim(),
+      };
+
       const updated = await updateDriverProfile(profile.driverId, payload);
 
-      setProfile(updated);
+      // Reload profile để lấy avatar mới nếu có
+      if (avatarFile) {
+        const reloadedProfile = await getDriverProfileByUser(userId);
+        setProfile(reloadedProfile);
+
+        // Reload avatar với auth token
+        if (reloadedProfile?.avatar) {
+          try {
+            const apiBase = (import.meta?.env?.VITE_API_BASE || "http://localhost:8080").replace(/\/$/, "");
+            const imgPath = reloadedProfile.avatar;
+            const fullUrl = /^https?:\/\//i.test(imgPath)
+                ? imgPath
+                : `${apiBase}${imgPath.startsWith("/") ? "" : "/"}${imgPath}`;
+            const urlWithCacheBuster = `${fullUrl}${fullUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
+
+            let token = localStorage.getItem("access_token") || "";
+            if (!token) {
+              try {
+                const parts = document.cookie.split("; ");
+                for (const p of parts) {
+                  const [k, v] = p.split("=");
+                  if (k === "access_token") {
+                    token = decodeURIComponent(v || "");
+                    break;
+                  }
+                }
+              } catch {}
+            }
+            const resp = await fetch(urlWithCacheBuster, {
+              headers: token ? { Authorization: `Bearer ${token}` } : {},
+              credentials: "include",
+              cache: "no-store",
+            });
+
+            if (resp.ok) {
+              // Revoke old URL
+              if (avatarUrl) {
+                URL.revokeObjectURL(avatarUrl);
+              }
+              const blob = await resp.blob();
+              const newBlobUrl = URL.createObjectURL(blob);
+              setAvatarUrl(newBlobUrl);
+            }
+          } catch (err) {
+            // Silently ignore - avatar reload is optional
+          }
+        }
+      } else {
+        setProfile(updated);
+      }
+
       setPhone(updated.phone || "");
       setAddress(updated.address || "");
+      setAvatarPreview(null);
+      setAvatarFile(null);
 
-      push("Đã lưu thông tin liên lạc", "success");
+      push("Đã lưu thông tin", "success");
     } catch (err) {
       setError(
           err?.data?.message ||
@@ -208,6 +373,7 @@ export default function DriverProfilePage() {
       push("Lưu thất bại ❌", "error");
     } finally {
       setSaving(false);
+      setUploadingAvatar(false);
     }
   };
 
@@ -217,7 +383,43 @@ export default function DriverProfilePage() {
     setAddress(profile.address || "");
     setPhoneError("");
     setAddressError("");
+    setAvatarPreview(null);
+    setAvatarFile(null);
     push("Đã hoàn tác thay đổi", "info");
+  };
+
+  /* ===========================================
+     Avatar preview handler (chỉ hiển thị preview, chưa upload)
+  =========================================== */
+  const handleAvatarSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      push("Chỉ chấp nhận file ảnh", "error");
+      e.target.value = "";
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      push("Kích thước file không được vượt quá 5MB", "error");
+      e.target.value = "";
+      return;
+    }
+
+    // Tạo preview URL
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAvatarPreview(reader.result);
+      setAvatarFile(file);
+    };
+    reader.onerror = () => {
+      push("Không thể đọc file ảnh", "error");
+      e.target.value = "";
+    };
+    reader.readAsDataURL(file);
   };
 
   /* ===========================================
@@ -251,7 +453,6 @@ export default function DriverProfilePage() {
   }
 
   const tripsTotal = profile?.totalTrips || 0;
-  const kmTotal = profile?.totalKm || 0;
   const status = profile?.status || "ACTIVE";
   const licenseClass = profile?.licenseClass || "—";
   const note = profile?.note || "";
@@ -284,18 +485,84 @@ export default function DriverProfilePage() {
                 <div className="relative flex flex-col lg:flex-row lg:items-start gap-6">
                   {/* Avatar + info */}
                   <div className="flex items-start gap-4 min-w-[220px]">
-                    <div className="relative flex h-16 w-16 items-center justify-center rounded-xl bg-blue-50 text-blue-600 ring-1 ring-blue-100 text-xl font-semibold shadow-sm">
-                      {initialsOf(fullName)}
+                    <div className="relative">
+                      <div className="relative">
+                        {avatarPreview ? (
+                            // Hiển thị preview nếu có
+                            <UserAvatar
+                                name={fullName}
+                                avatar={avatarPreview}
+                                size={64}
+                                className={cls(
+                                    "ring-4 ring-amber-400 shadow-sm transition-all"
+                                )}
+                            />
+                        ) : avatarUrl ? (
+                            // Hiển thị avatar đã fetch với auth
+                            <div
+                                className={cls(
+                                    "rounded-full overflow-hidden ring-2 ring-blue-100 shadow-sm",
+                                    "w-16 h-16 flex items-center justify-center"
+                                )}
+                            >
+                              <img
+                                  src={avatarUrl}
+                                  alt={fullName}
+                                  className="w-full h-full object-cover"
+                                  onError={() => setAvatarUrl(null)}
+                              />
+                            </div>
+                        ) : (
+                            // Fallback sang UserAvatar với initials
+                            <UserAvatar
+                                name={fullName}
+                                avatar={null}
+                                size={64}
+                                className="ring-2 ring-blue-100 shadow-sm"
+                            />
+                        )}
+                        {/* Badge "Chưa lưu" khi có preview */}
+                        {avatarPreview && (
+                            <div className="absolute -top-1 -left-1 bg-amber-500 text-white text-[9px] font-semibold px-1.5 py-0.5 rounded-full shadow-sm border border-white">
+                              Mới
+                            </div>
+                        )}
+                      </div>
 
+                      {/* Upload button overlay */}
+                      <label
+                          className={cls(
+                              "absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white shadow-md cursor-pointer transition-colors",
+                              (saving || uploadingAvatar)
+                                  ? "bg-slate-400 cursor-not-allowed"
+                                  : "bg-blue-600 hover:bg-blue-700"
+                          )}
+                          title="Tải ảnh đại diện"
+                      >
+                        {uploadingAvatar ? (
+                            <div className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                            <Camera className="h-3.5 w-3.5 text-white" />
+                        )}
+                        <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleAvatarSelect}
+                            disabled={saving || uploadingAvatar}
+                            className="hidden"
+                        />
+                      </label>
+
+                      {/* Status badge */}
                       <span
                           className={cls(
-                              "absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full text-[10px] border border-white shadow-sm",
+                              "absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full text-[10px] border-2 border-white shadow-sm font-semibold",
                               status === "ACTIVE"
                                   ? "bg-amber-500 text-white"
                                   : "bg-slate-400 text-white"
                           )}
                       >
-                    {status === "ACTIVE" ? "ON" : "OFF"}
+                    {/* {status === "ACTIVE" ? "ON" : "OFF"} */}
                   </span>
                     </div>
 
@@ -317,7 +584,7 @@ export default function DriverProfilePage() {
                   </div>
 
                   {/* Stats */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 lg:ml-auto lg:max-w-xl">
+                  <div className="grid grid-cols-2 gap-4 lg:ml-auto lg:max-w-xl">
                     {/* Tổng chuyến */}
                     <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 shadow-sm">
                       <div className="text-xs text-slate-500 flex items-center gap-1">
@@ -326,17 +593,6 @@ export default function DriverProfilePage() {
                       </div>
                       <div className="mt-1 text-2xl font-semibold text-slate-900">
                         {fmtNum(tripsTotal)}
-                      </div>
-                    </div>
-
-                    {/* Tổng km */}
-                    <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 shadow-sm">
-                      <div className="text-xs text-slate-500 flex items-center gap-1">
-                        <Car className="h-3.5 w-3.5 text-amber-500" />
-                        Tổng km
-                      </div>
-                      <div className="mt-1 text-2xl font-semibold">
-                        {fmtNum(kmTotal)} km
                       </div>
                     </div>
 
@@ -369,11 +625,8 @@ export default function DriverProfilePage() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* ===== Contact + Edit ===== */}
                 <div className="rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-900/5">
-                  <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 flex items-center">
+                  <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
                     <div className="text-sm font-medium">Thông tin liên lạc</div>
-                    <div className="ml-auto text-[11px] text-slate-400">
-                      PUT /api/drivers/{profile.driverId}/profile
-                    </div>
                   </div>
 
                   <div className="p-4 space-y-4 text-sm text-slate-700">
@@ -499,11 +752,8 @@ export default function DriverProfilePage() {
 
                 {/* ===== Driver Info ===== */}
                 <div className="rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-900/5">
-                  <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 flex items-center">
+                  <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
                     <div className="text-sm font-medium">Hồ sơ tài xế</div>
-                    <div className="ml-auto text-[11px] text-slate-400">
-                      GET /api/drivers/{profile.driverId}/profile
-                    </div>
                   </div>
 
                   <div className="p-4 text-sm space-y-4">

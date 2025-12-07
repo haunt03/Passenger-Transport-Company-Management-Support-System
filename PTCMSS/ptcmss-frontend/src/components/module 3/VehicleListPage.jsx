@@ -88,8 +88,8 @@ const VEHICLE_STATUS = {
 };
 
 const STATUS_LABEL = {
-    AVAILABLE: "Hoạt động",
-    INUSE: "Hoạt động",
+    AVAILABLE: "Sẵn sàng",
+    INUSE: "Đang sử dụng",
     MAINTENANCE: "Bảo trì",
     INACTIVE: "Ngừng hoạt động",
 };
@@ -883,8 +883,6 @@ function FilterBar({
                        setCategoryFilter,
                        statusFilter,
                        setStatusFilter,
-                       searchPlate,
-                       setSearchPlate,
                        branches,
                        categories,
                        onClickCreate,
@@ -969,31 +967,20 @@ function FilterBar({
                     >
                         <option value="">Tất cả trạng thái</option>
                         <option value="AVAILABLE">Hoạt động</option>
-                        <option value="INUSE">Hoạt động</option>
+                        <option value="INUSE">Đang sử dụng</option>
                         <option value="MAINTENANCE">Bảo trì</option>
                         <option value="INACTIVE">Ngừng hoạt động</option>
                     </select>
-                </div>
-
-                {/* Search biß╗ân sß╗æ */}
-                <div className="flex items-center gap-2 rounded-md border border-slate-300 bg-white shadow-sm px-3 py-2 min-w-[200px]">
-                    <Search className="h-4 w-4 text-slate-400" />
-                    <input
-                        value={searchPlate}
-                        onChange={(e) => setSearchPlate(e.target.value)}
-                        placeholder="Tìm biển số xe..."
-                        className="bg-transparent outline-none text-[13px] placeholder:text-slate-400 text-slate-700 flex-1"
-                    />
                 </div>
 
                 {/* Time filter for Consultant - Check vehicle availability */}
                 {isConsultant && (
                     <>
                         <div className="flex items-center gap-2 rounded-md border border-slate-300 bg-white shadow-sm px-3 py-2 min-w-[160px]">
-                            <Calendar className="h-4 w-4 text-slate-400" />
+                            <Calendar className="h-4 w-4 text-slate-400 shrink-0" />
                             <input
                                 type="date"
-                                value={timeFilterStart}
+                                value={timeFilterStart || ""}
                                 onChange={(e) => {
                                     const newStart = e.target.value;
                                     setTimeFilterStart(newStart);
@@ -1003,17 +990,16 @@ function FilterBar({
                                     }
                                 }}
                                 max={timeFilterEnd || undefined}
-                                placeholder="Từ ngày"
-                                className="bg-transparent outline-none text-[13px] text-slate-700 flex-1"
+                                className="bg-transparent outline-none text-[13px] text-slate-700 flex-1 cursor-pointer"
                                 title="Từ ngày"
                             />
                         </div>
                         <span className="text-slate-400 text-[13px]">→</span>
                         <div className="flex items-center gap-2 rounded-md border border-slate-300 bg-white shadow-sm px-3 py-2 min-w-[160px]">
-                            <Calendar className="h-4 w-4 text-slate-400" />
+                            <Calendar className="h-4 w-4 text-slate-400 shrink-0" />
                             <input
                                 type="date"
-                                value={timeFilterEnd}
+                                value={timeFilterEnd || ""}
                                 onChange={(e) => {
                                     const newEnd = e.target.value;
                                     // Validate: end phải >= start
@@ -1024,8 +1010,7 @@ function FilterBar({
                                     setTimeFilterEnd(newEnd);
                                 }}
                                 min={timeFilterStart || undefined}
-                                placeholder="Đến ngày"
-                                className="bg-transparent outline-none text-[13px] text-slate-700 flex-1"
+                                className="bg-transparent outline-none text-[13px] text-slate-700 flex-1 cursor-pointer"
                                 title="Đến ngày"
                             />
                         </div>
@@ -1414,6 +1399,7 @@ export default function VehicleListPage({ readOnly: readOnlyProp = false }) {
     const isManager = currentRole === ROLES.MANAGER;
     const isAccountant = currentRole === ROLES.ACCOUNTANT;
     const isConsultant = currentRole === ROLES.CONSULTANT;
+    const isCoordinator = currentRole === ROLES.COORDINATOR;
     // readOnly mode: Consultant và Accountant chỉ được xem, không được thêm/sửa/xóa
     const isReadOnly = readOnlyProp || isAccountant || isConsultant;
 
@@ -1425,7 +1411,6 @@ export default function VehicleListPage({ readOnly: readOnlyProp = false }) {
     const [branchFilter, setBranchFilter] = React.useState("");
     const [categoryFilter, setCategoryFilter] = React.useState("");
     const [statusFilter, setStatusFilter] = React.useState("");
-    const [searchPlate, setSearchPlate] = React.useState("");
 
     // Time filter for Consultant (to check vehicle availability)
     const [timeFilterStart, setTimeFilterStart] = React.useState("");
@@ -1470,14 +1455,15 @@ export default function VehicleListPage({ readOnly: readOnlyProp = false }) {
     const mapVehicle = React.useCallback((v) => ({
         id: v.id,
         license_plate: v.licensePlate,
-        category_id: v.categoryId,
-        category_name: v.categoryName,
-        branch_id: v.branchId,
-        branch_name: v.branchName,
+        category_id: v.categoryId || v.category?.id,
+        category_name: v.categoryName || v.category?.categoryName || v.category?.name || "",
+        branch_id: v.branchId || v.branch?.id,
+        branch_name: v.branchName || v.branch?.branchName || v.branch?.name || "",
         status: v.status,
         reg_due_date: v.inspectionExpiry || "",
         ins_due_date: v.insuranceExpiry || "",
         model: v.model,
+        brand: v.brand,
         year: v.productionYear,
     }), []);
 
@@ -1485,23 +1471,22 @@ export default function VehicleListPage({ readOnly: readOnlyProp = false }) {
     React.useEffect(() => {
         (async () => {
             try {
-                // Một số role read-only (ví dụ Consultant) không có quyền gọi API list branches/categories → dễ bị 403.
-                // Tuy nhiên, Kế toán vẫn cần dữ liệu loại xe để filter, nên chỉ skip metadata cho Consultant.
-                const shouldLoadMeta = !isConsultant;
-
                 const [brData, catData, vehData] = await Promise.all([
-                    shouldLoadMeta
-                        ? listBranches({ size: 1000 }).catch(() => ({ content: [] }))
-                        : Promise.resolve({ content: [] }),
-                    shouldLoadMeta
-                        ? listVehicleCategories().catch(() => [])
-                        : Promise.resolve([]),
+                    // Luôn cố gắng load chi nhánh + loại xe để filter cho mọi role.
+                    // Nếu role nào không có quyền, catch sẽ trả mảng rỗng, UI vẫn hoạt động.
+                    listBranches({ size: 1000 }).catch(() => ({ content: [] })),
+                    listVehicleCategories().catch(() => []),
                     listVehicles().catch(() => []),
                 ]);
                 const brs = Array.isArray(brData) ? brData : (brData?.items || brData?.content || []);
                 setBranches(brs.map(b => ({ id: b.id, name: b.branchName || b.name || b.branch_name })));
                 setCategories((catData || []).map(c => ({ id: c.id, name: c.categoryName || c.name, seats: c.seats, status: c.status })));
                 const mappedVehicles = (vehData || []).map(mapVehicle);
+                // Debug: kiểm tra dữ liệu category_name
+                if (mappedVehicles.length > 0) {
+                    console.log("Sample vehicle data:", mappedVehicles[0]);
+                    console.log("Category name:", mappedVehicles[0].category_name);
+                }
                 setVehicles(mappedVehicles);
 
                 // Check xe đang trong chuyến (ongoing trips)
@@ -1528,6 +1513,57 @@ export default function VehicleListPage({ readOnly: readOnlyProp = false }) {
         })();
     }, [mapVehicle]);
 
+    // Check vehicle availability khi có date filter (cho Consultant)
+    React.useEffect(() => {
+        if (!isConsultant || !timeFilterStart || !timeFilterEnd || vehicles.length === 0) {
+            setVehicleAvailability({});
+            return;
+        }
+
+        (async () => {
+            try {
+                const availabilityMap = {};
+                const startTime = new Date(timeFilterStart + "T00:00:00").toISOString();
+                const endTime = new Date(timeFilterEnd + "T23:59:59").toISOString();
+
+                // Check availability cho từng xe bằng cách check trips
+                await Promise.all(vehicles.map(async (v) => {
+                    try {
+                        const trips = await getVehicleTrips(v.id);
+                        const tripList = Array.isArray(trips) ? trips : (trips?.data || trips?.content || []);
+
+                        // Check xem có trip nào overlap với khoảng thời gian không
+                        const hasConflict = tripList.some(trip => {
+                            if (!trip.startTime || trip.status === 'COMPLETED' || trip.status === 'CANCELLED') {
+                                return false;
+                            }
+                            const tripStart = new Date(trip.startTime);
+                            const tripEnd = trip.endTime ? new Date(trip.endTime) : new Date(tripStart.getTime() + 8 * 60 * 60 * 1000);
+                            const filterStart = new Date(startTime);
+                            const filterEnd = new Date(endTime);
+
+                            // Check overlap: tripStart <= filterEnd && tripEnd >= filterStart
+                            return (tripStart <= filterEnd && tripEnd >= filterStart);
+                        });
+
+                        availabilityMap[v.id] = {
+                            available: !hasConflict,
+                            reason: hasConflict ? "Có chuyến trong khoảng thời gian này" : "Rảnh"
+                        };
+                    } catch (err) {
+                        console.warn(`Failed to check availability for vehicle ${v.id}:`, err);
+                        // Mặc định là available nếu không check được
+                        availabilityMap[v.id] = { available: true, reason: "" };
+                    }
+                }));
+                setVehicleAvailability(availabilityMap);
+            } catch (err) {
+                console.error("Failed to check vehicle availability:", err);
+                setVehicleAvailability({});
+            }
+        })();
+    }, [isConsultant, timeFilterStart, timeFilterEnd, vehicles]);
+
     // modal state
     const [createOpen, setCreateOpen] = React.useState(false);
     const [editOpen, setEditOpen] = React.useState(false);
@@ -1535,7 +1571,6 @@ export default function VehicleListPage({ readOnly: readOnlyProp = false }) {
 
     // filter + sort data (moved before useEffect that uses it)
     const filteredSorted = React.useMemo(() => {
-        const q = searchPlate.trim().toLowerCase();
         // Manager chỉ xem xe trong chi nhánh của mình
         const bf = isManager && managerBranchId
             ? String(managerBranchId)
@@ -1552,12 +1587,24 @@ export default function VehicleListPage({ readOnly: readOnlyProp = false }) {
             // Filter status: nếu xe đang trong chuyến, coi như INUSE
             const displayStatus = vehicleOngoingTrips[v.id] ? "INUSE" : v.status;
             if (statusFilter) {
-                // Nếu filter "AVAILABLE" hoặc "INUSE", cần check cả 2 trường hợp
-                if (statusFilter === "AVAILABLE" && displayStatus !== "AVAILABLE") return false;
-                if (statusFilter === "INUSE" && displayStatus !== "INUSE") return false;
-                if (statusFilter !== "AVAILABLE" && statusFilter !== "INUSE" && displayStatus !== statusFilter) return false;
+                // Filter "Hoạt động" (AVAILABLE) bao gồm cả AVAILABLE và INUSE
+                if (statusFilter === "AVAILABLE") {
+                    // "Hoạt động" = AVAILABLE hoặc INUSE
+                    if (displayStatus !== "AVAILABLE" && displayStatus !== "INUSE") return false;
+                } else {
+                    // Các filter khác: chính xác
+                    if (displayStatus !== statusFilter) return false;
+                }
             }
-            if (q && !String(v.license_plate).toLowerCase().includes(q)) return false;
+
+            // Filter theo ngày cho Consultant: chỉ hiển thị xe rảnh trong khoảng thời gian
+            if (isConsultant && timeFilterStart && timeFilterEnd) {
+                // Nếu có vehicleAvailability data, chỉ hiển thị xe rảnh
+                if (vehicleAvailability && vehicleAvailability[v.id] !== undefined) {
+                    if (!vehicleAvailability[v.id]?.available) return false;
+                }
+            }
+
             return true;
         });
 
@@ -1595,7 +1642,6 @@ export default function VehicleListPage({ readOnly: readOnlyProp = false }) {
         branchFilter,
         categoryFilter,
         statusFilter,
-        searchPlate,
         sortKey,
         sortDir,
         isManager,
@@ -1664,7 +1710,6 @@ export default function VehicleListPage({ readOnly: readOnlyProp = false }) {
         setLoadingRefresh(true);
         try {
             const vehData = await listVehicles({
-                licensePlate: searchPlate || undefined,
                 categoryId: categoryFilter ? Number(categoryFilter) : undefined,
                 branchId: branchFilter ? Number(branchFilter) : undefined,
                 status: statusFilter || undefined,
@@ -1721,15 +1766,13 @@ export default function VehicleListPage({ readOnly: readOnlyProp = false }) {
                     setCategoryFilter={setCategoryFilter}
                     statusFilter={statusFilter}
                     setStatusFilter={setStatusFilter}
-                    searchPlate={searchPlate}
-                    setSearchPlate={setSearchPlate}
                     branches={branches}
                     categories={categories}
                     onClickCreate={handleCreateNew}
                     loadingRefresh={loadingRefresh}
                     onRefresh={handleRefresh}
                     showBranchFilter={!isManager && !isConsultant && !isAccountant}
-                    showCreateButton={!isReadOnly}
+                    showCreateButton={!isReadOnly && !isCoordinator}
                     createButtonPosition="left"
                     // Time filter for Consultant
                     isConsultant={isConsultant}

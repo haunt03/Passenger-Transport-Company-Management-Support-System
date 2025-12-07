@@ -1008,6 +1008,20 @@ export default function EditOrderPage() {
         ? {}
         : { disabled: true, readOnly: true };
 
+    // Với role Tư vấn viên: cho phép chỉnh "Ghi chú cho tài xế" miễn là chuyến CHƯA bắt đầu,
+    // kể cả khi đã qua mốc 12h không cho sửa các thông tin khác.
+    const canEditDriverNote = React.useMemo(() => {
+        if (!isConsultant) {
+            return canEdit;
+        }
+        if (!startTime) {
+            return true;
+        }
+        const tripStart = new Date(startTime);
+        const now = new Date();
+        return tripStart.getTime() > now.getTime();
+    }, [isConsultant, canEdit, startTime]);
+
     /* ---------------- locked banner ---------------- */
     const lockedReason = React.useMemo(() => {
         const editableStatuses = ["DRAFT", "PENDING", "CONFIRMED", "ASSIGNED", "QUOTATION_SENT"];
@@ -1624,14 +1638,18 @@ export default function EditOrderPage() {
                         </div>
                         <textarea
                             rows={3}
-                            className={makeInputCls({
-                                enabled: cls(textareaEnabledCls, "resize-none"),
-                                disabled: cls(textareaDisabledCls, "resize-none"),
-                            })}
+                            className={
+                                canEditDriverNote
+                                    ? cls(textareaEnabledCls, "resize-none")
+                                    : cls(textareaDisabledCls, "resize-none")
+                            }
                             value={bookingNote}
-                            onChange={(e) => setBookingNote(e.target.value)}
+                            onChange={(e) => {
+                                if (!canEditDriverNote) return;
+                                setBookingNote(e.target.value);
+                            }}
                             placeholder="VD: Đón thêm 1 khách ở 123 Trần Hưng Đạo lúc 8h30, hành lý cồng kềnh..."
-                            {...disableInputProps}
+                            {...(canEditDriverNote ? {} : { disabled: true, readOnly: true })}
                         />
                         <div className="text-[11px] text-slate-400 mt-2">
                             Ghi chú này sẽ hiển thị cho tài xế trong chi tiết chuyến đi.

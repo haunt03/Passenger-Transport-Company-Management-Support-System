@@ -19,3 +19,7 @@ export async function uploadAvatar(userId, file) {
     form.append("file", file);
     return apiFetch(`/api/users/${userId}/avatar`, { method: "POST", body: form });
 }
+
+export function changePassword(userId, body) {
+    return apiFetch(`/api/users/${userId}/change-password`, { method: "POST", body });
+}

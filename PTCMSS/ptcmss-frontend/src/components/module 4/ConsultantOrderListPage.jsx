@@ -453,12 +453,37 @@ function OrdersTable({
     };
 
     // Cho phép hủy khi chưa khởi hành/chưa hoàn thành/chưa hủy
-    const canCancel = (status) => {
+    // Nếu đơn chưa đến ngày đi, vẫn cho phép hủy (trừ khi đã hoàn thành hoặc đã hủy)
+    const canCancel = (status, pickupTime = null) => {
         const normalized = status ? status.replace(/_/g, '').toUpperCase() : '';
-        // Không cho hủy khi: đang thực hiện, hoàn thành, đã hủy
-        return normalized !== 'INPROGRESS' &&
-            normalized !== 'COMPLETED' &&
-            normalized !== 'CANCELLED';
+
+        // Không cho hủy khi: đã hoàn thành, đã hủy
+        if (normalized === 'COMPLETED' || normalized === 'CANCELLED') {
+            return false;
+        }
+
+        // Nếu có thông tin ngày đi, kiểm tra xem đã đến ngày đi chưa
+        if (pickupTime) {
+            try {
+                // Parse ngày giống như fmtDateTime: replace space thành T để parse đúng ISO format
+                const safe = String(pickupTime).replace(" ", "T");
+                const pickupDate = new Date(safe);
+                const now = new Date();
+
+                // Kiểm tra xem parse có thành công không
+                if (!isNaN(pickupDate.getTime())) {
+                    // Nếu chưa đến ngày đi, cho phép hủy (trừ khi đã hoàn thành hoặc đã hủy - đã check ở trên)
+                    if (pickupDate > now) {
+                        return true;
+                    }
+                }
+            } catch (e) {
+                console.error("Error parsing pickup time:", e);
+            }
+        }
+
+        // Nếu đã qua ngày đi hoặc không có thông tin ngày đi, chỉ cho hủy khi chưa đang thực hiện
+        return normalized !== 'INPROGRESS';
     };
 
     return (
@@ -606,13 +631,13 @@ function OrdersTable({
 
                                         <button
                                             type="button"
-                                            disabled={!canCancel(o.status)}
+                                            disabled={!canCancel(o.status, o.pickup_time)}
                                             onClick={() => {
-                                                if (canCancel(o.status)) onCancel(o);
+                                                if (canCancel(o.status, o.pickup_time)) onCancel(o);
                                             }}
                                             className={cls(
                                                 "rounded-md border px-2.5 py-1.5 text-[12px] flex items-center gap-1 shadow-sm",
-                                                canCancel(o.status)
+                                                canCancel(o.status, o.pickup_time)
                                                     ? "border-rose-300 text-rose-700 bg-white hover:bg-rose-50"
                                                     : "border-slate-200 text-slate-400 bg-white cursor-not-allowed opacity-50"
                                             )}
@@ -1671,13 +1696,7 @@ function OrderFormModal({
                 </div>
 
                 {/* Footer */}
-                <div className="px-5 py-4 border-t border-slate-200 bg-slate-50 flex flex-wrap gap-2 justify-between items-center text-[13px]">
-                    <div className="text-[11px] text-slate-400">
-                        {isEdit
-                            ? "PUT /api/orders/{orderId}"
-                            : "POST /api/orders"}
-                    </div>
-
+                <div className="px-5 py-4 border-t border-slate-200 bg-slate-50 flex flex-wrap gap-2 justify-end items-center text-[13px]">
                     <div className="flex flex-wrap gap-2">
                         <button
                             onClick={onClose}

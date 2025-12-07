@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { createEmployeeWithUser } from "../../api/employees";
+import { createEmployeeWithUser, getEmployeeByUserId } from "../../api/employees";
 import { listBranches } from "../../api/branches";
 import { listRoles } from "../../api/users";
 import { Save, ArrowLeft, CheckCircle, XCircle, UserPlus, User, Mail, Phone, MapPin, Building2, Shield, Lock, AlertCircle, Info } from "lucide-react";
@@ -27,13 +27,43 @@ export default function CreateEmployeeWithUserPage() {
     const [generalError, setGeneralError] = React.useState("");
     const [branches, setBranches] = React.useState([]);
     const [roles, setRoles] = React.useState([]);
+    const [isCurrentUserAdmin, setIsCurrentUserAdmin] = React.useState(false);
+    const [isCurrentUserManager, setIsCurrentUserManager] = React.useState(false);
+    const [managerBranchId, setManagerBranchId] = React.useState(null);
     const [saving, setSaving] = React.useState(false);
     const [showSuccess, setShowSuccess] = React.useState(false);
 
-    // Load branches và roles
+    // Load branches và roles + thông tin current user
     React.useEffect(() => {
         (async () => {
             try {
+                // Lấy role + branch của current user từ localStorage + API
+                const storedUserId = localStorage.getItem("userId");
+                const currentRole = (localStorage.getItem("roleName") || "").toUpperCase();
+                const isAdminLocal = currentRole === "ADMIN";
+                const isManagerLocal = currentRole === "MANAGER";
+                setIsCurrentUserAdmin(isAdminLocal);
+                setIsCurrentUserManager(isManagerLocal);
+
+                let detectedManagerBranchId = null;
+                if (isManagerLocal && storedUserId) {
+                    try {
+                        const empResp = await getEmployeeByUserId(Number(storedUserId));
+                        const emp = empResp?.data || empResp;
+                        if (emp?.branchId) {
+                            detectedManagerBranchId = Number(emp.branchId);
+                            setManagerBranchId(detectedManagerBranchId);
+                            // Gán sẵn chi nhánh cho form
+                            setForm((prev) => ({
+                                ...prev,
+                                branchId: String(detectedManagerBranchId),
+                            }));
+                        }
+                    } catch (e) {
+                        console.error("Không lấy được chi nhánh của Manager hiện tại:", e);
+                    }
+                }
+
                 const [branchData, roleData] = await Promise.all([
                     listBranches({ size: 100 }),
                     listRoles(),
@@ -54,10 +84,20 @@ export default function CreateEmployeeWithUserPage() {
                 } else if (Array.isArray(branchData)) {
                     branchesList = branchData;
                 }
+                // Nếu là Manager, chỉ hiển thị chi nhánh mình quản lý
+                if (isManagerLocal && detectedManagerBranchId) {
+                    branchesList = branchesList.filter(
+                        (b) => String(b.id) === String(detectedManagerBranchId)
+                    );
+                }
                 setBranches(branchesList);
 
                 // Xử lý roles data
-                const rolesList = Array.isArray(roleData?.data) ? roleData.data : (Array.isArray(roleData) ? roleData : []);
+                const rolesList = Array.isArray(roleData?.data)
+                    ? roleData.data
+                    : Array.isArray(roleData)
+                        ? roleData
+                        : [];
                 setRoles(rolesList);
             } catch (error) {
                 console.error("Load data error:", error);
@@ -234,6 +274,24 @@ export default function CreateEmployeeWithUserPage() {
     };
 
     const BRAND_COLOR = "#0079BC";
+
+    // Filter roles dựa trên quyền của current user (Manager không chọn được Admin/Manager)
+    const filteredRoles = React.useMemo(() => {
+        if (!roles.length) return [];
+
+        return roles.filter((r) => {
+            const roleName = (r.roleName || r.name || "").toUpperCase();
+
+            // Manager không được chọn Admin hoặc Manager
+            if (!isCurrentUserAdmin) {
+                if (roleName === "ADMIN" || roleName === "MANAGER" || roleName === "QUẢN LÝ") {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+    }, [roles, isCurrentUserAdmin]);
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 text-slate-900 p-5">
@@ -452,6 +510,7 @@ export default function CreateEmployeeWithUserPage() {
                                 }`}
                                 value={form.branchId}
                                 onChange={(e) => updateField("branchId", e.target.value)}
+                                disabled={isCurrentUserManager}
                             >
                                 <option value="">-- Chọn chi nhánh --</option>
                                 {branches.map((b) => (
@@ -485,7 +544,7 @@ export default function CreateEmployeeWithUserPage() {
                                 onChange={(e) => updateField("roleId", e.target.value)}
                             >
                                 <option value="">-- Chọn vai trò --</option>
-                                {roles.map((r) => (
+                                {filteredRoles.map((r) => (
                                     <option key={r.id} value={r.id}>
                                         {r.roleName}
                                     </option>

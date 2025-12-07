@@ -23,6 +23,7 @@ import {
     AlertTriangle,
     Save,
     X,
+    Gauge,
 } from "lucide-react";
 
 /**
@@ -359,6 +360,42 @@ function VehicleProfileTab({ form, setForm, onSave, dirty, readOnly = false, isC
                         />
                     </div>
 
+                    {/* Số ghế */}
+                    <div>
+                        <div className="text-[12px] text-slate-600 mb-1">
+                            Số ghế
+                        </div>
+                        {readOnly || isCoordinator ? (
+                            <input
+                                className="rounded-md border border-slate-300 bg-slate-100 px-3 py-2 text-[13px] text-slate-500 font-medium cursor-not-allowed w-full"
+                                value={form.capacity != null ? form.capacity : "—"}
+                                readOnly
+                                disabled
+                            />
+                        ) : (
+                            <input
+                                type="number"
+                                min="1"
+                                max="100"
+                                className={inputCls}
+                                value={form.capacity != null ? form.capacity : ""}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val === "") {
+                                        setForm((f) => ({ ...f, capacity: null }));
+                                    } else {
+                                        const num = parseInt(val, 10);
+                                        if (!isNaN(num) && num > 0) {
+                                            setForm((f) => ({ ...f, capacity: num }));
+                                        }
+                                    }
+                                }}
+                                disabled={readOnly}
+                                placeholder="Nhập số ghế"
+                            />
+                        )}
+                    </div>
+
                     {/* Ngày đăng kiểm tiếp theo */}
                     <div>
                         <div className="text-[12px] text-slate-600 mb-1">
@@ -396,6 +433,20 @@ function VehicleProfileTab({ form, setForm, onSave, dirty, readOnly = false, isC
                             disabled={readOnly}
                         />
                     </div>
+
+                    {/* Odometer (Quãng đường đã chạy) - Read-only */}
+                    <div>
+                        <div className="text-[12px] text-slate-600 mb-1">
+                            Quãng đường đã chạy (km)
+                        </div>
+                        <input
+                            type="text"
+                            className="rounded-md border border-slate-300 bg-slate-100 px-3 py-2 text-[13px] text-slate-500 font-medium cursor-not-allowed w-full"
+                            value={form.odometer != null ? form.odometer.toLocaleString("vi-VN") : "—"}
+                            readOnly
+                            disabled
+                        />
+                    </div>
                 </div>
             </div>
 
@@ -431,6 +482,18 @@ function VehicleProfileTab({ form, setForm, onSave, dirty, readOnly = false, isC
                             </span>
                         </span>
                     </div>
+
+                    {form.odometer != null && (
+                        <div className="flex items-center gap-1 text-slate-600">
+                            <Gauge className="h-3.5 w-3.5 text-emerald-500" />
+                            <span>
+                                Quãng đường:{" "}
+                                <span className="text-slate-800 font-medium">
+                                    {form.odometer.toLocaleString("vi-VN")} km
+                                </span>
+                            </span>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -752,6 +815,8 @@ export default function VehicleDetailPage() {
         brand: "",
         model: "",
         year: "",
+        capacity: null,
+        odometer: null,
         reg_due_date: "",
         ins_due_date: "",
         _branchOptions: [],
@@ -768,6 +833,22 @@ export default function VehicleDetailPage() {
                     isReadOnly ? Promise.resolve([]) : listVehicleCategories().catch(() => []),
                 ]);
                 const brs = Array.isArray(brData) ? brData : (brData?.items || brData?.content || []);
+                // Debug: log vehicle data to check capacity
+                console.log("🔍 [VehicleDetailPage] Vehicle data from API:", v);
+                console.log("🔍 [VehicleDetailPage] Vehicle capacity:", v.capacity);
+                console.log("🔍 [VehicleDetailPage] Category data:", catData);
+
+                // Tìm category tương ứng để lấy seats nếu vehicle không có capacity
+                const vehicleCategory = (catData || []).find(c => c.id === v.categoryId);
+                const categorySeats = vehicleCategory?.seats || null;
+
+                // Ưu tiên capacity từ vehicle, nếu không có thì lấy từ category
+                const finalCapacity = v.capacity != null ? Number(v.capacity) : (categorySeats != null ? Number(categorySeats) : null);
+
+                console.log("🔍 [VehicleDetailPage] Vehicle category:", vehicleCategory);
+                console.log("🔍 [VehicleDetailPage] Category seats:", categorySeats);
+                console.log("🔍 [VehicleDetailPage] Final capacity:", finalCapacity);
+
                 const mapped = {
                     id: v.id,
                     license_plate: v.licensePlate,
@@ -779,11 +860,14 @@ export default function VehicleDetailPage() {
                     brand: v.brand || "",
                     model: v.model || "",
                     year: v.productionYear != null ? String(v.productionYear) : "",
+                    capacity: finalCapacity,
+                    odometer: v.odometer != null ? Number(v.odometer) : null,
                     reg_due_date: v.inspectionExpiry || "",
                     ins_due_date: v.insuranceExpiry || "",
                     _branchOptions: brs.map(b => ({ id: b.id, name: b.branchName || b.name || b.branch_name })),
-                    _categoryOptions: (catData || []).map(c => ({ id: c.id, name: c.categoryName || c.name })),
+                    _categoryOptions: (catData || []).map(c => ({ id: c.id, name: c.categoryName || c.name, seats: c.seats })),
                 };
+                console.log("🔍 [VehicleDetailPage] Mapped vehicle data:", mapped);
                 setInitialVehicle(mapped);
                 setVehicleForm(mapped);
                 setSavedVehicle(mapped);
@@ -839,8 +923,26 @@ export default function VehicleDetailPage() {
         if (!vehicleId) return;
         setLoadingExpenses(true);
         try {
+            console.log("🔍 [VehicleDetailPage] Loading expenses for vehicle:", vehicleId);
             const data = await getVehicleExpenses(vehicleId);
-            const expenses = Array.isArray(data) ? data : (data?.data || []);
+            console.log("🔍 [VehicleDetailPage] Expenses API response:", data);
+
+            // Handle different response formats
+            let expenses = [];
+            if (Array.isArray(data)) {
+                expenses = data;
+            } else if (data?.data && Array.isArray(data.data)) {
+                expenses = data.data;
+            } else if (data?.content && Array.isArray(data.content)) {
+                expenses = data.content;
+            } else if (data?.items && Array.isArray(data.items)) {
+                expenses = data.items;
+            } else if (data?.expenses && Array.isArray(data.expenses)) {
+                expenses = data.expenses;
+            }
+
+            console.log("🔍 [VehicleDetailPage] Parsed expenses:", expenses);
+
             // Map backend data to frontend format
             const mappedExpenses = expenses.map((e) => ({
                 id: e.expenseId || e.id,
@@ -854,11 +956,17 @@ export default function VehicleDetailPage() {
                 note: e.description || e.note || "—",
                 amount: e.amount || 0,
             }));
+            console.log("🔍 [VehicleDetailPage] Mapped expenses:", mappedExpenses);
             setExpensesData(mappedExpenses);
         } catch (err) {
-            console.error("Failed to load vehicle expenses:", err);
+            console.error("❌ [VehicleDetailPage] Failed to load vehicle expenses:", err);
+            console.error("❌ [VehicleDetailPage] Error details:", {
+                message: err.message,
+                status: err.status,
+                response: err.response,
+            });
             if (err.status !== 404) {
-                push("Không thể tải lịch sử chi phí", "error");
+                push("Không thể tải lịch sử chi phí: " + (err.message || "Lỗi không xác định"), "error");
             }
             setExpensesData([]);
         } finally {
@@ -871,8 +979,26 @@ export default function VehicleDetailPage() {
         if (!vehicleId) return;
         setLoadingMaintenance(true);
         try {
+            console.log("🔍 [VehicleDetailPage] Loading maintenance for vehicle:", vehicleId);
             const data = await getVehicleMaintenance(vehicleId);
-            const maintenance = Array.isArray(data) ? data : (data?.data || []);
+            console.log("🔍 [VehicleDetailPage] Maintenance API response:", data);
+
+            // Handle different response formats
+            let maintenance = [];
+            if (Array.isArray(data)) {
+                maintenance = data;
+            } else if (data?.data && Array.isArray(data.data)) {
+                maintenance = data.data;
+            } else if (data?.content && Array.isArray(data.content)) {
+                maintenance = data.content;
+            } else if (data?.items && Array.isArray(data.items)) {
+                maintenance = data.items;
+            } else if (data?.maintenance && Array.isArray(data.maintenance)) {
+                maintenance = data.maintenance;
+            }
+
+            console.log("🔍 [VehicleDetailPage] Parsed maintenance:", maintenance);
+
             // Map backend data to frontend format
             const mappedMaintenance = maintenance.map((m) => ({
                 id: m.maintenanceId || m.id,
@@ -885,11 +1011,17 @@ export default function VehicleDetailPage() {
                 note: m.description || m.note || "—",
                 amount: m.cost || m.amount || 0,
             }));
+            console.log("🔍 [VehicleDetailPage] Mapped maintenance:", mappedMaintenance);
             setMaintenanceData(mappedMaintenance);
         } catch (err) {
-            console.error("Failed to load vehicle maintenance:", err);
+            console.error("❌ [VehicleDetailPage] Failed to load vehicle maintenance:", err);
+            console.error("❌ [VehicleDetailPage] Error details:", {
+                message: err.message,
+                status: err.status,
+                response: err.response,
+            });
             if (err.status !== 404) {
-                push("Không thể tải lịch sử bảo trì", "error");
+                push("Không thể tải lịch sử bảo trì: " + (err.message || "Lỗi không xác định"), "error");
             }
             setMaintenanceData([]);
         } finally {
@@ -902,14 +1034,12 @@ export default function VehicleDetailPage() {
         if (activeTab === "TRIPS" && vehicleId && tripsData.length === 0) {
             loadTrips();
         } else if (activeTab === "COSTS" && vehicleId) {
-            if (expensesData.length === 0) {
-                loadExpenses();
-            }
-            if (maintenanceData.length === 0) {
-                loadMaintenance();
-            }
+            // Always reload when switching to COSTS tab to ensure fresh data
+            console.log("🔍 [VehicleDetailPage] Switching to COSTS tab, loading expenses and maintenance");
+            loadExpenses();
+            loadMaintenance();
         }
-    }, [activeTab, vehicleId, tripsData.length, expensesData.length, maintenanceData.length, loadTrips, loadExpenses, loadMaintenance]);
+    }, [activeTab, vehicleId, tripsData.length, loadTrips, loadExpenses, loadMaintenance]);
 
     // Combine expenses and maintenance for COSTS tab
     const combinedExpensesData = React.useMemo(() => {
@@ -962,6 +1092,8 @@ export default function VehicleDetailPage() {
                 brand: vehicleForm.brand,
                 model: vehicleForm.model,
                 year: vehicleForm.year,
+                capacity: vehicleForm.capacity != null ? Number(vehicleForm.capacity) : null,
+                // odometer không được update (chỉ đọc)
                 reg_due_date: vehicleForm.reg_due_date,
                 ins_due_date: vehicleForm.ins_due_date,
             });
