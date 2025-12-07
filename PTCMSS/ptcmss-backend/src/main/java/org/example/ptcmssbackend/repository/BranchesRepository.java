@@ -10,4 +10,11 @@ import java.util.List;
 @Repository
 public interface BranchesRepository extends JpaRepository<Branches, Integer> {
     List<Branches> findByStatus(BranchStatus status);
+    
+    boolean existsByBranchNameIgnoreCase(String branchName);
+    
+    boolean existsByBranchNameIgnoreCaseAndIdNot(String branchName, Integer id);
+    
+    // Tìm chi nhánh theo manager employeeId
+    Branches findByManager_EmployeeId(Integer employeeId);
 }
