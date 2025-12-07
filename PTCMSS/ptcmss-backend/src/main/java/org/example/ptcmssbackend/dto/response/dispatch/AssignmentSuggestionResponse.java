@@ -76,6 +76,7 @@ public class AssignmentSuggestionResponse {
         private Integer score;
         private boolean eligible;
         private List<String> reasons;
+        private String categoryName; // Tên loại xe (ví dụ: "Xe 9 chỗ (Limousine)")
     }
 
     @Data

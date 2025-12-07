@@ -1,14 +1,12 @@
 package org.example.ptcmssbackend.dto.response.Trip;
 
-import lombok.*;
-import org.example.ptcmssbackend.entity.*;
-import org.example.ptcmssbackend.enums.AssignmentAction;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.example.ptcmssbackend.enums.TripStatus;
 
 import java.time.Instant;
-import java.util.List;
-import java.util.Objects;
-import java.util.stream.Collectors;
 
 @Data
 @Builder
@@ -33,6 +31,7 @@ public class TripDetailResponse {
     private String driverName;
     private String driverPhone;
 
+    private Integer vehicleId;
     private String vehiclePlate;
     private String vehicleModel;
 
@@ -40,6 +39,8 @@ public class TripDetailResponse {
 
     // Thông tin từ Booking
     private String bookingNote;
+    private String hireType; // ONE_WAY, ROUND_TRIP, DAILY, MULTI_DAY
+    private String hireTypeName; // Tên hiển thị: "Một chiều", "Hai chiều", "Theo ngày", etc.
     private java.math.BigDecimal totalCost;
     private java.math.BigDecimal depositAmount;
     private java.math.BigDecimal remainingAmount;
@@ -47,16 +48,4 @@ public class TripDetailResponse {
     // Rating từ DriverRatings
     private java.math.BigDecimal rating;
     private String ratingComment;
-
-    private List<AssignmentHistoryItem> history;
-
-    @Data
-    @Builder
-    public static class AssignmentHistoryItem {
-        private Instant time;
-        private AssignmentAction action;
-        private String driverName;
-        private String vehiclePlate;
-        private String note;
-    }
 }

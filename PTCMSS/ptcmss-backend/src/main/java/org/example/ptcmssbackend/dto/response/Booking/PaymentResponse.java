@@ -22,4 +22,9 @@ public class PaymentResponse {
     private String qrText;
     private String qrImageUrl;
     private Instant expiresAt;
+
+    // Payment history fields (for payment requests)
+    private Integer paymentId;  // ID của payment_history
+    private String confirmationStatus;  // PENDING, CONFIRMED, REJECTED
 }
+

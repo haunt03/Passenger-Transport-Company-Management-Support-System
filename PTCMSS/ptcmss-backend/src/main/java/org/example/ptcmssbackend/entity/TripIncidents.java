@@ -41,7 +41,31 @@ public class TripIncidents {
     @Column(name = "resolved", nullable = false)
     private Boolean resolved = false;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "resolution_action", length = 50)
+    private ResolutionAction resolutionAction;
+
+    @Lob
+    @Column(name = "resolution_note", columnDefinition = "TEXT")
+    private String resolutionNote;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "resolved_by")
+    private Users resolvedBy;
+
+    @Column(name = "resolved_at")
+    private Instant resolvedAt;
+
     @CreationTimestamp
     @Column(name = "createdAt", updatable = false)
     private Instant createdAt;
+
+    public enum ResolutionAction {
+        SEND_EMERGENCY_SUPPORT,    // Gửi hỗ trợ khẩn cấp
+        CONTACT_DRIVER,             // Liên hệ với tài xế
+        SEND_REPLACEMENT_VEHICLE,   // Gửi xe thay thế
+        REASSIGN_TRIP,              // Chuyển chuyến đi
+        CANCEL_TRIP,                // Hủy chuyến đi
+        OTHER                       // Giải pháp khác
+    }
 }
