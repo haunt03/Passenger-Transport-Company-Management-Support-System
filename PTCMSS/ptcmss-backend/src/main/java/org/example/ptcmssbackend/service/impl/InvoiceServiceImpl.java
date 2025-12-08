@@ -761,20 +761,37 @@ public class InvoiceServiceImpl implements InvoiceService {
             // Tìm tất cả Accountants trong chi nhánh
             List<Employees> accountants = employeeRepository.findByRoleNameAndBranchId("Accountant", branchId);
 
+            String title = "Yêu cầu thanh toán mới";
+            String message = String.format(
+                    "Có yêu cầu thanh toán %s từ %s cho hóa đơn %s cần xác nhận.",
+                    amountStr,
+                    customerName,
+                    invoice.getInvoiceNumber()
+            );
+
             for (Employees accountant : accountants) {
                 if (accountant.getUser() != null) {
+                    // 1. Lưu notification vào DB
                     org.example.ptcmssbackend.entity.Notifications notification = new org.example.ptcmssbackend.entity.Notifications();
                     notification.setUser(accountant.getUser());
-                    notification.setTitle("Yêu cầu thanh toán mới");
-                    notification.setMessage(String.format(
-                            "Có yêu cầu thanh toán %s từ %s cho hóa đơn %s cần xác nhận.",
-                            amountStr,
-                            customerName,
-                            invoice.getInvoiceNumber()
-                    ));
+                    notification.setTitle(title);
+                    notification.setMessage(message);
                     notification.setIsRead(false);
                     notificationRepository.save(notification);
-                    log.debug("[InvoiceService] Sent notification to accountant: {}", accountant.getUser().getUsername());
+
+                    // 2. Gửi WebSocket notification để hiển thị realtime
+                    try {
+                        webSocketNotificationService.sendUserNotification(
+                                accountant.getUser().getId(),
+                                title,
+                                message,
+                                "INFO"
+                        );
+                        log.debug("[InvoiceService] Sent WebSocket notification to accountant: {}", accountant.getUser().getUsername());
+                    } catch (Exception wsErr) {
+                        log.warn("[InvoiceService] Failed to send WebSocket notification to accountant {}: {}",
+                                accountant.getUser().getUsername(), wsErr.getMessage());
+                    }
                 }
             }
 

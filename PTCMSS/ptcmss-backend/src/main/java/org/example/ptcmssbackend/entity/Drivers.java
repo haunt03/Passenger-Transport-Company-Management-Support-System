@@ -60,6 +60,7 @@ public class Drivers {
     @Column(name = "note")
     private String note;
 
+    @ColumnDefault("'AVAILABLE'")
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
     private DriverStatus status=DriverStatus.AVAILABLE;
