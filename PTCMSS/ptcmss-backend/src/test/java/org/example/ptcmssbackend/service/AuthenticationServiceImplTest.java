@@ -220,7 +220,7 @@ class AuthenticationServiceImplTest {
         role.setRoleName("EMPLOYEE");
         user.setRole(role);
 
-        when(jwtService.extractUsername(refreshToken, org.example.ptcmssbackend.common.TokenType.REFRESH_TOKEN))
+        when(jwtService.extractUsername(refreshToken, org.example.ptcmssbackend.enums.TokenType.REFRESH_TOKEN))
                 .thenReturn(username);
         when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
         when(jwtService.generateAccessToken(eq(100), eq(username), anyCollection()))
@@ -233,7 +233,7 @@ class AuthenticationServiceImplTest {
         assertThat(result).isNotNull();
         assertThat(result.getAccessToken()).isEqualTo("newAccessToken123");
         assertThat(result.getRefreshToken()).isEqualTo(refreshToken);
-        verify(jwtService).extractUsername(refreshToken, org.example.ptcmssbackend.common.TokenType.REFRESH_TOKEN);
+        verify(jwtService).extractUsername(refreshToken, org.example.ptcmssbackend.enums.TokenType.REFRESH_TOKEN);
         verify(jwtService).generateAccessToken(eq(100), eq(username), anyCollection());
     }
 
@@ -254,7 +254,7 @@ class AuthenticationServiceImplTest {
         String refreshToken = "validRefreshToken";
         String username = "nonexistent";
 
-        when(jwtService.extractUsername(refreshToken, org.example.ptcmssbackend.common.TokenType.REFRESH_TOKEN))
+        when(jwtService.extractUsername(refreshToken, org.example.ptcmssbackend.enums.TokenType.REFRESH_TOKEN))
                 .thenReturn(username);
         when(userRepository.findByUsername(username)).thenReturn(Optional.empty());
 

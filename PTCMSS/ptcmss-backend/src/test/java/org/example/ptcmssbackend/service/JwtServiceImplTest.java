@@ -2,7 +2,7 @@ package org.example.ptcmssbackend.service;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import org.example.ptcmssbackend.common.TokenType;
+import org.example.ptcmssbackend.enums.TokenType;
 import org.example.ptcmssbackend.service.impl.JwtServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,8 +20,8 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.example.ptcmssbackend.common.TokenType.ACCESS_TOKEN;
-import static org.example.ptcmssbackend.common.TokenType.REFRESH_TOKEN;
+import static org.example.ptcmssbackend.enums.TokenType.ACCESS_TOKEN;
+import static org.example.ptcmssbackend.enums.TokenType.REFRESH_TOKEN;
 
 @ExtendWith(MockitoExtension.class)
 class JwtServiceImplTest {
