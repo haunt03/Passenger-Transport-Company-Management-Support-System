@@ -1,6 +1,6 @@
 package org.example.ptcmssbackend.service;
 
-import org.example.ptcmssbackend.common.TokenType;
+import org.example.ptcmssbackend.enums.TokenType;
 import org.example.ptcmssbackend.entity.Users;
 import org.example.ptcmssbackend.enums.UserStatus;
 import org.example.ptcmssbackend.repository.UsersRepository;
