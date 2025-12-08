@@ -10,6 +10,7 @@ import {
 import { recordPayment } from "../../api/invoices";
 import { createDeposit } from "../../api/deposits";
 import { getCookie } from "../../utils/cookies";
+import { getCurrentRole, ROLES } from "../../utils/session";
 
 /**
  * DepositModal (LIGHT THEME REWORK, FIXED PRESET CALC)
@@ -59,20 +60,21 @@ const fmtVND = (n) =>
     );
 
 export default function DepositModal({
-                                         open,
-                                         context, // { type: 'order'|'invoice', id, title? }
-                                         totals = { total: 0, paid: 0 }, // { total, paid } có thể là số hoặc chuỗi "12.000.000"
-                                         defaultAmount = 0,
-                                         defaultMethod = "CASH",
-                                         defaultDate,
-                                         modeLabel = "Thanh toán",
-                                         allowOverpay = false,
-                                         onClose,
-                                         onSubmitted,
-                                     }) {
+    open,
+    context, // { type: 'order'|'invoice', id, title? }
+    totals = { total: 0, paid: 0 }, // { total, paid } có thể là số hoặc chuỗi "12.000.000"
+    defaultAmount = 0,
+    defaultMethod = "CASH",
+    defaultDate,
+    modeLabel = "Thanh toán",
+    allowOverpay = false,
+    onClose,
+    onSubmitted,
+}) {
     // ----- STATE -----
     const [amountStr, setAmountStr] = React.useState("");
     const [preset, setPreset] = React.useState("CUSTOM"); // "30" | "50" | "ALL" | "CUSTOM"
+    const [isInputFocused, setIsInputFocused] = React.useState(false); // Track focus state
 
     const [method, setMethod] = React.useState(defaultMethod);
     const [date, setDate] = React.useState(defaultDate || todayISO());
@@ -135,8 +137,9 @@ export default function DepositModal({
             }
 
             setMethod(defaultMethod);
-            setDate(defaultDate || todayISO());
-            setKind("PAYMENT");
+            // Luôn set ngày thanh toán là hôm nay khi mở modal
+            setDate(todayISO());
+            setKind("DEPOSIT"); // Luôn là DEPOSIT, không cho chọn PAYMENT
             setNote("");
             setBankName("");
             setBankAccount("");
@@ -148,7 +151,6 @@ export default function DepositModal({
         open,
         defaultAmount,
         defaultMethod,
-        defaultDate,
         remaining,
     ]);
 
@@ -167,17 +169,17 @@ export default function DepositModal({
     // ----- HANDLERS -----
     const handleManualAmountChange = (e) => {
         let input = e.target.value;
-
+        
         // Xử lý format Việt Nam: "1.760.000,55" -> "1760000.55"
         // Nếu có cả dấu chấm và dấu phẩy, coi dấu chấm là phân cách nghìn, dấu phẩy là thập phân
         if (input.includes(".") && input.includes(",")) {
             input = input.replace(/\./g, "").replace(",", ".");
-        }
+        } 
         // Nếu chỉ có dấu phẩy, coi là thập phân
         else if (input.includes(",")) {
             input = input.replace(",", ".");
         }
-            // Nếu chỉ có dấu chấm, kiểm tra xem có phải phân cách nghìn không
+        // Nếu chỉ có dấu chấm, kiểm tra xem có phải phân cách nghìn không
         // (nếu có nhiều dấu chấm hoặc dấu chấm ở vị trí phân cách nghìn)
         else if (input.includes(".")) {
             const parts = input.split(".");
@@ -190,21 +192,13 @@ export default function DepositModal({
             }
             // Ngược lại, giữ dấu chấm như thập phân
         }
-
+        
         const v = cleanDigits(input); // giữ lại chỉ số và dấu chấm thập phân
         setAmountStr(v);
         setPreset("CUSTOM");
         // Tự động set ngày thanh toán về hôm nay khi nhập số tiền
         setDate(todayISO());
     };
-
-    // Format hiển thị trong input với dấu phân cách (hỗ trợ số thập phân)
-    const displayAmount = amountStr
-        ? new Intl.NumberFormat("vi-VN", {
-            maximumFractionDigits: 2,
-            minimumFractionDigits: 0
-        }).format(Number(amountStr))
-        : "";
 
     // chọn preset % (30 / 50)
     const applyPresetPercent = (ratio) => {
@@ -301,10 +295,13 @@ export default function DepositModal({
             } else {
                 // Record payment for invoice - Backend expects RecordPaymentRequest
                 // Driver/Consultant tạo payment với status PENDING → Kế toán xác nhận sau
+                // Accountant ghi nhận trực tiếp với status CONFIRMED
+                const role = getCurrentRole();
+                const isAccountant = role === ROLES.ACCOUNTANT || role === ROLES.ADMIN || role === ROLES.MANAGER;
                 const paymentPayload = {
                     amount,
                     paymentMethod: method,
-                    confirmationStatus: "PENDING", // Chờ Kế toán xác nhận
+                    confirmationStatus: isAccountant ? "CONFIRMED" : "PENDING", // Accountant xác nhận ngay, role khác chờ xác nhận
                     note: note || undefined,
                     createdBy: userId ? parseInt(userId) : undefined,
                 };
@@ -409,42 +406,22 @@ export default function DepositModal({
                         </div>
                     ) : null}
 
-                    {/* Chọn loại ghi nhận */}
+                    {/* Chọn loại ghi nhận - Chỉ hiển thị Tiền cọc */}
                     <div className="flex flex-wrap items-center gap-2 text-[13px]">
                         <label
                             className={cls(
                                 "px-3 py-1.5 rounded-lg border cursor-pointer text-[13px] font-medium shadow-sm transition-colors",
-                                kind === "DEPOSIT"
-                                    ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                                    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                                "border-emerald-500 bg-emerald-50 text-emerald-700"
                             )}
                         >
                             <input
                                 type="radio"
                                 name="kind"
                                 className="hidden"
-                                checked={kind === "DEPOSIT"}
-                                onChange={() => setKind("DEPOSIT")}
+                                checked={true}
+                                readOnly
                             />{" "}
                             Tiền cọc
-                        </label>
-
-                        <label
-                            className={cls(
-                                "px-3 py-1.5 rounded-lg border cursor-pointer text-[13px] font-medium shadow-sm transition-colors",
-                                kind === "PAYMENT"
-                                    ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                                    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                            )}
-                        >
-                            <input
-                                type="radio"
-                                name="kind"
-                                className="hidden"
-                                checked={kind === "PAYMENT"}
-                                onChange={() => setKind("PAYMENT")}
-                            />{" "}
-                            Thanh toán
                         </label>
                     </div>
 
@@ -455,11 +432,11 @@ export default function DepositModal({
                         </div>
 
                         <input
-                            value={displayAmount}
+                            value={amountStr}
                             onChange={handleManualAmountChange}
-                            inputMode="numeric"
-                            className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 tabular-nums text-slate-900 shadow-sm outline-none placeholder-slate-400"
-                            placeholder="Nhập số tiền"
+                            className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 tabular-nums text-slate-900 font-medium shadow-sm outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                            placeholder="Nhập số tiền hoặc chọn gợi ý bên dưới"
+                            inputMode="decimal"
                         />
 
                         {/* Preset row */}
@@ -645,13 +622,7 @@ export default function DepositModal({
                 </div>
 
                 {/* Footer */}
-                <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex flex-wrap items-center gap-3 justify-between flex-shrink-0">
-                    <div className="text-[11px] text-slate-500 leading-relaxed flex-1 min-w-0">
-                        {context?.type === "order"
-                            ? "Tạo deposit cho booking"
-                            : "Ghi nhận thanh toán cho invoice"}
-                    </div>
-
+                <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex flex-wrap items-center gap-3 justify-end flex-shrink-0">
                     <div className="flex items-center gap-2">
                         <button
                             onClick={onClose}

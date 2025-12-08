@@ -32,53 +32,53 @@ export const useNotifications = () => {
         [subscribeToUserNotifications]
     );
 
-    /**
-     * Get notifications filtered by type
-     * @param {string} type - Notification type filter
-     * @returns {Array} Filtered notifications
-     */
-    const getNotificationsByType = useCallback(
-        (type) => {
-            if (!type) return notifications;
-            return notifications.filter((n) => n.type === type);
-        },
-        [notifications]
-    );
+  /**
+   * Get notifications filtered by type
+   * @param {string} type - Notification type filter
+   * @returns {Array} Filtered notifications
+   */
+  const getNotificationsByType = useCallback(
+    (type) => {
+      if (!type) return notifications;
+      return notifications.filter((n) => n.type === type);
+    },
+    [notifications]
+  );
 
-    /**
-     * Get unread notifications
-     * @returns {Array} Unread notifications
-     */
-    const getUnreadNotifications = useCallback(() => {
-        return notifications.filter((n) => !n.read);
-    }, [notifications]);
+  /**
+   * Get unread notifications
+   * @returns {Array} Unread notifications
+   */
+  const getUnreadNotifications = useCallback(() => {
+    return notifications.filter((n) => !n.read);
+  }, [notifications]);
 
-    /**
-     * Play notification sound (optional)
-     */
-    const playNotificationSound = useCallback(() => {
-        // You can add audio notification here if needed
-        // const audio = new Audio('/notification-sound.mp3');
-        // audio.play().catch(err => console.error('Failed to play sound:', err));
-    }, []);
+  /**
+   * Play notification sound (optional)
+   */
+  const playNotificationSound = useCallback(() => {
+    // You can add audio notification here if needed
+    // const audio = new Audio('/notification-sound.mp3');
+    // audio.play().catch(err => console.error('Failed to play sound:', err));
+  }, []);
 
-    // Auto-play sound on new notification (optional)
-    useEffect(() => {
-        if (notifications.length > 0 && !notifications[0].read) {
-            // playNotificationSound();
-        }
-    }, [notifications, playNotificationSound]);
+  // Auto-play sound on new notification (optional)
+  useEffect(() => {
+    if (notifications.length > 0 && !notifications[0].read) {
+      // playNotificationSound();
+    }
+  }, [notifications, playNotificationSound]);
 
-    return {
-        connected,
-        notifications,
-        unreadCount,
-        markAsRead,
-        clearNotification,
-        clearAllNotifications,
-        subscribeToUser,
-        getNotificationsByType,
-        getUnreadNotifications,
-        pushNotification,
-    };
+  return {
+    connected,
+    notifications,
+    unreadCount,
+    markAsRead,
+    clearNotification,
+    clearAllNotifications,
+    subscribeToUser,
+    getNotificationsByType,
+    getUnreadNotifications,
+    pushNotification,
+  };
 };

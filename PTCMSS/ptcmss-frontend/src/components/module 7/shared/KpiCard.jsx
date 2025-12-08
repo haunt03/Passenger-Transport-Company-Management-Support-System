@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { TrendingUp, TrendingDown } from "lucide-react";
 
 const cls = (...a) => a.filter(Boolean).join(" ");

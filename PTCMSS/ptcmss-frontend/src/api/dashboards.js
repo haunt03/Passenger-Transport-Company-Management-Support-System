@@ -66,6 +66,18 @@ export async function getTopRoutes(params = {}) {
 }
 
 /**
+ * Get top vehicle categories by usage
+ * @param {Object} params - { period, limit: 5 }
+ * @returns {Promise}
+ */
+export async function getTopVehicleCategories(params = {}) {
+    const response = await axiosInstance.get("/api/v1/admin/analytics/top-vehicle-categories", {
+        params: { limit: 5, ...params },
+    });
+    return response.data;
+}
+
+/**
  * Get system alerts (critical warnings)
  * @param {Object} params - { severity: 'CRITICAL'|'HIGH'|'MEDIUM'|'LOW' }
  * @returns {Promise}
@@ -131,6 +143,18 @@ export async function getBranchRevenueTrend(params = {}) {
  */
 export async function getBranchDriverPerformance(params = {}) {
     const response = await axiosInstance.get("/api/v1/manager/analytics/driver-performance", {
+        params: { limit: 5, ...params },
+    });
+    return response.data;
+}
+
+/**
+ * Get vehicle booking performance for branch (vehicles ordered by booking count)
+ * @param {Object} params - { branchId, period, limit: 5 }
+ * @returns {Promise}
+ */
+export async function getBranchVehicleBookingPerformance(params = {}) {
+    const response = await axiosInstance.get("/api/v1/manager/analytics/vehicle-booking-performance", {
         params: { limit: 5, ...params },
     });
     return response.data;

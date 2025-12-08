@@ -1,4 +1,4 @@
-// OrderDetailPage.jsx (LIGHT THEME, hooked with light DepositModal)
+﻿// OrderDetailPage.jsx (LIGHT THEME, hooked with light DepositModal)
 import React from "react";
 import { useParams } from "react-router-dom";
 import {
@@ -209,7 +209,7 @@ function TripInfoCard({ trip, hireTypeName, useHighway }) {
     const vehicleDetailsText = trip.vehicle_details && trip.vehicle_details.length > 0
         ? trip.vehicle_details.map(v => `${v.quantity}×${v.name}`).join(", ")
         : (trip.vehicle_category ? `${trip.vehicle_count || 1}×${trip.vehicle_category}` : "—");
-
+    
     return (
         <div className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-4 shadow-sm">
             <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
@@ -311,15 +311,16 @@ function TripInfoCard({ trip, hireTypeName, useHighway }) {
 
                         <div className="flex items-start gap-2">
                             <CarFront className="h-4 w-4 text-amber-600 mt-0.5" />
-                            <div>
-                                <span className="text-slate-600">Xe: </span>
-                                <span className="font-medium text-slate-900">
-                                    {vehicleDetailsText}
-                                </span>
-                                {trip.vehicle_count > 0 && (
-                                    <span className="text-slate-500 ml-1">
-                                        ({trip.vehicle_count} xe)
-                                    </span>
+                            <div className="flex flex-col">
+                                <span className="text-slate-600 mb-1">Xe: {trip.vehicle_count > 0 && <span className="text-slate-500">({trip.vehicle_count} xe)</span>}</span>
+                                {trip.vehicle_details && trip.vehicle_details.length > 0 ? (
+                                    trip.vehicle_details.map((v, idx) => (
+                                        <span key={idx} className="font-medium text-slate-900">
+                                            • {v.quantity}×{v.name}
+                                        </span>
+                                    ))
+                                ) : (
+                                    <span className="font-medium text-slate-900">{vehicleDetailsText || "—"}</span>
                                 )}
                             </div>
                         </div>
@@ -402,7 +403,7 @@ function QuoteInfoCard({ quote }) {
 }
 
 /* 4. Thanh toán / Cọc */
-function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr, isConsultant = false }) {
+function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr, isConsultant = false, isCoordinator = false }) {
     const remain = Math.max(0, Number(payment.remaining || 0));
     const paid = Math.max(0, Number(payment.paid || 0));
 
@@ -415,17 +416,17 @@ function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr, i
 
             {/* Số liệu tóm tắt */}
             <div className="grid grid-cols-2 gap-4">
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 flex flex-col gap-1">
-                    <div className="text-[11px] uppercase tracking-wide font-medium text-amber-700">Đã thu</div>
-                    <div className="text-lg font-bold tabular-nums text-amber-700 flex items-center gap-1">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 flex flex-col gap-1">
+                    <div className="text-[11px] uppercase tracking-wide font-medium text-emerald-700">Đã thu</div>
+                    <div className="text-lg font-bold tabular-nums text-emerald-700 flex items-center gap-1">
                         <DollarSign className="h-4 w-4" />
                         <span>{fmtVND(paid)}</span>
                     </div>
                 </div>
 
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 flex flex-col gap-1">
-                    <div className="text-[11px] uppercase tracking-wide font-medium text-amber-700">Còn lại</div>
-                    <div className="text-lg font-bold tabular-nums text-amber-700 flex items-center gap-1">
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 flex flex-col gap-1">
+                    <div className="text-[11px] uppercase tracking-wide font-medium text-rose-700">Còn lại</div>
+                    <div className="text-lg font-bold tabular-nums text-rose-700 flex items-center gap-1">
                         <DollarSign className="h-4 w-4" />
                         <span>{fmtVND(remain)}</span>
                     </div>
@@ -444,8 +445,8 @@ function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr, i
                 </div>
             )}
 
-            {/* Nút hành động - Chỉ hiển thị khi còn tiền chưa thanh toán */}
-            {remain > 0 && (
+            {/* Nút hành động - Chỉ hiển thị khi còn tiền chưa thanh toán và không phải Coordinator */}
+            {remain > 0 && !isCoordinator && (
                 <>
                     <div className="grid grid-cols-2 gap-3">
                         <button
@@ -467,11 +468,19 @@ function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr, i
                     </div>
 
                     <div className="text-[11px] text-slate-500 text-center leading-relaxed px-2">
-                        {isConsultant
+                        {isConsultant 
                             ? "Tạo yêu cầu thu cọc/thanh toán để kế toán xác nhận, hoặc gửi QR cho khách."
                             : "Ghi nhận tiền mặt/chuyển khoản hoặc gửi mã QR để khách tự thanh toán."}
                     </div>
                 </>
+            )}
+            
+            {/* Thông báo cho Coordinator khi còn tiền chưa thanh toán */}
+            {remain > 0 && isCoordinator && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-700 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                    <span>Điều phối viên không có quyền tạo request thanh toán. Vui lòng liên hệ kế toán hoặc tư vấn viên.</span>
+                </div>
             )}
 
             {/* Lịch sử thanh toán */}
@@ -496,17 +505,17 @@ function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr, i
                                             item.paymentStatus === "PAID"
                                                 ? "bg-emerald-100 text-emerald-700"
                                                 : item.paymentStatus === "PENDING"
-                                                    ? "bg-amber-100 text-amber-700"
-                                                    : "bg-slate-100 text-slate-700"
+                                                ? "bg-amber-100 text-amber-700"
+                                                : "bg-slate-100 text-slate-700"
                                         )}
                                     >
-                                        {item.paymentStatus === "PAID"
-                                            ? "Đã thanh toán"
+                                        {item.paymentStatus === "PAID" 
+                                            ? "Đã thanh toán" 
                                             : item.paymentStatus === "PENDING"
-                                                ? "Chờ xác nhận"
-                                                : item.paymentStatus === "UNPAID"
-                                                    ? "Chưa thanh toán"
-                                                    : item.paymentStatus || "Chưa thanh toán"}
+                                            ? "Chờ xác nhận"
+                                            : item.paymentStatus === "UNPAID"
+                                            ? "Chưa thanh toán"
+                                            : item.paymentStatus || "Chưa thanh toán"}
                                     </span>
                                 </div>
                                 {item.note ? (
@@ -526,13 +535,13 @@ function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr, i
 }
 
 function QrPaymentModal({
-                            open,
-                            bookingCode,
-                            customerName,
-                            defaultAmount = 0,
-                            onClose,
-                            onGenerate,
-                        }) {
+    open,
+    bookingCode,
+    customerName,
+    defaultAmount = 0,
+    onClose,
+    onGenerate,
+}) {
     const [amountStr, setAmountStr] = React.useState("");
     const [note, setNote] = React.useState("");
     const [deposit, setDeposit] = React.useState(true);
@@ -547,19 +556,17 @@ function QrPaymentModal({
             const initAmount = Math.max(0, Number(defaultAmount || 0));
             setAmountStr(initAmount > 0 ? String(initAmount) : "");
 
-            // Auto-generate note based on booking info
-            const autoNote = deposit
-                ? `Cọc đơn ${bookingCode || 'ORD'} - ${customerName || 'Khách hàng'}`
-                : `Thanh toán ${bookingCode || 'ORD'} - ${customerName || 'Khách hàng'}`;
+            // Mặc định coi QR là khoản đặt cọc khi mở popup
+            setDeposit(true);
+            const autoNote = `Cọc đơn ${bookingCode || "ORD"} - ${customerName || "Khách hàng"}`;
             setNote(autoNote);
 
-            setDeposit(true);
             setResult(null);
             setError("");
             setCopied(false);
             setUseFallbackImage(false);
         }
-    }, [open, defaultAmount, bookingCode, customerName, deposit]);
+    }, [open, defaultAmount, bookingCode, customerName]);
 
     if (!open) return null;
 
@@ -666,6 +673,7 @@ function QrPaymentModal({
                         </div>
                     </div>
 
+                    {/* Cho phép đánh dấu là cọc / thanh toán, dùng để set flag deposit cho backend */}
                     <label className="inline-flex items-center gap-2 text-[12px] text-slate-600">
                         <input
                             type="checkbox"
@@ -673,10 +681,9 @@ function QrPaymentModal({
                             onChange={(e) => {
                                 const isDeposit = e.target.checked;
                                 setDeposit(isDeposit);
-                                // Auto-update note when deposit status changes
                                 const autoNote = isDeposit
-                                    ? `Cọc đơn ${bookingCode || 'ORD'} - ${customerName || 'Khách hàng'}`
-                                    : `Thanh toán ${bookingCode || 'ORD'} - ${customerName || 'Khách hàng'}`;
+                                    ? `Cọc đơn ${bookingCode || "ORD"} - ${customerName || "Khách hàng"}`
+                                    : `Thanh toán ${bookingCode || "ORD"} - ${customerName || "Khách hàng"}`;
                                 setNote(autoNote);
                             }}
                             className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
@@ -812,12 +819,23 @@ function QrPaymentModal({
 }
 
 /* 5. Điều phối */
-function DispatchInfoCard({ dispatch, onAssignClick, showAssignButton = false }) {
-    const hasAssign =
-        dispatch &&
-        (dispatch.driver_name ||
-            dispatch.driver_phone ||
-            dispatch.vehicle_plate);
+function DispatchInfoCard({ dispatch, dispatchList = [], onAssignClick, showAssignButton = false, allTrips = [] }) {
+    // Check if has any assignment (backward compatibility)
+    const hasAssign = dispatchList && dispatchList.length > 0
+        ? dispatchList.some(d => d.driver_name || d.driver_phone || d.vehicle_plate)
+        : (dispatch && (dispatch.driver_name || dispatch.driver_phone || dispatch.vehicle_plate));
+    
+    // Tính số trips chưa gán
+    const assignedTripIds = new Set(
+        (dispatchList || [])
+            .filter(d => d.tripId && d.driver_name && d.vehicle_plate)
+            .map(d => d.tripId)
+    );
+    
+    const unassignedCount = (allTrips || []).filter(t => {
+        const tripId = t.id || t.tripId;
+        return tripId && !assignedTripIds.has(tripId);
+    }).length;
 
     if (!hasAssign) {
         return (
@@ -848,6 +866,9 @@ function DispatchInfoCard({ dispatch, onAssignClick, showAssignButton = false })
         );
     }
 
+    // Use dispatchList if available, otherwise fallback to single dispatch
+    const displayList = dispatchList && dispatchList.length > 0 ? dispatchList : [dispatch];
+
     return (
         <div className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-4 shadow-sm">
             <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
@@ -855,69 +876,147 @@ function DispatchInfoCard({ dispatch, onAssignClick, showAssignButton = false })
                 Thông tin điều phối
             </div>
 
-            <div className="grid sm:grid-cols-3 gap-4 text-sm">
-                {/* Tài xế */}
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex flex-col gap-1">
-                    <div className="text-[11px] uppercase tracking-wide font-medium text-slate-500">
-                        Tài xế
-                    </div>
-                    <div className="font-medium text-slate-900 leading-tight">
-                        {dispatch.driver_name ||
-                            "—"}
-                    </div>
-                    <div className="text-[12px] text-slate-600 flex items-center gap-2 break-all leading-relaxed">
-                        <Phone className="h-3.5 w-3.5 text-sky-600 shrink-0" />
-                        <a
-                            className="text-sky-600 hover:underline"
-                            href={
-                                "tel:" +
-                                (dispatch.driver_phone ||
-                                    "")
-                            }
-                        >
-                            {dispatch.driver_phone ||
-                                "—"}
-                        </a>
-                    </div>
+            {/* Hiển thị danh sách tài xế/xe nếu có nhiều */}
+            {displayList.length > 1 ? (
+                <div className="space-y-3">
+                    {displayList.map((item, idx) => (
+                        <div key={item.tripId || idx} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <div className="text-[11px] font-medium text-slate-500 mb-2">
+                                {item.vehicle_category || `Xe ${idx + 1}`}
+                            </div>
+                            <div className="text-[10px] text-slate-400 mb-2">
+                                Xe {idx + 1} {item.tripId ? `(Chuyến #${item.tripId})` : ''}
+                            </div>
+                            <div className="grid grid-cols-2 gap-3 text-sm">
+                                <div>
+                                    <div className="text-[11px] text-slate-500 mb-1">Tài xế</div>
+                                    <div className="font-medium text-slate-900 leading-tight">
+                                        {item.driver_name || "—"}
+                                    </div>
+                                    {item.driver_phone && (
+                                        <div className="text-[12px] text-slate-600 flex items-center gap-1 break-all leading-relaxed mt-1">
+                                            <Phone className="h-3.5 w-3.5 text-sky-600 shrink-0" />
+                                            <a
+                                                className="text-sky-600 hover:underline"
+                                                href={`tel:${item.driver_phone}`}
+                                            >
+                                                {item.driver_phone}
+                                            </a>
+                                        </div>
+                                    )}
+                                </div>
+                                <div>
+                                    <div className="text-[11px] text-slate-500 mb-1">Biển số xe</div>
+                                    <div className="font-medium text-slate-900">
+                                        {item.vehicle_plate || "—"}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
                 </div>
+            ) : (
+                /* Hiển thị single (backward compatibility) */
+                <div className="space-y-4">
+                    <div className="grid sm:grid-cols-3 gap-4 text-sm">
+                        {/* Tài xế */}
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex flex-col gap-1">
+                            <div className="text-[11px] uppercase tracking-wide font-medium text-slate-500">
+                                Tài xế
+                            </div>
+                            <div className="font-medium text-slate-900 leading-tight">
+                                {displayList[0]?.driver_name || dispatch?.driver_name || "—"}
+                            </div>
+                            <div className="text-[12px] text-slate-600 flex items-center gap-2 break-all leading-relaxed">
+                                <Phone className="h-3.5 w-3.5 text-sky-600 shrink-0" />
+                                <a
+                                    className="text-sky-600 hover:underline"
+                                    href={
+                                        "tel:" +
+                                        (displayList[0]?.driver_phone || dispatch?.driver_phone || "")
+                                    }
+                                >
+                                    {displayList[0]?.driver_phone || dispatch?.driver_phone || "—"}
+                                </a>
+                            </div>
+                        </div>
 
-                {/* Biển số xe */}
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex flex-col gap-1">
-                    <div className="text-[11px] uppercase tracking-wide font-medium text-slate-500">
-                        Biển số xe
+                        {/* Biển số xe */}
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex flex-col gap-1">
+                            <div className="text-[11px] uppercase tracking-wide font-medium text-slate-500">
+                                Biển số xe
+                            </div>
+                            <div className="font-medium text-slate-900">
+                                {displayList[0]?.vehicle_plate || dispatch?.vehicle_plate || "—"}
+                            </div>
+                            <div className="text-[11px] text-slate-500 flex items-center gap-1 leading-relaxed">
+                                <CarFront className="h-3.5 w-3.5 text-amber-600" />
+                                <span>
+                                    Xe đã gán cho
+                                    chuyến
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Trạng thái điều phối */}
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex flex-col gap-1">
+                            <div className="text-[11px] uppercase tracking-wide font-medium text-slate-500">
+                                Trạng thái điều
+                                phối
+                            </div>
+                            <div className="text-sm font-medium text-amber-700 flex items-center gap-2">
+                                <CheckCircle2 className="h-4 w-4 text-amber-600" />
+                                <span>
+                                    Đã phân xe
+                                </span>
+                            </div>
+                            <div className="text-[11px] text-slate-500 leading-relaxed">
+                                Hệ thống đã gửi
+                                thông tin chuyến
+                                cho tài xế.
+                            </div>
+                        </div>
                     </div>
-                    <div className="font-medium text-slate-900">
-                        {dispatch.vehicle_plate ||
-                            "—"}
-                    </div>
-                    <div className="text-[11px] text-slate-500 flex items-center gap-1 leading-relaxed">
-                        <CarFront className="h-3.5 w-3.5 text-amber-600" />
+                    
+                    {/* Nút gán cho xe còn lại nếu có trips chưa gán */}
+                    {unassignedCount > 0 && showAssignButton && (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-[12px] text-amber-800">
+                                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                                <span>
+                                    Còn {unassignedCount} chuyến chưa gán tài xế/xe
+                                </span>
+                            </div>
+                            <button
+                                onClick={onAssignClick}
+                                className="rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 text-sm font-semibold shadow-sm transition-colors flex items-center gap-2"
+                            >
+                                <Truck className="h-4 w-4" />
+                                Gán cho xe còn lại
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+            
+            {/* Nút gán cho xe còn lại nếu có nhiều xe và còn trips chưa gán */}
+            {displayList.length > 1 && unassignedCount > 0 && showAssignButton && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-[12px] text-amber-800">
+                        <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
                         <span>
-                            Xe đã gán cho
-                            chuyến
+                            Còn {unassignedCount} chuyến chưa gán tài xế/xe
                         </span>
                     </div>
+                    <button
+                        onClick={onAssignClick}
+                        className="rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 text-sm font-semibold shadow-sm transition-colors flex items-center gap-2"
+                    >
+                        <Truck className="h-4 w-4" />
+                        Gán cho xe còn lại
+                    </button>
                 </div>
-
-                {/* Trạng thái điều phối */}
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex flex-col gap-1">
-                    <div className="text-[11px] uppercase tracking-wide font-medium text-slate-500">
-                        Trạng thái điều
-                        phối
-                    </div>
-                    <div className="text-sm font-medium text-amber-700 flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-amber-600" />
-                        <span>
-                            Đã phân xe
-                        </span>
-                    </div>
-                    <div className="text-[11px] text-slate-500 leading-relaxed">
-                        Hệ thống đã gửi
-                        thông tin chuyến
-                        cho tài xế.
-                    </div>
-                </div>
-            </div>
+            )}
         </div>
     );
 }
@@ -941,15 +1040,16 @@ export default function OrderDetailPage() {
 
     const mapBookingToOrder = (b) => {
         if (!b) return null;
-        const firstTrip = Array.isArray(b.trips) && b.trips.length ? b.trips[0] : {};
+        const trips = Array.isArray(b.trips) ? b.trips : [];
+        const firstTrip = trips.length ? trips[0] : {};
         const vehicleCount = Array.isArray(b.vehicles) ? b.vehicles.reduce((sum, v) => sum + (v.quantity || 0), 0) : 0;
         const vehicleCategory = Array.isArray(b.vehicles) && b.vehicles.length ? b.vehicles[0].categoryName : "";
         // Tính tổng sức chứa từ vehicles
-        const totalCapacity = Array.isArray(b.vehicles)
-            ? b.vehicles.reduce((sum, v) => sum + ((v.capacity || 0) * (v.quantity || 1)), 0)
+        const totalCapacity = Array.isArray(b.vehicles) 
+            ? b.vehicles.reduce((sum, v) => sum + ((v.capacity || 0) * (v.quantity || 1)), 0) 
             : 0;
         // Chi tiết các loại xe
-        const vehicleDetails = Array.isArray(b.vehicles)
+        const vehicleDetails = Array.isArray(b.vehicles) 
             ? b.vehicles.map(v => ({
                 name: v.categoryName || '',
                 quantity: v.quantity || 1,
@@ -959,6 +1059,29 @@ export default function OrderDetailPage() {
         const discount = Number(b.discountAmount || 0);
         const basePrice = Number(b.estimatedCost || 0);
         const finalPrice = Number(b.totalCost || 0);
+        
+        // Map tất cả trips với thông tin tài xế/xe
+        // Lấy danh sách vehicle categories từ booking để map với từng trip
+        const vehicleCategories = Array.isArray(b.vehicles) 
+            ? b.vehicles.flatMap(v => {
+                const qty = v.quantity || 1;
+                return Array(qty).fill(v.categoryName || '');
+            })
+            : [];
+        const hasMixedVehicleCategories =
+            Array.isArray(b.vehicles) && b.vehicles.length > 1
+                ? new Set(b.vehicles.map(v => v.categoryName || '')).size > 1
+                : false;
+        
+        const dispatchList = trips.map((trip, idx) => ({
+            tripId: trip.id || trip.tripId || null,
+            driver_name: trip.driverName || '',
+            driver_phone: trip.driverPhone || '',
+            vehicle_plate: trip.vehicleLicensePlate || '',
+            vehicle_id: trip.vehicleId || null,
+            vehicle_category: idx < vehicleCategories.length ? vehicleCategories[idx] : '',
+        }));
+        
         return {
             id: b.id,
             code: `ORD-${b.id}`,
@@ -994,11 +1117,20 @@ export default function OrderDetailPage() {
                 paid: Number(b.paidAmount || 0),
                 remaining: Number(b.remainingAmount || 0),
             },
-            dispatch: {
-                driver_name: firstTrip.driverName || '',
+            // Dispatch info - giữ backward compatibility với single dispatch
+            dispatch: dispatchList.length > 0 ? {
+                driver_name: dispatchList[0].driver_name || '',
+                driver_phone: dispatchList[0].driver_phone || '',
+                vehicle_plate: dispatchList[0].vehicle_plate || '',
+            } : {
+                driver_name: '',
                 driver_phone: '',
-                vehicle_plate: firstTrip.vehicleLicensePlate || '',
+                vehicle_plate: '',
             },
+            // Thêm danh sách dispatch cho nhiều xe
+            dispatchList: dispatchList,
+            trips: trips, // Lưu toàn bộ trips để dùng trong AssignDriverDialog
+            hasMixedVehicleCategories,
             notes_internal: b.note || '',
             branch_name: b.branchName || b.branch?.name || '',
         };
@@ -1051,10 +1183,39 @@ export default function OrderDetailPage() {
         setAssignDialogOpen(true);
     };
 
-    const handleAssignSuccess = async () => {
+    const handleAssignSuccess = async (payload) => {
         try {
             await fetchOrder();
-            push("Đã gán chuyến thành công", "success");
+            
+            // Kiểm tra xem còn trips chưa gán không
+            const updatedOrder = await getBooking(orderId);
+            const mapped = mapBookingToOrder(updatedOrder);
+            const allTrips = mapped.trips || [];
+            const dispatchList = mapped.dispatchList || [];
+            
+            // Tạo map của trips đã gán
+            const assignedTripIds = new Set(
+                dispatchList
+                    .filter(d => d.tripId && d.driver_name && d.vehicle_plate)
+                    .map(d => d.tripId)
+            );
+            
+            // Lọc ra trips chưa gán
+            const unassignedTrips = allTrips.filter(t => {
+                const tripId = t.id || t.tripId;
+                return tripId && !assignedTripIds.has(tripId);
+            });
+            
+            if (unassignedTrips.length > 0) {
+                // Còn trips chưa gán - tự động mở lại dialog sau 1 giây
+                push(`Đã gán chuyến thành công. Còn ${unassignedTrips.length} chuyến chưa gán.`, "info");
+                setTimeout(() => {
+                    setAssignDialogOpen(true);
+                }, 1000);
+            } else {
+                // Đã gán hết
+                push("Đã gán tất cả chuyến thành công", "success");
+            }
         } catch (e) {
             push("Không thể tải lại dữ liệu", "error");
         }
@@ -1172,14 +1333,14 @@ export default function OrderDetailPage() {
                     {/* cảnh báo nếu huỷ / nháp */}
                     {(order.status === "CANCELLED" ||
                         order.status === "DRAFT") && (
-                        <div className="flex max-w-fit items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] text-amber-700">
-                            <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
-                            <span className="leading-relaxed">
+                            <div className="flex max-w-fit items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] text-amber-700">
+                                <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                                <span className="leading-relaxed">
                                     Đơn chưa xác nhận. Cần
                                     chốt lại với khách.
                                 </span>
-                        </div>
-                    )}
+                            </div>
+                        )}
                 </div>
 
                 {/* Bỏ bảng thanh toán summary - thông tin đã có trong PaymentInfoCard */}
@@ -1190,8 +1351,8 @@ export default function OrderDetailPage() {
                 <CustomerInfoCard
                     customer={order.customer}
                 />
-                <TripInfoCard
-                    trip={order.trip}
+                <TripInfoCard 
+                    trip={order.trip} 
                     hireTypeName={order.hireTypeName}
                     useHighway={order.useHighway}
                 />
@@ -1206,6 +1367,7 @@ export default function OrderDetailPage() {
                         onOpenDeposit={openDeposit}
                         onGenerateQr={openQrModal}
                         isConsultant={isConsultant}
+                        isCoordinator={isCoordinator}
                     />
                 )}
             </div>
@@ -1213,8 +1375,10 @@ export default function OrderDetailPage() {
             <div className="grid xl:grid-cols-2 gap-5">
                 <DispatchInfoCard
                     dispatch={order.dispatch}
+                    dispatchList={order.dispatchList}
                     onAssignClick={openAssignDialog}
                     showAssignButton={isCoordinator}
+                    allTrips={order.trips || []}
                 />
 
                 {/* ghi chú nội bộ */}
@@ -1240,22 +1404,74 @@ export default function OrderDetailPage() {
             </div>
 
             {/* Assign Driver Dialog - cho Coordinator */}
-            {isCoordinator && order && (
-                <AssignDriverDialog
-                    open={assignDialogOpen}
-                    order={{
-                        id: order.id,
-                        bookingId: order.id,
-                        tripId: order.trip?.id,
-                        code: order.code,
-                        pickup_time: order.trip?.pickup_time,
-                        vehicle_type: order.trip?.vehicle_category,
-                        branch_name: order.branch_name,
-                    }}
-                    onClose={() => setAssignDialogOpen(false)}
-                    onAssigned={handleAssignSuccess}
-                />
-            )}
+            {isCoordinator && order && (() => {
+                // Lọc ra các trips chưa gán (không có driver hoặc vehicle trong dispatchList)
+                const allTrips = order.trips || [];
+                const dispatchList = order.dispatchList || [];
+                
+                // Tạo map của trips đã gán (có driver và vehicle)
+                const assignedTripIds = new Set(
+                    dispatchList
+                        .filter(d => {
+                            // Trip được coi là đã gán nếu có cả driver_name và vehicle_plate
+                            return d.tripId && d.driver_name && d.vehicle_plate;
+                        })
+                        .map(d => d.tripId)
+                );
+                
+                // Lọc ra trips chưa gán
+                const unassignedTrips = allTrips.filter(t => {
+                    const tripId = t.id || t.tripId;
+                    // Trip chưa gán nếu không có trong danh sách đã gán
+                    return tripId && !assignedTripIds.has(tripId);
+                });
+                
+                const unassignedTripIds = unassignedTrips.map(t => {
+                    const tripId = t.id || t.tripId;
+                    return tripId ? Number(tripId) : null;
+                }).filter(id => id !== null);
+                
+                // Nếu không có trip nào chưa gán, dùng trip đầu tiên (fallback)
+                const firstUnassignedTrip = unassignedTrips[0];
+                const defaultTripId = firstUnassignedTrip 
+                    ? (firstUnassignedTrip.id || firstUnassignedTrip.tripId)
+                    : (order.trip?.id || order.trips?.[0]?.id || order.trips?.[0]?.tripId);
+                
+                // Tìm đúng vehicle_category của trip đang được gán
+                let vehicleCategoryForTrip = order.trip?.vehicle_category; // Fallback
+                if (defaultTripId && order.dispatchList) {
+                    const tripDispatch = order.dispatchList.find(d => d.tripId === defaultTripId);
+                    if (tripDispatch?.vehicle_category) {
+                        vehicleCategoryForTrip = tripDispatch.vehicle_category;
+                    }
+                }
+                // Nếu không tìm thấy trong dispatchList, tìm trong trips
+                if (!vehicleCategoryForTrip && defaultTripId && order.trips) {
+                    const tripIndex = order.trips.findIndex(t => (t.id || t.tripId) === defaultTripId);
+                    if (tripIndex >= 0 && order.dispatchList && order.dispatchList[tripIndex]) {
+                        vehicleCategoryForTrip = order.dispatchList[tripIndex].vehicle_category;
+                    }
+                }
+                
+                return (
+                    <AssignDriverDialog
+                        open={assignDialogOpen}
+                        order={{
+                            id: order.id,
+                            bookingId: order.id,
+                            tripId: defaultTripId,
+                            tripIds: unassignedTripIds.length > 0 ? unassignedTripIds : undefined,
+                            code: order.code,
+                            pickup_time: order.trip?.pickup_time,
+                            vehicle_type: vehicleCategoryForTrip,
+                            vehicle_count: order.trip?.vehicle_count || 1,
+                            branch_name: order.branch_name,
+                        }}
+                        onClose={() => setAssignDialogOpen(false)}
+                        onAssigned={handleAssignSuccess}
+                    />
+                );
+            })()}
 
             {/* Payment modals - ẩn với Accountant */}
             {!isAccountant && (
@@ -1295,7 +1511,7 @@ export default function OrderDetailPage() {
                             order.quote.final_price -
                             order.payment.paid
                         )}
-                        modeLabel="Thanh toán"
+                        // modeLabel="Thanh toán"
                         allowOverpay={false}
                         onClose={() => setDepositOpen(false)}
                         onSubmitted={handleDepositSubmitted}

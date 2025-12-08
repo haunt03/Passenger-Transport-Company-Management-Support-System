@@ -25,7 +25,7 @@ import { unassignTrip } from "../../api/dispatch";
 
 /**
  * NotificationsDashboard - Dashboard cảnh báo & phê duyệt
- *
+ * 
  * Hiển thị:
  * - Alerts: Xe sắp hết đăng kiểm, bằng lái hết hạn, xung đột lịch, etc.
  * - Pending Approvals: Nghỉ phép tài xế, yêu cầu tạm ứng, giảm giá, etc.
@@ -45,15 +45,15 @@ export default function NotificationsDashboard() {
     const [dialogType, setDialogType] = React.useState(""); // "approve" or "reject"
     const [selectedApprovalId, setSelectedApprovalId] = React.useState(null);
     const [dialogNote, setDialogNote] = React.useState("");
-
+    
     // Detail dialog state
     const [detailDialogOpen, setDetailDialogOpen] = React.useState(false);
     const [selectedItem, setSelectedItem] = React.useState(null);
     const [selectedItemType, setSelectedItemType] = React.useState(""); // "alert", "pending", "processed"
-
+    
     // Local state để lưu note sau khi duyệt (hiển thị trên card)
     const [approvalNotes, setApprovalNotes] = React.useState({});
-
+    
     // State for checking driver trips before approval
     const [checkingTrips, setCheckingTrips] = React.useState(false);
     const [conflictingTrips, setConflictingTrips] = React.useState([]);
@@ -147,7 +147,7 @@ export default function NotificationsDashboard() {
                 params.append("limit", "50"); // Lấy 50 mục gần nhất
                 // Chỉ lấy những yêu cầu do current user duyệt
                 if (userId) params.append("processedByUserId", userId);
-
+                
                 const data = await apiFetch(`/api/notifications/approvals/processed?${params}`);
                 setProcessedApprovals(Array.isArray(data) ? data : []);
             } catch (err) {
@@ -162,7 +162,21 @@ export default function NotificationsDashboard() {
     }, [selectedBranchId, isAdmin, userId]);
 
     const handleRefresh = () => {
-        setSelectedBranchId(selectedBranchId); // Trigger reload
+        // Reload dashboard (pending approvals)
+        setLoading(true);
+        (async () => {
+            try {
+                const params = selectedBranchId ? `?branchId=${selectedBranchId}` : "";
+                const data = await apiFetch(`/api/notifications/dashboard${params}`);
+                setDashboard(data);
+            } catch (err) {
+                console.error("Failed to reload dashboard:", err);
+                setError("Không thể tải dashboard");
+            } finally {
+                setLoading(false);
+            }
+        })();
+        
         // Reload processed approvals too
         setLoadingProcessed(true);
         (async () => {
@@ -197,17 +211,17 @@ export default function NotificationsDashboard() {
 
     const handleApproveClick = async (historyId, e) => {
         e?.stopPropagation(); // Prevent triggering detail dialog
-
+        
         // Find the approval to check if it's a day off request
         const approval = dashboard?.pendingApprovals?.find(a => a.id === historyId);
-
+        
         // If it's a driver day off request, check for conflicting trips first
         if (approval?.approvalType === "DRIVER_DAY_OFF" && approval?.details) {
             // Try to get driverId from various possible fields
             const driverId = approval.details.driverId || approval.driverId || approval.requestedByUserId;
             const startDate = approval.details.startDate;
             const endDate = approval.details.endDate || startDate;
-
+            
             console.log("🔍 [TEST] Checking day off approval:", {
                 approvalType: approval.approvalType,
                 driverId,
@@ -215,7 +229,7 @@ export default function NotificationsDashboard() {
                 endDate,
                 approvalDetails: approval.details
             });
-
+            
             if (driverId && startDate) {
                 setCheckingTrips(true);
                 try {
@@ -224,30 +238,30 @@ export default function NotificationsDashboard() {
                     const schedule = await getDriverSchedule(driverId);
                     const scheduleList = Array.isArray(schedule) ? schedule : [];
                     console.log("📋 [TEST] Driver schedule received:", scheduleList.length, "trips");
-
+                    
                     // Parse date range
                     const leaveStart = new Date(startDate);
                     const leaveEnd = new Date(endDate);
                     leaveStart.setHours(0, 0, 0, 0);
                     leaveEnd.setHours(23, 59, 59, 999);
-
+                    
                     console.log("📆 [TEST] Leave period:", {
                         start: leaveStart.toISOString(),
                         end: leaveEnd.toISOString()
                     });
-
+                    
                     // Find conflicting trips (trips that overlap with leave period)
                     const conflicts = scheduleList.filter(trip => {
                         const tripDate = new Date(trip.startTime || trip.start_time);
                         if (isNaN(tripDate.getTime())) return false;
-
+                        
                         // Check if trip is scheduled (not completed/cancelled)
                         const status = trip.status || trip.tripStatus;
                         if (status === "COMPLETED" || status === "CANCELLED") return false;
-
+                        
                         // Check if trip date is within leave period
                         const isConflict = tripDate >= leaveStart && tripDate <= leaveEnd;
-
+                        
                         if (isConflict) {
                             console.log("⚠️ [TEST] Found conflicting trip:", {
                                 tripId: trip.tripId || trip.trip_id || trip.id,
@@ -256,12 +270,12 @@ export default function NotificationsDashboard() {
                                 startTime: trip.startTime || trip.start_time
                             });
                         }
-
+                        
                         return isConflict;
                     });
-
+                    
                     console.log("✅ [TEST] Total conflicts found:", conflicts.length);
-
+                    
                     if (conflicts.length > 0) {
                         console.log("🚨 [TEST] Showing conflict dialog with", conflicts.length, "conflicting trips");
                         // Show conflict dialog
@@ -285,7 +299,7 @@ export default function NotificationsDashboard() {
         } else {
             console.log("ℹ️ [TEST] Not a DRIVER_DAY_OFF request, skipping check");
         }
-
+        
         // No conflicts or not a day off request, proceed with normal approval dialog
         setSelectedApprovalId(historyId);
         setDialogType("approve");
@@ -315,29 +329,46 @@ export default function NotificationsDashboard() {
                 method: "POST",
                 body: { userId: Number(userId), note: dialogNote || null },
             });
-
+            
             // Lưu note vào state để hiển thị trên card
             setApprovalNotes(prev => ({
                 ...prev,
                 [selectedApprovalId]: { note: dialogNote, type: "approved", timestamp: new Date().toISOString() }
             }));
-
+            
+            // Cập nhật UI ngay lập tức: remove approval khỏi pending list
+            setDashboard(prev => {
+                if (!prev || !prev.pendingApprovals) return prev;
+                return {
+                    ...prev,
+                    pendingApprovals: prev.pendingApprovals.filter(a => a.id !== selectedApprovalId),
+                    stats: {
+                        ...prev.stats,
+                        totalPendingApprovals: Math.max(0, (prev.stats?.totalPendingApprovals || 0) - 1)
+                    }
+                };
+            });
+            
             setDialogOpen(false);
             setShowConflictDialog(false);
             setConflictingTrips([]);
-            handleRefresh();
+            
+            // Reload dashboard để đảm bảo data sync với backend
+            setTimeout(() => {
+                handleRefresh();
+            }, 500);
         } catch (err) {
             console.error("Failed to approve:", err);
             alert("Không thể phê duyệt");
         }
     };
-
+    
     // Handle unassigning conflicting trips before approval
     const handleUnassignConflictingTrips = async () => {
         if (conflictingTrips.length === 0) return;
-
+        
         const unassignNote = `Hủy gán do tài xế nghỉ phép từ ${dashboard?.pendingApprovals?.find(a => a.id === selectedApprovalId)?.details?.startDate} đến ${dashboard?.pendingApprovals?.find(a => a.id === selectedApprovalId)?.details?.endDate}`;
-
+        
         try {
             // Unassign all conflicting trips
             const unassignPromises = conflictingTrips.map(trip => {
@@ -348,13 +379,13 @@ export default function NotificationsDashboard() {
                     return null; // Continue with other trips even if one fails
                 });
             });
-
+            
             await Promise.all(unassignPromises);
-
+            
             // Clear conflicts and proceed with approval
             setConflictingTrips([]);
             setShowConflictDialog(false);
-
+            
             // Now show approval dialog
             setDialogType("approve");
             setDialogNote(`Đã hủy gán ${conflictingTrips.length} chuyến xung đột. ${unassignNote}`);
@@ -367,7 +398,7 @@ export default function NotificationsDashboard() {
 
     const handleReject = async () => {
         if (!selectedApprovalId) return;
-
+        
         if (!dialogNote || !dialogNote.trim()) {
             alert("Vui lòng nhập lý do từ chối");
             return;
@@ -378,18 +409,54 @@ export default function NotificationsDashboard() {
                 method: "POST",
                 body: { userId: Number(userId), note: dialogNote },
             });
-
+            
             // Lưu note vào state để hiển thị trên card
             setApprovalNotes(prev => ({
                 ...prev,
                 [selectedApprovalId]: { note: dialogNote, type: "rejected", timestamp: new Date().toISOString() }
             }));
-
+            
+            // Cập nhật UI ngay lập tức: remove approval khỏi pending list
+            setDashboard(prev => {
+                if (!prev || !prev.pendingApprovals) return prev;
+                return {
+                    ...prev,
+                    pendingApprovals: prev.pendingApprovals.filter(a => a.id !== selectedApprovalId),
+                    stats: {
+                        ...prev.stats,
+                        totalPendingApprovals: Math.max(0, (prev.stats?.totalPendingApprovals || 0) - 1)
+                    }
+                };
+            });
+            
             setDialogOpen(false);
-            handleRefresh();
-        } catch (err) {
+            
+            // Reload dashboard để đảm bảo data sync với backend
+            setTimeout(() => {
+                handleRefresh();
+            }, 500);
+            } catch (err) {
             console.error("Failed to reject:", err);
             alert("Không thể từ chối");
+        }
+    };
+
+    // Xóa / ẩn một approval đã xử lý khỏi danh sách (và backend)
+    const handleDismissProcessedApproval = async (approvalId) => {
+        if (!approvalId) return;
+        if (!window.confirm("Bạn có chắc muốn xóa thông báo này khỏi danh sách?")) return;
+
+        try {
+            await apiFetch(`/api/notifications/approvals/${approvalId}?userId=${userId}`, {
+                method: "DELETE",
+            });
+            // Cập nhật UI local ngay để cảm giác mượt
+            setProcessedApprovals((prev) => prev.filter((a) => a.id !== approvalId));
+            // Cập nhật lại thống kê tổng quan
+            handleRefresh();
+        } catch (err) {
+            console.error("Failed to dismiss approval:", err);
+            alert("Không thể xóa thông báo này. Vui lòng thử lại.");
         }
     };
 
@@ -535,6 +602,7 @@ export default function NotificationsDashboard() {
                                                     key={approval.id}
                                                     approval={approval}
                                                     onClick={() => handleViewDetail(approval, "processed")}
+                                                    onDismiss={handleDismissProcessedApproval}
                                                 />
                                             ))}
                                         </div>
@@ -561,13 +629,13 @@ export default function NotificationsDashboard() {
                                 <div className="flex-1">
                                     <h3 className="text-lg font-semibold text-slate-900">Cảnh báo: Tài xế có chuyến trong ngày nghỉ</h3>
                                     <p className="text-sm text-slate-600 mt-1">
-                                        Tài xế đã được lên lịch {conflictingTrips.length} chuyến trong khoảng thời gian nghỉ phép.
+                                        Tài xế đã được lên lịch {conflictingTrips.length} chuyến trong khoảng thời gian nghỉ phép. 
                                         Bạn cần hủy gán các chuyến này trước khi duyệt nghỉ phép.
                                     </p>
                                 </div>
                             </div>
                         </div>
-
+                        
                         <div className="px-6 py-4 overflow-y-auto flex-1">
                             <div className="space-y-3">
                                 {conflictingTrips.map((trip, idx) => {
@@ -576,7 +644,7 @@ export default function NotificationsDashboard() {
                                     const startLocation = trip.startLocation || trip.start_location || "—";
                                     const endLocation = trip.endLocation || trip.end_location || "—";
                                     const customerName = trip.customerName || trip.customer_name || "—";
-
+                                    
                                     return (
                                         <div key={tripId || idx} className="border border-amber-200 bg-amber-50 rounded-lg p-3">
                                             <div className="flex items-start justify-between gap-3">
@@ -597,7 +665,7 @@ export default function NotificationsDashboard() {
                                 })}
                             </div>
                         </div>
-
+                        
                         <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-3">
                             <button
                                 onClick={() => {
@@ -640,7 +708,7 @@ export default function NotificationsDashboard() {
                     </div>
                 </div>
             )}
-
+            
             {/* Approval Dialog */}
             {dialogOpen && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setDialogOpen(false)}>
@@ -649,7 +717,7 @@ export default function NotificationsDashboard() {
                             <h3 className="text-lg font-semibold text-slate-900 mb-4">
                                 {dialogType === "approve" ? "Phê duyệt yêu cầu" : "Từ chối yêu cầu"}
                             </h3>
-
+                            
                             <div className="mb-4">
                                 <label className="block text-sm font-medium text-slate-700 mb-2">
                                     {dialogType === "approve" ? "Ghi chú phê duyệt (tùy chọn):" : "Lý do từ chối:"}
@@ -768,7 +836,7 @@ function AlertCard({ alert, onAcknowledge, onClick }) {
     const Icon = config.icon;
 
     return (
-        <div
+        <div 
             className={`bg-white rounded-lg border ${config.border} p-2.5 cursor-pointer hover:shadow-md transition-shadow`}
             onClick={onClick}
         >
@@ -809,7 +877,7 @@ function AlertCard({ alert, onAcknowledge, onClick }) {
     );
 }
 
-function ProcessedApprovalCard({ approval, onClick }) {
+function ProcessedApprovalCard({ approval, onClick, onDismiss }) {
     const typeConfig = {
         DRIVER_DAY_OFF: { icon: Calendar, label: "Nghỉ phép", color: "text-purple-600" },
         EXPENSE_REQUEST: { icon: DollarSign, label: "Tạm ứng", color: "text-green-600" },
@@ -818,13 +886,13 @@ function ProcessedApprovalCard({ approval, onClick }) {
 
     const config = typeConfig[approval.approvalType] || { icon: FileText, label: "Yêu cầu", color: "text-slate-600" };
     const Icon = config.icon;
-
+    
     const isApproved = approval.status === "APPROVED";
     const isRejected = approval.status === "REJECTED";
     const processedAt = approval.processedAt || approval.approvedAt;
 
     return (
-        <div
+        <div 
             className={`bg-white rounded-lg border p-2.5 cursor-pointer hover:shadow-md transition-shadow ${
                 isApproved ? "border-green-200 bg-green-50/30" : "border-red-200 bg-red-50/30"
             }`}
@@ -888,8 +956,8 @@ function ProcessedApprovalCard({ approval, onClick }) {
                                 {/* Hiển thị note phê duyệt/từ chối */}
                                 {approval.approvalNote && (
                                     <div className={`mt-1.5 p-1.5 rounded text-[10px] ${
-                                        isApproved
-                                            ? "bg-green-50 border border-green-200"
+                                        isApproved 
+                                            ? "bg-green-50 border border-green-200" 
                                             : "bg-red-50 border border-red-200"
                                     }`}>
                                         <div className="flex items-start gap-1.5">
@@ -918,6 +986,19 @@ function ProcessedApprovalCard({ approval, onClick }) {
                                 </div>
                             </div>
                         </div>
+
+                        {onDismiss && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDismiss(approval.id);
+                                }}
+                                className="text-slate-400 hover:text-slate-600 ml-1 p-1 rounded-full hover:bg-slate-100 transition-colors"
+                                title="Xóa thông báo này"
+                            >
+                                <X className="h-3.5 w-3.5" />
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -934,14 +1015,14 @@ function ApprovalCard({ approval, onApprove, onReject, canApprove, approvalNote,
 
     const config = typeConfig[approval.approvalType] || { icon: FileText, label: "Yêu cầu", color: "text-slate-600" };
     const Icon = config.icon;
-
+    
     // Kiểm tra xem đã có note từ state local chưa
     const hasNote = approvalNote && approvalNote.note;
     const isApproved = approvalNote?.type === "approved";
     const isRejected = approvalNote?.type === "rejected";
 
     return (
-        <div
+        <div 
             className="bg-white rounded-lg border border-slate-200 p-2.5 cursor-pointer hover:shadow-md transition-shadow"
             onClick={onClick}
         >
@@ -1003,8 +1084,8 @@ function ApprovalCard({ approval, onApprove, onReject, canApprove, approvalNote,
                                 {/* Hiển thị note sau khi duyệt/từ chối */}
                                 {hasNote && (
                                     <div className={`mt-1.5 p-1.5 rounded text-[10px] ${
-                                        isApproved
-                                            ? "bg-green-50 border border-green-200"
+                                        isApproved 
+                                            ? "bg-green-50 border border-green-200" 
                                             : "bg-red-50 border border-red-200"
                                     }`}>
                                         <div className="flex items-start gap-1.5">
@@ -1145,7 +1226,7 @@ function DetailDialog({ item, type, onClose, onAcknowledge, onApprove, onReject,
     };
     const config = typeConfig[item.approvalType] || { icon: FileText, label: "Yêu cầu", color: "text-slate-600" };
     const Icon = config.icon;
-
+    
     const isApproved = item.status === "APPROVED";
     const isRejected = item.status === "REJECTED";
     const isPending = !isApproved && !isRejected;
@@ -1236,8 +1317,8 @@ function DetailDialog({ item, type, onClose, onAcknowledge, onApprove, onReject,
                                     {isApproved ? "Ghi chú phê duyệt" : "Lý do từ chối"}
                                 </label>
                                 <div className={`mt-1 p-3 rounded-lg text-sm ${
-                                    isApproved
-                                        ? "bg-green-50 border border-green-200 text-green-800"
+                                    isApproved 
+                                        ? "bg-green-50 border border-green-200 text-green-800" 
                                         : "bg-red-50 border border-red-200 text-red-800"
                                 }`}>
                                     <div className="flex items-start gap-2">

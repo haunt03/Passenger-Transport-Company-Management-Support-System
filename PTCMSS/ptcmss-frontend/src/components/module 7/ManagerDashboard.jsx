@@ -1,4 +1,4 @@
-// src/components/module7/ManagerDashboardPro.jsx
+﻿// src/components/module7/ManagerDashboardPro.jsx
 import React from "react";
 import {
     RefreshCw,
@@ -7,7 +7,6 @@ import {
     TrendingUp,
     TrendingDown,
     Car,
-    User,
     CheckCircle2,
     XCircle,
     Gauge,
@@ -17,7 +16,7 @@ import { getBranchByUserId } from "../../api/branches";
 import {
     getManagerDashboard,
     getBranchRevenueTrend,
-    getBranchDriverPerformance,
+    getBranchVehicleBookingPerformance,
 } from "../../api/dashboards";
 import TrendChart from "./shared/TrendChart";
 
@@ -82,13 +81,13 @@ function Toasts({ toasts }) {
 
 /* -------------------- KPI CARD (light style) -------------------- */
 function KpiBlock({
-                      label,
-                      value,
-                      sub,
-                      deltaPct,
-                      up,
-                      icon,
-                  }) {
+    label,
+    value,
+    sub,
+    deltaPct,
+    up,
+    icon,
+}) {
     return (
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-4 flex flex-col gap-3">
             {/* header row: label + delta chip */}
@@ -194,71 +193,77 @@ function TripsSummaryCard({ completed, inProgress, cancelled }) {
     );
 }
 
-/* -------------------- Driver Performance table (light) -------------------- */
-function DriverPerfTable({ rows }) {
+/* -------------------- Vehicle Performance table (light) -------------------- */
+function VehiclePerfTable({ rows }) {
     return (
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex flex-wrap items-center gap-2 text-sm">
                 <div className="h-8 w-8 rounded-md bg-amber-100 text-amber-600 border border-amber-200 flex items-center justify-center shadow-sm">
-                    <User className="h-4 w-4" />
+                    <Car className="h-4 w-4" />
                 </div>
 
                 <div className="text-slate-700 font-medium leading-none">
-                    Hiệu suất tài xế
+                    Hiệu suất xe
                 </div>
 
                 <div className="text-[11px] text-slate-500 leading-none ml-auto">
-                    Trips &amp; km đã chạy
+                    Số lần được book
                 </div>
             </div>
 
             <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                     <thead className="text-[11px] uppercase tracking-wide text-slate-500 bg-slate-50 border-b border-slate-200">
-                    <tr>
-                        <th className="px-3 py-2 font-medium text-slate-600 text-xs text-left">
-                            Tài xế
-                        </th>
-                        <th className="px-3 py-2 font-medium text-slate-600 text-xs text-left whitespace-nowrap">
-                            Số chuyến
-                        </th>
-                        <th className="px-3 py-2 font-medium text-slate-600 text-xs text-left whitespace-nowrap">
-                            KM chạy
-                        </th>
-                    </tr>
+                        <tr>
+                            <th className="px-3 py-2 font-medium text-slate-600 text-xs text-left">
+                                Biển số xe
+                            </th>
+                            <th className="px-3 py-2 font-medium text-slate-600 text-xs text-left whitespace-nowrap">
+                                Tổng booking
+                            </th>
+                            <th className="px-3 py-2 font-medium text-slate-600 text-xs text-left whitespace-nowrap">
+                                Đã xác nhận
+                            </th>
+                            <th className="px-3 py-2 font-medium text-slate-600 text-xs text-left whitespace-nowrap">
+                                Đã hoàn thành
+                            </th>
+                        </tr>
                     </thead>
 
                     <tbody>
-                    {(!rows || rows.length === 0) ? (
-                        <tr>
-                            <td colSpan="3" className="px-3 py-8 text-center text-slate-500 text-sm">
-                                Chưa có dữ liệu tài xế trong kỳ này
-                            </td>
-                        </tr>
-                    ) : (
-                        rows.map((d) => (
-                            <tr
-                                key={d.driverId}
-                                className="border-b border-slate-200 hover:bg-slate-50/70"
-                            >
-                                <td className="px-3 py-2 text-slate-900 text-sm font-medium">
-                                    {d.driverName}
-                                </td>
-                                <td className="px-3 py-2 text-slate-700 text-sm font-medium tabular-nums">
-                                    {fmtInt(d.trips)}
-                                </td>
-                                <td className="px-3 py-2 text-slate-700 text-sm tabular-nums">
-                                    {fmtInt(d.km)} km
+                        {(!rows || rows.length === 0) ? (
+                            <tr>
+                                <td colSpan="4" className="px-3 py-8 text-center text-slate-500 text-sm">
+                                    Chưa có dữ liệu xe trong kỳ này
                                 </td>
                             </tr>
-                        ))
-                    )}
+                        ) : (
+                            rows.map((v) => (
+                                <tr
+                                    key={v.vehicleId}
+                                    className="border-b border-slate-200 hover:bg-slate-50/70"
+                                >
+                                    <td className="px-3 py-2 text-slate-900 text-sm font-medium">
+                                        {v.vehicleName}
+                                    </td>
+                                    <td className="px-3 py-2 text-slate-700 text-sm font-medium tabular-nums">
+                                        {fmtInt(v.totalBookings)}
+                                    </td>
+                                    <td className="px-3 py-2 text-slate-700 text-sm tabular-nums">
+                                        {fmtInt(v.confirmedBookings)}
+                                    </td>
+                                    <td className="px-3 py-2 text-slate-700 text-sm tabular-nums">
+                                        {fmtInt(v.completedBookings)}
+                                    </td>
+                                </tr>
+                            ))
+                        )}
                     </tbody>
                 </table>
             </div>
 
             <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 text-[11px] text-slate-500 leading-relaxed">
-                Dựa trên chuyến đã hoàn thành trong kỳ lọc.
+                Dựa trên booking trong kỳ lọc. Sắp xếp theo số lần được book nhiều nhất.
             </div>
         </div>
     );
@@ -288,7 +293,7 @@ export default function ManagerDashboardPro() {
     // Dashboard data
     const [dashboardData, setDashboardData] = React.useState(null);
     const [revenueTrend, setRevenueTrend] = React.useState([]);
-    const [driverPerformance, setDriverPerformance] = React.useState([]);
+    const [vehicleBookingPerformance, setVehicleBookingPerformance] = React.useState([]);
     const [dataLoading, setDataLoading] = React.useState(false);
 
     // Check if user is admin
@@ -369,7 +374,7 @@ export default function ManagerDashboardPro() {
                 const results = await Promise.allSettled([
                     getManagerDashboard({ branchId: branchInfo.id, period }),
                     getBranchRevenueTrend({ branchId: branchInfo.id }),
-                    getBranchDriverPerformance({ branchId: branchInfo.id, limit: 5, period }),
+                    getBranchVehicleBookingPerformance({ branchId: branchInfo.id, limit: 5, period }),
                 ]);
 
                 if (cancelled) return;
@@ -378,7 +383,7 @@ export default function ManagerDashboardPro() {
                 const [
                     dashboardResult,
                     revenueTrendResult,
-                    driverPerformanceResult,
+                    vehicleBookingPerformanceResult,
                 ] = results;
 
                 // Set data, using fallback values for failed requests
@@ -390,7 +395,7 @@ export default function ManagerDashboardPro() {
                 }
 
                 setRevenueTrend(revenueTrendResult.status === 'fulfilled' ? (revenueTrendResult.value || []) : []);
-                setDriverPerformance(driverPerformanceResult.status === 'fulfilled' ? (driverPerformanceResult.value || []) : []);
+                setVehicleBookingPerformance(vehicleBookingPerformanceResult.status === 'fulfilled' ? (vehicleBookingPerformanceResult.value || []) : []);
 
                 // Log any errors for debugging
                 const errors = results
@@ -400,7 +405,7 @@ export default function ManagerDashboardPro() {
                     const apiNames = [
                         'dashboard',
                         'revenue-trend',
-                        'driver-performance',
+                        'vehicle-booking-performance',
                     ];
                     console.warn("Some APIs failed to load:", errors.map(idx => apiNames[idx]).join(', '));
                 }
@@ -434,14 +439,14 @@ export default function ManagerDashboardPro() {
                 const results = await Promise.allSettled([
                     getManagerDashboard({ branchId: branchInfo.id, period }),
                     getBranchRevenueTrend({ branchId: branchInfo.id }),
-                    getBranchDriverPerformance({ branchId: branchInfo.id, limit: 5, period }),
+                    getBranchVehicleBookingPerformance({ branchId: branchInfo.id, limit: 5, period }),
                 ]);
 
                 // Extract results, handling both fulfilled and rejected promises
                 const [
                     dashboardResult,
                     revenueTrendResult,
-                    driverPerformanceResult,
+                    vehicleBookingPerformanceResult,
                 ] = results;
 
                 // Set data, using fallback values for failed requests
@@ -452,7 +457,7 @@ export default function ManagerDashboardPro() {
                 }
 
                 setRevenueTrend(revenueTrendResult.status === 'fulfilled' ? (revenueTrendResult.value || []) : []);
-                setDriverPerformance(driverPerformanceResult.status === 'fulfilled' ? (driverPerformanceResult.value || []) : []);
+                setVehicleBookingPerformance(vehicleBookingPerformanceResult.status === 'fulfilled' ? (vehicleBookingPerformanceResult.value || []) : []);
 
                 // Check if any requests failed
                 const failedCount = results.filter(r => r.status === 'rejected').length;
@@ -481,12 +486,13 @@ export default function ManagerDashboardPro() {
     const driversOnTrip = dashboardData?.driversOnTrip || 0;
     const driversAvailable = dashboardData?.driversAvailable || 0;
 
-    // Map driver performance data
-    const topDrivers = driverPerformance.map((d) => ({
-        driverId: d.driverId,
-        driverName: d.driverName,
-        trips: d.totalTrips || 0,
-        km: d.totalKm || 0,
+    // Map vehicle booking performance data
+    const topVehicles = vehicleBookingPerformance.map((v) => ({
+        vehicleId: v.vehicleId,
+        vehicleName: v.vehicleName || v.licensePlate || `Xe #${v.vehicleId}`,
+        totalBookings: v.totalBookings || 0,
+        confirmedBookings: v.confirmedBookings || 0,
+        completedBookings: v.completedBookings || 0,
     }));
 
     // Tỷ lệ lợi nhuận (profit margin)
@@ -645,8 +651,8 @@ export default function ManagerDashboardPro() {
                         cancelled={totalTrips - completedTrips - ongoingTrips - scheduledTrips}
                     />
 
-                    {/* cột giữa: tài xế */}
-                    <DriverPerfTable rows={topDrivers} />
+                    {/* cột phải: hiệu suất xe */}
+                    <VehiclePerfTable rows={topVehicles} />
                 </div>
             )}
 

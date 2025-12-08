@@ -1,4 +1,4 @@
-// EditOrderPage.jsx (LIGHT THEME)
+﻿// EditOrderPage.jsx (LIGHT THEME)
 import React from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { getBooking, updateBooking, calculatePrice, assignBooking } from "../../api/bookings";
@@ -7,6 +7,9 @@ import { listVehicleCategories } from "../../api/vehicleCategories";
 import { listBranches } from "../../api/branches";
 import { listDriversByBranch } from "../../api/drivers";
 import { listVehicles } from "../../api/vehicles";
+import { listHireTypes } from "../../api/hireTypes";
+import { getCurrentRole, ROLES } from "../../utils/session";
+import PlaceAutocomplete from "../common/PlaceAutocomplete";
 import {
     ArrowLeft,
     User,
@@ -152,6 +155,9 @@ export default function EditOrderPage() {
     const location = useLocation();
     const seedOrder = location?.state?.order;
 
+    const role = React.useMemo(() => getCurrentRole(), []);
+    const isConsultant = role === ROLES.CONSULTANT;
+
     /* --- trạng thái đơn hàng --- */
     const [status, setStatus] = React.useState("PENDING");
 
@@ -164,8 +170,10 @@ export default function EditOrderPage() {
     const [customerEmail, setCustomerEmail] = React.useState("");
 
     /* --- hình thức thuê --- */
+    const [hireType, setHireType] = React.useState("ONE_WAY"); // ONE_WAY | ROUND_TRIP | DAILY
     const [hireTypeId, setHireTypeId] = React.useState("");
     const [hireTypeName, setHireTypeName] = React.useState("");
+    const [hireTypesList, setHireTypesList] = React.useState([]);
 
     /* --- hành trình --- */
     const [pickup, setPickup] = React.useState("");
@@ -187,7 +195,7 @@ export default function EditOrderPage() {
     const [availabilityMsg, setAvailabilityMsg] =
         React.useState("");
     const [checkingAvailability, setCheckingAvailability] = React.useState(false);
-
+    
     /* --- ghi chú --- */
     const [bookingNote, setBookingNote] = React.useState("");
 
@@ -209,7 +217,7 @@ export default function EditOrderPage() {
     const [vehicleSearch, setVehicleSearch] = React.useState("");
     const [showDriverDropdown, setShowDriverDropdown] = React.useState(false);
     const [showVehicleDropdown, setShowVehicleDropdown] = React.useState(false);
-
+    
     // Assigned driver/vehicle info and cooldown
     const [assignedDriver, setAssignedDriver] = React.useState(null);
     const [assignedVehicle, setAssignedVehicle] = React.useState(null);
@@ -229,7 +237,7 @@ export default function EditOrderPage() {
     const canEdit = React.useMemo(() => {
         const editableStatuses = ["DRAFT", "PENDING", "CONFIRMED", "ASSIGNED", "QUOTATION_SENT"];
         if (!editableStatuses.includes(status)) return false;
-
+        
         // Check thời gian: phải còn >= 12h trước chuyến
         if (startTime) {
             const tripStart = new Date(startTime);
@@ -345,7 +353,7 @@ export default function EditOrderPage() {
                 // Load pax from trip or booking
                 const paxValue = t.paxCount || b.paxCount || 1;
                 setPax(String(paxValue));
-
+                
                 const qty = Array.isArray(b.vehicles) ? b.vehicles.reduce((s, v) => s + (v.quantity || 0), 0) : 1;
                 const catId = Array.isArray(b.vehicles) && b.vehicles.length ? String(b.vehicles[0].vehicleCategoryId) : "";
                 setVehiclesNeeded(String(qty));
@@ -390,6 +398,46 @@ export default function EditOrderPage() {
         })();
     }, [orderId]);
 
+    // Load hire types once
+    React.useEffect(() => {
+        (async () => {
+            try {
+                const resp = await listHireTypes();
+                const list = Array.isArray(resp) ? resp : (resp?.data || []);
+                setHireTypesList(list);
+            } catch (err) {
+                console.error("Failed to load hire types:", err);
+            }
+        })();
+    }, []);
+
+    // Map hireTypeId -> hireType code when both are available
+    React.useEffect(() => {
+        if (!hireTypeId || hireTypesList.length === 0) return;
+        const found = hireTypesList.find(h => String(h.id) === String(hireTypeId));
+        if (found && found.code && found.code !== hireType) {
+            setHireType(found.code);
+        }
+    }, [hireTypeId, hireTypesList]); 
+
+    // Map hireType code -> hireTypeId to keep payload đúng
+    React.useEffect(() => {
+        if (!hireType || hireTypesList.length === 0) return;
+        const found = hireTypesList.find(h => h.code === hireType);
+        if (found && String(found.id) !== String(hireTypeId)) {
+            setHireTypeId(String(found.id));
+        }
+    }, [hireType, hireTypesList]);
+
+    // Với thuê theo ngày, chỉ dùng date (YYYY-MM-DD)
+    React.useEffect(() => {
+        const isDaily = hireType === "DAILY" || hireType === "MULTI_DAY";
+        if (!isDaily) return;
+
+        setStartTime(prev => (prev && prev.includes("T") ? prev.split("T")[0] : prev));
+        setEndTime(prev => (prev && prev.includes("T") ? prev.split("T")[0] : prev));
+    }, [hireType]);
+    
     // Update selectedCategory khi categoryId thay đổi
     React.useEffect(() => {
         if (categoryId && categories.length > 0) {
@@ -431,7 +479,7 @@ export default function EditOrderPage() {
     // Load drivers và vehicles khi branchId thay đổi
     React.useEffect(() => {
         if (!branchId) return;
-
+        
         // Load drivers
         (async () => {
             setLoadingDrivers(true);
@@ -451,7 +499,7 @@ export default function EditOrderPage() {
                 setLoadingDrivers(false);
             }
         })();
-
+        
         // Load vehicles
         (async () => {
             setLoadingVehicles(true);
@@ -477,8 +525,8 @@ export default function EditOrderPage() {
     const filteredDrivers = React.useMemo(() => {
         if (!driverSearch) return driversList;
         const search = driverSearch.toLowerCase();
-        return driversList.filter(d =>
-            d.name.toLowerCase().includes(search) ||
+        return driversList.filter(d => 
+            d.name.toLowerCase().includes(search) || 
             d.phone.toLowerCase().includes(search)
         );
     }, [driversList, driverSearch]);
@@ -486,19 +534,19 @@ export default function EditOrderPage() {
     const filteredVehicles = React.useMemo(() => {
         if (!vehicleSearch) return vehiclesList;
         const search = vehicleSearch.toLowerCase();
-        return vehiclesList.filter(v =>
+        return vehiclesList.filter(v => 
             v.licensePlate.toLowerCase().includes(search) ||
             v.categoryName.toLowerCase().includes(search)
         );
     }, [vehiclesList, vehicleSearch]);
 
     // Get selected driver/vehicle info
-    const selectedDriver = React.useMemo(() =>
-            driversList.find(d => String(d.id) === String(driverId)),
+    const selectedDriver = React.useMemo(() => 
+        driversList.find(d => String(d.id) === String(driverId)), 
         [driversList, driverId]
     );
-    const selectedVehicle = React.useMemo(() =>
-            vehiclesList.find(v => String(v.id) === String(vehicleId)),
+    const selectedVehicle = React.useMemo(() => 
+        vehiclesList.find(v => String(v.id) === String(vehicleId)), 
         [vehiclesList, vehicleId]
     );
 
@@ -578,6 +626,72 @@ export default function EditOrderPage() {
         setFinalPrice(fp);
     }, [discountAmount, systemPrice]);
 
+    // Detect weekend and holiday from startTime (phải khai báo trước useEffect sử dụng)
+    const isWeekend = React.useMemo(() => {
+        if (!startTime) return false;
+        const date = new Date(startTime);
+        const day = date.getDay();
+        return day === 0 || day === 6; // Sunday or Saturday
+    }, [startTime]);
+
+    const isHoliday = React.useMemo(() => {
+        if (!startTime) return false;
+        const date = new Date(startTime);
+        const month = date.getMonth();
+        const day = date.getDate();
+        // Vietnamese holidays (simplified - có thể mở rộng sau)
+        const holidays = [
+            { month: 0, day: 1 },   // New Year
+            { month: 3, day: 30 },  // Liberation Day
+            { month: 4, day: 1 },   // Labor Day
+            { month: 8, day: 2 },   // National Day
+        ];
+        return holidays.some(h => h.month === month && h.day === day);
+    }, [startTime]);
+
+    /* --- tự động tính lại giá khi thay đổi các tham số --- */
+    React.useEffect(() => {
+        if (!canEdit) return; // Chỉ tính khi có quyền sửa
+        
+        const timeoutId = setTimeout(async () => {
+            // Chỉ tính nếu có đủ thông tin
+            if (!startTime || !categoryId) {
+                return;
+            }
+            if (hireType !== "ONE_WAY" && !endTime) {
+                return;
+            }
+
+            try {
+                const startISO = toIsoZ(startTime);
+                const endISO = hireType === "ONE_WAY" && !endTime
+                    ? toIsoZ(new Date(new Date(startTime).getTime() + 2 * 60 * 60 * 1000).toISOString())
+                    : toIsoZ(endTime);
+
+                const price = await calculatePrice({
+                    vehicleCategoryIds: [Number(categoryId || 0)],
+                    quantities: [Number(vehiclesNeeded || 1)],
+                    distance: Number(distanceKm || 0),
+                    useHighway: false,
+                    hireTypeId: hireTypeId ? Number(hireTypeId) : undefined,
+                    isHoliday: isHoliday,
+                    isWeekend: isWeekend,
+                    startTime: startISO,
+                    endTime: endISO,
+                });
+                const base = Number(price || 0);
+                if (base > 0) {
+                    setSystemPrice(base);
+                }
+            } catch (err) {
+                console.error("Auto calculate price error:", err);
+                // Không hiển thị toast vì có thể user đang nhập dở
+            }
+        }, 1500); // Debounce 1.5 seconds
+
+        return () => clearTimeout(timeoutId);
+    }, [hireTypeId, isHoliday, isWeekend, startTime, endTime, distanceKm, categoryId, vehiclesNeeded, hireType, canEdit]);
+
     /* --- check availability (real call) --- */
     const checkAvailability = async () => {
         if (!categoryId || !branchId) {
@@ -590,10 +704,10 @@ export default function EditOrderPage() {
             pushToast("Vui lòng nhập thời gian đón và trả", "error");
             return;
         }
-
+        
         setCheckingAvailability(true);
         setAvailabilityMsg("");
-
+        
         try {
             const { checkVehicleAvailability } = await import("../../api/bookings");
             const result = await checkVehicleAvailability({
@@ -620,20 +734,40 @@ export default function EditOrderPage() {
         }
     };
 
-    /* --- recalc system price (mock) --- */
+    /* --- recalc system price --- */
     const recalcPrice = async () => {
+        if (!startTime) {
+            pushToast("Vui lòng nhập thời gian đón trước", "error");
+            return;
+        }
+        if (!categoryId) {
+            pushToast("Vui lòng chọn loại xe trước", "error");
+            return;
+        }
         try {
+            const startISO = toIsoZ(startTime);
+            // ONE_WAY: endTime = startTime + 2 giờ (mặc định)
+            const endISO = hireType === "ONE_WAY" && !endTime
+                ? toIsoZ(new Date(new Date(startTime).getTime() + 2 * 60 * 60 * 1000).toISOString())
+                : toIsoZ(endTime);
+
             const price = await calculatePrice({
                 vehicleCategoryIds: [Number(categoryId || 0)],
                 quantities: [Number(vehiclesNeeded || 1)],
                 distance: Number(distanceKm || 0),
                 useHighway: false,
+                hireTypeId: hireTypeId ? Number(hireTypeId) : undefined,
+                isHoliday: isHoliday,
+                isWeekend: isWeekend,
+                startTime: startISO,
+                endTime: endISO,
             });
             const base = Number(price || 0);
             setSystemPrice(base);
             pushToast("Đã tính lại giá hệ thống: " + base.toLocaleString("vi-VN") + "đ", "info");
-        } catch {
-            pushToast("Không tính được giá tự động", "error");
+        } catch (err) {
+            console.error("Calculate price error:", err);
+            pushToast("Không tính được giá tự động: " + (err.message || "Lỗi"), "error");
         }
     };
 
@@ -648,7 +782,7 @@ export default function EditOrderPage() {
             pushToast("Vui lòng nhập tên khách hàng", "error");
             return;
         }
-
+        
         // Validate điểm đón/trả
         if (!pickup || pickup.trim().length < 3) {
             pushToast("Vui lòng nhập điểm đón", "error");
@@ -658,13 +792,13 @@ export default function EditOrderPage() {
             pushToast("Vui lòng nhập điểm đến", "error");
             return;
         }
-
+        
         // Validate time
         if (!startTime || !endTime) {
             pushToast("Vui lòng nhập thời gian đón và kết thúc", "error");
             return;
         }
-
+        
         const startDate = new Date(startTime);
         const endDate = new Date(endTime);
         const now = new Date();
@@ -680,7 +814,7 @@ export default function EditOrderPage() {
             pushToast("Thời gian kết thúc phải sau thời gian đón", "error");
             return;
         }
-
+        
         // Validate số khách
         const paxNum = Number(pax || 0);
         if (paxNum < 1) {
@@ -702,11 +836,11 @@ export default function EditOrderPage() {
             customer: { fullName: customerName.trim(), phone: customerPhone.trim(), email: customerEmail?.trim() || null },
             branchId: Number(branchId || 0) || undefined,
             hireTypeId: hireTypeId ? Number(hireTypeId) : undefined,
-            trips: [{
-                startLocation: pickup.trim(),
-                endLocation: dropoff.trim(),
-                startTime: toIsoZ(startTime),
-                endTime: toIsoZ(endTime),
+            trips: [{ 
+                startLocation: pickup.trim(), 
+                endLocation: dropoff.trim(), 
+                startTime: toIsoZ(startTime), 
+                endTime: toIsoZ(endTime), 
                 distance: distanceKm ? Number(distanceKm) : undefined,
                 paxCount: paxNum
             }],
@@ -812,7 +946,7 @@ export default function EditOrderPage() {
             pushToast("Không tìm thấy chuyến để gán. Vui lòng tải lại trang.", "error");
             return;
         }
-
+        
         // Check cooldown
         if (cooldownRemaining > 0) {
             const mins = Math.floor(cooldownRemaining / 60000);
@@ -820,7 +954,7 @@ export default function EditOrderPage() {
             pushToast(`Vui lòng đợi ${mins}:${String(secs).padStart(2, '0')} để thay đổi tài xế/xe`, "error");
             return;
         }
-
+        
         setAssigning(true);
         try {
             await assignBooking(orderId, {
@@ -874,6 +1008,20 @@ export default function EditOrderPage() {
         ? {}
         : { disabled: true, readOnly: true };
 
+    // Với role Tư vấn viên: cho phép chỉnh "Ghi chú cho tài xế" miễn là chuyến CHƯA bắt đầu,
+    // kể cả khi đã qua mốc 12h không cho sửa các thông tin khác.
+    const canEditDriverNote = React.useMemo(() => {
+        if (!isConsultant) {
+            return canEdit;
+        }
+        if (!startTime) {
+            return true;
+        }
+        const tripStart = new Date(startTime);
+        const now = new Date();
+        return tripStart.getTime() > now.getTime();
+    }, [isConsultant, canEdit, startTime]);
+
     /* ---------------- locked banner ---------------- */
     const lockedReason = React.useMemo(() => {
         const editableStatuses = ["DRAFT", "PENDING", "CONFIRMED", "ASSIGNED", "QUOTATION_SENT"];
@@ -886,12 +1034,12 @@ export default function EditOrderPage() {
             const now = new Date();
             const diffMs = tripStart.getTime() - now.getTime();
             const hoursUntilTrip = diffMs / (1000 * 60 * 60);
-
+            
             if (hoursUntilTrip < 12) {
                 const absHours = Math.abs(hoursUntilTrip);
                 const hours = Math.floor(absHours);
                 const minutes = Math.floor((absHours - hours) * 60);
-
+                
                 if (hoursUntilTrip < 0) {
                     return `Chuyến đi đã diễn ra ${hours} giờ ${minutes} phút trước. Không thể chỉnh sửa.`;
                 }
@@ -1052,6 +1200,45 @@ export default function EditOrderPage() {
                         </div>
                     </div>
 
+                    {/* --- Hình thức thuê --- */}
+                    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div className="text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center gap-2 mb-4">
+                            <CarFront className="h-4 w-4 text-emerald-600" />
+                            Hình thức thuê xe
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 text-[13px]">
+                            {[
+                                { key: "ONE_WAY", label: "Một chiều" },
+                                { key: "ROUND_TRIP", label: "Hai chiều" },
+                                { key: "DAILY", label: "Theo ngày" },
+                            ].map((opt) => (
+                                <button
+                                    key={opt.key}
+                                    type="button"
+                                    onClick={() => canEdit && setHireType(opt.key)}
+                                    className={cls(
+                                        "px-3 py-2 rounded-md border text-[13px] flex items-center gap-2 shadow-sm",
+                                        hireType === opt.key
+                                            ? "ring-1 ring-emerald-200 bg-emerald-50 border-emerald-200 text-emerald-700"
+                                            : "border-slate-300 bg-white hover:bg-slate-50 text-slate-700",
+                                        !canEdit && "cursor-not-allowed opacity-60"
+                                    )}
+                                    disabled={!canEdit}
+                                >
+                                    <CarFront className="h-4 w-4" />
+                                    <span>{opt.label}</span>
+                                </button>
+                            ))}
+                        </div>
+
+                        {hireTypeName && (
+                            <div className="mt-3 text-[12px] text-slate-500">
+                                Từ hệ thống: <span className="font-medium text-slate-700">{hireTypeName}</span>
+                            </div>
+                        )}
+                    </div>
+
                     {/* --- Báo giá --- */}
                     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                         <div className="text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center gap-2 mb-4">
@@ -1201,22 +1388,18 @@ export default function EditOrderPage() {
                         {/* Điểm đón */}
                         <div className="mb-3">
                             <label className={labelCls}>
-                                <MapPin className="h-3.5 w-3.5 text-amber-600" />
-                                <span>Điểm đón</span>
+                                <MapPin className="h-3.5 w-3.5 text-emerald-600" />
+                                <span>Điểm đón *</span>
                             </label>
-                            <input
+                            <PlaceAutocomplete
+                                value={pickup}
+                                onChange={setPickup}
+                                placeholder="VD: Hồ Hoàn Kiếm, Sân bay Nội Bài..."
                                 className={makeInputCls({
                                     enabled: inputEnabledCls,
                                     disabled: inputDisabledCls,
                                 })}
-                                value={pickup}
-                                onChange={(e) =>
-                                    setPickup(
-                                        e.target.value
-                                    )
-                                }
-                                placeholder="Sân bay Nội Bài - T1"
-                                {...disableInputProps}
+                                disabled={!canEdit}
                             />
                         </div>
 
@@ -1224,34 +1407,32 @@ export default function EditOrderPage() {
                         <div className="mb-3">
                             <label className={labelCls}>
                                 <MapPin className="h-3.5 w-3.5 text-rose-600" />
-                                <span>Điểm đến</span>
+                                <span>Điểm đến *</span>
                             </label>
-                            <input
+                            <PlaceAutocomplete
+                                value={dropoff}
+                                onChange={setDropoff}
+                                placeholder="VD: Trung tâm Hà Nội, Phố cổ..."
                                 className={makeInputCls({
                                     enabled: inputEnabledCls,
                                     disabled: inputDisabledCls,
                                 })}
-                                value={dropoff}
-                                onChange={(e) =>
-                                    setDropoff(
-                                        e.target.value
-                                    )
-                                }
-                                placeholder="Khách sạn Pearl Westlake, Tây Hồ"
-                                {...disableInputProps}
+                                disabled={!canEdit}
                             />
                         </div>
 
-                        {/* Thời gian đón */}
+                        {/* Thời gian đón / Ngày bắt đầu */}
                         <div className="mb-3">
                             <label className={labelCls}>
                                 <Calendar className="h-3.5 w-3.5 text-slate-400" />
                                 <span>
-                                    Thời gian đón
+                                    {hireType === "DAILY" || hireType === "MULTI_DAY"
+                                        ? "Ngày bắt đầu"
+                                        : "Thời gian đón"}
                                 </span>
                             </label>
                             <input
-                                type="datetime-local"
+                                type={hireType === "DAILY" || hireType === "MULTI_DAY" ? "date" : "datetime-local"}
                                 className={makeInputCls({
                                     enabled: inputEnabledCls,
                                     disabled: inputDisabledCls,
@@ -1266,17 +1447,18 @@ export default function EditOrderPage() {
                             />
                         </div>
 
-                        {/* Kết thúc dự kiến */}
+                        {/* Kết thúc dự kiến / Ngày kết thúc */}
                         <div className="mb-3">
                             <label className={labelCls}>
                                 <Calendar className="h-3.5 w-3.5 text-slate-400" />
                                 <span>
-                                    Thời gian kết
-                                    thúc (dự kiến)
+                                    {hireType === "DAILY" || hireType === "MULTI_DAY"
+                                        ? "Ngày kết thúc"
+                                        : "Thời gian kết thúc (dự kiến)"}
                                 </span>
                             </label>
                             <input
-                                type="datetime-local"
+                                type={hireType === "DAILY" || hireType === "MULTI_DAY" ? "date" : "datetime-local"}
                                 className={makeInputCls({
                                     enabled: inputEnabledCls,
                                     disabled: inputDisabledCls,
@@ -1435,8 +1617,8 @@ export default function EditOrderPage() {
                             {availabilityMsg ? (
                                 <div className={cls(
                                     "text-[12px]",
-                                    availabilityMsg.includes("✓") ? "text-emerald-600" :
-                                        availabilityMsg.includes("⚠") ? "text-amber-600" : "text-slate-700"
+                                    availabilityMsg.includes("✓") ? "text-emerald-600" : 
+                                    availabilityMsg.includes("⚠") ? "text-amber-600" : "text-slate-700"
                                 )}>
                                     {availabilityMsg}
                                 </div>
@@ -1456,21 +1638,26 @@ export default function EditOrderPage() {
                         </div>
                         <textarea
                             rows={3}
-                            className={makeInputCls({
-                                enabled: cls(textareaEnabledCls, "resize-none"),
-                                disabled: cls(textareaDisabledCls, "resize-none"),
-                            })}
+                            className={
+                                canEditDriverNote
+                                    ? cls(textareaEnabledCls, "resize-none")
+                                    : cls(textareaDisabledCls, "resize-none")
+                            }
                             value={bookingNote}
-                            onChange={(e) => setBookingNote(e.target.value)}
+                            onChange={(e) => {
+                                if (!canEditDriverNote) return;
+                                setBookingNote(e.target.value);
+                            }}
                             placeholder="VD: Đón thêm 1 khách ở 123 Trần Hưng Đạo lúc 8h30, hành lý cồng kềnh..."
-                            {...disableInputProps}
+                            {...(canEditDriverNote ? {} : { disabled: true, readOnly: true })}
                         />
                         <div className="text-[11px] text-slate-400 mt-2">
                             Ghi chú này sẽ hiển thị cho tài xế trong chi tiết chuyến đi.
                         </div>
                     </div>
 
-                    {/* Gán tài xế / xe */}
+                    {/* Gán tài xế / xe - Ẩn với Tư vấn viên */}
+                    {!isConsultant && (
                     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                         <div className="text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center gap-2 mb-4">
                             <CarFront className="h-4 w-4 text-sky-600" />
@@ -1520,7 +1707,7 @@ export default function EditOrderPage() {
                                         )}
                                         <ChevronDown className={cls("h-4 w-4 text-slate-400 transition-transform", showDriverDropdown && "rotate-180")} />
                                     </div>
-
+                                    
                                     {showDriverDropdown && (
                                         <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-auto">
                                             {loadingDrivers ? (
@@ -1611,7 +1798,7 @@ export default function EditOrderPage() {
                                         )}
                                         <ChevronDown className={cls("h-4 w-4 text-slate-400 transition-transform", showVehicleDropdown && "rotate-180")} />
                                     </div>
-
+                                    
                                     {showVehicleDropdown && (
                                         <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-auto">
                                             {loadingVehicles ? (
@@ -1703,14 +1890,14 @@ export default function EditOrderPage() {
                         )}
 
                         <div className="mt-4 flex items-center gap-3">
-                            <button
-                                type="button"
-                                onClick={onAssign}
+                            <button 
+                                type="button" 
+                                onClick={onAssign} 
                                 disabled={(!driverId && !vehicleId) || cooldownRemaining > 0 || assigning}
                                 className={cls(
                                     "rounded-md font-medium text-[13px] px-4 py-2 shadow-sm flex items-center gap-2",
                                     (driverId || vehicleId) && cooldownRemaining === 0
-                                        ? "bg-sky-600 hover:bg-sky-500 text-white"
+                                        ? "bg-sky-600 hover:bg-sky-500 text-white" 
                                         : "bg-slate-200 text-slate-400 cursor-not-allowed"
                                 )}
                             >
@@ -1718,14 +1905,15 @@ export default function EditOrderPage() {
                                 {assigning ? "Đang gán..." : (cooldownRemaining > 0 ? "Đang chờ..." : "Gán tài xế / xe")}
                             </button>
                             <div className="text-[11px] text-slate-500">
-                                {cooldownRemaining > 0
+                                {cooldownRemaining > 0 
                                     ? `Đợi ${Math.floor(cooldownRemaining / 60000)}:${String(Math.floor((cooldownRemaining % 60000) / 1000)).padStart(2, '0')} để thay đổi`
-                                    : (!driverId && !vehicleId
-                                        ? "Chọn ít nhất tài xế hoặc xe để gán"
+                                    : (!driverId && !vehicleId 
+                                        ? "Chọn ít nhất tài xế hoặc xe để gán" 
                                         : "Áp dụng cho toàn bộ chuyến của đơn.")}
                             </div>
                         </div>
                     </div>
+                    )}
                 </div>
             </div>
 

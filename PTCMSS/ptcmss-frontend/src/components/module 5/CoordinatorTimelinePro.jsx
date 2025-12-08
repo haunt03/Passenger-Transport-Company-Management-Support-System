@@ -1,4 +1,5 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import {
     CalendarDays,
     Search,
@@ -725,16 +726,16 @@ function Modal({ open, onClose, item }) {
 
 // ===== Dialog gán chuyến (stub M5.S3) =====
 function AssignDialog({
-                          open,
-                          order,
-                          suggestions,
-                          onClose,
-                          onConfirm,
-                          submitting = false,
-                          error = "",
-                          optionsLoading = false,
-                          optionsError = "",
-                      }) {
+    open,
+    order,
+    suggestions,
+    onClose,
+    onConfirm,
+    submitting = false,
+    error = "",
+    optionsLoading = false,
+    optionsError = "",
+}) {
     const [driverId, setDriverId] = React.useState("");
     const [vehicleId, setVehicleId] = React.useState("");
 
@@ -852,7 +853,7 @@ function AssignDialog({
                         className={`rounded-md px-3 py-2 text-[13px] font-medium shadow-sm ${canConfirm
                             ? "bg-emerald-600 hover:bg-emerald-500 text-white"
                             : "bg-slate-200 text-slate-400 cursor-not-allowed"
-                        }`}
+                            }`}
                     >
                         {submitting ? "Đang gán..." : "Gán"}
                     </button>
@@ -864,9 +865,8 @@ function AssignDialog({
 
 // ===== MAIN PAGE =====
 export default function CoordinatorTimelinePro() {
-    const [date, setDate] = React.useState(() =>
-        new Date().toISOString().slice(0, 10)
-    );
+    const navigate = useNavigate();
+    // Removed date state - load all future trips
     const [queueQuery, setQueueQuery] = React.useState("");
     const role = React.useMemo(() => getCurrentRole(), []);
     const userId = React.useMemo(() => getStoredUserId(), []);
@@ -1009,7 +1009,7 @@ export default function CoordinatorTimelinePro() {
 
     // Load data
     const fetchData = React.useCallback(
-        async (branch, d) => {
+        async (branch) => {
             if (!branch) {
                 console.warn("[CoordinatorTimelinePro] No branch ID provided");
                 return;
@@ -1022,10 +1022,10 @@ export default function CoordinatorTimelinePro() {
             setLoading(true);
             setError("");
             try {
-                console.log("[CoordinatorTimelinePro] Fetching dashboard for branch:", branchNumeric, "date:", d);
+                console.log("[CoordinatorTimelinePro] Fetching dashboard for branch:", branchNumeric);
+                // Don't pass date - load all future trips
                 const payload = await getDispatchDashboard({
                     branchId: branchNumeric,
-                    date: d,
                 });
                 console.log("[CoordinatorTimelinePro] Dashboard payload:", payload);
 
@@ -1084,8 +1084,8 @@ export default function CoordinatorTimelinePro() {
 
     React.useEffect(() => {
         if (!branchId || branchLoading) return;
-        fetchData(branchId, date);
-    }, [branchId, branchLoading, date, fetchData]);
+        fetchData(branchId);
+    }, [branchId, branchLoading, fetchData]);
 
     React.useEffect(() => {
         if (!assignOrder) return;
@@ -1130,23 +1130,19 @@ export default function CoordinatorTimelinePro() {
     const unassignedTrips = branchId ? pending : [];
 
     const openAssign = (order) => {
-        setAssignOrder(order);
-        setAssignSuggest({
-            drivers: [],
-            vehicles: [],
-        });
-        setAssignOptionsError("");
-        setAssignOptionsLoading(false);
-        setAssignErrorMsg("");
-        setAssigning(false);
+        // Navigate to order detail page instead of opening assignment dialog
+        const orderId = order.bookingId || order.id;
+        if (orderId) {
+            navigate(`/orders/${orderId}`);
+        }
     };
 
     const handleConfirmAssign = async ({
-                                           bookingId,
-                                           tripId,
-                                           driverId,
-                                           vehicleId,
-                                       }) => {
+        bookingId,
+        tripId,
+        driverId,
+        vehicleId,
+    }) => {
         if (!assignOrder && !bookingId) return;
         const targetBooking = bookingId ?? assignOrder?.bookingId ?? assignOrder?.id;
         if (targetBooking == null) {
@@ -1232,7 +1228,7 @@ export default function CoordinatorTimelinePro() {
                             ) : branches.length ? (
                                 <select
                                     className={`bg-transparent outline-none text-[13px] text-slate-900 min-w-[140px] appearance-none pr-6 focus:ring-2 focus:ring-sky-500 rounded ${isBranchScoped ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'
-                                    }`}
+                                        }`}
                                     value={branchId}
                                     onChange={(e) => {
                                         const newBranchId = e.target.value;
@@ -1260,35 +1256,11 @@ export default function CoordinatorTimelinePro() {
                             )}
                         </div>
 
-                        {/* date */}
-                        <div className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-[13px] text-slate-700 relative z-10">
-                            <CalendarDays className="h-4 w-4 text-slate-500" />
-                            <input
-                                type="date"
-                                className="bg-transparent outline-none text-[13px] text-slate-900 cursor-pointer w-full"
-                                value={date}
-                                onChange={(e) => {
-                                    const newDate = e.target.value;
-                                    if (newDate) {
-                                        setDate(newDate);
-                                    }
-                                }}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                }}
-                                style={{
-                                    pointerEvents: 'auto',
-                                    WebkitAppearance: 'none',
-                                    MozAppearance: 'textfield'
-                                }}
-                            />
-                        </div>
-
                         {/* refresh */}
                         <button
                             onClick={() => {
                                 if (branchId) {
-                                    fetchData(branchId, date);
+                                    fetchData(branchId);
                                 }
                             }}
                             disabled={loading}
@@ -1507,4 +1479,3 @@ export default function CoordinatorTimelinePro() {
         </div>
     );
 }
-

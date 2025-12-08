@@ -6,6 +6,7 @@ import { listHireTypes } from "../../api/hireTypes";
 import { calculatePrice, createBooking, getBooking, pageBookings, checkVehicleAvailability } from "../../api/bookings";
 import { calculateDistance } from "../../api/graphhopper";
 import { getBranchByUserId, listBranches } from "../../api/branches";
+import { listSystemSettings } from "../../api/systemSettings";
 import PlaceAutocomplete from "../common/PlaceAutocomplete";
 import {
     Phone,
@@ -252,39 +253,55 @@ export default function CreateOrderPage() {
     const [dropoff, setDropoff] = React.useState("");
     const [startTime, setStartTime] = React.useState("");
     const [endTime, setEndTime] = React.useState("");
+    const [timeError, setTimeError] = React.useState(""); // Error message cho validation thời gian
     const [categories, setCategories] = React.useState([]);
     const [paxCount, setPaxCount] = React.useState(1);
-
+    
     // Multiple vehicle selections: [{ categoryId, quantity }]
     const [vehicleSelections, setVehicleSelections] = React.useState([
         { categoryId: "", quantity: 1 }
     ]);
-
+    
     // Helper: thêm loại xe
     const addVehicleSelection = () => {
         if (vehicleSelections.length >= 5) return; // Max 5 loại
-        const unusedCategory = categories.find(c =>
+        const unusedCategory = categories.find(c => 
             !vehicleSelections.some(v => v.categoryId === c.id)
         );
-        setVehicleSelections([...vehicleSelections, {
-            categoryId: unusedCategory?.id || "",
-            quantity: 1
+        setVehicleSelections([...vehicleSelections, { 
+            categoryId: unusedCategory?.id || "", 
+            quantity: 1 
         }]);
     };
-
+    
     // Helper: xóa loại xe
     const removeVehicleSelection = (index) => {
         if (vehicleSelections.length <= 1) return; // Ít nhất 1 loại
         setVehicleSelections(vehicleSelections.filter((_, i) => i !== index));
     };
-
+    
     // Helper: cập nhật loại xe
     const updateVehicleSelection = (index, field, value) => {
         const updated = [...vehicleSelections];
+        
+        // Nếu đang thay đổi categoryId, kiểm tra trùng lặp
+        if (field === 'categoryId') {
+            // Kiểm tra xem loại xe này đã được chọn ở selection khác chưa
+            const isDuplicate = vehicleSelections.some((v, i) => 
+                i !== index && v.categoryId === value && value !== ""
+            );
+            
+            if (isDuplicate) {
+                // Không cho phép chọn loại xe đã được chọn
+                alert("Loại xe này đã được chọn. Vui lòng chọn loại xe khác hoặc tăng số lượng của loại xe đã chọn.");
+                return;
+            }
+        }
+        
         updated[index] = { ...updated[index], [field]: value };
         setVehicleSelections(updated);
     };
-
+    
     // Tính tổng số chỗ
     const totalSeats = React.useMemo(() => {
         return vehicleSelections.reduce((sum, v) => {
@@ -292,7 +309,7 @@ export default function CreateOrderPage() {
             return sum + (cat?.seats || 0) * (v.quantity || 0);
         }, 0);
     }, [vehicleSelections, categories]);
-
+    
     // Lấy categoryId đầu tiên để tương thích với code cũ
     const categoryId = vehicleSelections[0]?.categoryId || "";
     const vehicleCount = vehicleSelections[0]?.quantity || 1;
@@ -315,7 +332,8 @@ export default function CreateOrderPage() {
     const [checkingAvail, setCheckingAvail] =
         React.useState(false);
 
-    // Real API check-availability với suggestions - CHECK ALL VEHICLES
+    // Check availability real-time khi chọn xe hoặc thay đổi thời gian
+    // Backend API chỉ đọc dữ liệu, không giữ/reserve xe nên an toàn để check real-time
     React.useEffect(() => {
         // Chỉ check khi có ít nhất 1 loại xe được chọn
         const hasValidSelection = vehicleSelections.some(v => v.categoryId && v.quantity > 0);
@@ -327,7 +345,7 @@ export default function CreateOrderPage() {
             setAvailabilityInfo(null);
             return;
         }
-
+        
         const checkAvail = async () => {
             setCheckingAvail(true);
             try {
@@ -336,7 +354,7 @@ export default function CreateOrderPage() {
                 const sEnd = hireType === "ONE_WAY" && !endTime
                     ? new Date(new Date(startTime).getTime() + 2 * 60 * 60 * 1000).toISOString()
                     : new Date(endTime).toISOString();
-
+                
                 // Check availability cho TẤT CẢ các loại xe đã chọn
                 const results = await Promise.all(
                     vehicleSelections
@@ -352,13 +370,13 @@ export default function CreateOrderPage() {
                             return { ...data, categoryId: selection.categoryId, quantity: selection.quantity };
                         })
                 );
-
-                console.log("[CheckAvailability] All results:", results);
-
+                
+                console.log("🔵 [FRONTEND] Real-time Check Availability Results:", results);
+                
                 // Tổng hợp kết quả: nếu có bất kỳ loại xe nào hết thì báo hết
                 const allOk = results.every(r => r.ok);
                 const failedChecks = results.filter(r => !r.ok);
-
+                
                 if (allOk) {
                     // Tất cả đều có đủ xe
                     const totalAvailable = results.reduce((sum, r) => sum + (r.availableCount || 0), 0);
@@ -395,7 +413,7 @@ export default function CreateOrderPage() {
             } catch (err) {
                 console.error("Check availability error:", err);
                 setAvailabilityInfo({
-                    ok: true,
+                    ok: false,
                     count: 0,
                     text: "Lỗi kiểm tra: " + (err.message || "Không xác định"),
                     branch: branchId,
@@ -404,8 +422,8 @@ export default function CreateOrderPage() {
                 setCheckingAvail(false);
             }
         };
-
-        // Debounce 500ms
+        
+        // Debounce 500ms để tránh check quá nhiều khi user đang nhập
         const timer = setTimeout(checkAvail, 500);
         return () => clearTimeout(timer);
     }, [startTime, endTime, branchId, hireType, vehicleSelections, categories]);
@@ -431,7 +449,7 @@ export default function CreateOrderPage() {
     React.useEffect(() => {
         const discountAmount = Math.round((estPriceSys * discountPercent) / 100);
         setDiscount(discountAmount);
-
+        
         // Tự động cập nhật giá báo khách nếu chưa được chỉnh sửa thủ công
         if (!quotedPriceTouched) {
             const newQuotedPrice = Math.max(0, estPriceSys - discountAmount);
@@ -442,7 +460,11 @@ export default function CreateOrderPage() {
     // Các field mới cho logic tính giá
     const [isHoliday, setIsHoliday] = React.useState(false);
     const [isWeekend, setIsWeekend] = React.useState(false);
-
+    
+    // System settings cho phụ phí (load từ admin settings)
+    const [holidaySurchargeRate, setHolidaySurchargeRate] = React.useState(0.25); // Mặc định 25%
+    const [weekendSurchargeRate, setWeekendSurchargeRate] = React.useState(0.20); // Mặc định 20%
+    
     // Note cho tài xế (ghi chú điểm đón/trả, hướng dẫn...)
     const [bookingNote, setBookingNote] = React.useState("");
     const loadRecentBookingSuggestion = React.useCallback(async (phoneNumber) => {
@@ -484,14 +506,16 @@ export default function CreateOrderPage() {
         setDropoff(primaryTrip?.endLocation || "");
         setStartTime(primaryTrip?.startTime ? toDatetimeLocalValue(primaryTrip.startTime) : "");
         setEndTime(primaryTrip?.endTime ? toDatetimeLocalValue(primaryTrip.endTime) : "");
+        // Map booking.vehicles to vehicleSelections format
         if (Array.isArray(booking.vehicles) && booking.vehicles.length > 0) {
-            const firstVehicle = booking.vehicles[0];
-            if (firstVehicle?.vehicleCategoryId) {
-                setCategoryId(String(firstVehicle.vehicleCategoryId));
-            }
-            const totalVehicles = booking.vehicles.reduce((sum, v) => sum + (v.quantity || 0), 0);
-            if (totalVehicles > 0) {
-                setVehicleCount(totalVehicles);
+            const mappedVehicles = booking.vehicles
+                .filter(v => v.vehicleCategoryId && v.quantity > 0)
+                .map(v => ({
+                    categoryId: String(v.vehicleCategoryId),
+                    quantity: Number(v.quantity || 1)
+                }));
+            if (mappedVehicles.length > 0) {
+                setVehicleSelections(mappedVehicles);
             }
         }
         if (primaryTrip?.distance != null) {
@@ -684,12 +708,44 @@ export default function CreateOrderPage() {
         }
     }, [hireType, hireTypesList]);
 
-    // Reset số khách nếu vượt quá tổng số chỗ
+    // Load system settings cho phụ phí từ admin settings
     React.useEffect(() => {
-        if (totalSeats > 0 && paxCount > totalSeats) {
-            setPaxCount(Math.max(1, totalSeats));
+        (async () => {
+            try {
+                const settings = await listSystemSettings();
+                if (Array.isArray(settings)) {
+                    const holidaySetting = settings.find(s => s.settingKey === "HOLIDAY_SURCHARGE_RATE");
+                    const weekendSetting = settings.find(s => s.settingKey === "WEEKEND_SURCHARGE_RATE");
+                    
+                    if (holidaySetting && holidaySetting.settingValue) {
+                        const rate = parseFloat(holidaySetting.settingValue);
+                        if (!isNaN(rate)) {
+                            setHolidaySurchargeRate(rate);
+                        }
+                    }
+                    
+                    if (weekendSetting && weekendSetting.settingValue) {
+                        const rate = parseFloat(weekendSetting.settingValue);
+                        if (!isNaN(rate)) {
+                            setWeekendSurchargeRate(rate);
+                        }
+                    }
+                }
+            } catch (err) {
+                // Log warning thay vì error để không làm phiền user
+                // Giữ giá trị mặc định nếu load lỗi (có thể do không có quyền hoặc network issue)
+                console.warn("⚠️ [FRONTEND] Failed to load system settings (using defaults):", err.message || err);
+                // Giá trị mặc định đã được set ở useState: holidaySurchargeRate = 0.25, weekendSurchargeRate = 0.20
+            }
+        })();
+    }, []);
+
+    // Tự động set số khách = tổng số chỗ khi chọn xe
+    React.useEffect(() => {
+        if (totalSeats > 0) {
+            setPaxCount(totalSeats);
         }
-    }, [totalSeats, paxCount]);
+    }, [totalSeats]);
 
     // Auto-calculate distance when both pickup and dropoff are entered
     React.useEffect(() => {
@@ -744,6 +800,32 @@ export default function CreateOrderPage() {
             setIsWeekend(false);
         }
     }, [startTime]);
+    
+    // Validate thời gian real-time khi startTime hoặc endTime thay đổi
+    React.useEffect(() => {
+        if (hireType === "ONE_WAY") {
+            setTimeError(""); // ONE_WAY không cần validate
+            return;
+        }
+        
+        if (startTime && endTime) {
+            const startDate = new Date(startTime);
+            const endDate = new Date(endTime);
+            
+            if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+                setTimeError(""); // Chưa parse được thì chưa validate
+                return;
+            }
+            
+            if (endDate <= startDate) {
+                setTimeError("Thời gian về phải sau thời gian đi");
+            } else {
+                setTimeError(""); // Clear error nếu hợp lệ
+            }
+        } else {
+            setTimeError(""); // Chưa đủ thông tin thì chưa validate
+        }
+    }, [startTime, endTime, hireType]);
 
     // calculate via backend when possible
     React.useEffect(() => {
@@ -773,7 +855,9 @@ export default function CreateOrderPage() {
                     : toIsoZ(endTime);
 
                 // Gửi tất cả loại xe đã chọn
-                const price = await calculatePrice({
+                // TODO: Backend cần kiểm tra logic tính giá - thuê theo ngày (DAILY) phải rẻ hơn thuê 2 chiều (ROUND_TRIP)
+                // Hiện tại có thể đang tính sai: ROUND_TRIP đắt gấp đôi DAILY
+                const priceRequest = {
                     vehicleCategoryIds: validSelections.map(v => Number(v.categoryId)),
                     quantities: validSelections.map(v => Number(v.quantity || 1)),
                     distance: Number(distanceKm || 0),
@@ -783,8 +867,41 @@ export default function CreateOrderPage() {
                     isWeekend: isWeekend,
                     startTime: startISO,
                     endTime: endISO,
+                };
+                
+                // Lấy thông tin hireType từ hireTypesList
+                const currentHireTypeObj = hireTypesList.find(h => 
+                    (hireTypeId && h.id === Number(hireTypeId)) || 
+                    (hireType && h.code === hireType)
+                );
+                
+                // 🔍 LOG FRONTEND: Dữ liệu gửi đi
+                console.log("🔵 [FRONTEND] Calculate Price Request:", {
+                    ...priceRequest,
+                    hireType: hireType, // String: "ONE_WAY", "ROUND_TRIP", "DAILY"
+                    hireTypeId: hireTypeId,
+                    hireTypeName: currentHireTypeObj?.name || "N/A",
+                    hireTypeCode: currentHireTypeObj?.code || hireType || "N/A",
+                    vehicleSelections: validSelections.map(v => ({
+                        categoryId: v.categoryId,
+                        categoryName: v.categoryName,
+                        quantity: v.quantity || 1
+                    })),
+                    hireTypesList: hireTypesList.map(h => ({ id: h.id, code: h.code, name: h.name }))
                 });
+                
+                const price = await calculatePrice(priceRequest);
                 const base = Number(price || 0);
+                
+                // 🔍 LOG FRONTEND: Kết quả nhận về
+                console.log("🟢 [FRONTEND] Calculate Price Response:", {
+                    price: base,
+                    formattedPrice: new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(base),
+                    distance: distanceKm,
+                    hireTypeId: hireTypeId,
+                    hireTypeName: hireType?.name || "N/A"
+                });
+                
                 setEstPriceSys(base);
                 setQuotedPrice((old) => (quotedPriceTouched ? old : base));
             } catch (err) {
@@ -885,6 +1002,17 @@ export default function CreateOrderPage() {
 
     // Validation: ONE_WAY không cần endTime
     const needsEndTime = hireType !== "ONE_WAY";
+    
+    // Validate thời gian: endTime phải > startTime
+    const isTimeValid = React.useMemo(() => {
+        if (!startTime) return true; // Chưa nhập startTime thì chưa cần validate
+        if (!needsEndTime || !endTime) return true; // ONE_WAY hoặc chưa nhập endTime
+        
+        const startDate = new Date(startTime);
+        const endDate = new Date(endTime);
+        return endDate > startDate;
+    }, [startTime, endTime, needsEndTime]);
+    
     const isValidCore =
         phone &&
         customerName &&
@@ -892,6 +1020,8 @@ export default function CreateOrderPage() {
         dropoff &&
         startTime &&
         (needsEndTime ? endTime : true) &&
+        isTimeValid && // Thêm validation thời gian
+        !timeError && // Không có lỗi thời gian
         categoryId &&
         branchId &&
         quotedPrice > 0;
@@ -940,21 +1070,24 @@ export default function CreateOrderPage() {
             // Validate endTime nếu không phải ONE_WAY
             if (hireType !== "ONE_WAY" && endTime) {
                 const endDate = new Date(endTime);
-
+                
                 // Check if end time is after start time
                 if (endDate <= startDate) {
+                    setTimeError("Thời gian về phải sau thời gian đi");
                     push("Thời gian về phải sau thời gian đi", "error");
                     return;
+                } else {
+                    setTimeError(""); // Clear error nếu hợp lệ
                 }
 
                 // Check minimum duration based on hire type
                 const durationHours = (endDate - startDate) / (1000 * 60 * 60);
                 let minDuration = 2; // Minimum 2 hours for round trip
-
+                
                 if (hireType === "DAILY" || hireType === "MULTI_DAY") {
                     minDuration = 8; // Minimum 8 hours for daily hire
                 }
-
+                
                 if (durationHours < minDuration) {
                     const hireTypeLabel = hireType === "ROUND_TRIP" ? "hai chiều" : "theo ngày";
                     push(`Thời gian thuê ${hireTypeLabel} tối thiểu ${minDuration} giờ`, "error");
@@ -976,6 +1109,41 @@ export default function CreateOrderPage() {
                 return;
             }
 
+            // Tự động tạo 2 trips cho ROUND_TRIP (Hai chiều)
+            let tripsToSend = [];
+            if (hireType === "ROUND_TRIP") {
+                // Trip 1: Đi (A → B)
+                tripsToSend.push({
+                    startLocation: pickup,
+                    endLocation: dropoff,
+                    startTime: sStart,
+                    endTime: sEnd
+                });
+                // Trip 2: Về (B → A) - đảo ngược điểm đi/về
+                // Thời gian về: bắt đầu từ thời gian kết thúc chuyến đi (sEnd)
+                // Kết thúc = sEnd + thời gian di chuyển (tương tự chuyến đi)
+                const tripDuration = new Date(sEnd).getTime() - new Date(sStart).getTime();
+                const returnStartTime = sEnd; // Bắt đầu về ngay sau khi đến điểm đến
+                const returnEndTime = new Date(new Date(sEnd).getTime() + tripDuration).toISOString();
+                tripsToSend.push({
+                    startLocation: dropoff,
+                    endLocation: pickup,
+                    startTime: returnStartTime,
+                    endTime: returnEndTime
+                });
+                console.log("🔵 [FRONTEND] ROUND_TRIP: Created 2 trips");
+                console.log("  - Trip 1 (Đi):", pickup, "→", dropoff, sStart, "→", sEnd);
+                console.log("  - Trip 2 (Về):", dropoff, "→", pickup, returnStartTime, "→", returnEndTime);
+            } else {
+                // ONE_WAY hoặc DAILY: chỉ 1 trip
+                tripsToSend.push({
+                    startLocation: pickup,
+                    endLocation: dropoff,
+                    startTime: sStart,
+                    endTime: sEnd
+                });
+            }
+
             const req = {
                 customer: { fullName: customerName, phone, email },
                 branchId: Number(branchId),
@@ -984,9 +1152,7 @@ export default function CreateOrderPage() {
                 isHoliday: isHoliday,
                 isWeekend: isWeekend,
                 note: bookingNote || null,
-                trips: [
-                    { startLocation: pickup, endLocation: dropoff, startTime: sStart, endTime: sEnd },
-                ],
+                trips: tripsToSend,
                 vehicles: vehicleSelections
                     .filter(v => v.categoryId)
                     .map(v => ({ vehicleCategoryId: Number(v.categoryId), quantity: Number(v.quantity || 1) })),
@@ -1002,10 +1168,10 @@ export default function CreateOrderPage() {
             console.log("📤 Full request payload:", req);
             const created = await createBooking(req);
             console.log("✅ Draft created response:", created);
-
+            
             // Handle different response formats
             const bookingId = created?.id || created?.data?.id || created?.bookingId;
-
+            
             if (bookingId) {
                 push(`✓ Đã lưu nháp đơn hàng #${bookingId} - Đang chuyển đến trang chi tiết...`, "success", 3000);
                 setTimeout(() => {
@@ -1066,21 +1232,24 @@ export default function CreateOrderPage() {
             // Validate endTime nếu không phải ONE_WAY
             if (hireType !== "ONE_WAY" && endTime) {
                 const endDate = new Date(endTime);
-
+                
                 // Check if end time is after start time
                 if (endDate <= startDate) {
+                    setTimeError("Thời gian về phải sau thời gian đi");
                     push("Thời gian về phải sau thời gian đi", "error");
                     return;
+                } else {
+                    setTimeError(""); // Clear error nếu hợp lệ
                 }
 
                 // Check minimum duration based on hire type
                 const durationHours = (endDate - startDate) / (1000 * 60 * 60);
                 let minDuration = 2; // Minimum 2 hours for round trip
-
+                
                 if (hireType === "DAILY" || hireType === "MULTI_DAY") {
                     minDuration = 8; // Minimum 8 hours for daily hire
                 }
-
+                
                 if (durationHours < minDuration) {
                     const hireTypeLabel = hireType === "ROUND_TRIP" ? "hai chiều" : "theo ngày";
                     push(`Thời gian thuê ${hireTypeLabel} tối thiểu ${minDuration} giờ`, "error");
@@ -1089,14 +1258,8 @@ export default function CreateOrderPage() {
             }
         }
 
-        if (availabilityInfo && !availabilityInfo.ok) {
-            push(
-                "Cảnh báo: Hệ thống báo hết xe trong khung giờ này.",
-                "error"
-            );
-            return;
-        }
-
+        // Check availability trước khi submit (chỉ check, không giữ xe)
+        // TODO: Backend cần hỗ trợ parameter để chỉ check mà không giữ xe
         setLoadingSubmit(true);
         try {
             const sStart = toIsoZ(startTime);
@@ -1107,7 +1270,126 @@ export default function CreateOrderPage() {
 
             if (!sStart) {
                 push("Thời gian đi không hợp lệ", "error");
+                setLoadingSubmit(false);
                 return;
+            }
+
+            // Check availability cho tất cả loại xe trước khi submit
+            const validSelections = vehicleSelections.filter(v => v.categoryId && v.quantity > 0);
+            if (validSelections.length > 0) {
+                try {
+                    const checkResults = await Promise.all(
+                        validSelections.map(async (selection) => {
+                            const data = await checkVehicleAvailability({
+                                branchId: Number(branchId),
+                                categoryId: Number(selection.categoryId),
+                                startTime: sStart,
+                                endTime: sEnd,
+                                quantity: selection.quantity || 1,
+                            });
+                            
+                            // 🔍 LOG FRONTEND: Check availability response
+                            console.log("🔵 [FRONTEND] Check Availability Response:", {
+                                categoryId: selection.categoryId,
+                                categoryName: selection.categoryName,
+                                ok: data.ok,
+                                availableCount: data.availableCount,
+                                needed: data.needed,
+                                totalCandidates: data.totalCandidates,
+                                busyCount: data.busyCount,
+                                alternativeCategories: data.alternativeCategories || [],
+                                nextAvailableSlots: data.nextAvailableSlots || [],
+                            });
+                            
+                            return { ...data, categoryId: selection.categoryId, quantity: selection.quantity };
+                        })
+                    );
+                    
+                    const allOk = checkResults.every(r => r.ok);
+                    if (!allOk) {
+                        const firstFailed = checkResults.find(r => !r.ok);
+                        const cat = categories.find(c => c.id === firstFailed.categoryId);
+                        
+                        // Set availabilityInfo để hiển thị suggest dialog
+                        setAvailabilityInfo({
+                            ok: false,
+                            count: 0,
+                            totalCandidates: firstFailed.totalCandidates || 0,
+                            busyCount: firstFailed.busyCount || 0,
+                            text: `${cat?.name || 'Xe'}: Không đủ xe trong khung giờ này (${firstFailed.busyCount || 0}/${firstFailed.totalCandidates || 0} đang bận). Vui lòng chọn thời gian khác.`,
+                            branch: branchId,
+                            // Suggestions từ kết quả đầu tiên bị fail
+                            alternativeCategories: firstFailed.alternativeCategories || [],
+                            nextAvailableSlots: firstFailed.nextAvailableSlots || [],
+                            failedCategoryId: firstFailed.categoryId,
+                            results: checkResults,
+                        });
+                        
+                        push(
+                            `${cat?.name || 'Xe'}: Không đủ xe trong khung giờ này (${firstFailed.busyCount || 0}/${firstFailed.totalCandidates || 0} đang bận). Vui lòng chọn thời gian khác.`,
+                            "error"
+                        );
+                        
+                        // Tự động mở popup gợi ý khi không đủ xe và có suggestions
+                        if (firstFailed.alternativeCategories?.length > 0 || firstFailed.nextAvailableSlots?.length > 0) {
+                            setShowSuggestionDialog(true);
+                        }
+                        
+                        setLoadingSubmit(false);
+                        return;
+                    }
+                } catch (checkErr) {
+                    console.error("Check availability error:", checkErr);
+                    // Không block submit nếu check lỗi, chỉ cảnh báo
+                    push("Không thể kiểm tra tính khả dụng xe. Vui lòng thử lại.", "error");
+                    setLoadingSubmit(false);
+                    return;
+                }
+            }
+
+            // 🔍 DEBUG: Log vehicleSelections trước khi tạo request
+            console.log("🔵 [FRONTEND] vehicleSelections before creating booking:", vehicleSelections);
+            const validVehicleSelections = vehicleSelections.filter(v => v.categoryId);
+            console.log("🔵 [FRONTEND] Valid vehicle selections:", validVehicleSelections);
+            const vehiclesToSend = validVehicleSelections.map(v => ({ 
+                vehicleCategoryId: Number(v.categoryId), 
+                quantity: Number(v.quantity || 1) 
+            }));
+            console.log("🔵 [FRONTEND] Vehicles to send to backend:", vehiclesToSend);
+
+            // Tự động tạo 2 trips cho ROUND_TRIP (Hai chiều)
+            let tripsToSend = [];
+            if (hireType === "ROUND_TRIP") {
+                // Trip 1: Đi (A → B)
+                tripsToSend.push({
+                    startLocation: pickup,
+                    endLocation: dropoff,
+                    startTime: sStart,
+                    endTime: sEnd
+                });
+                // Trip 2: Về (B → A) - đảo ngược điểm đi/về
+                // Thời gian về: bắt đầu từ thời gian kết thúc chuyến đi (sEnd)
+                // Kết thúc = sEnd + thời gian di chuyển (tương tự chuyến đi)
+                const tripDuration = new Date(sEnd).getTime() - new Date(sStart).getTime();
+                const returnStartTime = sEnd; // Bắt đầu về ngay sau khi đến điểm đến
+                const returnEndTime = new Date(new Date(sEnd).getTime() + tripDuration).toISOString();
+                tripsToSend.push({
+                    startLocation: dropoff,
+                    endLocation: pickup,
+                    startTime: returnStartTime,
+                    endTime: returnEndTime
+                });
+                console.log("🔵 [FRONTEND] ROUND_TRIP: Created 2 trips");
+                console.log("  - Trip 1 (Đi):", pickup, "→", dropoff, sStart, "→", sEnd);
+                console.log("  - Trip 2 (Về):", dropoff, "→", pickup, returnStartTime, "→", returnEndTime);
+            } else {
+                // ONE_WAY hoặc DAILY: chỉ 1 trip
+                tripsToSend.push({
+                    startLocation: pickup,
+                    endLocation: dropoff,
+                    startTime: sStart,
+                    endTime: sEnd
+                });
             }
 
             const req = {
@@ -1118,12 +1400,8 @@ export default function CreateOrderPage() {
                 isHoliday: isHoliday,
                 isWeekend: isWeekend,
                 note: bookingNote || null,
-                trips: [
-                    { startLocation: pickup, endLocation: dropoff, startTime: sStart, endTime: sEnd },
-                ],
-                vehicles: vehicleSelections
-                    .filter(v => v.categoryId)
-                    .map(v => ({ vehicleCategoryId: Number(v.categoryId), quantity: Number(v.quantity || 1) })),
+                trips: tripsToSend,
+                vehicles: vehiclesToSend,
                 estimatedCost: Number(estPriceSys || 0),
                 discountAmount: Number(discount || 0),
                 totalCost: Number(quotedPrice || 0),
@@ -1135,10 +1413,11 @@ export default function CreateOrderPage() {
             console.log("📤 Creating booking:", req);
             const created = await createBooking(req);
             console.log("✅ Booking created response:", created);
-
+            console.log("🔍 [FRONTEND] Vehicles in response:", created?.vehicles || created?.data?.vehicles);
+            
             // Handle different response formats
             const bookingId = created?.id || created?.data?.id || created?.bookingId;
-
+            
             if (bookingId) {
                 push(`✓ Đã tạo đơn hàng #${bookingId} - Đang chuyển đến trang chi tiết...`, "success", 3000);
                 // Chuyển đến trang chi tiết để tạo request đặt cọc
@@ -1255,16 +1534,22 @@ export default function CreateOrderPage() {
                     {/* Đặt đơn */}
                     <button
                         onClick={submitOrder}
-                        disabled={loadingSubmit || loadingBranch || !branchId}
+                        disabled={loadingSubmit || loadingBranch || !branchId || (availabilityInfo && !availabilityInfo.ok)}
                         type="button"
-                        className="rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-[13px] px-4 py-2 shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className={cls(
+                            "rounded-md font-medium text-[13px] px-4 py-2 shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed",
+                            availabilityInfo && !availabilityInfo.ok
+                                ? "bg-slate-400 text-white cursor-not-allowed"
+                                : "bg-emerald-600 hover:bg-emerald-500 text-white"
+                        )}
+                        title={availabilityInfo && !availabilityInfo.ok ? "Không thể đặt đơn: Hết xe trong khung giờ này" : "Đặt đơn hàng"}
                     >
                         {loadingSubmit ? (
                             <Loader2 className="h-4 w-4 animate-spin text-white" />
                         ) : (
                             <Send className="h-4 w-4 text-white" />
                         )}
-                        <span>Đặt đơn</span>
+                        <span>{availabilityInfo && !availabilityInfo.ok ? "Hết xe" : "Đặt đơn"}</span>
                     </button>
                 </div>
             </div>
@@ -1365,7 +1650,7 @@ export default function CreateOrderPage() {
                                     className={cls(
                                         "px-3 py-2 rounded-md border text-[13px] flex items-center gap-2 shadow-sm",
                                         hireType ===
-                                        opt.key
+                                            opt.key
                                             ? "ring-1 ring-emerald-200 bg-emerald-50 border-emerald-200 text-emerald-700"
                                             : "border-slate-300 bg-white hover:bg-slate-50 text-slate-700"
                                     )}
@@ -1392,7 +1677,7 @@ export default function CreateOrderPage() {
                                         className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                                     />
                                     <span className="text-[13px] text-slate-700">
-                                        Ngày lễ (+25%)
+                                        Ngày lễ (+{Math.round(holidaySurchargeRate * 100)}%)
                                     </span>
                                 </label>
 
@@ -1405,7 +1690,7 @@ export default function CreateOrderPage() {
                                         className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                                     />
                                     <span className="text-[13px] text-slate-700">
-                                        Cuối tuần (+20%)
+                                        Cuối tuần (+{Math.round(weekendSurchargeRate * 100)}%)
                                     </span>
                                 </label>
                             </div>
@@ -1652,22 +1937,42 @@ export default function CreateOrderPage() {
                                 <div className={labelCls}>
                                     <Clock className="h-3.5 w-3.5 text-slate-400" />
                                     <span>
-                                        {hireType === "DAILY" || hireType === "MULTI_DAY"
-                                            ? "Ngày bắt đầu *"
+                                        {hireType === "DAILY" || hireType === "MULTI_DAY" 
+                                            ? "Ngày bắt đầu *" 
                                             : "Thời gian đi *"}
                                     </span>
                                 </div>
                                 <input
                                     type={hireType === "DAILY" || hireType === "MULTI_DAY" ? "date" : "datetime-local"}
                                     value={startTime}
-                                    onChange={(e) =>
-                                        setStartTime(
-                                            e.target
-                                                .value
-                                        )
-                                    }
-                                    className={inputCls}
+                                    onChange={(e) => {
+                                        const newStartTime = e.target.value;
+                                        setStartTime(newStartTime);
+                                        
+                                        // Validate real-time: nếu đã có endTime, kiểm tra endTime > startTime
+                                        if (newStartTime && endTime && hireType !== "ONE_WAY") {
+                                            const startDate = new Date(newStartTime);
+                                            const endDate = new Date(endTime);
+                                            if (endDate <= startDate) {
+                                                setTimeError("Thời gian về phải sau thời gian đi");
+                                            } else {
+                                                setTimeError("");
+                                            }
+                                        } else {
+                                            setTimeError("");
+                                        }
+                                    }}
+                                    className={cls(
+                                        inputCls,
+                                        timeError && "border-red-300 focus:border-red-500 focus:ring-red-500/20"
+                                    )}
                                 />
+                                {timeError && (
+                                    <div className="text-[12px] text-red-600 mt-1 flex items-center gap-1">
+                                        <AlertTriangle className="h-3.5 w-3.5" />
+                                        <span>{timeError}</span>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Kết thúc dự kiến / Ngày kết thúc - Ẩn với ONE_WAY */}
@@ -1684,14 +1989,34 @@ export default function CreateOrderPage() {
                                     <input
                                         type={hireType === "DAILY" || hireType === "MULTI_DAY" ? "date" : "datetime-local"}
                                         value={endTime}
-                                        onChange={(e) =>
-                                            setEndTime(
-                                                e.target
-                                                    .value
-                                            )
-                                        }
-                                        className={inputCls}
+                                        onChange={(e) => {
+                                            const newEndTime = e.target.value;
+                                            setEndTime(newEndTime);
+                                            
+                                            // Validate real-time: endTime phải > startTime
+                                            if (newEndTime && startTime) {
+                                                const startDate = new Date(startTime);
+                                                const endDate = new Date(newEndTime);
+                                                if (endDate <= startDate) {
+                                                    setTimeError("Thời gian về phải sau thời gian đi");
+                                                } else {
+                                                    setTimeError("");
+                                                }
+                                            } else {
+                                                setTimeError("");
+                                            }
+                                        }}
+                                        className={cls(
+                                            inputCls,
+                                            timeError && "border-red-300 focus:border-red-500 focus:ring-red-500/20"
+                                        )}
                                     />
+                                    {timeError && (
+                                        <div className="text-[12px] text-red-600 mt-1 flex items-center gap-1">
+                                            <AlertTriangle className="h-3.5 w-3.5" />
+                                            <span>{timeError}</span>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -1701,69 +2026,114 @@ export default function CreateOrderPage() {
                                     <CarFront className="h-3.5 w-3.5 text-emerald-600" />
                                     <span>Loại xe yêu cầu *</span>
                                 </div>
-
+                                
                                 <div className="space-y-2 mt-1">
                                     {vehicleSelections.map((selection, index) => {
                                         const cat = categories.find(c => c.id === selection.categoryId);
+                                        // Kiểm tra loại xe này có hết không (từ availabilityInfo.results)
+                                        const thisVehicleResult = availabilityInfo?.results?.find(r => r.categoryId === selection.categoryId);
+                                        const isOutOfStock = thisVehicleResult && !thisVehicleResult.ok;
+                                        
                                         return (
-                                            <div key={index} className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg border border-slate-200">
-                                                {/* Select loại xe */}
-                                                <select
-                                                    value={selection.categoryId}
-                                                    onChange={(e) => updateVehicleSelection(index, 'categoryId', e.target.value)}
-                                                    className="flex-1 bg-white border border-slate-300 rounded-md px-3 py-2 text-[13px] text-slate-900 shadow-sm outline-none focus:ring-2 focus:ring-[#0079BC]/20"
-                                                >
-                                                    <option value="">-- Chọn loại xe --</option>
-                                                    {categories.map((c) => (
-                                                        <option key={c.id} value={c.id}>
-                                                            {c.name} ({c.seats} chỗ)
-                                                        </option>
-                                                    ))}
-                                                </select>
-
-                                                {/* Số lượng */}
-                                                <div className="flex items-center gap-1">
-                                                    <span className="text-[12px] text-slate-500 whitespace-nowrap">SL:</span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => updateVehicleSelection(index, 'quantity', Math.max(1, selection.quantity - 1))}
-                                                        className="px-2 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-50"
-                                                        disabled={selection.quantity <= 1}
+                                            <div key={index} className={cls(
+                                                "p-2 rounded-lg border",
+                                                isOutOfStock 
+                                                    ? "bg-red-50 border-red-300" 
+                                                    : "bg-slate-50 border-slate-200"
+                                            )}>
+                                                {/* Row 1: Select + Số lượng + Số chỗ + Nút xóa */}
+                                                <div className="flex items-center gap-2">
+                                                    {/* Select loại xe */}
+                                                    <select
+                                                        value={selection.categoryId}
+                                                        onChange={(e) => updateVehicleSelection(index, 'categoryId', e.target.value)}
+                                                        className={cls(
+                                                            "flex-1 border rounded-md px-3 py-2 text-[13px] shadow-sm outline-none focus:ring-2",
+                                                            isOutOfStock
+                                                                ? "bg-red-50 border-red-300 text-red-700 focus:ring-red-200"
+                                                                : "bg-white border-slate-300 text-slate-900 focus:ring-[#0079BC]/20"
+                                                        )}
                                                     >
-                                                        <Minus className="h-3 w-3" />
-                                                    </button>
-                                                    <span className="w-8 text-center text-[13px] font-medium">{selection.quantity}</span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => updateVehicleSelection(index, 'quantity', selection.quantity + 1)}
-                                                        className="px-2 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50"
-                                                    >
-                                                        <Plus className="h-3 w-3" />
-                                                    </button>
+                                                        <option value="">-- Chọn loại xe --</option>
+                                                        {categories.map((c) => {
+                                                            // Disable nếu loại xe này đã được chọn ở selection khác
+                                                            const isAlreadySelected = vehicleSelections.some((v, i) => 
+                                                                i !== index && v.categoryId === c.id
+                                                            );
+                                                            // Kiểm tra loại xe này có hết không
+                                                            const catResult = availabilityInfo?.results?.find(r => r.categoryId === c.id);
+                                                            const catOutOfStock = catResult && !catResult.ok;
+                                                            
+                                                            return (
+                                                                <option 
+                                                                    key={c.id} 
+                                                                    value={c.id}
+                                                                    disabled={isAlreadySelected}
+                                                                    className={catOutOfStock ? "text-red-600" : ""}
+                                                                >
+                                                                    {c.name} ({c.seats} chỗ) {isAlreadySelected ? '(đã chọn)' : ''}{catOutOfStock ? ' ⚠️ HẾT XE' : ''}
+                                                                </option>
+                                                            );
+                                                        })}
+                                                    </select>
+                                                    
+                                                    {/* Số lượng */}
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="text-[12px] text-slate-500 whitespace-nowrap">SL:</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => updateVehicleSelection(index, 'quantity', Math.max(1, selection.quantity - 1))}
+                                                            className="px-2 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-50"
+                                                            disabled={selection.quantity <= 1}
+                                                        >
+                                                            <Minus className="h-3 w-3" />
+                                                        </button>
+                                                        <span className="w-8 text-center text-[13px] font-medium">{selection.quantity}</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => updateVehicleSelection(index, 'quantity', selection.quantity + 1)}
+                                                            className="px-2 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50"
+                                                        >
+                                                            <Plus className="h-3 w-3" />
+                                                        </button>
+                                                    </div>
+                                                    
+                                                    {/* Hiện số chỗ */}
+                                                    {cat && (
+                                                        <span className={cls(
+                                                            "text-[11px] whitespace-nowrap",
+                                                            isOutOfStock ? "text-red-600 font-medium" : "text-slate-500"
+                                                        )}>
+                                                            = {cat.seats * selection.quantity} chỗ
+                                                        </span>
+                                                    )}
+                                                    
+                                                    {/* Nút xóa */}
+                                                    {vehicleSelections.length > 1 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeVehicleSelection(index)}
+                                                            className="p-1 text-red-500 hover:bg-red-50 rounded"
+                                                            title="Xóa loại xe này"
+                                                        >
+                                                            <X className="h-4 w-4" />
+                                                        </button>
+                                                    )}
                                                 </div>
-
-                                                {/* Hiện số chỗ */}
-                                                {cat && (
-                                                    <span className="text-[11px] text-slate-500 whitespace-nowrap">
-                                                        = {cat.seats * selection.quantity} chỗ
-                                                    </span>
-                                                )}
-
-                                                {/* Nút xóa */}
-                                                {vehicleSelections.length > 1 && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => removeVehicleSelection(index)}
-                                                        className="p-1 text-red-500 hover:bg-red-50 rounded"
-                                                        title="Xóa loại xe này"
-                                                    >
-                                                        <X className="h-4 w-4" />
-                                                    </button>
+                                                
+                                                {/* Row 2: Badge hết xe (nếu có) */}
+                                                {isOutOfStock && (
+                                                    <div className="mt-2 flex items-center">
+                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium bg-red-100 text-red-700 border border-red-200">
+                                                            <CarFront className="h-3.5 w-3.5" />
+                                                            {cat?.name}: Hết xe ({thisVehicleResult?.busyCount || 0}/{thisVehicleResult?.totalCandidates || 0} đang bận) ({thisVehicleResult?.availableCount || 0} xe)
+                                                        </span>
+                                                    </div>
                                                 )}
                                             </div>
                                         );
                                     })}
-
+                                    
                                     {/* Nút thêm loại xe */}
                                     {vehicleSelections.length < 5 && categories.length > vehicleSelections.length && (
                                         <button
@@ -1776,7 +2146,7 @@ export default function CreateOrderPage() {
                                         </button>
                                     )}
                                 </div>
-
+                                
                                 {/* Tổng số chỗ */}
                                 <div className="mt-2 flex items-center justify-between text-[12px]">
                                     <span className="text-slate-500">
@@ -1784,13 +2154,13 @@ export default function CreateOrderPage() {
                                         {vehicleSelections.length > 1 && (
                                             <span className="ml-1">
                                                 ({vehicleSelections.filter(v => v.categoryId).map(v => {
-                                                const c = categories.find(cat => cat.id === v.categoryId);
-                                                return c ? `${v.quantity}×${c.seats}` : '';
-                                            }).filter(Boolean).join(' + ')})
+                                                    const c = categories.find(cat => cat.id === v.categoryId);
+                                                    return c ? `${v.quantity}×${c.seats}` : '';
+                                                }).filter(Boolean).join(' + ')})
                                             </span>
                                         )}
                                     </span>
-
+                                    
                                     {checkingAvail ? (
                                         <span className="inline-flex items-center gap-1 text-slate-500">
                                             <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />
@@ -1800,64 +2170,6 @@ export default function CreateOrderPage() {
                                         <AvailabilityBadge info={availabilityInfo} />
                                     )}
                                 </div>
-                            </div>
-
-                            {/* Số khách / Số xe */}
-                            {/* Số khách */}
-                            <div>
-                                <div className={labelCls}>
-                                    <Users className="h-3.5 w-3.5 text-slate-400" />
-                                    <span>Số khách</span>
-                                    {totalSeats > 0 && (
-                                        <span className="text-[11px] text-slate-500 font-normal">
-                                            (Tối đa: {totalSeats})
-                                        </span>
-                                    )}
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <button
-                                        type="button"
-                                        onClick={decrementPax}
-                                        disabled={paxCount <= 1}
-                                        className={cls(
-                                            "px-2 py-2 rounded-l-md border border-slate-300 bg-white hover:bg-slate-50 transition-colors",
-                                            "disabled:opacity-50 disabled:cursor-not-allowed",
-                                            "focus:outline-none focus:ring-2 focus:ring-[#0079BC]/20"
-                                        )}
-                                    >
-                                        <Minus className="h-4 w-4 text-slate-600" />
-                                    </button>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        max={totalSeats > 0 ? totalSeats : undefined}
-                                        value={paxCount}
-                                        onChange={(e) => onChangePax(e.target.value)}
-                                        className={cls(
-                                            inputCls,
-                                            "tabular-nums rounded-none border-x-0 text-center"
-                                        )}
-                                        placeholder="1"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={incrementPax}
-                                        disabled={totalSeats > 0 && paxCount >= totalSeats}
-                                        className={cls(
-                                            "px-2 py-2 rounded-r-md border border-slate-300 bg-white hover:bg-slate-50 transition-colors",
-                                            "disabled:opacity-50 disabled:cursor-not-allowed",
-                                            "focus:outline-none focus:ring-2 focus:ring-[#0079BC]/20"
-                                        )}
-                                    >
-                                        <Plus className="h-4 w-4 text-slate-600" />
-                                    </button>
-                                </div>
-                                {totalSeats > 0 && paxCount > totalSeats && (
-                                    <div className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
-                                        <AlertTriangle className="h-3 w-3" />
-                                        Số khách vượt quá tổng số chỗ ({totalSeats} chỗ)
-                                    </div>
-                                )}
                             </div>
 
                             {/* Note / cảnh báo */}
@@ -1892,7 +2204,7 @@ export default function CreateOrderPage() {
                     ) : null}
 
                     {availabilityInfo &&
-                    !availabilityInfo.ok ? (
+                        !availabilityInfo.ok ? (
                         <div className="rounded-lg border border-amber-200 bg-amber-50 text-amber-700 text-[12px] p-3 flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
@@ -2018,7 +2330,7 @@ export default function CreateOrderPage() {
                                     Không đủ xe khả dụng
                                 </h3>
                                 <p className="text-sm text-slate-500 mt-1">
-                                    Cần <span className="font-medium text-slate-700">{availabilityInfo.needed}</span> xe {selectedCategory?.name || ""},
+                                    Cần <span className="font-medium text-slate-700">{availabilityInfo.needed}</span> xe {selectedCategory?.name || ""}, 
                                     hiện chỉ còn <span className="font-medium text-amber-600">{availabilityInfo.count}</span> xe rảnh.
                                     Vui lòng chọn một trong các gợi ý bên dưới.
                                 </p>
@@ -2038,7 +2350,17 @@ export default function CreateOrderPage() {
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    {availabilityInfo.alternativeCategories.map((alt) => (
+                                {availabilityInfo.alternativeCategories
+                                    // Ẩn các loại xe đã được chọn trong form (tránh gợi ý trùng)
+                                    .filter(
+                                        (alt) =>
+                                            !vehicleSelections.some(
+                                                (v) =>
+                                                    String(v.categoryId) ===
+                                                    String(alt.categoryId)
+                                            )
+                                    )
+                                    .map((alt) => (
                                         <button
                                             key={alt.categoryId}
                                             type="button"
@@ -2106,8 +2428,17 @@ export default function CreateOrderPage() {
                                                 key={idx}
                                                 type="button"
                                                 onClick={() => {
-                                                    const newStart = fromDate.toISOString().slice(0, 16);
-                                                    setStartTime(newStart);
+                                                    // Chuyển sang local time phù hợp với input
+                                                    const local = new Date(fromDate.getTime() - fromDate.getTimezoneOffset() * 60000);
+                                                    if (hireType === "DAILY" || hireType === "MULTI_DAY") {
+                                                        // Input dạng date: yyyy-MM-dd
+                                                        const newDate = local.toISOString().slice(0, 10);
+                                                        setStartTime(newDate);
+                                                    } else {
+                                                        // datetime-local: yyyy-MM-ddTHH:mm
+                                                        const newStart = local.toISOString().slice(0, 16);
+                                                        setStartTime(newStart);
+                                                    }
                                                     setShowSuggestionDialog(false);
                                                     push(`Đã đổi giờ đón sang ${formattedTime}`, "success");
                                                 }}

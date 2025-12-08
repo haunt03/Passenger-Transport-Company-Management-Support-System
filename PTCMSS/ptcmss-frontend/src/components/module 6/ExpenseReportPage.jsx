@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import {
     PieChart as PieChartIcon,
     CalendarRange,
@@ -1252,17 +1252,23 @@ export default function ExpenseReportPage() {
     React.useEffect(() => {
         (async () => {
             try {
-                const [branchesData, vehiclesData] = await Promise.all([
-                    listBranches({ size: 100 }),
-                    listVehicles({ size: 100 }),
-                ]);
+                const branchesData = await listBranches({ size: 100 });
                 setBranches(normalizeBranchOptions(branchesData));
-                setVehicles(normalizeVehicleOptions(vehiclesData));
+                
+                // For Accountant/Manager/Consultant: only load vehicles from their branch
+                // For Admin: load all vehicles
+                if (isBranchLocked && branchId != null) {
+                    const vehiclesData = await listVehicles({ branchId, size: 100 });
+                    setVehicles(normalizeVehicleOptions(vehiclesData));
+                } else if (!isBranchLocked) {
+                    const vehiclesData = await listVehicles({ size: 100 });
+                    setVehicles(normalizeVehicleOptions(vehiclesData));
+                }
             } catch (err) {
                 console.error("Error loading options:", err);
             }
         })();
-    }, []);
+    }, [isBranchLocked, branchId]);
 
     // Lock branch filter for Manager and Consultant roles
     React.useEffect(() => {
@@ -1537,7 +1543,7 @@ export default function ExpenseReportPage() {
                 />
 
                 <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 text-[11px] text-slate-500 leading-relaxed">
-                    Tổng chi phí: {fmtVND(totalExpense)} đ.
+                 Tổng chi phí: {fmtVND(totalExpense)} đ.
                     {error && <span className="text-rose-600 ml-2">Lỗi: {error}</span>}
                 </div>
             </div>

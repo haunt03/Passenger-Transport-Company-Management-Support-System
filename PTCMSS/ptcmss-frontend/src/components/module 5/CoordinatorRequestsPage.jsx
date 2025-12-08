@@ -13,7 +13,8 @@ import {
     StickyNote,
 } from "lucide-react";
 import { getCookie } from "../../utils/cookies";
-import { getDriverProfileByUser, getDriverRequests, cancelDayOffRequest } from "../../api/drivers";
+import { getEmployeeByUserId } from "../../api/employees";
+import { getDriverExpenseRequests } from "../../api/expenses";
 
 const cls = (...a) => a.filter(Boolean).join(" ");
 
@@ -42,38 +43,14 @@ const EXPENSE_TYPE_LABELS = {
     OTHER: "Khác",
 };
 
-function RequestCard({ request, onCancel, cancellingId }) {
+function RequestCard({ request }) {
     // Validate request
     if (!request) {
         console.error("RequestCard: request is null or undefined");
         return null;
     }
 
-    // Kiểm tra xem yêu cầu nghỉ phép đã trong quá khứ chưa
-    const isPastLeaveRequest = React.useMemo(() => {
-        if (request.type !== "LEAVE" || !request.endDate) {
-            return false;
-        }
-        try {
-            const endDate = new Date(request.endDate);
-            const today = new Date();
-            // Reset time to start of day for comparison
-            today.setHours(0, 0, 0, 0);
-            endDate.setHours(0, 0, 0, 0);
-            return endDate < today;
-        } catch (err) {
-            console.error("Error checking if leave request is past:", err);
-            return false;
-        }
-    }, [request.type, request.endDate]);
-
     const typeMap = {
-        LEAVE: {
-            icon: Calendar,
-            label: "Xin nghỉ phép",
-            color: "text-sky-600",
-            bgColor: "bg-sky-50",
-        },
         PAYMENT: {
             icon: DollarSign,
             label: "Yêu cầu thanh toán",
@@ -105,7 +82,7 @@ function RequestCard({ request, onCancel, cancellingId }) {
         },
     };
 
-    const type = typeMap[request.type] || typeMap.LEAVE;
+    const type = typeMap[request.type] || typeMap.PAYMENT;
     const status = statusMap[request.status] || statusMap.PENDING;
     const TypeIcon = type.icon;
     const StatusIcon = status.icon;
@@ -144,25 +121,6 @@ function RequestCard({ request, onCancel, cancellingId }) {
             </div>
 
             <div className="space-y-2 text-sm text-slate-700">
-                {request.type === "LEAVE" && (
-                    <>
-                        <div className="flex items-center gap-2">
-                            <span className="text-slate-500">Từ ngày:</span>
-                            <span className="font-medium">{fmtDate(request.startDate)}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-slate-500">Đến ngày:</span>
-                            <span className="font-medium">{fmtDate(request.endDate)}</span>
-                        </div>
-                        {request.reason && (
-                            <div className="flex items-start gap-2">
-                                <span className="text-slate-500">Lý do:</span>
-                                <span className="flex-1">{request.reason}</span>
-                            </div>
-                        )}
-                    </>
-                )}
-
                 {request.type === "PAYMENT" && (
                     <>
                         {/* Số tiền */}
@@ -224,40 +182,31 @@ function RequestCard({ request, onCancel, cancellingId }) {
                         </div>
                     </div>
                 )}
-            </div>
 
-            {/* Cancel button for PENDING or APPROVED leave requests - chỉ hiển thị nếu chưa trong quá khứ */}
-            {request.type === "LEAVE" && 
-             (request.status === "PENDING" || request.status === "APPROVED") && 
-             !isPastLeaveRequest &&
-             onCancel && (
-                <div className="mt-3 pt-3 border-t border-slate-200">
-                    <button
-                        onClick={() => onCancel(request)}
-                        disabled={cancellingId === request.id}
-                        className="w-full px-3 py-2 text-sm font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-lg hover:bg-rose-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                        {cancellingId === request.id ? (
-                            <>
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                Đang hủy...
-                            </>
-                        ) : (
-                            "Hủy yêu cầu nghỉ phép"
-                        )}
-                    </button>
-                </div>
-            )}
+                {request.status === "APPROVED" && (
+                    <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-xs text-emerald-700">
+                        <div className="flex items-start gap-1">
+                            <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                            <div>
+                                <div className="font-medium">Đã được duyệt bởi kế toán</div>
+                                {request.approvedAt && (
+                                    <div className="text-[11px] mt-1">
+                                        Ngày duyệt: {fmtDate(request.approvedAt)}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
 
-export default function DriverRequestsPage() {
+export default function CoordinatorRequestsPage() {
     const [loading, setLoading] = React.useState(true);
     const [requests, setRequests] = React.useState([]);
     const [error, setError] = React.useState("");
-    const [cancellingId, setCancellingId] = React.useState(null);
-    const [driverId, setDriverId] = React.useState(null);
 
     // Tách logic load thành function riêng để tái sử dụng
     const loadRequests = React.useCallback(async () => {
@@ -265,89 +214,50 @@ export default function DriverRequestsPage() {
         setError("");
         try {
             const uid = getCookie("userId");
-            if (!uid) throw new Error("Không xác định được tài khoản tài xế.");
+            if (!uid) throw new Error("Không xác định được tài khoản điều phối viên.");
 
-            const profile = await getDriverProfileByUser(uid);
-            if (!profile || !profile.driverId) {
-                throw new Error("Không tìm thấy thông tin tài xế.");
-            }
-            setDriverId(profile.driverId);
-
-            // Get day-off requests (LEAVE type) and expense requests (PAYMENT type)
+            // Load expense requests
+            // Backend filter theo requesterUserId, nên truyền userId
+            let paymentRequests = [];
             try {
-                const { getDayOffHistory } = await import("../../api/drivers");
-                const { getDriverExpenseRequests } = await import("../../api/expenses");
-                
-                // Load day-off requests
-                let leaveRequests = [];
-                try {
-                    const dayOffList = await getDayOffHistory(profile.driverId);
-                    console.log("📅 Day-off list:", dayOffList);
-                    leaveRequests = (Array.isArray(dayOffList) ? dayOffList : []).map(item => {
-                        try {
-                            return {
-                                id: `leave-${item.dayOffId || item.id}`,
-                                dayOffId: item.dayOffId || item.id, // Store original ID for cancel API
-                                type: "LEAVE",
-                                status: item.status || "PENDING",
-                                createdAt: item.requestDate || item.createdAt,
-                                startDate: item.startDate,
-                                endDate: item.endDate,
-                                reason: item.reason,
-                                rejectionReason: item.rejectionReason || item.rejectReason,
-                            };
-                        } catch (mapErr) {
-                            console.error("Error mapping day-off item:", mapErr, item);
-                            return null;
-                        }
-                    }).filter(Boolean);
-                } catch (leaveErr) {
-                    console.warn("Could not load day-off requests:", leaveErr);
-                }
-                
-                // Load expense requests (the backend is currently filtering by requesterUserId,
-                // nên ở đây ta truyền userId thay vì driverId)
-                let paymentRequests = [];
-                try {
-                    const expenseList = await getDriverExpenseRequests(Number(uid));
-                    console.log("💰 Expense list for userId:", uid, expenseList);
-                    const expenses = expenseList?.data || expenseList || [];
-                    paymentRequests = (Array.isArray(expenses) ? expenses : []).map(item => {
-                        try {
-                            const expenseType = item.type || item.expenseType;
-                            const note =
-                                item.note ||
-                                item.description ||
-                                item.reason ||
-                                item.expenseNote;
+                console.log("💰 [CoordinatorRequestsPage] Loading expense requests for userId:", uid);
+                const expenseList = await getDriverExpenseRequests(Number(uid));
+                console.log("💰 [CoordinatorRequestsPage] Expense list:", expenseList);
+                const expenses = expenseList?.data || expenseList || [];
+                paymentRequests = (Array.isArray(expenses) ? expenses : []).map(item => {
+                    try {
+                        const expenseType = item.type || item.expenseType;
+                        const note =
+                            item.note ||
+                            item.description ||
+                            item.reason ||
+                            item.expenseNote;
 
-                            return {
-                                id: `payment-${item.id}`,
-                                type: "PAYMENT",
-                                status: item.status || "PENDING",
-                                createdAt: item.createdAt,
-                                amount: item.amount,
-                                tripId: item.tripId,
-                                // Thông tin chi tiết cho màn tài xế
-                                expenseType,
-                                vehiclePlate: item.vehiclePlate || item.licensePlate || item.vehiclePlateNumber,
-                                note,
-                                rejectionReason: item.rejectionReason || item.rejectReason,
-                            };
-                        } catch (mapErr) {
-                            console.error("Error mapping expense item:", mapErr, item);
-                            return null;
-                        }
-                    }).filter(Boolean);
-                } catch (expenseErr) {
-                    console.warn("Could not load expense requests:", expenseErr);
-                }
-
-                setRequests([...leaveRequests, ...paymentRequests]);
-            } catch (requestErr) {
-                console.warn("Could not load driver requests:", requestErr);
-                setRequests([]);
+                        return {
+                            id: `payment-${item.id}`,
+                            type: "PAYMENT",
+                            status: item.status || "PENDING",
+                            createdAt: item.createdAt,
+                            amount: item.amount,
+                            tripId: item.tripId,
+                            expenseType,
+                            vehiclePlate: item.vehiclePlate || item.licensePlate || item.vehiclePlateNumber,
+                            note,
+                            rejectionReason: item.rejectionReason || item.rejectReason,
+                            approvedAt: item.approvedAt || item.approvedDate,
+                        };
+                    } catch (mapErr) {
+                        console.error("Error mapping expense item:", mapErr, item);
+                        return null;
+                    }
+                }).filter(Boolean);
+                console.log("💰 [CoordinatorRequestsPage] Mapped payment requests:", paymentRequests);
+            } catch (expenseErr) {
+                console.warn("Could not load expense requests:", expenseErr);
+                setError("Không thể tải danh sách yêu cầu thanh toán: " + (expenseErr?.message || "Lỗi không xác định"));
             }
+
+            setRequests([...paymentRequests]);
         } catch (err) {
             console.error("Error in loadRequests:", err);
             setError(
@@ -355,7 +265,7 @@ export default function DriverRequestsPage() {
                 err?.message ||
                 "Không tải được danh sách yêu cầu."
             );
-            setRequests([]); // Đảm bảo requests luôn là array
+            setRequests([]);
         } finally {
             setLoading(false);
         }
@@ -387,44 +297,13 @@ export default function DriverRequestsPage() {
         });
     }, [requests]);
 
-    const handleCancelLeaveRequest = async (request) => {
-        if (!request.dayOffId || !driverId) {
-            alert("Không thể xác định yêu cầu nghỉ phép để hủy.");
-            return;
-        }
-
-        // Confirm before canceling
-        const confirmed = window.confirm(
-            "Bạn có chắc chắn muốn hủy yêu cầu nghỉ phép này? " +
-            "Sau khi hủy, yêu cầu sẽ không được tính vào số ngày nghỉ đã dùng và trạng thái của bạn sẽ được cập nhật."
-        );
-
-        if (!confirmed) return;
-
-        setCancellingId(request.id);
-        try {
-            await cancelDayOffRequest(driverId, request.dayOffId);
-            
-            // Reload lại toàn bộ danh sách từ server để đảm bảo đồng bộ
-            try {
-                await loadRequests();
-            } catch (reloadErr) {
-                console.error("Failed to reload requests after cancel:", reloadErr);
-                // Vẫn hiển thị thông báo thành công nếu hủy thành công
-            }
-            
-            alert("Đã hủy yêu cầu nghỉ phép thành công.");
-        } catch (err) {
-            console.error("Failed to cancel leave request:", err);
-            alert(
-                err?.data?.message || 
-                err?.message || 
-                "Không thể hủy yêu cầu nghỉ phép. Vui lòng thử lại."
-            );
-        } finally {
-            setCancellingId(null);
-        }
-    };
+    // Thống kê theo trạng thái
+    const stats = React.useMemo(() => {
+        const pending = sortedRequests.filter(r => r.status === "PENDING").length;
+        const approved = sortedRequests.filter(r => r.status === "APPROVED").length;
+        const rejected = sortedRequests.filter(r => r.status === "REJECTED").length;
+        return { pending, approved, rejected, total: sortedRequests.length };
+    }, [sortedRequests]);
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 p-6">
@@ -437,9 +316,31 @@ export default function DriverRequestsPage() {
                     </h1>
                 </div>
                 <p className="text-sm text-slate-600">
-                    Theo dõi trạng thái các yêu cầu nghỉ phép và thanh toán của bạn
+                    Theo dõi trạng thái các yêu cầu thanh toán của bạn
                 </p>
             </div>
+
+            {/* Stats */}
+            {!loading && stats.total > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div className="text-sm text-slate-600 mb-1">Tổng yêu cầu</div>
+                        <div className="text-2xl font-bold text-slate-900">{stats.total}</div>
+                    </div>
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+                        <div className="text-sm text-amber-700 mb-1">Chờ duyệt</div>
+                        <div className="text-2xl font-bold text-amber-700">{stats.pending}</div>
+                    </div>
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
+                        <div className="text-sm text-emerald-700 mb-1">Đã duyệt</div>
+                        <div className="text-2xl font-bold text-emerald-700">{stats.approved}</div>
+                    </div>
+                    <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 shadow-sm">
+                        <div className="text-sm text-rose-700 mb-1">Từ chối</div>
+                        <div className="text-2xl font-bold text-rose-700">{stats.rejected}</div>
+                    </div>
+                </div>
+            )}
 
             {error && (
                 <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700">
@@ -469,9 +370,7 @@ export default function DriverRequestsPage() {
                                 return (
                                     <RequestCard 
                                         key={request.id} 
-                                        request={request} 
-                                        onCancel={handleCancelLeaveRequest}
-                                        cancellingId={cancellingId}
+                                        request={request}
                                     />
                                 );
                             } catch (err) {
@@ -496,3 +395,4 @@ export default function DriverRequestsPage() {
         </div>
     );
 }
+

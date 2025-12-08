@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import {
     LayoutDashboard,
     DollarSign,
@@ -9,6 +9,7 @@ import {
     Calendar,
     Building2,
     BarChart3,
+    CarFront,
 } from "lucide-react";
 import {
     BarChart,
@@ -31,6 +32,7 @@ import {
     getRevenueTrend,
     getBranchComparison,
     getTopRoutes,
+    getTopVehicleCategories,
     getPendingApprovals,
     exportDashboardReport,
 } from "../../api/dashboards";
@@ -101,6 +103,7 @@ export default function AdminDashboard() {
     const [revenueTrend, setRevenueTrend] = React.useState([]);
     const [branchComparison, setBranchComparison] = React.useState([]);
     const [topRoutes, setTopRoutes] = React.useState([]);
+    const [topVehicleCategories, setTopVehicleCategories] = React.useState([]);
     const [pendingApprovals, setPendingApprovals] = React.useState([]);
 
     // Load all dashboard data
@@ -116,6 +119,10 @@ export default function AdminDashboard() {
                     console.warn("Top routes API failed, returning empty array:", err);
                     return [];
                 }),
+                getTopVehicleCategories({ period }).catch(err => {
+                    console.warn("Top vehicle categories API failed, returning empty array:", err);
+                    return [];
+                }),
                 getPendingApprovals().catch(err => {
                     console.warn("Pending approvals API failed, returning empty array:", err);
                     return [];
@@ -127,6 +134,7 @@ export default function AdminDashboard() {
                 trendResult,
                 branchResult,
                 routesResult,
+                vehicleCategoriesResult,
                 approvalsResult,
             ] = results;
 
@@ -135,6 +143,7 @@ export default function AdminDashboard() {
             const trendData = trendResult.status === 'fulfilled' ? trendResult.value : [];
             const branchData = branchResult.status === 'fulfilled' ? branchResult.value : [];
             const routesData = routesResult.status === 'fulfilled' ? routesResult.value : [];
+            const vehicleCategoriesData = vehicleCategoriesResult.status === 'fulfilled' ? vehicleCategoriesResult.value : [];
             const approvalsData = approvalsResult.status === 'fulfilled' ? approvalsResult.value : [];
 
             // KPIs
@@ -149,6 +158,7 @@ export default function AdminDashboard() {
             setRevenueTrend(trendData || []);
             setBranchComparison(branchData || []);
             setTopRoutes(routesData || []);
+            setTopVehicleCategories(vehicleCategoriesData || []);
 
             // Approvals
             setPendingApprovals(approvalsData || []);
@@ -314,13 +324,18 @@ export default function AdminDashboard() {
                             </span>
                         </div>
                         <div className="p-4">
-                            <ResponsiveContainer width="100%" height={300}>
-                                <BarChart data={branchComparison} margin={{ left: 20, right: 10, top: 10, bottom: 10 }}>
+                            {branchComparison && branchComparison.length > 0 ? (
+                                <ResponsiveContainer width="100%" height={300}>
+                                    <BarChart data={branchComparison} margin={{ left: 20, right: 10, top: 10, bottom: 60 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                                     <XAxis
                                         dataKey="branchName"
                                         stroke="#64748b"
                                         style={{ fontSize: "12px" }}
+                                        angle={-45}
+                                        textAnchor="end"
+                                        height={60}
+                                        interval={0}
                                     />
                                     <YAxis
                                         stroke="#64748b"
@@ -341,11 +356,59 @@ export default function AdminDashboard() {
                                     <Bar dataKey="expense" name="Chi phí" fill="#ef4444" />
                                 </BarChart>
                             </ResponsiveContainer>
+                            ) : (
+                                <div className="text-center py-8 text-slate-500 text-sm">
+                                    Không có dữ liệu chi nhánh
+                                </div>
+                            )}
                         </div>
                     </div>
 
-                    {/* TOP ROUTES & PENDING APPROVALS */}
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+                    {/* TOP VEHICLE CATEGORIES & TOP ROUTES */}
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 mb-5">
+                        {/* TOP VEHICLE CATEGORIES */}
+                        <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                            <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 text-sm text-slate-600 flex items-center gap-2">
+                                <CarFront className="h-4 w-4 text-sky-600" />
+                                <span className="font-medium text-slate-700">
+                                    Top Loại Xe Được Sử Dụng Nhiều Nhất
+                                </span>
+                            </div>
+                            <div className="p-4">
+                                {topVehicleCategories && topVehicleCategories.length > 0 ? (
+                                    <div className="space-y-3">
+                                        {topVehicleCategories.map((cat, index) => (
+                                            <div
+                                                key={cat.categoryId || index}
+                                                className="flex items-center gap-3 p-3 rounded-lg bg-sky-50 border border-sky-200"
+                                            >
+                                                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center font-semibold text-sm">
+                                                    {index + 1}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-sm font-medium text-slate-900">
+                                                        {cat.categoryName}
+                                                    </div>
+                                                    <div className="text-xs text-slate-500">
+                                                        {cat.seats} chỗ · {cat.bookingCount} đơn · {cat.totalVehiclesBooked} xe đặt
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-sm font-semibold text-sky-700">
+                                                        {cat.tripCount} chuyến
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-8 text-slate-500 text-sm">
+                                        Không có dữ liệu
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
                         {/* TOP ROUTES */}
                         <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                             <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 text-sm text-slate-600 flex items-center gap-2">
@@ -383,9 +446,10 @@ export default function AdminDashboard() {
                                 )}
                             </div>
                         </div>
+                    </div>
 
-                        {/* PENDING APPROVALS */}
-                        <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                    {/* PENDING APPROVALS */}
+                    <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                             <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 text-sm text-slate-600 flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <Calendar className="h-4 w-4 text-amber-600" />
@@ -432,7 +496,6 @@ export default function AdminDashboard() {
                                     </div>
                                 )}
                             </div>
-                        </div>
                     </div>
                 </>
             )}

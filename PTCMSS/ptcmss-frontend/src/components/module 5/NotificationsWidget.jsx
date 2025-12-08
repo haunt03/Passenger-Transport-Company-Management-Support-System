@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
     Bell,
@@ -36,11 +36,12 @@ import { useNotifications } from "../../hooks/useNotifications";
 import { getBookingsPendingDeposit, pageBookings } from "../../api/bookings";
 import { getDriverSchedule } from "../../api/drivers";
 import { unassignTrip } from "../../api/dispatch";
+import { deleteNotification, deleteNotificationByApproval, dismissApproval } from "../../api/notifications";
 
 /**
  * NotificationsWidget – Hiển thị cảnh báo & yêu cầu chờ duyệt
- *
- * UI:
+ * 
+ * UI: 
  * - Widget mode: Icon chuông với badge, click vào mới hiển thị dropdown chi tiết
  * - Page mode: Tự động hiển thị full content (khi route = /dispatch/notifications)
  */
@@ -57,11 +58,11 @@ export default function NotificationsWidget() {
     const [showBranchSelector, setShowBranchSelector] = React.useState(false);
     const [showDropdown, setShowDropdown] = React.useState(false);
     const [branchLoaded, setBranchLoaded] = React.useState(false);
-
+    
     // Consultant-specific: bookings pending deposit
     const [pendingDepositBookings, setPendingDepositBookings] = React.useState([]);
     const [loadingDeposit, setLoadingDeposit] = React.useState(false);
-
+    
     // Conflict resolution modal for driver day-off
     const [showConflictModal, setShowConflictModal] = React.useState(false);
     const [conflictData, setConflictData] = React.useState(null);
@@ -69,6 +70,7 @@ export default function NotificationsWidget() {
     const role = getCurrentRole();
     const userId = getStoredUserId();
     const isAdmin = role === ROLES.ADMIN;
+    const isManager = role === ROLES.MANAGER;
     const isConsultant = role === ROLES.CONSULTANT;
 
     // WebSocket real-time notifications
@@ -124,11 +126,11 @@ export default function NotificationsWidget() {
     }, [userId, isAdmin, branchLoaded]);
 
     const loadingRef = React.useRef(false);
-
+    
     const fetchAll = React.useCallback(async () => {
-        // Skip for DRIVER role - they don't have access to notifications dashboard
-        if (role === ROLES.DRIVER) {
-            console.log('[NotificationsWidget] Skipping dashboard fetch for DRIVER role');
+        // Skip for roles không tham gia phê duyệt/điều phối (DRIVER, MANAGER, ADMIN)
+        if (role === ROLES.DRIVER || role === ROLES.MANAGER || role === ROLES.ADMIN) {
+            console.log('[NotificationsWidget] Skipping dashboard fetch for role:', role);
             setDashboard(null);
             setLoading(false);
             return;
@@ -161,7 +163,7 @@ export default function NotificationsWidget() {
     // Fetch pending deposit bookings for consultant
     const fetchPendingDeposit = React.useCallback(async () => {
         if (!isConsultant && !isAdmin) return;
-
+        
         setLoadingDeposit(true);
         try {
             // Try the dedicated endpoint first
@@ -173,31 +175,31 @@ export default function NotificationsWidget() {
                 // Get bookings that are PENDING or CONFIRMED but not yet deposited, within 48h
                 const now = new Date();
                 const in48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-
+                
                 const result = await pageBookings({
                     status: 'PENDING,CONFIRMED,QUOTATION_SENT',
                     consultantId: isConsultant ? userId : undefined,
                     size: 100,
                 });
-
+                
                 const bookings = result?.content || result?.data || result || [];
-
+                
                 // Filter: trip starts within 48h AND no deposit yet
                 data = bookings.filter(b => {
                     const trip = b.trips?.[0];
                     if (!trip?.startTime) return false;
-
+                    
                     const tripStart = new Date(trip.startTime);
                     const isWithin48h = tripStart <= in48h && tripStart > now;
-
+                    
                     // Check if deposit is missing
                     const depositAmount = b.depositAmount || 0;
                     const hasDeposit = depositAmount > 0;
-
+                    
                     return isWithin48h && !hasDeposit;
                 });
             }
-
+            
             setPendingDepositBookings(Array.isArray(data) ? data : []);
         } catch (err) {
             console.error("Failed to load pending deposit bookings:", err);
@@ -276,7 +278,7 @@ export default function NotificationsWidget() {
             return next;
         });
     };
-
+    
     const showConflictResolutionModal = (conflicts, driverId, approval) => {
         return new Promise((resolve) => {
             setConflictData({
@@ -304,7 +306,7 @@ export default function NotificationsWidget() {
             fetchAll();
         } catch (err) {
             console.error("Failed to acknowledge alert:", err);
-            alert("Không thể xác nhận cảnh báo");
+            pushToast("Không thể xác nhận cảnh báo. Vui lòng thử lại.", "error");
         } finally {
             setIdBusy(`alert-${alertId}`, false);
         }
@@ -313,64 +315,64 @@ export default function NotificationsWidget() {
     const handleApprove = async (historyId) => {
         // Find the approval to check if it's a day off request
         const approval = dashboard?.pendingApprovals?.find(a => a.id === historyId);
-
+        
         let replacements = {};
-
+        
         // If it's a driver day off request, check for conflicting trips first
         if (approval?.approvalType === "DRIVER_DAY_OFF" && approval?.details) {
             const driverId = approval.details.driverId || approval.driverId || approval.requestedByUserId;
             const startDate = approval.details.startDate;
             const endDate = approval.details.endDate || startDate;
-
+            
             if (driverId && startDate) {
                 try {
                     // Get driver schedule
                     const schedule = await getDriverSchedule(driverId);
                     const scheduleList = Array.isArray(schedule) ? schedule : [];
-
+                    
                     // Parse date range
                     const leaveStart = new Date(startDate);
                     const leaveEnd = new Date(endDate);
                     leaveStart.setHours(0, 0, 0, 0);
                     leaveEnd.setHours(23, 59, 59, 999);
-
+                    
                     // Find conflicting trips
                     const conflicts = scheduleList.filter(trip => {
                         const tripDate = new Date(trip.startTime || trip.start_time);
                         if (isNaN(tripDate.getTime())) return false;
-
+                        
                         const status = trip.status || trip.tripStatus;
                         if (status === "COMPLETED" || status === "CANCELLED") return false;
-
+                        
                         return tripDate >= leaveStart && tripDate <= leaveEnd;
                     });
-
+                    
                     if (conflicts.length > 0) {
                         // Show modal with conflict trips and driver suggestions
                         const result = await showConflictResolutionModal(conflicts, driverId, approval);
-
+                        
                         if (!result || !result.confirmed) {
                             // User chose to reject
                             const rejectNote = prompt("Lý do từ chối (tài xế có chuyến trong ngày nghỉ):");
                             if (rejectNote === null) return;
-
+                            
                             setIdBusy(`approval-${historyId}`, true);
                             try {
                                 await apiFetch(`/api/notifications/approvals/${historyId}/reject`, {
                                     method: "POST",
                                     body: { userId: Number(userId), note: rejectNote },
                                 });
-                                alert("✅ Đã từ chối yêu cầu nghỉ phép");
+                                pushToast("Đã từ chối yêu cầu nghỉ phép", "success");
                                 fetchAll();
                             } catch (err) {
                                 console.error("Failed to reject:", err);
-                                alert("❌ Không thể từ chối. Vui lòng thử lại.");
+                                pushToast("Không thể từ chối. Vui lòng thử lại.", "error");
                             } finally {
                                 setIdBusy(`approval-${historyId}`, false);
                             }
                             return;
                         }
-
+                        
                         // User confirmed - get replacements
                         replacements = result.replacements || {};
                     }
@@ -380,7 +382,7 @@ export default function NotificationsWidget() {
                 }
             }
         }
-
+        
         // Proceed with approval
         const note = prompt("Ghi chú phê duyệt (tùy chọn):");
         if (note === null) return;
@@ -392,38 +394,67 @@ export default function NotificationsWidget() {
                 method: "POST",
                 body: { userId: Number(userId), note },
             });
-
+            
             // Then reassign trips with replacement drivers if any
             if (Object.keys(replacements).length > 0) {
                 const { reassignTrips } = await import("../../api/dispatch");
+                const reassignPromises = [];
                 for (const [tripId, newDriverId] of Object.entries(replacements)) {
+                    if (!tripId || !newDriverId) continue;
                     try {
-                        await reassignTrips({
-                            tripIds: [Number(tripId)],
-                            driverId: Number(newDriverId),
-                            note: "Tài xế thay thế do tài xế cũ nghỉ phép"
-                        });
+                        // Get trip detail to get bookingId
+                        const { getTripDetail } = await import("../../api/dispatch");
+                        const tripDetail = await getTripDetail(Number(tripId));
+                        const bookingId = tripDetail?.bookingId || tripDetail?.booking?.id;
+                        
+                        reassignPromises.push(
+                            reassignTrips({
+                                bookingId: bookingId ? Number(bookingId) : undefined,
+                                tripIds: [Number(tripId)],
+                                driverId: Number(newDriverId),
+                                note: "Tài xế thay thế do tài xế cũ nghỉ phép"
+                            }).catch(err => {
+                                console.error(`Failed to reassign trip ${tripId}:`, err);
+                                return { tripId, error: err };
+                            })
+                        );
                     } catch (err) {
-                        console.error(`Failed to reassign trip ${tripId}:`, err);
+                        console.error(`Failed to get trip detail for ${tripId}:`, err);
                     }
                 }
-                alert(`✅ Đã phê duyệt thành công!\n\n` +
-                    `• Đã gán ${Object.keys(replacements).length} tài xế thay thế\n` +
-                    `• Hệ thống đã tự động xóa tài xế cũ khỏi các chuyến`);
+                
+                const results = await Promise.allSettled(reassignPromises);
+                const successCount = results.filter(r => r.status === 'fulfilled').length;
+                const failCount = results.length - successCount;
+                
+                if (failCount > 0) {
+                    pushToast(
+                        `Đã phê duyệt. Gán thành công ${successCount}/${results.length} tài xế thay thế.`,
+                        failCount === results.length ? "error" : "success"
+                    );
+                } else {
+                    pushToast(
+                        `Đã phê duyệt thành công! Đã gán ${successCount} tài xế thay thế.`,
+                        "success"
+                    );
+                }
             } else {
-                alert("✅ Đã phê duyệt thành công!\n\nHệ thống đã tự động xóa tài xế khỏi các chuyến xung đột (nếu có).\nVui lòng kiểm tra cảnh báo để sắp xếp tài xế thay thế.");
+                pushToast(
+                    "Đã phê duyệt thành công! Hệ thống đã tự động xóa tài xế khỏi các chuyến xung đột.",
+                    "success"
+                );
             }
-
+            
             fetchAll();
         } catch (err) {
             console.error("Failed to approve:", err);
-
+            
             // Check if error message contains conflict info from backend
             const errMsg = err.message || err.toString();
             if (errMsg.includes("chuyến") || errMsg.includes("conflict")) {
-                alert(`❌ Lỗi khi phê duyệt:\n\n${errMsg}`);
+                pushToast(`Lỗi khi phê duyệt: ${errMsg}`, "error");
             } else {
-                alert("❌ Không thể phê duyệt. Vui lòng thử lại.");
+                pushToast("Không thể phê duyệt. Vui lòng thử lại.", "error");
             }
         } finally {
             setIdBusy(`approval-${historyId}`, false);
@@ -433,7 +464,7 @@ export default function NotificationsWidget() {
     const handleReject = async (historyId) => {
         const note = prompt("Lý do từ chối:");
         if (!note) {
-            alert("Vui lòng nhập lý do từ chối");
+            pushToast("Vui lòng nhập lý do từ chối", "error");
             return;
         }
 
@@ -443,13 +474,46 @@ export default function NotificationsWidget() {
                 method: "POST",
                 body: { userId: Number(userId), note },
             });
-            alert("Đã từ chối yêu cầu");
+            pushToast("Đã từ chối yêu cầu", "success");
             fetchAll();
         } catch (err) {
             console.error("Failed to reject:", err);
-            alert("Không thể từ chối");
+            pushToast("Không thể từ chối. Vui lòng thử lại.", "error");
         } finally {
             setIdBusy(`approval-${historyId}`, false);
+        }
+    };
+
+    // Toast notification system
+    const [toasts, setToasts] = React.useState([]);
+    const pushToast = React.useCallback((msg, kind = "info", ttl = 3000) => {
+        const id = Math.random().toString(36).slice(2);
+        setToasts((a) => [...a, { id, msg, kind }]);
+        setTimeout(() => {
+            setToasts((a) => a.filter((t) => t.id !== id));
+        }, ttl);
+    }, []);
+
+    const handleDeleteNotification = async (approval) => {
+        const deleteKey = `delete-${approval.id}`;
+        setIdBusy(deleteKey, true);
+        try {
+            // Xóa approval history (sẽ tự động xóa notification liên quan)
+            await dismissApproval(approval.id, userId);
+            
+            // Đợi một chút để đảm bảo backend đã xóa xong
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            // Reload dashboard để cập nhật danh sách
+            await fetchAll();
+            
+            // Thông báo toast sau khi xóa thành công
+            pushToast("Đã xóa thông báo", "success");
+        } catch (err) {
+            console.error("Failed to delete notification:", err);
+            pushToast("Không thể xóa thông báo. Vui lòng thử lại.", "error");
+        } finally {
+            setIdBusy(deleteKey, false);
         }
     };
 
@@ -530,10 +594,10 @@ export default function NotificationsWidget() {
         const Icon = config.icon;
         const idKey = `approval-${approval.id}`;
         const working = busyIds.has(idKey);
-
+        
         // Coordinator chỉ được duyệt nghỉ phép, Admin/Manager duyệt tất cả
         const isCoordinator = role === ROLES.COORDINATOR;
-        const canApprove = isAdmin || role === ROLES.MANAGER ||
+        const canApprove = isAdmin || role === ROLES.MANAGER || 
             (isCoordinator && approval.approvalType === "DRIVER_DAY_OFF");
 
         return (
@@ -578,43 +642,62 @@ export default function NotificationsWidget() {
                     </div>
                 </div>
 
-                {canApprove && (
-                    <div className="shrink-0 flex items-center gap-2">
-                        <button
-                            disabled={working}
-                            onClick={() => handleApprove(approval.id)}
-                            className={cls(
-                                "inline-flex items-center gap-1.5 rounded-lg border-2 border-sky-500 bg-white text-sky-700 hover:bg-sky-50 hover:shadow-md px-3 py-1.5 text-[12px] font-semibold transition-all duration-200",
-                                working ? "opacity-60 cursor-not-allowed" : "hover:scale-105"
-                            )}
-                            title="Duyệt"
-                        >
-                            {working ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                                <Check className="h-3.5 w-3.5" />
-                            )}
-                            Duyệt
-                        </button>
+                <div className="shrink-0 flex items-center gap-2">
+                    {canApprove && (
+                        <>
+                            <button
+                                disabled={working}
+                                onClick={() => handleApprove(approval.id)}
+                                className={cls(
+                                    "inline-flex items-center gap-1.5 rounded-lg border-2 border-sky-500 bg-white text-sky-700 hover:bg-sky-50 hover:shadow-md px-3 py-1.5 text-[12px] font-semibold transition-all duration-200",
+                                    working ? "opacity-60 cursor-not-allowed" : "hover:scale-105"
+                                )}
+                                title="Duyệt"
+                            >
+                                {working ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                    <Check className="h-3.5 w-3.5" />
+                                )}
+                                Duyệt
+                            </button>
 
-                        <button
-                            disabled={working}
-                            onClick={() => handleReject(approval.id)}
-                            className={cls(
-                                "inline-flex items-center gap-1.5 rounded-lg border-2 border-rose-600 bg-white text-rose-700 hover:bg-rose-50 hover:shadow-md px-3 py-1.5 text-[12px] font-semibold transition-all duration-200",
-                                working ? "opacity-60 cursor-not-allowed" : "hover:scale-105"
-                            )}
-                            title="Từ chối"
-                        >
-                            {working ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                                <X className="h-3.5 w-3.5" />
-                            )}
-                            Từ chối
-                        </button>
-                    </div>
-                )}
+                            <button
+                                disabled={working}
+                                onClick={() => handleReject(approval.id)}
+                                className={cls(
+                                    "inline-flex items-center gap-1.5 rounded-lg border-2 border-rose-600 bg-white text-rose-700 hover:bg-rose-50 hover:shadow-md px-3 py-1.5 text-[12px] font-semibold transition-all duration-200",
+                                    working ? "opacity-60 cursor-not-allowed" : "hover:scale-105"
+                                )}
+                                title="Từ chối"
+                            >
+                                {working ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                    <X className="h-3.5 w-3.5" />
+                                )}
+                                Từ chối
+                            </button>
+                        </>
+                    )}
+                    
+                    {/* Nút X để xóa thông báo */}
+                    <button
+                        disabled={busyIds.has(`delete-${approval.id}`)}
+                        onClick={() => handleDeleteNotification(approval)}
+                        className={cls(
+                            "inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-700 px-2 py-1.5 text-[12px] transition-all duration-200",
+                            busyIds.has(`delete-${approval.id}`) ? "opacity-60 cursor-not-allowed" : "hover:scale-105"
+                        )}
+                        title="Xóa thông báo"
+                    >
+                        {busyIds.has(`delete-${approval.id}`) ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                            <XCircle className="h-3.5 w-3.5" />
+                        )}
+                    </button>
+                </div>
             </div>
         );
     };
@@ -625,11 +708,11 @@ export default function NotificationsWidget() {
 
     // Calculate unread count (alerts not acknowledged + pending approvals)
     const unreadAlerts = alerts.filter(a => !a.isAcknowledged).length;
-
+    
     // For DRIVER role, use filtered WebSocket unreadCount (only driver-relevant notifications)
     // For CONSULTANT role, use pending deposit bookings count
     // For other roles, use alerts + pending count (dashboard notifications)
-    const badgeCount = role === ROLES.DRIVER
+    const badgeCount = role === ROLES.DRIVER 
         ? wsNotifications.filter(n => {
             // Filter: chỉ đếm thông báo liên quan đến tài xế
             const driverNotificationTypes = [
@@ -647,48 +730,48 @@ export default function NotificationsWidget() {
             // Nếu không có type nhưng có message, kiểm tra message
             if (n.message) {
                 const msg = n.message.toLowerCase();
-                return msg.includes('chuyến') ||
-                    msg.includes('chi phí') ||
-                    msg.includes('thanh toán') ||
-                    msg.includes('nghỉ phép') ||
-                    msg.includes('duyệt') ||
-                    msg.includes('trip') ||
-                    msg.includes('expense') ||
-                    msg.includes('payment') ||
-                    msg.includes('leave');
+                return msg.includes('chuyến') || 
+                       msg.includes('chi phí') || 
+                       msg.includes('thanh toán') || 
+                       msg.includes('nghỉ phép') ||
+                       msg.includes('duyệt') ||
+                       msg.includes('trip') ||
+                       msg.includes('expense') ||
+                       msg.includes('payment') ||
+                       msg.includes('leave');
             }
             // Nếu không có type và message không rõ, đếm nếu từ user-specific channel
             return true; // Đếm tất cả từ /topic/notifications/{userId}
         }).length
         : role === ROLES.CONSULTANT
             ? pendingDepositBookings.length + wsNotifications.filter(n => {
-            // Consultant nhận thông báo khi kế toán duyệt payment request
-            if (n.read) return false;
-            // Filter payment approval/rejection notifications
-            const paymentNotificationTypes = [
-                'PAYMENT_APPROVED', 'PAYMENT_REJECTED',
-                'PAYMENT_REQUEST_APPROVED', 'PAYMENT_REQUEST_REJECTED',
-                'PAYMENT_UPDATE'
-            ];
-            // Kiểm tra type
-            if (n.type) {
-                return paymentNotificationTypes.some(t =>
-                    n.type.includes(t) || t.includes(n.type) ||
-                    n.type === 'PAYMENT_UPDATE'
-                );
-            }
-            // Kiểm tra message
-            if (n.message) {
-                const msg = n.message.toLowerCase();
-                return msg.includes('thanh toán') ||
-                    msg.includes('payment') ||
-                    msg.includes('duyệt') ||
-                    msg.includes('approve') ||
-                    msg.includes('reject');
-            }
-            // Nếu từ user-specific channel và có liên quan đến payment
-            return n.data?.paymentId || n.data?.requestId;
-        }).length
+                // Consultant nhận thông báo khi kế toán duyệt payment request
+                if (n.read) return false;
+                // Filter payment approval/rejection notifications
+                const paymentNotificationTypes = [
+                    'PAYMENT_APPROVED', 'PAYMENT_REJECTED', 
+                    'PAYMENT_REQUEST_APPROVED', 'PAYMENT_REQUEST_REJECTED',
+                    'PAYMENT_UPDATE'
+                ];
+                // Kiểm tra type
+                if (n.type) {
+                    return paymentNotificationTypes.some(t => 
+                        n.type.includes(t) || t.includes(n.type) || 
+                        n.type === 'PAYMENT_UPDATE'
+                    );
+                }
+                // Kiểm tra message
+                if (n.message) {
+                    const msg = n.message.toLowerCase();
+                    return msg.includes('thanh toán') || 
+                           msg.includes('payment') ||
+                           msg.includes('duyệt') ||
+                           msg.includes('approve') ||
+                           msg.includes('reject');
+                }
+                // Nếu từ user-specific channel và có liên quan đến payment
+                return n.data?.paymentId || n.data?.requestId;
+            }).length
             : (unreadAlerts + pending.length + pendingDepositBookings.length);
 
     // Helper to format time remaining
@@ -698,7 +781,7 @@ export default function NotificationsWidget() {
         const diffMs = start - now;
         const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
         const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-
+        
         if (diffHours <= 0 && diffMins <= 0) return "Đã quá hạn";
         if (diffHours < 1) return `${diffMins} phút`;
         if (diffHours < 24) return `${diffHours}h ${diffMins}p`;
@@ -712,9 +795,9 @@ export default function NotificationsWidget() {
         const startTime = trip?.startTime;
         const timeRemaining = startTime ? formatTimeRemaining(startTime) : "";
         const isUrgent = startTime && (new Date(startTime) - new Date()) < 24 * 60 * 60 * 1000;
-
+        
         return (
-            <div
+            <div 
                 className="flex items-start gap-3 px-4 py-3.5 border-b border-slate-100 hover:bg-gradient-to-r hover:from-amber-50 hover:to-white transition-all duration-200 group cursor-pointer"
                 onClick={() => {
                     setShowDropdown(false);
@@ -735,8 +818,8 @@ export default function NotificationsWidget() {
                         </span>
                         <span className={cls(
                             "px-2 py-0.5 text-[10px] font-bold rounded-full border",
-                            isUrgent
-                                ? "bg-red-100 text-red-800 border-red-200"
+                            isUrgent 
+                                ? "bg-red-100 text-red-800 border-red-200" 
                                 : "bg-amber-100 text-amber-800 border-amber-200"
                         )}>
                             Chưa cọc
@@ -788,8 +871,37 @@ export default function NotificationsWidget() {
         );
     };
 
+    // Toast component
+    const ToastContainer = () => (
+        <div className="fixed top-4 right-4 z-[9999] space-y-2 pointer-events-none">
+            {toasts.map((t) => (
+                <div
+                    key={t.id}
+                    className={cls(
+                        "pointer-events-auto rounded-lg px-4 py-3 text-sm shadow-lg border min-w-[280px] max-w-md",
+                        t.kind === "success" &&
+                            "bg-emerald-50 border-emerald-300 text-emerald-800",
+                        t.kind === "error" &&
+                            "bg-rose-50 border-rose-300 text-rose-800",
+                        t.kind === "info" &&
+                            "bg-blue-50 border-blue-300 text-blue-800"
+                    )}
+                >
+                    <div className="flex items-center gap-2">
+                        {t.kind === "success" && <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />}
+                        {t.kind === "error" && <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />}
+                        {t.kind === "info" && <Info className="h-4 w-4 text-blue-600 shrink-0" />}
+                        <span className="font-medium">{t.msg}</span>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+
     return (
         <div className={isPageMode ? "min-h-screen" : "relative"}>
+            <ToastContainer />
+            
             {/* Bell Icon Button - Only show in widget mode */}
             {!isPageMode && (
                 <button
@@ -976,21 +1088,21 @@ export default function NotificationsWidget() {
                                         // Nếu không có type nhưng có message, kiểm tra message
                                         if (n.message) {
                                             const msg = n.message.toLowerCase();
-                                            return msg.includes('chuyến') ||
-                                                msg.includes('chi phí') ||
-                                                msg.includes('thanh toán') ||
-                                                msg.includes('nghỉ phép') ||
-                                                msg.includes('duyệt') ||
-                                                msg.includes('trip') ||
-                                                msg.includes('expense') ||
-                                                msg.includes('payment') ||
-                                                msg.includes('leave');
+                                            return msg.includes('chuyến') || 
+                                                   msg.includes('chi phí') || 
+                                                   msg.includes('thanh toán') || 
+                                                   msg.includes('nghỉ phép') ||
+                                                   msg.includes('duyệt') ||
+                                                   msg.includes('trip') ||
+                                                   msg.includes('expense') ||
+                                                   msg.includes('payment') ||
+                                                   msg.includes('leave');
                                         }
                                         // Nếu không có type và message không rõ, chỉ hiển thị nếu từ user-specific channel
                                         return true; // Hiển thị tất cả từ /topic/notifications/{userId}
                                     }).length}
                                 />
-
+                                
                                 {/* Connection Status for Driver */}
                                 <div className="px-4 py-2 mb-2">
                                     <div className="flex items-center gap-2 text-xs">
@@ -1025,15 +1137,15 @@ export default function NotificationsWidget() {
                                         // Nếu không có type nhưng có message, kiểm tra message
                                         if (n.message) {
                                             const msg = n.message.toLowerCase();
-                                            return msg.includes('chuyến') ||
-                                                msg.includes('chi phí') ||
-                                                msg.includes('thanh toán') ||
-                                                msg.includes('nghỉ phép') ||
-                                                msg.includes('duyệt') ||
-                                                msg.includes('trip') ||
-                                                msg.includes('expense') ||
-                                                msg.includes('payment') ||
-                                                msg.includes('leave');
+                                            return msg.includes('chuyến') || 
+                                                   msg.includes('chi phí') || 
+                                                   msg.includes('thanh toán') || 
+                                                   msg.includes('nghỉ phép') ||
+                                                   msg.includes('duyệt') ||
+                                                   msg.includes('trip') ||
+                                                   msg.includes('expense') ||
+                                                   msg.includes('payment') ||
+                                                   msg.includes('leave');
                                         }
                                         // Nếu không có type và message không rõ, chỉ hiển thị nếu từ user-specific channel
                                         return true; // Hiển thị tất cả từ /topic/notifications/{userId}
@@ -1056,7 +1168,7 @@ export default function NotificationsWidget() {
                                         let Icon = Bell;
                                         let iconBg = notif.read ? "bg-slate-100" : "bg-sky-50";
                                         let iconColor = notif.read ? "text-slate-400" : "text-sky-600";
-
+                                        
                                         if (notif.type) {
                                             if (notif.type.includes('TRIP') || notif.type.includes('ASSIGN')) {
                                                 Icon = CarFront;
@@ -1078,12 +1190,12 @@ export default function NotificationsWidget() {
                                         }
 
                                         return (
-                                            <div
-                                                key={notif.id}
+                                            <div 
+                                                key={notif.id} 
                                                 className={cls(
                                                     "flex items-start gap-3 px-4 py-3.5 border-b border-slate-100 transition-colors cursor-pointer group",
-                                                    notif.read
-                                                        ? "bg-slate-50/50 hover:bg-slate-100/50"
+                                                    notif.read 
+                                                        ? "bg-slate-50/50 hover:bg-slate-100/50" 
                                                         : "bg-white hover:bg-sky-50/50"
                                                 )}
                                                 onClick={() => {
@@ -1104,8 +1216,8 @@ export default function NotificationsWidget() {
                                                 <div className="flex-1 min-w-0">
                                                     <div className={cls(
                                                         "text-sm mb-1",
-                                                        notif.read
-                                                            ? "font-medium text-slate-600"
+                                                        notif.read 
+                                                            ? "font-medium text-slate-600" 
                                                             : "font-semibold text-slate-900"
                                                     )}>
                                                         {notif.title}
@@ -1146,27 +1258,27 @@ export default function NotificationsWidget() {
                                     const paymentNotifications = wsNotifications.filter(n => {
                                         if (n.read) return false;
                                         const paymentNotificationTypes = [
-                                            'PAYMENT_APPROVED', 'PAYMENT_REJECTED',
+                                            'PAYMENT_APPROVED', 'PAYMENT_REJECTED', 
                                             'PAYMENT_REQUEST_APPROVED', 'PAYMENT_REQUEST_REJECTED',
                                             'PAYMENT_UPDATE'
                                         ];
                                         if (n.type) {
-                                            return paymentNotificationTypes.some(t =>
-                                                n.type.includes(t) || t.includes(n.type) ||
+                                            return paymentNotificationTypes.some(t => 
+                                                n.type.includes(t) || t.includes(n.type) || 
                                                 n.type === 'PAYMENT_UPDATE'
                                             );
                                         }
                                         if (n.message) {
                                             const msg = n.message.toLowerCase();
-                                            return msg.includes('thanh toán') ||
-                                                msg.includes('payment') ||
-                                                msg.includes('duyệt') ||
-                                                msg.includes('approve') ||
-                                                msg.includes('reject');
+                                            return msg.includes('thanh toán') || 
+                                                   msg.includes('payment') ||
+                                                   msg.includes('duyệt') ||
+                                                   msg.includes('approve') ||
+                                                   msg.includes('reject');
                                         }
                                         return n.data?.paymentId || n.data?.requestId;
                                     });
-
+                                    
                                     return paymentNotifications.length > 0 ? (
                                         <>
                                             <SectionHeader
@@ -1175,13 +1287,13 @@ export default function NotificationsWidget() {
                                                 count={paymentNotifications.length}
                                             />
                                             {paymentNotifications.map((notif) => {
-                                                const isApproved = notif.type?.includes('APPROVED') ||
-                                                    notif.message?.toLowerCase().includes('duyệt') ||
-                                                    notif.message?.toLowerCase().includes('approve');
-                                                const isRejected = notif.type?.includes('REJECTED') ||
-                                                    notif.message?.toLowerCase().includes('từ chối') ||
-                                                    notif.message?.toLowerCase().includes('reject');
-
+                                                const isApproved = notif.type?.includes('APPROVED') || 
+                                                                  notif.message?.toLowerCase().includes('duyệt') ||
+                                                                  notif.message?.toLowerCase().includes('approve');
+                                                const isRejected = notif.type?.includes('REJECTED') || 
+                                                                  notif.message?.toLowerCase().includes('từ chối') ||
+                                                                  notif.message?.toLowerCase().includes('reject');
+                                                
                                                 return (
                                                     <div
                                                         key={notif.id}
@@ -1250,7 +1362,7 @@ export default function NotificationsWidget() {
                                         </>
                                     ) : null;
                                 })()}
-
+                                
                                 <SectionHeader
                                     icon={<CreditCard className="h-4 w-4 text-amber-600" />}
                                     title="Đơn chưa đặt cọc"
@@ -1380,7 +1492,7 @@ export default function NotificationsWidget() {
                     </div>
                 </>
             )}
-
+            
             {/* Conflict Resolution Modal */}
             {showConflictModal && conflictData && (
                 <ConflictResolutionModal
@@ -1401,13 +1513,13 @@ function ConflictResolutionModal({ conflicts, driverId, approval, onResolve }) {
     const [loading, setLoading] = React.useState(false);
     const [suggestions, setSuggestions] = React.useState({});
     const [selectedReplacements, setSelectedReplacements] = React.useState({});
-
+    
     React.useEffect(() => {
         // Load suggestions for each conflict trip
         async function loadSuggestions() {
             setLoading(true);
             const newSuggestions = {};
-
+            
             for (const trip of conflicts) {
                 const tripId = trip.tripId || trip.trip_id || trip.id;
                 try {
@@ -1419,43 +1531,43 @@ function ConflictResolutionModal({ conflicts, driverId, approval, onResolve }) {
                     newSuggestions[tripId] = [];
                 }
             }
-
+            
             setSuggestions(newSuggestions);
             setLoading(false);
         }
-
+        
         loadSuggestions();
     }, [conflicts]);
-
+    
     const handleApproveWithReplacements = async () => {
         // Check if all trips have replacement selected
         const missingReplacements = conflicts.filter(trip => {
             const tripId = trip.tripId || trip.trip_id || trip.id;
             return !selectedReplacements[tripId];
         });
-
+        
         if (missingReplacements.length > 0) {
-            alert(`⚠️ Vui lòng chọn tài xế thay thế cho ${missingReplacements.length} chuyến`);
+            pushToast(`Vui lòng chọn tài xế thay thế cho ${missingReplacements.length} chuyến`, "error");
             return;
         }
-
+        
         // User confirmed with replacements selected
-        onResolve({
-            confirmed: true,
-            replacements: selectedReplacements
+        onResolve({ 
+            confirmed: true, 
+            replacements: selectedReplacements 
         });
     };
-
+    
     const handleReject = () => {
         onResolve({ confirmed: false });
     };
-
+    
     const handleApproveWithoutReplacement = () => {
         if (confirm('⚠️ Bạn chắc chắn muốn duyệt mà không chọn tài xế thay thế?\n\nHệ thống sẽ xóa tài xế khỏi các chuyến và tạo cảnh báo để bạn sắp xếp sau.')) {
             onResolve({ confirmed: true, replacements: {} });
         }
     };
-
+    
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
@@ -1475,7 +1587,7 @@ function ConflictResolutionModal({ conflicts, driverId, approval, onResolve }) {
                                 </p>
                             </div>
                         </div>
-                        <button
+                        <button 
                             onClick={handleReject}
                             className="text-slate-400 hover:text-slate-600"
                         >
@@ -1483,7 +1595,7 @@ function ConflictResolutionModal({ conflicts, driverId, approval, onResolve }) {
                         </button>
                     </div>
                 </div>
-
+                
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-6">
                     {loading ? (
@@ -1497,7 +1609,7 @@ function ConflictResolutionModal({ conflicts, driverId, approval, onResolve }) {
                                 const tripId = trip.tripId || trip.trip_id || trip.id;
                                 const tripSuggestions = suggestions[tripId] || [];
                                 const selectedDriver = selectedReplacements[tripId];
-
+                                
                                 return (
                                     <div key={tripId} className="border border-slate-200 rounded-lg p-4 bg-slate-50">
                                         <div className="flex items-start justify-between mb-3">
@@ -1516,7 +1628,7 @@ function ConflictResolutionModal({ conflicts, driverId, approval, onResolve }) {
                                                 </div>
                                             </div>
                                         </div>
-
+                                        
                                         <div className="mt-3">
                                             <label className="block text-xs font-medium text-slate-700 mb-2">
                                                 Chọn tài xế thay thế:
@@ -1543,7 +1655,7 @@ function ConflictResolutionModal({ conflicts, driverId, approval, onResolve }) {
                         </div>
                     )}
                 </div>
-
+                
                 {/* Footer */}
                 <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-3">
                     <button

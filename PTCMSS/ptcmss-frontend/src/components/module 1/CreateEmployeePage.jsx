@@ -1,4 +1,4 @@
-
+﻿
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { createEmployee } from "../../api/employees";
@@ -162,7 +162,7 @@ export default function CreateEmployeePage() {
                     >
                         <ArrowLeft className="h-4 w-4 text-slate-600" />
                     </button>
-
+                    
                     <div className="flex items-center gap-3 flex-1">
                         <div className="h-12 w-12 rounded-xl flex items-center justify-center text-white shadow-lg" style={{ backgroundColor: BRAND_COLOR }}>
                             <UserPlus className="h-6 w-6" />
@@ -225,8 +225,8 @@ export default function CreateEmployeePage() {
                             <input
                                 type="number"
                                 className={`w-full border rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 ${
-                                    errors.userId
-                                        ? "border-red-400 focus:border-red-500 focus:ring-red-200"
+                                    errors.userId 
+                                        ? "border-red-400 focus:border-red-500 focus:ring-red-200" 
                                         : "border-slate-300 focus:border-[#0079BC]/50 focus:ring-[#0079BC]/20"
                                 }`}
                                 value={form.userId}
@@ -251,8 +251,8 @@ export default function CreateEmployeePage() {
                         </label>
                         <select
                             className={`w-full border rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 ${
-                                errors.branchId
-                                    ? "border-red-400 focus:border-red-500 focus:ring-red-200"
+                                errors.branchId 
+                                    ? "border-red-400 focus:border-red-500 focus:ring-red-200" 
                                     : "border-slate-300 focus:border-[#0079BC]/50 focus:ring-[#0079BC]/20"
                             }`}
                             value={form.branchId}
@@ -282,8 +282,8 @@ export default function CreateEmployeePage() {
                         </label>
                         <select
                             className={`w-full border rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 ${
-                                errors.roleId
-                                    ? "border-red-400 focus:border-red-500 focus:ring-red-200"
+                                errors.roleId 
+                                    ? "border-red-400 focus:border-red-500 focus:ring-red-200" 
                                     : "border-slate-300 focus:border-[#0079BC]/50 focus:ring-[#0079BC]/20"
                             }`}
                             value={form.roleId}

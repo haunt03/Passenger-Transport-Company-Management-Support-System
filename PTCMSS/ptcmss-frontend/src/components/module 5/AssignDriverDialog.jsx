@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import {
     UserRound,
     Car,
@@ -37,11 +37,11 @@ import { getAssignmentSuggestions, assignTrips, reassignTrips } from "../../api/
 // Endpoints đã được chuyển sang sử dụng API functions từ dispatch.js
 
 export default function AssignDriverDialog({
-                                               open,
-                                               order,
-                                               onClose,
-                                               onAssigned,
-                                           }) {
+    open,
+    order,
+    onClose,
+    onAssigned,
+}) {
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState("");
     const [suggestions, setSuggestions] = React.useState([]); // [{driver, vehicle, score, reasons[]}]
@@ -56,7 +56,15 @@ export default function AssignDriverDialog({
         React.useState(false);
 
     const tripId = order?.tripId || order?.id;
+    const tripIds = order?.tripIds; // Danh sách trips nếu có nhiều xe
     const bookingId = order?.bookingId;
+    const vehicleCount = order?.vehicle_count || 1; // Số lượng xe trong booking
+    const hasMixedVehicleCategories = !!order?.hasMixedVehicleCategories;
+    
+    // Tính số trips chưa gán (nếu có nhiều xe)
+    const [unassignedTripCount, setUnassignedTripCount] = React.useState(0);
+    // Nếu đơn có nhiều loại xe khác nhau -> mặc định KHÔNG gán cho tất cả để tránh sai loại xe
+    const [assignToAllTrips, setAssignToAllTrips] = React.useState(!hasMixedVehicleCategories);
 
     // Fetch gợi ý khi popup mở
     React.useEffect(() => {
@@ -67,6 +75,19 @@ export default function AssignDriverDialog({
             setError("");
             setDriverId("");
             setVehicleId("");
+            
+            // Tính số trips chưa gán từ tripIds (đã được lọc từ OrderDetailPage)
+            if (tripIds && tripIds.length > 0) {
+                setUnassignedTripCount(tripIds.length);
+                // Nếu có nhiều hơn 1 trip chưa gán:
+                //  - Nếu đơn có nhiều loại xe khác nhau -> KHÔNG auto tick "gán cho tất cả"
+                //  - Ngược lại (cùng loại xe) -> vẫn mặc định gán cho tất cả như trước
+                setAssignToAllTrips(tripIds.length > 1 && !hasMixedVehicleCategories);
+            } else {
+                setUnassignedTripCount(1);
+                setAssignToAllTrips(false); // Chỉ gán cho 1 trip
+            }
+            
             try {
                 const data = await getAssignmentSuggestions(tripId);
 
@@ -121,10 +142,24 @@ export default function AssignDriverDialog({
         return driverCandidates.filter(d => d.eligible);
     }, [driverCandidates]);
 
-    // danh sách xe (chỉ eligible)
+    // Loại xe khách đã đặt (dùng để lọc danh sách xe phù hợp)
+    // Ưu tiên lấy từ summary (từ API) vì đã được map đúng cho trip này
+    const expectedVehicleType =
+        summary?.vehicleType ||
+        order?.trip?.vehicle_category ||
+        order?.vehicle_type ||
+        order?.vehicleType ||
+        null;
+    
+    // danh sách xe (chỉ eligible & đúng loại xe mà khách đặt)
     const vehicleOptions = React.useMemo(() => {
-        return vehicleCandidates.filter(v => v.eligible);
-    }, [vehicleCandidates]);
+        return vehicleCandidates.filter(v => {
+            if (!v.eligible) return false;
+            if (!expectedVehicleType) return true;
+            const vType = v.type || v.categoryName || v.vehicleType || "";
+            return vType === expectedVehicleType;
+        });
+    }, [vehicleCandidates, expectedVehicleType]);
 
     // khi click 1 dòng gợi ý => fill vào dropdown
     const handlePickSuggestion = (s) => {
@@ -139,6 +174,16 @@ export default function AssignDriverDialog({
     const canConfirm =
         driverId && vehicleId && !posting;
 
+    // Helper: Trích xuất message lỗi từ response
+    const extractErrorMessage = (err) => {
+        // Thử lấy message từ các cấu trúc response khác nhau
+        const msg = err?.response?.data?.message 
+            || err?.response?.data?.error 
+            || err?.message 
+            || "Lỗi không xác định";
+        return msg;
+    };
+
     // Gán thủ công
     const doAssignManual = async () => {
         if (
@@ -148,12 +193,26 @@ export default function AssignDriverDialog({
         )
             return;
         setPosting(true);
+        setError(""); // Clear previous error
         try {
             // Check if trip already has assignment (reassign) or new assignment
             const isReassign = order?.driverId || order?.vehicleId;
-
+            
+            // Xác định trips cần gán
+            let targetTripIds = undefined;
+            if (!assignToAllTrips && tripId) {
+                // Chỉ gán cho 1 trip cụ thể
+                targetTripIds = [Number(tripId)];
+            } else if (assignToAllTrips && tripIds && tripIds.length > 0) {
+                // Gán cho tất cả trips
+                targetTripIds = tripIds.map(id => Number(id));
+            } else if (tripId) {
+                // Fallback: gán cho 1 trip
+                targetTripIds = [Number(tripId)];
+            }
+            
             if (isReassign && tripId) {
-                // Use reassign API
+                // Use reassign API - chỉ reassign 1 trip tại một thời điểm
                 const result = await reassignTrips({
                     tripId: Number(tripId),
                     driverId: Number(driverId),
@@ -170,10 +229,10 @@ export default function AssignDriverDialog({
                     response: result,
                 });
             } else {
-                // Use assign API
+                // Use assign API - có thể gán cho nhiều trips
                 const result = await assignTrips({
                     bookingId: Number(bookingId),
-                    tripIds: tripId ? [Number(tripId)] : undefined,
+                    tripIds: targetTripIds, // undefined = gán tất cả, array = gán các trips được chọn
                     driverId: Number(driverId),
                     vehicleId: Number(vehicleId),
                     autoAssign: false,
@@ -181,7 +240,8 @@ export default function AssignDriverDialog({
 
                 onAssigned?.({
                     type: "manual",
-                    tripId,
+                    tripId: tripId,
+                    tripIds: targetTripIds,
                     bookingId,
                     driverId: Number(driverId),
                     vehicleId: Number(vehicleId),
@@ -190,10 +250,9 @@ export default function AssignDriverDialog({
             }
             onClose?.();
         } catch (e) {
-            console.error(e);
-            alert(
-                "Gán chuyến thất bại. Vui lòng thử lại."
-            );
+            console.error("❌ Gán chuyến thất bại:", e);
+            const errorMsg = extractErrorMessage(e);
+            setError(`Gán chuyến thất bại: ${errorMsg}`);
         } finally {
             setPosting(false);
         }
@@ -203,25 +262,36 @@ export default function AssignDriverDialog({
     const doAssignAuto = async () => {
         if (!bookingId) return;
         setAutoPosting(true);
+        setError(""); // Clear previous error
         try {
+            // Xác định trips cần gán: nếu có nhiều trips (nhiều xe), gán cho tất cả
+            let targetTripIds = undefined;
+            if (tripIds && tripIds.length > 0) {
+                // Gán cho tất cả trips (nhiều xe)
+                targetTripIds = tripIds.map(id => Number(id));
+            } else if (tripId) {
+                // Chỉ có 1 trip
+                targetTripIds = [Number(tripId)];
+            }
+            
             const result = await assignTrips({
                 bookingId: Number(bookingId),
-                tripIds: tripId ? [Number(tripId)] : undefined,
+                tripIds: targetTripIds, // undefined = gán tất cả, array = gán các trips được chọn
                 autoAssign: true,
             });
 
             onAssigned?.({
                 type: "auto",
                 tripId,
+                tripIds: targetTripIds,
                 bookingId,
                 response: result,
             });
             onClose?.();
         } catch (e) {
-            console.error(e);
-            alert(
-                "Tự động gán thất bại. Vui lòng thử lại."
-            );
+            console.error("❌ Tự động gán thất bại:", e);
+            const errorMsg = extractErrorMessage(e);
+            setError(`Tự động gán thất bại: ${errorMsg}`);
         } finally {
             setAutoPosting(false);
         }
@@ -268,7 +338,7 @@ export default function AssignDriverDialog({
                             </span>
                             <span className="font-mono text-slate-900 font-medium">
                                 {fmtDateTime(
-                                    order?.pickup_time
+                                    order?.pickup_time || order?.pickupTime
                                 )}
                             </span>
                         </div>
@@ -279,8 +349,12 @@ export default function AssignDriverDialog({
                                 Loại xe:
                             </span>
                             <span className="text-slate-900 font-medium">
-                                {order?.vehicle_type ||
-                                    "—"}
+                                {summary?.vehicleType || 
+                                 order?.vehicle_type || 
+                                 order?.vehicleType || 
+                                 "—"}
+                                {/* Chỉ hiển thị số lượng nếu đang gán cho nhiều trips cùng loại xe */}
+                                {assignToAllTrips && unassignedTripCount > 1 && !hasMixedVehicleCategories && ` (${unassignedTripCount} xe)`}
                             </span>
                         </div>
 
@@ -290,11 +364,51 @@ export default function AssignDriverDialog({
                                 Chi nhánh:
                             </span>
                             <span className="text-slate-900 font-medium">
-                                {order?.branch_name ||
-                                    "—"}
+                                {order?.branch_name || 
+                                 order?.branchName || 
+                                 summary?.branchName ||
+                                 "—"}
                             </span>
                         </div>
                     </div>
+                    
+                    {/* Thông báo nếu có nhiều chuyến chưa gán */}
+                    {unassignedTripCount > 1 && (
+                        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800 flex items-start gap-2">
+                            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                            <div className="flex-1">
+                                <div className="font-medium mb-1">
+                                    Còn {unassignedTripCount} chuyến chưa gán tài xế/xe
+                                </div>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={assignToAllTrips}
+                                        onChange={(e) => setAssignToAllTrips(e.target.checked)}
+                                        className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                                    />
+                                    <span>
+                                        Gán cho tất cả {unassignedTripCount} chuyến còn lại
+                                    </span>
+                                </label>
+                                {hasMixedVehicleCategories && assignToAllTrips && (
+                                    <div className="mt-1 text-[11px] text-blue-600 font-medium">
+                                        ℹ️ Hệ thống sẽ tự động chọn xe phù hợp cho từng chuyến (xe 9 chỗ cho chuyến 1, xe 45 chỗ cho chuyến 2, ...)
+                                    </div>
+                                )}
+                                {!hasMixedVehicleCategories && assignToAllTrips && (
+                                    <div className="mt-1 text-[11px] text-blue-600 font-medium">
+                                        ℹ️ Sẽ gán cùng tài xế/xe cho tất cả {unassignedTripCount} chuyến
+                                    </div>
+                                )}
+                                {!assignToAllTrips && (
+                                    <div className="mt-1 text-[11px] text-amber-700">
+                                        (Chỉ gán cho chuyến đầu tiên trong danh sách chưa gán)
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Body */}
@@ -320,7 +434,7 @@ export default function AssignDriverDialog({
                                 Đang tải gợi ý…
                             </div>
                         ) : suggestions.length ===
-                        0 ? (
+                            0 ? (
                             <div className="px-3 py-6 text-[13px] text-slate-500 flex items-center gap-2">
                                 <AlertTriangle className="h-4 w-4 text-amber-600" />
                                 <span>
@@ -364,22 +478,22 @@ export default function AssignDriverDialog({
                                                                 }
                                                             >
                                                                 {s
-                                                                        ?.driver
-                                                                        ?.name ||
+                                                                    ?.driver
+                                                                    ?.name ||
                                                                     "—"}
                                                             </span>
                                                             {s
                                                                 ?.driver
                                                                 ?.id && (
-                                                                <span className="text-[11px] text-slate-500 font-normal">
+                                                                    <span className="text-[11px] text-slate-500 font-normal">
                                                                         #
-                                                                    {
-                                                                        s
-                                                                            .driver
-                                                                            .id
-                                                                    }
+                                                                        {
+                                                                            s
+                                                                                .driver
+                                                                                .id
+                                                                        }
                                                                     </span>
-                                                            )}
+                                                                )}
                                                         </div>
 
                                                         {/* vehicle */}
@@ -394,27 +508,28 @@ export default function AssignDriverDialog({
                                                                 }
                                                             >
                                                                 {s
-                                                                        ?.vehicle
-                                                                        ?.plate ||
+                                                                    ?.vehicle
+                                                                    ?.plate ||
                                                                     "—"}
                                                             </span>
                                                             {s
                                                                 ?.vehicle
                                                                 ?.type && (
-                                                                <span className="text-[11px] text-slate-500 font-normal">
+                                                                    <span className="text-[11px] text-slate-500 font-normal">
                                                                         ·{" "}
-                                                                    {
-                                                                        s
-                                                                            .vehicle
-                                                                            .type
-                                                                    }
+                                                                        {
+                                                                            s
+                                                                                .vehicle
+                                                                                .type
+                                                                        }
                                                                     </span>
-                                                            )}
+                                                                )}
                                                         </div>
 
-                                                        {/* score */}
+                                                        {/* score - chỉ hiển thị nếu có lịch sử với khách hàng */}
                                                         {typeof s?.score ===
-                                                            "number" && (
+                                                            "number" && 
+                                                            s?.driver?.hasHistoryWithCustomer && (
                                                                 <div className="ml-auto flex items-center gap-1 text-[11px] text-amber-600 font-medium">
                                                                     <BadgeCheck className="h-4 w-4 text-amber-600" />
                                                                     <span>
@@ -429,8 +544,8 @@ export default function AssignDriverDialog({
 
                                                     {/* reasons */}
                                                     {Array.isArray(
-                                                            s?.reasons
-                                                        ) &&
+                                                        s?.reasons
+                                                    ) &&
                                                         s
                                                             .reasons
                                                             .length >
@@ -496,7 +611,7 @@ export default function AssignDriverDialog({
                                                     d.id
                                                 }
                                             >
-                                                {d.name}{" "}
+                                                {d.hasHistoryWithCustomer ? "✓ " : ""}{d.name}{" "}
                                                 {d.tripsToday != null
                                                     ? `(${d.tripsToday} chuyến hôm nay)`
                                                     : ""}
@@ -573,9 +688,9 @@ export default function AssignDriverDialog({
                         className={`
                             rounded-md px-3 py-2 border text-[13px] font-medium flex items-center gap-1
                             ${autoPosting
-                            ? "opacity-60 cursor-not-allowed border-amber-300 text-amber-400 bg-white"
-                            : "border-sky-500 text-sky-700 bg-white hover:bg-sky-50"
-                        }
+                                ? "opacity-60 cursor-not-allowed border-amber-300 text-amber-400 bg-white"
+                                : "border-sky-500 text-sky-700 bg-white hover:bg-sky-50"
+                            }
                         `}
                     >
                         {autoPosting ? (
@@ -600,9 +715,9 @@ export default function AssignDriverDialog({
                         className={`
                             rounded-md px-3 py-2 border text-[13px] font-medium flex items-center gap-1
                             ${canConfirm
-                            ? "border-sky-600 text-sky-700 bg-white hover:bg-sky-50"
-                            : "opacity-60 cursor-not-allowed border-slate-300 text-slate-400 bg-white"
-                        }
+                                ? "border-sky-600 text-sky-700 bg-white hover:bg-sky-50"
+                                : "opacity-60 cursor-not-allowed border-slate-300 text-slate-400 bg-white"
+                            }
                         `}
                     >
                         <Check className="h-4 w-4 text-sky-600" />

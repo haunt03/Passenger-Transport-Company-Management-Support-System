@@ -1,8 +1,8 @@
-import React from "react";
+﻿import React from "react";
 import { Building2, ArrowLeft, Save, ShieldCheck, RefreshCw, X, MapPin } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getBranch, updateBranch } from "../../api/branches";
-import { listEmployeesByRole } from "../../api/employees";
+import { listEmployeesByRole, getAvailableManagers } from "../../api/employees";
 import { listUsers, listRoles } from "../../api/users";
 import ProvinceAutocomplete from "../common/ProvinceAutocomplete";
 
@@ -11,14 +11,14 @@ const cls = (...a) => a.filter(Boolean).join(" ");
 function StatusPill({ status }) {
   if (status === "ACTIVE") {
     return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium border bg-amber-50 text-amber-700 border-amber-200">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium border bg-amber-50 text-amber-700 border-amber-200">
         <ShieldCheck className="h-3.5 w-3.5 text-amber-600" />
         <span>Đang hoạt động</span>
       </span>
     );
   }
   return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium border bg-slate-100 text-slate-600 border-slate-300">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium border bg-slate-100 text-slate-600 border-slate-300">
       <ShieldCheck className="h-3.5 w-3.5 text-slate-500 opacity-70" />
       <span>Ngừng hoạt động</span>
     </span>
@@ -94,7 +94,18 @@ export default function AdminBranchDetailPage() {
 
   React.useEffect(() => {
     (async () => {
-      // Try Employee API first; fallback to Roles + Users
+      // Lấy danh sách managers chưa được gán (hoặc đang quản lý chi nhánh hiện tại)
+      try {
+        const emps = await getAvailableManagers(Number(branchId));
+        if (Array.isArray(emps)) {
+          const arr = emps.map((e) => ({ id: e.userId, name: e.userFullName || "", email: e.email || "" }));
+          setManagers(arr);
+          return;
+        }
+      } catch (err) {
+        console.error("Failed to load available managers:", err);
+      }
+      // Fallback: lấy tất cả managers nếu API mới không hoạt động
       try {
         const emps = await listEmployeesByRole("Manager");
         if (Array.isArray(emps) && emps.length >= 0) {
@@ -113,7 +124,7 @@ export default function AdminBranchDetailPage() {
         }
       } catch {}
     })();
-  }, []);
+  }, [branchId]);
 
   const validateBranchName = React.useCallback((nameStr) => {
     const cleaned = nameStr.trim();
