@@ -1,4 +1,4 @@
-// src/components/module 1/SystemSettingsPage.jsx
+﻿// src/components/module 1/SystemSettingsPage.jsx
 import React from "react";
 import {
     Settings,
@@ -387,7 +387,7 @@ export default function SystemSettingsPage() {
             // Add to local state
             setSettings((list) => [...list, mappedCreated]);
             setOriginalSettings((list) => [...list, mappedCreated]);
-
+            
             setAdding(false);
             setDraftNew({
                 key: "",
@@ -395,7 +395,7 @@ export default function SystemSettingsPage() {
                 value: "",
                 description: "",
             });
-
+            
             push("Đã thêm cấu hình mới.", "success");
         } catch (err) {
             console.error("Failed to create system setting:", err);

@@ -12,24 +12,24 @@ import { getStoredUserId } from "../utils/session";
  * Note: If backend doesn't have this endpoint, we can use the general notifications endpoint
  */
 export function getDriverNotifications({ userId, page = 1, limit = 20 } = {}) {
-    if (!userId) {
-        // Try to get from session
-        try {
-            const { getStoredUserId } = require("../utils/session");
-            userId = getStoredUserId();
-        } catch (err) {
-            throw new Error("USER_ID_REQUIRED");
-        }
+  if (!userId) {
+    // Try to get from session
+    try {
+      const { getStoredUserId } = require("../utils/session");
+      userId = getStoredUserId();
+    } catch (err) {
+      throw new Error("USER_ID_REQUIRED");
     }
-
-    const params = new URLSearchParams();
-    params.append("page", String(page));
-    params.append("limit", String(limit));
-
-    return apiFetch(`/api/notifications/user/${userId}?${params.toString()}`).catch(() => {
-        // If endpoint fails, return empty array
-        return { data: [], total: 0, page, limit };
-    });
+  }
+  
+  const params = new URLSearchParams();
+  params.append("page", String(page));
+  params.append("limit", String(limit));
+  
+  return apiFetch(`/api/notifications/user/${userId}?${params.toString()}`).catch(() => {
+    // If endpoint fails, return empty array
+    return { data: [], total: 0, page, limit };
+  });
 }
 
 /**
@@ -37,9 +37,9 @@ export function getDriverNotifications({ userId, page = 1, limit = 20 } = {}) {
  * PUT /api/notifications/{notificationId}/read
  */
 export function markNotificationRead(notificationId) {
-    return apiFetch(`/api/notifications/${notificationId}/read`, {
-        method: "PUT",
-    });
+  return apiFetch(`/api/notifications/${notificationId}/read`, {
+    method: "PUT",
+  });
 }
 
 /**
@@ -47,10 +47,10 @@ export function markNotificationRead(notificationId) {
  * PUT /api/notifications/read-all
  */
 export function markAllNotificationsRead(userId) {
-    return apiFetch(`/api/notifications/read-all`, {
-        method: "PUT",
-        body: { userId: Number(userId) },
-    });
+  return apiFetch(`/api/notifications/read-all`, {
+    method: "PUT",
+    body: { userId: Number(userId) },
+  });
 }
 
 /**
@@ -58,9 +58,9 @@ export function markAllNotificationsRead(userId) {
  * GET /api/notifications/dashboard?branchId={branchId}
  */
 export function getNotificationDashboard(branchId) {
-    const params = new URLSearchParams();
-    if (branchId) params.append("branchId", String(branchId));
-    return apiFetch(`/api/notifications/dashboard${params.toString() ? `?${params.toString()}` : ""}`);
+  const params = new URLSearchParams();
+  if (branchId) params.append("branchId", String(branchId));
+  return apiFetch(`/api/notifications/dashboard${params.toString() ? `?${params.toString()}` : ""}`);
 }
 
 /**
@@ -68,9 +68,9 @@ export function getNotificationDashboard(branchId) {
  * GET /api/notifications/alerts?branchId={branchId}
  */
 export function getAlerts(branchId) {
-    const params = new URLSearchParams();
-    if (branchId) params.append("branchId", String(branchId));
-    return apiFetch(`/api/notifications/alerts${params.toString() ? `?${params.toString()}` : ""}`);
+  const params = new URLSearchParams();
+  if (branchId) params.append("branchId", String(branchId));
+  return apiFetch(`/api/notifications/alerts${params.toString() ? `?${params.toString()}` : ""}`);
 }
 
 /**
@@ -78,10 +78,10 @@ export function getAlerts(branchId) {
  * POST /api/notifications/alerts/{alertId}/acknowledge
  */
 export function acknowledgeAlert(alertId, userId) {
-    return apiFetch(`/api/notifications/alerts/${alertId}/acknowledge`, {
-        method: "POST",
-        body: { userId: Number(userId) },
-    });
+  return apiFetch(`/api/notifications/alerts/${alertId}/acknowledge`, {
+    method: "POST",
+    body: { userId: Number(userId) },
+  });
 }
 
 /**
@@ -89,31 +89,31 @@ export function acknowledgeAlert(alertId, userId) {
  * GET /api/notifications/approvals/pending?branchId={branchId}
  */
 export function getPendingApprovals(branchId) {
-    const params = new URLSearchParams();
-    if (branchId) params.append("branchId", String(branchId));
-    return apiFetch(`/api/notifications/approvals/pending${params.toString() ? `?${params.toString()}` : ""}`);
+  const params = new URLSearchParams();
+  if (branchId) params.append("branchId", String(branchId));
+  return apiFetch(`/api/notifications/approvals/pending${params.toString() ? `?${params.toString()}` : ""}`);
 }
 
 export function approveApprovalRequest(historyId, { userId, note } = {}) {
-    const resolvedUserId = userId ?? getStoredUserId();
-    if (!resolvedUserId) {
-        throw new Error("USER_ID_REQUIRED");
-    }
-    return apiFetch(`/api/notifications/approvals/${historyId}/approve`, {
-        method: "POST",
-        body: { userId: Number(resolvedUserId), note },
-    });
+  const resolvedUserId = userId ?? getStoredUserId();
+  if (!resolvedUserId) {
+    throw new Error("USER_ID_REQUIRED");
+  }
+  return apiFetch(`/api/notifications/approvals/${historyId}/approve`, {
+    method: "POST",
+    body: { userId: Number(resolvedUserId), note },
+  });
 }
 
 export function rejectApprovalRequest(historyId, { userId, note } = {}) {
-    const resolvedUserId = userId ?? getStoredUserId();
-    if (!resolvedUserId) {
-        throw new Error("USER_ID_REQUIRED");
-    }
-    return apiFetch(`/api/notifications/approvals/${historyId}/reject`, {
-        method: "POST",
-        body: { userId: Number(resolvedUserId), note },
-    });
+  const resolvedUserId = userId ?? getStoredUserId();
+  if (!resolvedUserId) {
+    throw new Error("USER_ID_REQUIRED");
+  }
+  return apiFetch(`/api/notifications/approvals/${historyId}/reject`, {
+    method: "POST",
+    body: { userId: Number(resolvedUserId), note },
+  });
 }
 
 /**
@@ -121,13 +121,46 @@ export function rejectApprovalRequest(historyId, { userId, note } = {}) {
  * DELETE /api/notifications/{notificationId}?userId={userId}
  */
 export function deleteNotification(notificationId, userId) {
-    const resolvedUserId = userId ?? getStoredUserId();
-    if (!resolvedUserId) {
-        throw new Error("USER_ID_REQUIRED");
-    }
-    return apiFetch(`/api/notifications/${notificationId}?userId=${resolvedUserId}`, {
-        method: "DELETE",
-    });
+  const resolvedUserId = userId ?? getStoredUserId();
+  if (!resolvedUserId) {
+    throw new Error("USER_ID_REQUIRED");
+  }
+  return apiFetch(`/api/notifications/${notificationId}?userId=${resolvedUserId}`, {
+    method: "DELETE",
+  });
+}
+
+/**
+ * Delete notification by approval type and related entity ID
+ * DELETE /api/notifications/by-approval?approvalType=...&relatedEntityId=...&userId=...
+ */
+export function deleteNotificationByApproval(approvalType, relatedEntityId, userId) {
+  const resolvedUserId = userId ?? getStoredUserId();
+  if (!resolvedUserId) {
+    throw new Error("USER_ID_REQUIRED");
+  }
+  const params = new URLSearchParams({
+    approvalType,
+    relatedEntityId: String(relatedEntityId),
+    userId: String(resolvedUserId),
+  });
+  return apiFetch(`/api/notifications/by-approval?${params.toString()}`, {
+    method: "DELETE",
+  });
+}
+
+/**
+ * Dismiss approval (delete approval history and related notification)
+ * DELETE /api/notifications/approvals/{approvalHistoryId}?userId=...
+ */
+export function dismissApproval(approvalHistoryId, userId) {
+  const resolvedUserId = userId ?? getStoredUserId();
+  if (!resolvedUserId) {
+    throw new Error("USER_ID_REQUIRED");
+  }
+  return apiFetch(`/api/notifications/approvals/${approvalHistoryId}?userId=${resolvedUserId}`, {
+    method: "DELETE",
+  });
 }
 
 /**

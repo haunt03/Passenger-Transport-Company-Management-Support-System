@@ -11,12 +11,12 @@ const fmtVND = (n) => new Intl.NumberFormat("vi-VN").format(Math.max(0, Number(n
  * @param {string} props.xKey - X-axis data key
  */
 export default function TrendChart({
-                                       data = [],
-                                       lines = [],
-                                       xKey = "month",
-                                       height = 300,
-                                       loading = false,
-                                   }) {
+    data = [],
+    lines = [],
+    xKey = "month",
+    height = 300,
+    loading = false,
+}) {
     if (loading) {
         return (
             <div className="w-full bg-slate-100 rounded animate-pulse" style={{ height }} />

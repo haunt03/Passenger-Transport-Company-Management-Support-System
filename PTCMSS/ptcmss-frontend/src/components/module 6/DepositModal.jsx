@@ -60,17 +60,17 @@ const fmtVND = (n) =>
     );
 
 export default function DepositModal({
-                                         open,
-                                         context, // { type: 'order'|'invoice', id, title? }
-                                         totals = { total: 0, paid: 0 }, // { total, paid } có thể là số hoặc chuỗi "12.000.000"
-                                         defaultAmount = 0,
-                                         defaultMethod = "CASH",
-                                         defaultDate,
-                                         modeLabel = "Thanh toán",
-                                         allowOverpay = false,
-                                         onClose,
-                                         onSubmitted,
-                                     }) {
+    open,
+    context, // { type: 'order'|'invoice', id, title? }
+    totals = { total: 0, paid: 0 }, // { total, paid } có thể là số hoặc chuỗi "12.000.000"
+    defaultAmount = 0,
+    defaultMethod = "CASH",
+    defaultDate,
+    modeLabel = "Thanh toán",
+    allowOverpay = false,
+    onClose,
+    onSubmitted,
+}) {
     // ----- STATE -----
     const [amountStr, setAmountStr] = React.useState("");
     const [preset, setPreset] = React.useState("CUSTOM"); // "30" | "50" | "ALL" | "CUSTOM"
@@ -169,17 +169,17 @@ export default function DepositModal({
     // ----- HANDLERS -----
     const handleManualAmountChange = (e) => {
         let input = e.target.value;
-
+        
         // Xử lý format Việt Nam: "1.760.000,55" -> "1760000.55"
         // Nếu có cả dấu chấm và dấu phẩy, coi dấu chấm là phân cách nghìn, dấu phẩy là thập phân
         if (input.includes(".") && input.includes(",")) {
             input = input.replace(/\./g, "").replace(",", ".");
-        }
+        } 
         // Nếu chỉ có dấu phẩy, coi là thập phân
         else if (input.includes(",")) {
             input = input.replace(",", ".");
         }
-            // Nếu chỉ có dấu chấm, kiểm tra xem có phải phân cách nghìn không
+        // Nếu chỉ có dấu chấm, kiểm tra xem có phải phân cách nghìn không
         // (nếu có nhiều dấu chấm hoặc dấu chấm ở vị trí phân cách nghìn)
         else if (input.includes(".")) {
             const parts = input.split(".");
@@ -192,7 +192,7 @@ export default function DepositModal({
             }
             // Ngược lại, giữ dấu chấm như thập phân
         }
-
+        
         const v = cleanDigits(input); // giữ lại chỉ số và dấu chấm thập phân
         setAmountStr(v);
         setPreset("CUSTOM");

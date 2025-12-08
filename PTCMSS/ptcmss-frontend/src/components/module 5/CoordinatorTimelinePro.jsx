@@ -726,16 +726,16 @@ function Modal({ open, onClose, item }) {
 
 // ===== Dialog gán chuyến (stub M5.S3) =====
 function AssignDialog({
-                          open,
-                          order,
-                          suggestions,
-                          onClose,
-                          onConfirm,
-                          submitting = false,
-                          error = "",
-                          optionsLoading = false,
-                          optionsError = "",
-                      }) {
+    open,
+    order,
+    suggestions,
+    onClose,
+    onConfirm,
+    submitting = false,
+    error = "",
+    optionsLoading = false,
+    optionsError = "",
+}) {
     const [driverId, setDriverId] = React.useState("");
     const [vehicleId, setVehicleId] = React.useState("");
 
@@ -853,7 +853,7 @@ function AssignDialog({
                         className={`rounded-md px-3 py-2 text-[13px] font-medium shadow-sm ${canConfirm
                             ? "bg-emerald-600 hover:bg-emerald-500 text-white"
                             : "bg-slate-200 text-slate-400 cursor-not-allowed"
-                        }`}
+                            }`}
                     >
                         {submitting ? "Đang gán..." : "Gán"}
                     </button>
@@ -1138,11 +1138,11 @@ export default function CoordinatorTimelinePro() {
     };
 
     const handleConfirmAssign = async ({
-                                           bookingId,
-                                           tripId,
-                                           driverId,
-                                           vehicleId,
-                                       }) => {
+        bookingId,
+        tripId,
+        driverId,
+        vehicleId,
+    }) => {
         if (!assignOrder && !bookingId) return;
         const targetBooking = bookingId ?? assignOrder?.bookingId ?? assignOrder?.id;
         if (targetBooking == null) {
@@ -1228,7 +1228,7 @@ export default function CoordinatorTimelinePro() {
                             ) : branches.length ? (
                                 <select
                                     className={`bg-transparent outline-none text-[13px] text-slate-900 min-w-[140px] appearance-none pr-6 focus:ring-2 focus:ring-sky-500 rounded ${isBranchScoped ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'
-                                    }`}
+                                        }`}
                                     value={branchId}
                                     onChange={(e) => {
                                         const newBranchId = e.target.value;
