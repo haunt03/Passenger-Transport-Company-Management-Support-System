@@ -214,7 +214,7 @@ function RequestCard({ request }) {
 
 export default function CoordinatorExpenseManagementPage() {
     const [activeTab, setActiveTab] = React.useState("create"); // "create" or "list"
-
+    
     const role = React.useMemo(() => getCurrentRole(), []);
     const userId = React.useMemo(() => getStoredUserId(), []);
     const branchScoped = React.useMemo(() => BRANCH_SCOPED_ROLES.has(role), [role]);
@@ -291,8 +291,8 @@ export default function CoordinatorExpenseManagementPage() {
                 setBranchName("");
                 setBranchError(
                     err?.data?.message ||
-                    err?.message ||
-                    "Không tải được chi nhánh."
+                        err?.message ||
+                        "Không tải được chi nhánh."
                 );
             } finally {
                 if (!cancelled) setBranchLoading(false);
@@ -328,8 +328,8 @@ export default function CoordinatorExpenseManagementPage() {
                 setVehicleOptions([]);
                 setVehicleError(
                     err?.data?.message ||
-                    err?.message ||
-                    "Không tải được danh sách xe."
+                        err?.message ||
+                        "Không tải được danh sách xe."
                 );
             } finally {
                 if (!cancelled) setVehicleLoading(false);
@@ -463,8 +463,8 @@ export default function CoordinatorExpenseManagementPage() {
         } catch (err) {
             setError(
                 err?.data?.message ||
-                err?.message ||
-                "Không gửi được yêu cầu. Vui lòng thử lại."
+                    err?.message ||
+                    "Không gửi được yêu cầu. Vui lòng thử lại."
             );
         } finally {
             setSubmitting(false);
@@ -834,3 +834,4 @@ export default function CoordinatorExpenseManagementPage() {
         </div>
     );
 }
+

@@ -52,7 +52,7 @@ export default function LoginPage() {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return emailRegex.test(email);
     };
-
+    
     const validateLogin = () => {
         if (!email.trim()) {
             return "Vui lòng nhập email hoặc tên đăng nhập";
@@ -65,7 +65,7 @@ export default function LoginPage() {
         }
         return null;
     };
-
+    
     const trimmedEmail = email.trim();
     const canUseForgotPassword = isValidEmail(trimmedEmail);
     const canSubmit =
@@ -76,14 +76,14 @@ export default function LoginPage() {
 
     async function handleLogin(e) {
         e.preventDefault();
-
+        
         // Validate
         const validationError = validateLogin();
         if (validationError) {
             setError(validationError);
             return;
         }
-
+        
         if (!canSubmit) return;
 
         setLoading(true);
@@ -141,8 +141,8 @@ export default function LoginPage() {
         } catch (err) {
             console.error("Login error:", err);
             // Handle validation errors from backend
-            const errorMessage = err?.data?.message
-                || err?.message
+            const errorMessage = err?.data?.message 
+                || err?.message 
                 || err?.data?.error
                 || "Email hoặc mật khẩu không chính xác.";
             setError(errorMessage);
@@ -426,8 +426,8 @@ export default function LoginPage() {
                                         await apiForgotPassword(forgotEmail.trim());
                                         setForgotSuccess(true);
                                     } catch (err) {
-                                        const errorMessage = err?.data?.message
-                                            || err?.message
+                                        const errorMessage = err?.data?.message 
+                                            || err?.message 
                                             || err?.data?.error
                                             || "Không thể gửi email đặt lại mật khẩu. Vui lòng thử lại.";
                                         setForgotError(errorMessage);

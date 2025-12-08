@@ -1,4 +1,4 @@
-import { getCookie } from '../../utils/cookies';
+﻿import { getCookie } from '../../utils/cookies';
 // src/components/driver/DriverLeaveRequestPage.jsx
 import React from "react";
 import { getDriverProfileByUser, requestDayOff, getDayOffHistory } from "../../api/drivers";
@@ -88,10 +88,10 @@ export default function DriverLeaveRequestPage() {
             try {
                 const uid = getCookie("userId");
                 if (!uid) return;
-
+                
                 const profile = await getDriverProfileByUser(uid);
                 const dayOffList = await getDayOffHistory(profile.driverId);
-
+                
                 const now = new Date();
                 const currentMonth = now.getMonth();
                 const currentYear = now.getFullYear();
@@ -100,7 +100,7 @@ export default function DriverLeaveRequestPage() {
                 const approvedDayOffs = Array.isArray(dayOffList)
                     ? dayOffList.filter((dayOff) => {
                         if (dayOff.status !== "APPROVED") return false;
-
+                        
                         const leaveDate = dayOff.date || dayOff.leaveDate || dayOff.startDate;
                         if (!leaveDate) return false;
 
@@ -116,19 +116,19 @@ export default function DriverLeaveRequestPage() {
                 approvedDayOffs.forEach((dayOff) => {
                     const startDate = new Date(dayOff.startDate || dayOff.date || dayOff.leaveDate);
                     const endDate = dayOff.endDate ? new Date(dayOff.endDate) : startDate;
-
+                    
                     if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
                         const monthStart = new Date(currentYear, currentMonth, 1);
                         const monthEnd = new Date(currentYear, currentMonth + 1, 0);
-
+                        
                         startDate.setHours(0, 0, 0, 0);
                         endDate.setHours(0, 0, 0, 0);
                         monthStart.setHours(0, 0, 0, 0);
                         monthEnd.setHours(23, 59, 59, 999);
-
+                        
                         const start = new Date(Math.max(startDate.getTime(), monthStart.getTime()));
                         const end = new Date(Math.min(endDate.getTime(), monthEnd.getTime()));
-
+                        
                         if (end >= start) {
                             const diffDays = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
                             used += diffDays;
@@ -335,8 +335,8 @@ export default function DriverLeaveRequestPage() {
                                 requestedDays > 0 && requestedDays <= remainingDays && validDateOrder
                                     ? "bg-emerald-50 border-emerald-200 text-emerald-900"
                                     : requestedDays > remainingDays
-                                        ? "bg-rose-50 border-rose-200 text-rose-900"
-                                        : "bg-slate-50 border-slate-200 text-slate-500"
+                                    ? "bg-rose-50 border-rose-200 text-rose-900"
+                                    : "bg-slate-50 border-slate-200 text-slate-500"
                             )}
                         >
                             <span className="text-2xl font-bold tabular-nums">

@@ -80,18 +80,3 @@ export async function uploadDriverAvatar(userId, file) {
   });
 }
 
-/**
- * Upload avatar cho driver (thông qua userId)
- * @param {number} userId - ID của user (driver)
- * @param {File} file - File ảnh
- * @returns {Promise<string>} URL của avatar đã upload
- */
-export async function uploadDriverAvatar(userId, file) {
-    const formData = new FormData();
-    formData.append("file", file);
-
-    return apiFetch(`/api/users/${userId}/avatar`, {
-        method: "POST",
-        body: formData,
-    });
-}

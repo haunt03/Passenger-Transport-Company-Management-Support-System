@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { useNavigate } from "react-router-dom";
 import { createEmployeeWithUser, getEmployeeByUserId } from "../../api/employees";
 import { listBranches } from "../../api/branches";
@@ -96,8 +96,8 @@ export default function CreateEmployeeWithUserPage() {
                 const rolesList = Array.isArray(roleData?.data)
                     ? roleData.data
                     : Array.isArray(roleData)
-                        ? roleData
-                        : [];
+                    ? roleData
+                    : [];
                 setRoles(rolesList);
             } catch (error) {
                 console.error("Load data error:", error);
@@ -116,7 +116,7 @@ export default function CreateEmployeeWithUserPage() {
         if (!form.fullName || form.fullName.trim().length === 0) {
             newErrors.fullName = "Họ tên không được để trống";
         }
-
+        
         if (!form.email || form.email.trim().length === 0) {
             newErrors.email = "Email là bắt buộc để gửi link xác thực";
         }
@@ -140,10 +140,10 @@ export default function CreateEmployeeWithUserPage() {
 
         // Driver validation: yêu cầu số bằng lái
         const selectedRole = roles.find(r => String(r.id) === String(form.roleId));
-        const isDriverRole = selectedRole?.roleName?.toUpperCase().includes("DRIVER") ||
-            selectedRole?.roleName?.toLowerCase().includes("tài xế") ||
-            selectedRole?.description?.toLowerCase().includes("tài xế");
-
+        const isDriverRole = selectedRole?.roleName?.toUpperCase().includes("DRIVER") || 
+                             selectedRole?.roleName?.toLowerCase().includes("tài xế") ||
+                             selectedRole?.description?.toLowerCase().includes("tài xế");
+        
         if (isDriverRole && (!form.licenseNumber || form.licenseNumber.trim().length === 0)) {
             newErrors.licenseNumber = "Số bằng lái là bắt buộc đối với tài xế";
         }
@@ -155,19 +155,19 @@ export default function CreateEmployeeWithUserPage() {
     // Helper function to generate username from full name
     const generateUsername = (fullName) => {
         if (!fullName) return "";
-
+        
         // Remove Vietnamese accents
         const from = "àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ";
         const to = "aaaaaaaaaaaaaaaaaeeeeeeeeeeeiiiiiooooooooooooooooouuuuuuuuuuuyyyyyd";
-
+        
         let result = fullName.toLowerCase().trim();
         for (let i = 0; i < from.length; i++) {
             result = result.replace(new RegExp(from[i], "g"), to[i]);
         }
-
+        
         // Replace spaces with dots and remove special characters
         result = result.replace(/\s+/g, ".").replace(/[^a-z0-9.]/g, "");
-
+        
         return result;
     };
 
@@ -185,7 +185,7 @@ export default function CreateEmployeeWithUserPage() {
         } else {
             setForm((prev) => ({ ...prev, [field]: value }));
         }
-
+        
         setErrors((prev) => ({ ...prev, [field]: undefined }));
         setGeneralError("");
     };
@@ -208,17 +208,17 @@ export default function CreateEmployeeWithUserPage() {
                 roleId: Number(form.roleId),
                 status: form.status,
             };
-
+            
             // Thêm licenseNumber nếu là Driver
             const selectedRole = roles.find(r => String(r.id) === String(form.roleId));
-            const isDriverRole = selectedRole?.roleName?.toUpperCase().includes("DRIVER") ||
-                selectedRole?.roleName?.toLowerCase().includes("tài xế") ||
-                selectedRole?.description?.toLowerCase().includes("tài xế");
-
+            const isDriverRole = selectedRole?.roleName?.toUpperCase().includes("DRIVER") || 
+                                 selectedRole?.roleName?.toLowerCase().includes("tài xế") ||
+                                 selectedRole?.description?.toLowerCase().includes("tài xế");
+            
             if (isDriverRole) {
                 requestData.licenseNumber = form.licenseNumber?.trim() || "";
             }
-
+            
             console.log("Creating employee with user:", requestData);
             console.log("Selected role:", selectedRole);
             console.log("Is driver role:", isDriverRole);
@@ -230,10 +230,10 @@ export default function CreateEmployeeWithUserPage() {
             setTimeout(() => navigate("/admin/employees"), 1500);
         } catch (error) {
             console.error("Create error:", error);
-
+            
             // Parse error message từ nhiều nguồn khác nhau
             let errorMessage = "Tạo nhân viên thất bại";
-
+            
             if (error?.data) {
                 // Error từ apiFetch (http.js)
                 if (error.data.message) {
@@ -255,7 +255,7 @@ export default function CreateEmployeeWithUserPage() {
             } else if (error?.message) {
                 errorMessage = error.message;
             }
-
+            
             // Cải thiện message cho user-friendly hơn
             if (errorMessage.includes("Access is denied") || errorMessage.includes("Access denied") || errorMessage.includes("Forbidden")) {
                 errorMessage = "Bạn không có quyền tạo tài khoản. Chỉ Admin và Manager mới có thể tạo tài khoản mới. Vui lòng liên hệ quản trị viên nếu bạn cần quyền này.";
@@ -266,7 +266,7 @@ export default function CreateEmployeeWithUserPage() {
             } else if (errorMessage.includes("phone") && errorMessage.includes("exists")) {
                 errorMessage = "Số điện thoại đã được sử dụng. Vui lòng sử dụng số điện thoại khác.";
             }
-
+            
             setGeneralError(errorMessage);
         } finally {
             setSaving(false);
@@ -319,7 +319,7 @@ export default function CreateEmployeeWithUserPage() {
                     >
                         <ArrowLeft className="h-4 w-4 text-slate-600" />
                     </button>
-
+                    
                     <div className="flex items-center gap-3 flex-1">
                         <div className="h-12 w-12 rounded-xl flex items-center justify-center text-white shadow-lg" style={{ backgroundColor: BRAND_COLOR }}>
                             <UserPlus className="h-6 w-6" />
@@ -373,8 +373,8 @@ export default function CreateEmployeeWithUserPage() {
                             <input
                                 type="text"
                                 className={`w-full border rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 ${
-                                    errors.fullName
-                                        ? "border-red-400 focus:border-red-500 focus:ring-red-200"
+                                    errors.fullName 
+                                        ? "border-red-400 focus:border-red-500 focus:ring-red-200" 
                                         : "border-slate-300 focus:border-[#0079BC]/50 focus:ring-[#0079BC]/20"
                                 }`}
                                 value={form.fullName}
@@ -399,8 +399,8 @@ export default function CreateEmployeeWithUserPage() {
                             <input
                                 type="text"
                                 className={`w-full border rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 ${
-                                    errors.username
-                                        ? "border-red-400 focus:border-red-500 focus:ring-red-200"
+                                    errors.username 
+                                        ? "border-red-400 focus:border-red-500 focus:ring-red-200" 
                                         : "border-slate-300 focus:border-[#0079BC]/50 focus:ring-[#0079BC]/20"
                                 }`}
                                 value={form.username}
@@ -431,8 +431,8 @@ export default function CreateEmployeeWithUserPage() {
                             <input
                                 type="email"
                                 className={`w-full border rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 ${
-                                    errors.email
-                                        ? "border-red-400 focus:border-red-500 focus:ring-red-200"
+                                    errors.email 
+                                        ? "border-red-400 focus:border-red-500 focus:ring-red-200" 
                                         : "border-slate-300 focus:border-[#0079BC]/50 focus:ring-[#0079BC]/20"
                                 }`}
                                 value={form.email}
@@ -456,8 +456,8 @@ export default function CreateEmployeeWithUserPage() {
                             <input
                                 type="tel"
                                 className={`w-full border rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 ${
-                                    errors.phone
-                                        ? "border-red-400 focus:border-red-500 focus:ring-red-200"
+                                    errors.phone 
+                                        ? "border-red-400 focus:border-red-500 focus:ring-red-200" 
                                         : "border-slate-300 focus:border-[#0079BC]/50 focus:ring-[#0079BC]/20"
                                 }`}
                                 value={form.phone}
@@ -504,8 +504,8 @@ export default function CreateEmployeeWithUserPage() {
                             </label>
                             <select
                                 className={`w-full border rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 ${
-                                    errors.branchId
-                                        ? "border-red-400 focus:border-red-500 focus:ring-red-200"
+                                    errors.branchId 
+                                        ? "border-red-400 focus:border-red-500 focus:ring-red-200" 
                                         : "border-slate-300 focus:border-[#0079BC]/50 focus:ring-[#0079BC]/20"
                                 }`}
                                 value={form.branchId}
@@ -536,8 +536,8 @@ export default function CreateEmployeeWithUserPage() {
                             </label>
                             <select
                                 className={`w-full border rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 ${
-                                    errors.roleId
-                                        ? "border-red-400 focus:border-red-500 focus:ring-red-200"
+                                    errors.roleId 
+                                        ? "border-red-400 focus:border-red-500 focus:ring-red-200" 
                                         : "border-slate-300 focus:border-[#0079BC]/50 focus:ring-[#0079BC]/20"
                                 }`}
                                 value={form.roleId}
@@ -561,12 +561,12 @@ export default function CreateEmployeeWithUserPage() {
                         {/* Số bằng lái - Hiển thị khi chọn vai trò Tài xế */}
                         {(() => {
                             const selectedRole = roles.find(r => String(r.id) === String(form.roleId));
-                            const isDriverRole = selectedRole?.roleName?.toUpperCase().includes("DRIVER") ||
-                                selectedRole?.roleName?.toLowerCase().includes("tài xế") ||
-                                selectedRole?.description?.toLowerCase().includes("tài xế");
-
+                            const isDriverRole = selectedRole?.roleName?.toUpperCase().includes("DRIVER") || 
+                                                 selectedRole?.roleName?.toLowerCase().includes("tài xế") ||
+                                                 selectedRole?.description?.toLowerCase().includes("tài xế");
+                            
                             if (!isDriverRole) return null;
-
+                            
                             return (
                                 <div className="space-y-2">
                                     <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
@@ -577,8 +577,8 @@ export default function CreateEmployeeWithUserPage() {
                                     <input
                                         type="text"
                                         className={`w-full border rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 ${
-                                            errors.licenseNumber
-                                                ? "border-red-400 focus:border-red-500 focus:ring-red-200"
+                                            errors.licenseNumber 
+                                                ? "border-red-400 focus:border-red-500 focus:ring-red-200" 
                                                 : "border-slate-300 focus:border-[#0079BC]/50 focus:ring-[#0079BC]/20"
                                         }`}
                                         value={form.licenseNumber}

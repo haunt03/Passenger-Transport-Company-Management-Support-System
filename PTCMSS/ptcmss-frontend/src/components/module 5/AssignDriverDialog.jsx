@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import {
     UserRound,
     Car,
@@ -37,11 +37,11 @@ import { getAssignmentSuggestions, assignTrips, reassignTrips } from "../../api/
 // Endpoints đã được chuyển sang sử dụng API functions từ dispatch.js
 
 export default function AssignDriverDialog({
-                                               open,
-                                               order,
-                                               onClose,
-                                               onAssigned,
-                                           }) {
+    open,
+    order,
+    onClose,
+    onAssigned,
+}) {
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState("");
     const [suggestions, setSuggestions] = React.useState([]); // [{driver, vehicle, score, reasons[]}]
@@ -60,7 +60,7 @@ export default function AssignDriverDialog({
     const bookingId = order?.bookingId;
     const vehicleCount = order?.vehicle_count || 1; // Số lượng xe trong booking
     const hasMixedVehicleCategories = !!order?.hasMixedVehicleCategories;
-
+    
     // Tính số trips chưa gán (nếu có nhiều xe)
     const [unassignedTripCount, setUnassignedTripCount] = React.useState(0);
     // Nếu đơn có nhiều loại xe khác nhau -> mặc định KHÔNG gán cho tất cả để tránh sai loại xe
@@ -75,7 +75,7 @@ export default function AssignDriverDialog({
             setError("");
             setDriverId("");
             setVehicleId("");
-
+            
             // Tính số trips chưa gán từ tripIds (đã được lọc từ OrderDetailPage)
             if (tripIds && tripIds.length > 0) {
                 setUnassignedTripCount(tripIds.length);
@@ -87,7 +87,7 @@ export default function AssignDriverDialog({
                 setUnassignedTripCount(1);
                 setAssignToAllTrips(false); // Chỉ gán cho 1 trip
             }
-
+            
             try {
                 const data = await getAssignmentSuggestions(tripId);
 
@@ -150,7 +150,7 @@ export default function AssignDriverDialog({
         order?.vehicle_type ||
         order?.vehicleType ||
         null;
-
+    
     // danh sách xe (chỉ eligible & đúng loại xe mà khách đặt)
     const vehicleOptions = React.useMemo(() => {
         return vehicleCandidates.filter(v => {
@@ -177,9 +177,9 @@ export default function AssignDriverDialog({
     // Helper: Trích xuất message lỗi từ response
     const extractErrorMessage = (err) => {
         // Thử lấy message từ các cấu trúc response khác nhau
-        const msg = err?.response?.data?.message
-            || err?.response?.data?.error
-            || err?.message
+        const msg = err?.response?.data?.message 
+            || err?.response?.data?.error 
+            || err?.message 
             || "Lỗi không xác định";
         return msg;
     };
@@ -197,7 +197,7 @@ export default function AssignDriverDialog({
         try {
             // Check if trip already has assignment (reassign) or new assignment
             const isReassign = order?.driverId || order?.vehicleId;
-
+            
             // Xác định trips cần gán
             let targetTripIds = undefined;
             if (!assignToAllTrips && tripId) {
@@ -210,7 +210,7 @@ export default function AssignDriverDialog({
                 // Fallback: gán cho 1 trip
                 targetTripIds = [Number(tripId)];
             }
-
+            
             if (isReassign && tripId) {
                 // Use reassign API - chỉ reassign 1 trip tại một thời điểm
                 const result = await reassignTrips({
@@ -273,7 +273,7 @@ export default function AssignDriverDialog({
                 // Chỉ có 1 trip
                 targetTripIds = [Number(tripId)];
             }
-
+            
             const result = await assignTrips({
                 bookingId: Number(bookingId),
                 tripIds: targetTripIds, // undefined = gán tất cả, array = gán các trips được chọn
@@ -349,10 +349,10 @@ export default function AssignDriverDialog({
                                 Loại xe:
                             </span>
                             <span className="text-slate-900 font-medium">
-                                {summary?.vehicleType ||
-                                    order?.vehicle_type ||
-                                    order?.vehicleType ||
-                                    "—"}
+                                {summary?.vehicleType || 
+                                 order?.vehicle_type || 
+                                 order?.vehicleType || 
+                                 "—"}
                                 {/* Chỉ hiển thị số lượng nếu đang gán cho nhiều trips cùng loại xe */}
                                 {assignToAllTrips && unassignedTripCount > 1 && !hasMixedVehicleCategories && ` (${unassignedTripCount} xe)`}
                             </span>
@@ -364,14 +364,14 @@ export default function AssignDriverDialog({
                                 Chi nhánh:
                             </span>
                             <span className="text-slate-900 font-medium">
-                                {order?.branch_name ||
-                                    order?.branchName ||
-                                    summary?.branchName ||
-                                    "—"}
+                                {order?.branch_name || 
+                                 order?.branchName || 
+                                 summary?.branchName ||
+                                 "—"}
                             </span>
                         </div>
                     </div>
-
+                    
                     {/* Thông báo nếu có nhiều chuyến chưa gán */}
                     {unassignedTripCount > 1 && (
                         <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800 flex items-start gap-2">
@@ -434,7 +434,7 @@ export default function AssignDriverDialog({
                                 Đang tải gợi ý…
                             </div>
                         ) : suggestions.length ===
-                        0 ? (
+                            0 ? (
                             <div className="px-3 py-6 text-[13px] text-slate-500 flex items-center gap-2">
                                 <AlertTriangle className="h-4 w-4 text-amber-600" />
                                 <span>
@@ -478,22 +478,22 @@ export default function AssignDriverDialog({
                                                                 }
                                                             >
                                                                 {s
-                                                                        ?.driver
-                                                                        ?.name ||
+                                                                    ?.driver
+                                                                    ?.name ||
                                                                     "—"}
                                                             </span>
                                                             {s
                                                                 ?.driver
                                                                 ?.id && (
-                                                                <span className="text-[11px] text-slate-500 font-normal">
+                                                                    <span className="text-[11px] text-slate-500 font-normal">
                                                                         #
-                                                                    {
-                                                                        s
-                                                                            .driver
-                                                                            .id
-                                                                    }
+                                                                        {
+                                                                            s
+                                                                                .driver
+                                                                                .id
+                                                                        }
                                                                     </span>
-                                                            )}
+                                                                )}
                                                         </div>
 
                                                         {/* vehicle */}
@@ -508,27 +508,27 @@ export default function AssignDriverDialog({
                                                                 }
                                                             >
                                                                 {s
-                                                                        ?.vehicle
-                                                                        ?.plate ||
+                                                                    ?.vehicle
+                                                                    ?.plate ||
                                                                     "—"}
                                                             </span>
                                                             {s
                                                                 ?.vehicle
                                                                 ?.type && (
-                                                                <span className="text-[11px] text-slate-500 font-normal">
+                                                                    <span className="text-[11px] text-slate-500 font-normal">
                                                                         ·{" "}
-                                                                    {
-                                                                        s
-                                                                            .vehicle
-                                                                            .type
-                                                                    }
+                                                                        {
+                                                                            s
+                                                                                .vehicle
+                                                                                .type
+                                                                        }
                                                                     </span>
-                                                            )}
+                                                                )}
                                                         </div>
 
                                                         {/* score - chỉ hiển thị nếu có lịch sử với khách hàng */}
                                                         {typeof s?.score ===
-                                                            "number" &&
+                                                            "number" && 
                                                             s?.driver?.hasHistoryWithCustomer && (
                                                                 <div className="ml-auto flex items-center gap-1 text-[11px] text-amber-600 font-medium">
                                                                     <BadgeCheck className="h-4 w-4 text-amber-600" />
@@ -544,8 +544,8 @@ export default function AssignDriverDialog({
 
                                                     {/* reasons */}
                                                     {Array.isArray(
-                                                            s?.reasons
-                                                        ) &&
+                                                        s?.reasons
+                                                    ) &&
                                                         s
                                                             .reasons
                                                             .length >
@@ -688,9 +688,9 @@ export default function AssignDriverDialog({
                         className={`
                             rounded-md px-3 py-2 border text-[13px] font-medium flex items-center gap-1
                             ${autoPosting
-                            ? "opacity-60 cursor-not-allowed border-amber-300 text-amber-400 bg-white"
-                            : "border-sky-500 text-sky-700 bg-white hover:bg-sky-50"
-                        }
+                                ? "opacity-60 cursor-not-allowed border-amber-300 text-amber-400 bg-white"
+                                : "border-sky-500 text-sky-700 bg-white hover:bg-sky-50"
+                            }
                         `}
                     >
                         {autoPosting ? (
@@ -715,9 +715,9 @@ export default function AssignDriverDialog({
                         className={`
                             rounded-md px-3 py-2 border text-[13px] font-medium flex items-center gap-1
                             ${canConfirm
-                            ? "border-sky-600 text-sky-700 bg-white hover:bg-sky-50"
-                            : "opacity-60 cursor-not-allowed border-slate-300 text-slate-400 bg-white"
-                        }
+                                ? "border-sky-600 text-sky-700 bg-white hover:bg-sky-50"
+                                : "opacity-60 cursor-not-allowed border-slate-300 text-slate-400 bg-white"
+                            }
                         `}
                     >
                         <Check className="h-4 w-4 text-sky-600" />
@@ -756,3 +756,4 @@ function fmtDateTime(iso) {
     const mm = pad2(d.getMinutes());
     return `${day}/${m}/${y} ${hh}:${mm}`;
 }
+

@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import {
     PieChart as PieChartIcon,
     CalendarRange,
@@ -1254,7 +1254,7 @@ export default function ExpenseReportPage() {
             try {
                 const branchesData = await listBranches({ size: 100 });
                 setBranches(normalizeBranchOptions(branchesData));
-
+                
                 // For Accountant/Manager/Consultant: only load vehicles from their branch
                 // For Admin: load all vehicles
                 if (isBranchLocked && branchId != null) {
@@ -1543,7 +1543,7 @@ export default function ExpenseReportPage() {
                 />
 
                 <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 text-[11px] text-slate-500 leading-relaxed">
-                    Tổng chi phí: {fmtVND(totalExpense)} đ.
+                 Tổng chi phí: {fmtVND(totalExpense)} đ.
                     {error && <span className="text-rose-600 ml-2">Lỗi: {error}</span>}
                 </div>
             </div>

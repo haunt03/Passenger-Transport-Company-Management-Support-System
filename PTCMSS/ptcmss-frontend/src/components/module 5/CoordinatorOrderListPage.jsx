@@ -32,7 +32,7 @@ export default function CoordinatorOrderListPage() {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const defaultStartDate = thirtyDaysAgo.toISOString().slice(0, 10);
-
+    
     const [startDate, setStartDate] = useState(defaultStartDate);
     const [endDate, setEndDate] = useState(today);
 
@@ -57,13 +57,13 @@ export default function CoordinatorOrderListPage() {
                 const resp = await getBranchByUserId(Number(userId));
                 console.log("[CoordinatorOrderListPage] Branch response:", resp);
                 if (cancelled) return;
-
+                
                 // Try multiple possible response formats
                 const id = resp?.branchId ?? resp?.id ?? resp?.data?.branchId ?? resp?.data?.id ?? null;
                 const name = resp?.branchName ?? resp?.name ?? resp?.data?.branchName ?? resp?.data?.name ?? "";
-
+                
                 console.log("[CoordinatorOrderListPage] Extracted branchId:", id, "branchName:", name);
-
+                
                 if (id) {
                     setBranchId(id);
                     setBranchName(name);
@@ -168,7 +168,7 @@ export default function CoordinatorOrderListPage() {
             setOrders(Array.isArray(content) ? content : []);
             setTotalPages(filteredTotalPages);
             setTotalItems(filteredTotalItems);
-
+            
             if (Array.isArray(content) && content.length === 0) {
                 console.log("[CoordinatorOrderListPage] No orders found. Check if:");
                 console.log("  - BranchId is correct:", branchId);
@@ -340,7 +340,7 @@ export default function CoordinatorOrderListPage() {
                                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filterStatus === "ALL"
                                     ? "bg-[#0079BC] text-white shadow-md"
                                     : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                                }`}
+                                    }`}
                             >
                                 Tất cả
                             </button>
@@ -352,7 +352,7 @@ export default function CoordinatorOrderListPage() {
                                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filterStatus === "UNASSIGNED"
                                     ? "bg-orange-500 text-white shadow-md"
                                     : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                                }`}
+                                    }`}
                             >
                                 Chưa gắn chuyến
                             </button>
@@ -364,7 +364,7 @@ export default function CoordinatorOrderListPage() {
                                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filterStatus === "ASSIGNED"
                                     ? "bg-green-500 text-white shadow-md"
                                     : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                                }`}
+                                    }`}
                             >
                                 Đã gắn chuyến
                             </button>
@@ -395,99 +395,99 @@ export default function CoordinatorOrderListPage() {
                         <div className="overflow-x-auto">
                             <table className="w-full">
                                 <thead className="bg-slate-50 border-b border-slate-200">
-                                <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                        Mã đơn
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                        Khách hàng
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                        Điểm đi - Điểm đến
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                        Ngày khởi hành
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                        Trạng thái
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                        Chuyến
-                                    </th>
-                                    <th className="px-4 py-3 text-center text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                        Thao tác
-                                    </th>
-                                </tr>
+                                    <tr>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                            Mã đơn
+                                        </th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                            Khách hàng
+                                        </th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                            Điểm đi - Điểm đến
+                                        </th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                            Ngày khởi hành
+                                        </th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                            Trạng thái
+                                        </th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                            Chuyến
+                                        </th>
+                                        <th className="px-4 py-3 text-center text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                            Thao tác
+                                        </th>
+                                    </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-200">
-                                {orders.map((order) => (
-                                    <tr key={order.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-4 py-3">
-                                            <div className="font-semibold text-slate-900">#{order.id}</div>
-                                            <div className="text-xs text-slate-500">
-                                                {new Date(order.createdAt).toLocaleDateString("vi-VN")}
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="text-sm font-medium text-slate-900">
-                                                {order.customerName || order.customer?.name || "—"}
-                                            </div>
-                                            <div className="text-xs text-slate-500">
-                                                {order.customerPhone || order.customer?.phone || "—"}
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="text-sm text-slate-700">
-                                                {order.routeSummary ? (
-                                                    <div className="truncate max-w-xs" title={order.routeSummary}>
-                                                        {order.routeSummary}
-                                                    </div>
+                                    {orders.map((order) => (
+                                        <tr key={order.id} className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-4 py-3">
+                                                <div className="font-semibold text-slate-900">#{order.id}</div>
+                                                <div className="text-xs text-slate-500">
+                                                    {new Date(order.createdAt).toLocaleDateString("vi-VN")}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="text-sm font-medium text-slate-900">
+                                                    {order.customerName || order.customer?.name || "—"}
+                                                </div>
+                                                <div className="text-xs text-slate-500">
+                                                    {order.customerPhone || order.customer?.phone || "—"}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="text-sm text-slate-700">
+                                                    {order.routeSummary ? (
+                                                        <div className="truncate max-w-xs" title={order.routeSummary}>
+                                                            {order.routeSummary}
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <div className="truncate max-w-xs">
+                                                                {order.pickupLocation || order.pickup_location || order.startLocation || order.start_location || "—"}
+                                                            </div>
+                                                            <div className="text-xs text-slate-500 truncate max-w-xs">
+                                                                → {order.dropoffLocation || order.dropoff_location || order.endLocation || order.end_location || "—"}
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-slate-700">
+                                                {order.startDate || order.departureDate || order.departure_date || order.start_date
+                                                    ? new Date(order.startDate || order.departureDate || order.departure_date || order.start_date).toLocaleDateString("vi-VN")
+                                                    : "—"}
+                                            </td>
+                                            <td className="px-4 py-3">{getStatusBadge(order.status)}</td>
+                                            <td className="px-4 py-3">
+                                                {order.isAssigned ? (
+                                                    <button
+                                                        onClick={() => handleViewTripDetail(order.id, order.tripId)}
+                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-green-50 text-green-700 text-xs font-medium hover:bg-green-100 transition-colors"
+                                                    >
+                                                        <Eye className="h-3 w-3" />
+                                                        Đã gắn
+                                                    </button>
                                                 ) : (
-                                                    <>
-                                                        <div className="truncate max-w-xs">
-                                                            {order.pickupLocation || order.pickup_location || order.startLocation || order.start_location || "—"}
-                                                        </div>
-                                                        <div className="text-xs text-slate-500 truncate max-w-xs">
-                                                            → {order.dropoffLocation || order.dropoff_location || order.endLocation || order.end_location || "—"}
-                                                        </div>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3 text-sm text-slate-700">
-                                            {order.startDate || order.departureDate || order.departure_date || order.start_date
-                                                ? new Date(order.startDate || order.departureDate || order.departure_date || order.start_date).toLocaleDateString("vi-VN")
-                                                : "—"}
-                                        </td>
-                                        <td className="px-4 py-3">{getStatusBadge(order.status)}</td>
-                                        <td className="px-4 py-3">
-                                            {order.isAssigned ? (
-                                                <button
-                                                    onClick={() => handleViewTripDetail(order.id, order.tripId)}
-                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-green-50 text-green-700 text-xs font-medium hover:bg-green-100 transition-colors"
-                                                >
-                                                    <Eye className="h-3 w-3" />
-                                                    Đã gắn
-                                                </button>
-                                            ) : (
-                                                <span className="inline-flex px-2 py-1 rounded-md bg-orange-50 text-orange-700 text-xs font-medium">
+                                                    <span className="inline-flex px-2 py-1 rounded-md bg-orange-50 text-orange-700 text-xs font-medium">
                                                         Chưa gắn
                                                     </span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center justify-center">
-                                                <button
-                                                    onClick={() => handleViewDetail(order.id)}
-                                                    className="p-2 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors"
-                                                    title="Xem chi tiết"
-                                                >
-                                                    <Eye className="h-4 w-4" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center justify-center">
+                                                    <button
+                                                        onClick={() => handleViewDetail(order.id)}
+                                                        className="p-2 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors"
+                                                        title="Xem chi tiết"
+                                                    >
+                                                        <Eye className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
                                 </tbody>
                             </table>
                         </div>

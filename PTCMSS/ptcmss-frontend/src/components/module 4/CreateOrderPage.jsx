@@ -256,52 +256,52 @@ export default function CreateOrderPage() {
     const [timeError, setTimeError] = React.useState(""); // Error message cho validation thời gian
     const [categories, setCategories] = React.useState([]);
     const [paxCount, setPaxCount] = React.useState(1);
-
+    
     // Multiple vehicle selections: [{ categoryId, quantity }]
     const [vehicleSelections, setVehicleSelections] = React.useState([
         { categoryId: "", quantity: 1 }
     ]);
-
+    
     // Helper: thêm loại xe
     const addVehicleSelection = () => {
         if (vehicleSelections.length >= 5) return; // Max 5 loại
-        const unusedCategory = categories.find(c =>
+        const unusedCategory = categories.find(c => 
             !vehicleSelections.some(v => v.categoryId === c.id)
         );
-        setVehicleSelections([...vehicleSelections, {
-            categoryId: unusedCategory?.id || "",
-            quantity: 1
+        setVehicleSelections([...vehicleSelections, { 
+            categoryId: unusedCategory?.id || "", 
+            quantity: 1 
         }]);
     };
-
+    
     // Helper: xóa loại xe
     const removeVehicleSelection = (index) => {
         if (vehicleSelections.length <= 1) return; // Ít nhất 1 loại
         setVehicleSelections(vehicleSelections.filter((_, i) => i !== index));
     };
-
+    
     // Helper: cập nhật loại xe
     const updateVehicleSelection = (index, field, value) => {
         const updated = [...vehicleSelections];
-
+        
         // Nếu đang thay đổi categoryId, kiểm tra trùng lặp
         if (field === 'categoryId') {
             // Kiểm tra xem loại xe này đã được chọn ở selection khác chưa
-            const isDuplicate = vehicleSelections.some((v, i) =>
+            const isDuplicate = vehicleSelections.some((v, i) => 
                 i !== index && v.categoryId === value && value !== ""
             );
-
+            
             if (isDuplicate) {
                 // Không cho phép chọn loại xe đã được chọn
                 alert("Loại xe này đã được chọn. Vui lòng chọn loại xe khác hoặc tăng số lượng của loại xe đã chọn.");
                 return;
             }
         }
-
+        
         updated[index] = { ...updated[index], [field]: value };
         setVehicleSelections(updated);
     };
-
+    
     // Tính tổng số chỗ
     const totalSeats = React.useMemo(() => {
         return vehicleSelections.reduce((sum, v) => {
@@ -309,7 +309,7 @@ export default function CreateOrderPage() {
             return sum + (cat?.seats || 0) * (v.quantity || 0);
         }, 0);
     }, [vehicleSelections, categories]);
-
+    
     // Lấy categoryId đầu tiên để tương thích với code cũ
     const categoryId = vehicleSelections[0]?.categoryId || "";
     const vehicleCount = vehicleSelections[0]?.quantity || 1;
@@ -345,7 +345,7 @@ export default function CreateOrderPage() {
             setAvailabilityInfo(null);
             return;
         }
-
+        
         const checkAvail = async () => {
             setCheckingAvail(true);
             try {
@@ -354,7 +354,7 @@ export default function CreateOrderPage() {
                 const sEnd = hireType === "ONE_WAY" && !endTime
                     ? new Date(new Date(startTime).getTime() + 2 * 60 * 60 * 1000).toISOString()
                     : new Date(endTime).toISOString();
-
+                
                 // Check availability cho TẤT CẢ các loại xe đã chọn
                 const results = await Promise.all(
                     vehicleSelections
@@ -370,13 +370,13 @@ export default function CreateOrderPage() {
                             return { ...data, categoryId: selection.categoryId, quantity: selection.quantity };
                         })
                 );
-
+                
                 console.log("🔵 [FRONTEND] Real-time Check Availability Results:", results);
-
+                
                 // Tổng hợp kết quả: nếu có bất kỳ loại xe nào hết thì báo hết
                 const allOk = results.every(r => r.ok);
                 const failedChecks = results.filter(r => !r.ok);
-
+                
                 if (allOk) {
                     // Tất cả đều có đủ xe
                     const totalAvailable = results.reduce((sum, r) => sum + (r.availableCount || 0), 0);
@@ -422,7 +422,7 @@ export default function CreateOrderPage() {
                 setCheckingAvail(false);
             }
         };
-
+        
         // Debounce 500ms để tránh check quá nhiều khi user đang nhập
         const timer = setTimeout(checkAvail, 500);
         return () => clearTimeout(timer);
@@ -449,7 +449,7 @@ export default function CreateOrderPage() {
     React.useEffect(() => {
         const discountAmount = Math.round((estPriceSys * discountPercent) / 100);
         setDiscount(discountAmount);
-
+        
         // Tự động cập nhật giá báo khách nếu chưa được chỉnh sửa thủ công
         if (!quotedPriceTouched) {
             const newQuotedPrice = Math.max(0, estPriceSys - discountAmount);
@@ -460,11 +460,11 @@ export default function CreateOrderPage() {
     // Các field mới cho logic tính giá
     const [isHoliday, setIsHoliday] = React.useState(false);
     const [isWeekend, setIsWeekend] = React.useState(false);
-
+    
     // System settings cho phụ phí (load từ admin settings)
     const [holidaySurchargeRate, setHolidaySurchargeRate] = React.useState(0.25); // Mặc định 25%
     const [weekendSurchargeRate, setWeekendSurchargeRate] = React.useState(0.20); // Mặc định 20%
-
+    
     // Note cho tài xế (ghi chú điểm đón/trả, hướng dẫn...)
     const [bookingNote, setBookingNote] = React.useState("");
     const loadRecentBookingSuggestion = React.useCallback(async (phoneNumber) => {
@@ -716,14 +716,14 @@ export default function CreateOrderPage() {
                 if (Array.isArray(settings)) {
                     const holidaySetting = settings.find(s => s.settingKey === "HOLIDAY_SURCHARGE_RATE");
                     const weekendSetting = settings.find(s => s.settingKey === "WEEKEND_SURCHARGE_RATE");
-
+                    
                     if (holidaySetting && holidaySetting.settingValue) {
                         const rate = parseFloat(holidaySetting.settingValue);
                         if (!isNaN(rate)) {
                             setHolidaySurchargeRate(rate);
                         }
                     }
-
+                    
                     if (weekendSetting && weekendSetting.settingValue) {
                         const rate = parseFloat(weekendSetting.settingValue);
                         if (!isNaN(rate)) {
@@ -800,23 +800,23 @@ export default function CreateOrderPage() {
             setIsWeekend(false);
         }
     }, [startTime]);
-
+    
     // Validate thời gian real-time khi startTime hoặc endTime thay đổi
     React.useEffect(() => {
         if (hireType === "ONE_WAY") {
             setTimeError(""); // ONE_WAY không cần validate
             return;
         }
-
+        
         if (startTime && endTime) {
             const startDate = new Date(startTime);
             const endDate = new Date(endTime);
-
+            
             if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
                 setTimeError(""); // Chưa parse được thì chưa validate
                 return;
             }
-
+            
             if (endDate <= startDate) {
                 setTimeError("Thời gian về phải sau thời gian đi");
             } else {
@@ -868,13 +868,13 @@ export default function CreateOrderPage() {
                     startTime: startISO,
                     endTime: endISO,
                 };
-
+                
                 // Lấy thông tin hireType từ hireTypesList
-                const currentHireTypeObj = hireTypesList.find(h =>
-                    (hireTypeId && h.id === Number(hireTypeId)) ||
+                const currentHireTypeObj = hireTypesList.find(h => 
+                    (hireTypeId && h.id === Number(hireTypeId)) || 
                     (hireType && h.code === hireType)
                 );
-
+                
                 // 🔍 LOG FRONTEND: Dữ liệu gửi đi
                 console.log("🔵 [FRONTEND] Calculate Price Request:", {
                     ...priceRequest,
@@ -889,10 +889,10 @@ export default function CreateOrderPage() {
                     })),
                     hireTypesList: hireTypesList.map(h => ({ id: h.id, code: h.code, name: h.name }))
                 });
-
+                
                 const price = await calculatePrice(priceRequest);
                 const base = Number(price || 0);
-
+                
                 // 🔍 LOG FRONTEND: Kết quả nhận về
                 console.log("🟢 [FRONTEND] Calculate Price Response:", {
                     price: base,
@@ -901,7 +901,7 @@ export default function CreateOrderPage() {
                     hireTypeId: hireTypeId,
                     hireTypeName: hireType?.name || "N/A"
                 });
-
+                
                 setEstPriceSys(base);
                 setQuotedPrice((old) => (quotedPriceTouched ? old : base));
             } catch (err) {
@@ -1002,17 +1002,17 @@ export default function CreateOrderPage() {
 
     // Validation: ONE_WAY không cần endTime
     const needsEndTime = hireType !== "ONE_WAY";
-
+    
     // Validate thời gian: endTime phải > startTime
     const isTimeValid = React.useMemo(() => {
         if (!startTime) return true; // Chưa nhập startTime thì chưa cần validate
         if (!needsEndTime || !endTime) return true; // ONE_WAY hoặc chưa nhập endTime
-
+        
         const startDate = new Date(startTime);
         const endDate = new Date(endTime);
         return endDate > startDate;
     }, [startTime, endTime, needsEndTime]);
-
+    
     const isValidCore =
         phone &&
         customerName &&
@@ -1070,7 +1070,7 @@ export default function CreateOrderPage() {
             // Validate endTime nếu không phải ONE_WAY
             if (hireType !== "ONE_WAY" && endTime) {
                 const endDate = new Date(endTime);
-
+                
                 // Check if end time is after start time
                 if (endDate <= startDate) {
                     setTimeError("Thời gian về phải sau thời gian đi");
@@ -1083,11 +1083,11 @@ export default function CreateOrderPage() {
                 // Check minimum duration based on hire type
                 const durationHours = (endDate - startDate) / (1000 * 60 * 60);
                 let minDuration = 2; // Minimum 2 hours for round trip
-
+                
                 if (hireType === "DAILY" || hireType === "MULTI_DAY") {
                     minDuration = 8; // Minimum 8 hours for daily hire
                 }
-
+                
                 if (durationHours < minDuration) {
                     const hireTypeLabel = hireType === "ROUND_TRIP" ? "hai chiều" : "theo ngày";
                     push(`Thời gian thuê ${hireTypeLabel} tối thiểu ${minDuration} giờ`, "error");
@@ -1168,10 +1168,10 @@ export default function CreateOrderPage() {
             console.log("📤 Full request payload:", req);
             const created = await createBooking(req);
             console.log("✅ Draft created response:", created);
-
+            
             // Handle different response formats
             const bookingId = created?.id || created?.data?.id || created?.bookingId;
-
+            
             if (bookingId) {
                 push(`✓ Đã lưu nháp đơn hàng #${bookingId} - Đang chuyển đến trang chi tiết...`, "success", 3000);
                 setTimeout(() => {
@@ -1232,7 +1232,7 @@ export default function CreateOrderPage() {
             // Validate endTime nếu không phải ONE_WAY
             if (hireType !== "ONE_WAY" && endTime) {
                 const endDate = new Date(endTime);
-
+                
                 // Check if end time is after start time
                 if (endDate <= startDate) {
                     setTimeError("Thời gian về phải sau thời gian đi");
@@ -1245,11 +1245,11 @@ export default function CreateOrderPage() {
                 // Check minimum duration based on hire type
                 const durationHours = (endDate - startDate) / (1000 * 60 * 60);
                 let minDuration = 2; // Minimum 2 hours for round trip
-
+                
                 if (hireType === "DAILY" || hireType === "MULTI_DAY") {
                     minDuration = 8; // Minimum 8 hours for daily hire
                 }
-
+                
                 if (durationHours < minDuration) {
                     const hireTypeLabel = hireType === "ROUND_TRIP" ? "hai chiều" : "theo ngày";
                     push(`Thời gian thuê ${hireTypeLabel} tối thiểu ${minDuration} giờ`, "error");
@@ -1287,7 +1287,7 @@ export default function CreateOrderPage() {
                                 endTime: sEnd,
                                 quantity: selection.quantity || 1,
                             });
-
+                            
                             // 🔍 LOG FRONTEND: Check availability response
                             console.log("🔵 [FRONTEND] Check Availability Response:", {
                                 categoryId: selection.categoryId,
@@ -1300,16 +1300,16 @@ export default function CreateOrderPage() {
                                 alternativeCategories: data.alternativeCategories || [],
                                 nextAvailableSlots: data.nextAvailableSlots || [],
                             });
-
+                            
                             return { ...data, categoryId: selection.categoryId, quantity: selection.quantity };
                         })
                     );
-
+                    
                     const allOk = checkResults.every(r => r.ok);
                     if (!allOk) {
                         const firstFailed = checkResults.find(r => !r.ok);
                         const cat = categories.find(c => c.id === firstFailed.categoryId);
-
+                        
                         // Set availabilityInfo để hiển thị suggest dialog
                         setAvailabilityInfo({
                             ok: false,
@@ -1324,17 +1324,17 @@ export default function CreateOrderPage() {
                             failedCategoryId: firstFailed.categoryId,
                             results: checkResults,
                         });
-
+                        
                         push(
                             `${cat?.name || 'Xe'}: Không đủ xe trong khung giờ này (${firstFailed.busyCount || 0}/${firstFailed.totalCandidates || 0} đang bận). Vui lòng chọn thời gian khác.`,
                             "error"
                         );
-
+                        
                         // Tự động mở popup gợi ý khi không đủ xe và có suggestions
                         if (firstFailed.alternativeCategories?.length > 0 || firstFailed.nextAvailableSlots?.length > 0) {
                             setShowSuggestionDialog(true);
                         }
-
+                        
                         setLoadingSubmit(false);
                         return;
                     }
@@ -1351,9 +1351,9 @@ export default function CreateOrderPage() {
             console.log("🔵 [FRONTEND] vehicleSelections before creating booking:", vehicleSelections);
             const validVehicleSelections = vehicleSelections.filter(v => v.categoryId);
             console.log("🔵 [FRONTEND] Valid vehicle selections:", validVehicleSelections);
-            const vehiclesToSend = validVehicleSelections.map(v => ({
-                vehicleCategoryId: Number(v.categoryId),
-                quantity: Number(v.quantity || 1)
+            const vehiclesToSend = validVehicleSelections.map(v => ({ 
+                vehicleCategoryId: Number(v.categoryId), 
+                quantity: Number(v.quantity || 1) 
             }));
             console.log("🔵 [FRONTEND] Vehicles to send to backend:", vehiclesToSend);
 
@@ -1414,10 +1414,10 @@ export default function CreateOrderPage() {
             const created = await createBooking(req);
             console.log("✅ Booking created response:", created);
             console.log("🔍 [FRONTEND] Vehicles in response:", created?.vehicles || created?.data?.vehicles);
-
+            
             // Handle different response formats
             const bookingId = created?.id || created?.data?.id || created?.bookingId;
-
+            
             if (bookingId) {
                 push(`✓ Đã tạo đơn hàng #${bookingId} - Đang chuyển đến trang chi tiết...`, "success", 3000);
                 // Chuyển đến trang chi tiết để tạo request đặt cọc
@@ -1650,7 +1650,7 @@ export default function CreateOrderPage() {
                                     className={cls(
                                         "px-3 py-2 rounded-md border text-[13px] flex items-center gap-2 shadow-sm",
                                         hireType ===
-                                        opt.key
+                                            opt.key
                                             ? "ring-1 ring-emerald-200 bg-emerald-50 border-emerald-200 text-emerald-700"
                                             : "border-slate-300 bg-white hover:bg-slate-50 text-slate-700"
                                     )}
@@ -1937,8 +1937,8 @@ export default function CreateOrderPage() {
                                 <div className={labelCls}>
                                     <Clock className="h-3.5 w-3.5 text-slate-400" />
                                     <span>
-                                        {hireType === "DAILY" || hireType === "MULTI_DAY"
-                                            ? "Ngày bắt đầu *"
+                                        {hireType === "DAILY" || hireType === "MULTI_DAY" 
+                                            ? "Ngày bắt đầu *" 
                                             : "Thời gian đi *"}
                                     </span>
                                 </div>
@@ -1948,7 +1948,7 @@ export default function CreateOrderPage() {
                                     onChange={(e) => {
                                         const newStartTime = e.target.value;
                                         setStartTime(newStartTime);
-
+                                        
                                         // Validate real-time: nếu đã có endTime, kiểm tra endTime > startTime
                                         if (newStartTime && endTime && hireType !== "ONE_WAY") {
                                             const startDate = new Date(newStartTime);
@@ -1992,7 +1992,7 @@ export default function CreateOrderPage() {
                                         onChange={(e) => {
                                             const newEndTime = e.target.value;
                                             setEndTime(newEndTime);
-
+                                            
                                             // Validate real-time: endTime phải > startTime
                                             if (newEndTime && startTime) {
                                                 const startDate = new Date(startTime);
@@ -2026,19 +2026,19 @@ export default function CreateOrderPage() {
                                     <CarFront className="h-3.5 w-3.5 text-emerald-600" />
                                     <span>Loại xe yêu cầu *</span>
                                 </div>
-
+                                
                                 <div className="space-y-2 mt-1">
                                     {vehicleSelections.map((selection, index) => {
                                         const cat = categories.find(c => c.id === selection.categoryId);
                                         // Kiểm tra loại xe này có hết không (từ availabilityInfo.results)
                                         const thisVehicleResult = availabilityInfo?.results?.find(r => r.categoryId === selection.categoryId);
                                         const isOutOfStock = thisVehicleResult && !thisVehicleResult.ok;
-
+                                        
                                         return (
                                             <div key={index} className={cls(
                                                 "p-2 rounded-lg border",
-                                                isOutOfStock
-                                                    ? "bg-red-50 border-red-300"
+                                                isOutOfStock 
+                                                    ? "bg-red-50 border-red-300" 
                                                     : "bg-slate-50 border-slate-200"
                                             )}>
                                                 {/* Row 1: Select + Số lượng + Số chỗ + Nút xóa */}
@@ -2057,16 +2057,16 @@ export default function CreateOrderPage() {
                                                         <option value="">-- Chọn loại xe --</option>
                                                         {categories.map((c) => {
                                                             // Disable nếu loại xe này đã được chọn ở selection khác
-                                                            const isAlreadySelected = vehicleSelections.some((v, i) =>
+                                                            const isAlreadySelected = vehicleSelections.some((v, i) => 
                                                                 i !== index && v.categoryId === c.id
                                                             );
                                                             // Kiểm tra loại xe này có hết không
                                                             const catResult = availabilityInfo?.results?.find(r => r.categoryId === c.id);
                                                             const catOutOfStock = catResult && !catResult.ok;
-
+                                                            
                                                             return (
-                                                                <option
-                                                                    key={c.id}
+                                                                <option 
+                                                                    key={c.id} 
                                                                     value={c.id}
                                                                     disabled={isAlreadySelected}
                                                                     className={catOutOfStock ? "text-red-600" : ""}
@@ -2076,7 +2076,7 @@ export default function CreateOrderPage() {
                                                             );
                                                         })}
                                                     </select>
-
+                                                    
                                                     {/* Số lượng */}
                                                     <div className="flex items-center gap-1">
                                                         <span className="text-[12px] text-slate-500 whitespace-nowrap">SL:</span>
@@ -2097,7 +2097,7 @@ export default function CreateOrderPage() {
                                                             <Plus className="h-3 w-3" />
                                                         </button>
                                                     </div>
-
+                                                    
                                                     {/* Hiện số chỗ */}
                                                     {cat && (
                                                         <span className={cls(
@@ -2107,7 +2107,7 @@ export default function CreateOrderPage() {
                                                             = {cat.seats * selection.quantity} chỗ
                                                         </span>
                                                     )}
-
+                                                    
                                                     {/* Nút xóa */}
                                                     {vehicleSelections.length > 1 && (
                                                         <button
@@ -2120,7 +2120,7 @@ export default function CreateOrderPage() {
                                                         </button>
                                                     )}
                                                 </div>
-
+                                                
                                                 {/* Row 2: Badge hết xe (nếu có) */}
                                                 {isOutOfStock && (
                                                     <div className="mt-2 flex items-center">
@@ -2133,7 +2133,7 @@ export default function CreateOrderPage() {
                                             </div>
                                         );
                                     })}
-
+                                    
                                     {/* Nút thêm loại xe */}
                                     {vehicleSelections.length < 5 && categories.length > vehicleSelections.length && (
                                         <button
@@ -2146,7 +2146,7 @@ export default function CreateOrderPage() {
                                         </button>
                                     )}
                                 </div>
-
+                                
                                 {/* Tổng số chỗ */}
                                 <div className="mt-2 flex items-center justify-between text-[12px]">
                                     <span className="text-slate-500">
@@ -2154,13 +2154,13 @@ export default function CreateOrderPage() {
                                         {vehicleSelections.length > 1 && (
                                             <span className="ml-1">
                                                 ({vehicleSelections.filter(v => v.categoryId).map(v => {
-                                                const c = categories.find(cat => cat.id === v.categoryId);
-                                                return c ? `${v.quantity}×${c.seats}` : '';
-                                            }).filter(Boolean).join(' + ')})
+                                                    const c = categories.find(cat => cat.id === v.categoryId);
+                                                    return c ? `${v.quantity}×${c.seats}` : '';
+                                                }).filter(Boolean).join(' + ')})
                                             </span>
                                         )}
                                     </span>
-
+                                    
                                     {checkingAvail ? (
                                         <span className="inline-flex items-center gap-1 text-slate-500">
                                             <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />
@@ -2204,7 +2204,7 @@ export default function CreateOrderPage() {
                     ) : null}
 
                     {availabilityInfo &&
-                    !availabilityInfo.ok ? (
+                        !availabilityInfo.ok ? (
                         <div className="rounded-lg border border-amber-200 bg-amber-50 text-amber-700 text-[12px] p-3 flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
@@ -2330,7 +2330,7 @@ export default function CreateOrderPage() {
                                     Không đủ xe khả dụng
                                 </h3>
                                 <p className="text-sm text-slate-500 mt-1">
-                                    Cần <span className="font-medium text-slate-700">{availabilityInfo.needed}</span> xe {selectedCategory?.name || ""},
+                                    Cần <span className="font-medium text-slate-700">{availabilityInfo.needed}</span> xe {selectedCategory?.name || ""}, 
                                     hiện chỉ còn <span className="font-medium text-amber-600">{availabilityInfo.count}</span> xe rảnh.
                                     Vui lòng chọn một trong các gợi ý bên dưới.
                                 </p>
@@ -2350,53 +2350,53 @@ export default function CreateOrderPage() {
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    {availabilityInfo.alternativeCategories
-                                        // Ẩn các loại xe đã được chọn trong form (tránh gợi ý trùng)
-                                        .filter(
-                                            (alt) =>
-                                                !vehicleSelections.some(
-                                                    (v) =>
-                                                        String(v.categoryId) ===
-                                                        String(alt.categoryId)
-                                                )
-                                        )
-                                        .map((alt) => (
-                                            <button
-                                                key={alt.categoryId}
-                                                type="button"
-                                                onClick={() => {
-                                                    // Tìm index của loại xe bị hết để thay thế
-                                                    const failedIndex = vehicleSelections.findIndex(
-                                                        v => v.categoryId === availabilityInfo.failedCategoryId
-                                                    );
-                                                    if (failedIndex >= 0) {
-                                                        updateVehicleSelection(failedIndex, 'categoryId', String(alt.categoryId));
-                                                    } else {
-                                                        // Nếu không tìm thấy, cập nhật xe đầu tiên
-                                                        updateVehicleSelection(0, 'categoryId', String(alt.categoryId));
-                                                    }
-                                                    setShowSuggestionDialog(false);
-                                                    push(`Đã chọn ${alt.categoryName}`, "success");
-                                                }}
-                                                className="w-full text-left px-4 py-3 rounded-lg bg-white hover:bg-emerald-50 border border-emerald-200 hover:border-emerald-400 text-slate-700 transition-all flex items-center justify-between group shadow-sm hover:shadow"
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <div className="h-10 w-10 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
-                                                        <CarFront className="h-5 w-5" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="font-medium text-slate-800">{alt.categoryName}</div>
-                                                        <div className="text-[11px] text-slate-500">{alt.seats} chỗ ngồi • {alt.pricePerKm?.toLocaleString("vi-VN")}đ/km</div>
-                                                    </div>
+                                {availabilityInfo.alternativeCategories
+                                    // Ẩn các loại xe đã được chọn trong form (tránh gợi ý trùng)
+                                    .filter(
+                                        (alt) =>
+                                            !vehicleSelections.some(
+                                                (v) =>
+                                                    String(v.categoryId) ===
+                                                    String(alt.categoryId)
+                                            )
+                                    )
+                                    .map((alt) => (
+                                        <button
+                                            key={alt.categoryId}
+                                            type="button"
+                                            onClick={() => {
+                                                // Tìm index của loại xe bị hết để thay thế
+                                                const failedIndex = vehicleSelections.findIndex(
+                                                    v => v.categoryId === availabilityInfo.failedCategoryId
+                                                );
+                                                if (failedIndex >= 0) {
+                                                    updateVehicleSelection(failedIndex, 'categoryId', String(alt.categoryId));
+                                                } else {
+                                                    // Nếu không tìm thấy, cập nhật xe đầu tiên
+                                                    updateVehicleSelection(0, 'categoryId', String(alt.categoryId));
+                                                }
+                                                setShowSuggestionDialog(false);
+                                                push(`Đã chọn ${alt.categoryName}`, "success");
+                                            }}
+                                            className="w-full text-left px-4 py-3 rounded-lg bg-white hover:bg-emerald-50 border border-emerald-200 hover:border-emerald-400 text-slate-700 transition-all flex items-center justify-between group shadow-sm hover:shadow"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-10 w-10 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
+                                                    <CarFront className="h-5 w-5" />
                                                 </div>
-                                                <div className="flex items-center gap-2">
+                                                <div>
+                                                    <div className="font-medium text-slate-800">{alt.categoryName}</div>
+                                                    <div className="text-[11px] text-slate-500">{alt.seats} chỗ ngồi • {alt.pricePerKm?.toLocaleString("vi-VN")}đ/km</div>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
                                                 <span className="text-xs bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full font-medium">
                                                     {alt.availableCount} xe rảnh
                                                 </span>
-                                                    <ArrowRight className="h-4 w-4 text-emerald-500 group-hover:translate-x-1 transition-transform" />
-                                                </div>
-                                            </button>
-                                        ))}
+                                                <ArrowRight className="h-4 w-4 text-emerald-500 group-hover:translate-x-1 transition-transform" />
+                                            </div>
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
                         )}
