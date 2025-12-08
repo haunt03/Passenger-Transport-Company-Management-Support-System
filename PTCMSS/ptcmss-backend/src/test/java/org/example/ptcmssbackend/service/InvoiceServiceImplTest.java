@@ -441,9 +441,11 @@ class InvoiceServiceImplTest {
 
         when(invoiceRepository.findInvoicesWithFilters(any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(invoices);
-        when(invoiceRepository.findById(anyInt())).thenAnswer(inv -> {
-            Integer id = inv.getArgument(0);
-            return invoices.stream().filter(inv -> inv.getId().equals(id)).findFirst();
+        when(invoiceRepository.findById(anyInt())).thenAnswer(invocation -> {
+            Integer id = invocation.getArgument(0);
+            return invoices.stream()
+                    .filter(invoice -> invoice.getId().equals(id))
+                    .findFirst();
         });
         when(paymentHistoryRepository.sumConfirmedByInvoiceId(anyInt())).thenReturn(BigDecimal.ZERO);
         when(paymentHistoryRepository.countPendingPaymentsByInvoiceId(anyInt())).thenReturn(0);
@@ -465,12 +467,14 @@ class InvoiceServiceImplTest {
         Invoices invoice = createTestInvoice(100, "INV-001", PaymentStatus.UNPAID);
         List<Invoices> invoices = List.of(invoice);
 
-        when(invoiceRepository.findInvoicesWithFilters(eq(1), eq(InvoiceType.INCOME), 
+        when(invoiceRepository.findInvoicesWithFilters(eq(1), eq(InvoiceType.INCOME),
                 eq(InvoiceStatus.ACTIVE), any(), any(), any(), eq(PaymentStatus.UNPAID)))
                 .thenReturn(invoices);
-        when(invoiceRepository.findById(anyInt())).thenAnswer(inv -> {
-            Integer id = inv.getArgument(0);
-            return invoices.stream().filter(inv -> inv.getId().equals(id)).findFirst();
+        when(invoiceRepository.findById(anyInt())).thenAnswer(invocation -> {
+            Integer id = invocation.getArgument(0);
+            return invoices.stream()
+                    .filter(invoiceEntity -> invoiceEntity.getId().equals(id))
+                    .findFirst();
         });
         when(paymentHistoryRepository.sumConfirmedByInvoiceId(anyInt())).thenReturn(BigDecimal.ZERO);
         when(paymentHistoryRepository.countPendingPaymentsByInvoiceId(anyInt())).thenReturn(0);
@@ -497,9 +501,11 @@ class InvoiceServiceImplTest {
 
         when(invoiceRepository.findInvoicesWithFilters(any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(invoices);
-        when(invoiceRepository.findById(anyInt())).thenAnswer(inv -> {
-            Integer id = inv.getArgument(0);
-            return invoices.stream().filter(inv -> inv.getId().equals(id)).findFirst();
+        when(invoiceRepository.findById(anyInt())).thenAnswer(invocation -> {
+            Integer id = invocation.getArgument(0);
+            return invoices.stream()
+                    .filter(invoiceEntity -> invoiceEntity.getId().equals(id))
+                    .findFirst();
         });
         when(paymentHistoryRepository.sumConfirmedByInvoiceId(anyInt())).thenReturn(BigDecimal.ZERO);
         when(paymentHistoryRepository.countPendingPaymentsByInvoiceId(anyInt())).thenReturn(0);
@@ -968,7 +974,7 @@ class InvoiceServiceImplTest {
 
         when(invoiceRepository.findById(invoiceId)).thenReturn(Optional.of(invoice));
         when(invoiceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        doNothing().when(emailService).sendInvoiceEmail(anyString(), anyString(), anyString(), 
+        doNothing().when(emailService).sendInvoiceEmail(anyString(), anyString(), anyString(),
                 anyString(), anyString(), anyString(), anyString());
 
         // When
@@ -977,7 +983,7 @@ class InvoiceServiceImplTest {
         // Then
         assertThat(invoice.getSentAt()).isNotNull();
         assertThat(invoice.getSentToEmail()).isEqualTo("customer@example.com");
-        verify(emailService).sendInvoiceEmail(anyString(), anyString(), anyString(), 
+        verify(emailService).sendInvoiceEmail(anyString(), anyString(), anyString(),
                 anyString(), anyString(), anyString(), anyString());
         verify(invoiceRepository).save(invoice);
     }
@@ -1113,4 +1119,3 @@ class InvoiceServiceImplTest {
         return invoice;
     }
 }
-
