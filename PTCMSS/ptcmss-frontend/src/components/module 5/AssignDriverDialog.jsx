@@ -313,7 +313,7 @@ export default function AssignDriverDialog({
             >
                 {/* Header */}
                 <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-200">
-                    <Sparkles className="h-5 w-5 text-amber-600" />
+                    <Sparkles className="h-5 w-5 text-primary-600" />
                     <div className="font-semibold text-slate-900 text-sm">
                         Gán chuyến (Assign
                         Driver)
@@ -374,8 +374,8 @@ export default function AssignDriverDialog({
                     
                     {/* Thông báo nếu có nhiều chuyến chưa gán */}
                     {unassignedTripCount > 1 && (
-                        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800 flex items-start gap-2">
-                            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                        <div className="mt-3 rounded-lg border border-info-200 bg-info-50 px-3 py-2 text-[12px] text-info-800 flex items-start gap-2">
+                            <AlertTriangle className="h-4 w-4 text-primary-600 shrink-0 mt-0.5" />
                             <div className="flex-1">
                                 <div className="font-medium mb-1">
                                     Còn {unassignedTripCount} chuyến chưa gán tài xế/xe
@@ -385,7 +385,7 @@ export default function AssignDriverDialog({
                                         type="checkbox"
                                         checked={assignToAllTrips}
                                         onChange={(e) => setAssignToAllTrips(e.target.checked)}
-                                        className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                                        className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-info-500"
                                     />
                                     <span>
                                         Gán cho tất cả {unassignedTripCount} chuyến còn lại
@@ -402,7 +402,7 @@ export default function AssignDriverDialog({
                                     </div>
                                 )}
                                 {!assignToAllTrips && (
-                                    <div className="mt-1 text-[11px] text-amber-700">
+                                    <div className="mt-1 text-[11px] text-info-700">
                                         (Chỉ gán cho chuyến đầu tiên trong danh sách chưa gán)
                                     </div>
                                 )}
@@ -420,8 +420,8 @@ export default function AssignDriverDialog({
                         </div>
 
                         {error && (
-                            <div className="px-3 py-2 text-[12px] text-amber-700 border-b border-amber-200 bg-amber-50 flex items-start gap-2">
-                                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                            <div className="px-3 py-2 text-[12px] text-info-700 border-b border-info-200 bg-info-50 flex items-start gap-2">
+                                <AlertTriangle className="h-4 w-4 text-primary-600 shrink-0" />
                                 <span>
                                     {error}
                                 </span>
@@ -436,7 +436,7 @@ export default function AssignDriverDialog({
                         ) : suggestions.length ===
                             0 ? (
                             <div className="px-3 py-6 text-[13px] text-slate-500 flex items-center gap-2">
-                                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                                <AlertTriangle className="h-4 w-4 text-primary-600" />
                                 <span>
                                     Không có
                                     gợi ý phù
@@ -468,7 +468,7 @@ export default function AssignDriverDialog({
                                                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                                                         {/* driver */}
                                                         <div className="flex items-center gap-1.5 text-[13px] text-slate-900 font-medium min-w-0">
-                                                            <UserRound className="h-4 w-4 text-amber-600" />
+                                                            <UserRound className="h-4 w-4 text-primary-600" />
                                                             <span
                                                                 className="truncate"
                                                                 title={
@@ -530,8 +530,8 @@ export default function AssignDriverDialog({
                                                         {typeof s?.score ===
                                                             "number" && 
                                                             s?.driver?.hasHistoryWithCustomer && (
-                                                                <div className="ml-auto flex items-center gap-1 text-[11px] text-amber-600 font-medium">
-                                                                    <BadgeCheck className="h-4 w-4 text-amber-600" />
+                                                                <div className="ml-auto flex items-center gap-1 text-[11px] text-primary-600 font-medium">
+                                                                    <BadgeCheck className="h-4 w-4 text-primary-600" />
                                                                     <span>
                                                                         Score:{" "}
                                                                         {
@@ -688,15 +688,15 @@ export default function AssignDriverDialog({
                         className={`
                             rounded-md px-3 py-2 border text-[13px] font-medium flex items-center gap-1
                             ${autoPosting
-                                ? "opacity-60 cursor-not-allowed border-amber-300 text-amber-400 bg-white"
+                                ? "opacity-60 cursor-not-allowed border-info-300 text-primary-400 bg-white"
                                 : "border-sky-500 text-sky-700 bg-white hover:bg-sky-50"
                             }
                         `}
                     >
                         {autoPosting ? (
-                            <Loader2 className="h-4 w-4 animate-spin text-amber-600" />
+                            <Loader2 className="h-4 w-4 animate-spin text-primary-600" />
                         ) : (
-                            <Sparkles className="h-4 w-4 text-amber-600" />
+                            <Sparkles className="h-4 w-4 text-primary-600" />
                         )}
                         <span>
                             Tự động gán

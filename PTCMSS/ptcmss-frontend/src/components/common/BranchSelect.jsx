@@ -4,7 +4,7 @@ import { getAllBranchesForSelection } from '../../api/branches';
 
 /**
  * BranchSelect - Component dropdown chọn chi nhánh
- *
+ * 
  * Props:
  * - value: number - ID chi nhánh được chọn
  * - onChange: function - Callback khi thay đổi (nhận branchId)
@@ -16,15 +16,15 @@ import { getAllBranchesForSelection } from '../../api/branches';
  * - className: string - Custom class cho container
  */
 export default function BranchSelect({
-                                         value,
-                                         onChange,
-                                         required = false,
-                                         disabled = false,
-                                         error = '',
-                                         label = 'Chi nhánh',
-                                         placeholder = '-- Chọn chi nhánh --',
-                                         className = '',
-                                     }) {
+    value,
+    onChange,
+    required = false,
+    disabled = false,
+    error = '',
+    label = 'Chi nhánh',
+    placeholder = '-- Chọn chi nhánh --',
+    className = '',
+}) {
     const [branches, setBranches] = useState([]);
     const [loading, setLoading] = useState(false);
     const [loadError, setLoadError] = useState('');
@@ -66,12 +66,12 @@ export default function BranchSelect({
                     onChange={handleChange}
                     disabled={disabled || loading}
                     className={`w-full border rounded-lg px-3.5 py-2.5 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500/20 ${error
-                        ? 'border-rose-300 focus:border-rose-400'
-                        : 'border-slate-300 focus:border-sky-500/50'
-                    } ${disabled || loading
-                        ? 'bg-slate-50 text-slate-500 cursor-not-allowed'
-                        : 'bg-white'
-                    }`}
+                            ? 'border-rose-300 focus:border-rose-400'
+                            : 'border-slate-300 focus:border-sky-500/50'
+                        } ${disabled || loading
+                            ? 'bg-slate-50 text-slate-500 cursor-not-allowed'
+                            : 'bg-white'
+                        }`}
                 >
                     <option value="">{loading ? 'Đang tải...' : placeholder}</option>
                     {branches.map((branch) => (
@@ -96,7 +96,7 @@ export default function BranchSelect({
             )}
 
             {!loading && !loadError && branches.length === 0 && (
-                <div className="text-xs text-amber-600 mt-1.5 flex items-center gap-1">
+                <div className="text-xs text-primary-600 mt-1.5 flex items-center gap-1">
                     <AlertCircle className="h-3 w-3" />
                     <span>Chưa có chi nhánh nào</span>
                 </div>

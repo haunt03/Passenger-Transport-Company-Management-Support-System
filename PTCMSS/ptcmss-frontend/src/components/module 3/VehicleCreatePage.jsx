@@ -399,7 +399,7 @@ function StatCard({ icon, label, value, hint, color = "sky" }) {
             num: "text-slate-900",
         },
         amber: {
-            chipBg: "bg-amber-50 border-amber-200 text-amber-600",
+            chipBg: "bg-info-50 border-info-200 text-primary-600",
             num: "text-slate-900",
         },
     };

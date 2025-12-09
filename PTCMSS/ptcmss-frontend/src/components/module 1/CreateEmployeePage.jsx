@@ -324,13 +324,13 @@ export default function CreateEmployeePage() {
 
                     {/* Info message for prefilled status */}
                     {prefilledUserId && (
-                        <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-                            <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
-                                <Info className="h-4 w-4 text-amber-700" />
+                        <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-info-200 rounded-xl p-4 flex items-start gap-3">
+                            <div className="h-8 w-8 rounded-lg bg-info-100 flex items-center justify-center flex-shrink-0">
+                                <Info className="h-4 w-4 text-info-700" />
                             </div>
                             <div className="flex-1">
-                                <div className="font-semibold text-amber-800 text-sm mb-1">Lưu ý về trạng thái</div>
-                                <div className="text-sm text-amber-700">
+                                <div className="font-semibold text-info-800 text-sm mb-1">Lưu ý về trạng thái</div>
+                                <div className="text-sm text-info-700">
                                     Trạng thái sẽ được gán cứng là <span className="font-bold">INACTIVE</span> cho nhân viên mới
                                 </div>
                             </div>

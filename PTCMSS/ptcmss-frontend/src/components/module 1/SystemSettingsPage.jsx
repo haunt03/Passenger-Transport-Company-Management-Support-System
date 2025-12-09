@@ -578,7 +578,7 @@ export default function SystemSettingsPage() {
                             </div>
                             {hasChanges && (
                                 <div className="flex items-center gap-2">
-                                    <span className="text-xs text-amber-600 font-medium">
+                                    <span className="text-xs text-primary-600 font-medium">
                                         {dirtyPayload.length} thay đổi chưa lưu
                                     </span>
                                     <button

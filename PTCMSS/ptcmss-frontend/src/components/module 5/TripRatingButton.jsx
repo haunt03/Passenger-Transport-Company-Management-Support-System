@@ -60,7 +60,7 @@ const TripRatingButton = ({ trip, onRatingComplete }) => {
                             size={14}
                             className={
                                 star <= (existingRating.overallRating || 0)
-                                    ? 'fill-yellow-400 text-yellow-400'
+                                    ? 'fill-primary-500 text-primary-500'
                                     : 'text-gray-300'
                             }
                         />

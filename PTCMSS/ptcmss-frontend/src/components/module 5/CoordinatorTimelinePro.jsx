@@ -317,7 +317,7 @@ function UnassignedTripsPanel({ orders, onAssign, query, onQuery, loading }) {
         if (diff <= 30)
             return "bg-rose-50 text-rose-600 border-rose-300";
         if (diff <= 120)
-            return "bg-amber-50 text-amber-700 border-amber-300";
+            return "bg-info-50 text-info-700 border-info-300";
         return "bg-slate-100 text-slate-600 border-slate-300";
     };
 
@@ -428,7 +428,7 @@ function IncidentsPanel({ incidents = [], onViewDetail, loading }) {
             case "CRITICAL":
                 return "bg-rose-50 text-rose-700 border-rose-300";
             case "MEDIUM":
-                return "bg-amber-50 text-amber-700 border-amber-300";
+                return "bg-info-50 text-info-700 border-info-300";
             case "LOW":
                 return "bg-sky-50 text-sky-700 border-sky-300";
             default:
@@ -442,7 +442,7 @@ function IncidentsPanel({ incidents = [], onViewDetail, loading }) {
             case "CRITICAL":
                 return <XCircle className="h-4 w-4 text-rose-600" />;
             case "MEDIUM":
-                return <AlertCircle className="h-4 w-4 text-amber-600" />;
+                return <AlertCircle className="h-4 w-4 text-primary-600" />;
             default:
                 return <AlertCircle className="h-4 w-4 text-sky-600" />;
         }
@@ -550,7 +550,7 @@ function IncidentDetailModal({ open, onClose, incident }) {
             case "CRITICAL":
                 return "bg-rose-50 text-rose-700 border-rose-300";
             case "MEDIUM":
-                return "bg-amber-50 text-amber-700 border-amber-300";
+                return "bg-info-50 text-info-700 border-info-300";
             case "LOW":
                 return "bg-sky-50 text-sky-700 border-sky-300";
             default:
@@ -1318,13 +1318,13 @@ export default function CoordinatorTimelinePro() {
                 {/* THỐNG KÊ DASHBOARD */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                     {/* Chờ gắn lịch */}
-                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-amber-100 flex items-center justify-center">
-                            <ClipboardList className="h-5 w-5 text-amber-600" />
+                    <div className="rounded-xl border border-info-200 bg-info-50 p-4 flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-info-100 flex items-center justify-center">
+                            <ClipboardList className="h-5 w-5 text-primary-600" />
                         </div>
                         <div>
-                            <div className="text-2xl font-bold text-amber-700">{stats.pendingCount}</div>
-                            <div className="text-[11px] text-amber-600 font-medium">Chờ gắn lịch</div>
+                            <div className="text-2xl font-bold text-info-700">{stats.pendingCount}</div>
+                            <div className="text-[11px] text-primary-600 font-medium">Chờ gắn lịch</div>
                         </div>
                     </div>
 
@@ -1445,7 +1445,7 @@ export default function CoordinatorTimelinePro() {
                             </div>
                         )}
                         {error && (
-                            <div className="text-[13px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                            <div className="text-[13px] text-info-700 bg-info-50 border border-info-200 rounded-lg px-3 py-2">
                                 {error}
                             </div>
                         )}
@@ -1479,3 +1479,4 @@ export default function CoordinatorTimelinePro() {
         </div>
     );
 }
+

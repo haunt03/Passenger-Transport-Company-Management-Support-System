@@ -89,7 +89,7 @@ function Toasts({ toasts }) {
           className={cls(
             "rounded-lg px-3 py-2 text-sm border shadow-lg bg-white",
             t.kind === "success" &&
-            "bg-amber-50 border-amber-200 text-amber-700",
+            "bg-info-50 border-info-200 text-info-700",
             t.kind === "error" &&
             "bg-rose-50 border-rose-200 text-rose-700",
             t.kind === "info" &&
@@ -115,7 +115,7 @@ function DriverAvatar({ name = "Tài xế" }) {
   return (
     <div className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl bg-sky-50 text-sky-600 ring-1 ring-inset ring-sky-100 shadow-sm text-[12px] font-semibold leading-none">
       {initials || "TX"}
-      <span className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white ring-1 ring-white shadow-sm">
+      <span className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-info-500 text-[9px] font-bold text-white ring-1 ring-white shadow-sm">
         ●
       </span>
     </div>
@@ -134,9 +134,9 @@ function PhasePill({ phase }) {
 
   const colorMap = {
     IDLE: "bg-slate-100 text-slate-600 border-slate-300",
-    READY: "bg-amber-50 text-amber-700 border-amber-300",
+    READY: "bg-info-50 text-info-700 border-info-300",
     ON_ROUTE: "bg-sky-50 text-sky-700 border-sky-300",
-    PICKED: "bg-amber-50 text-amber-700 border-amber-300",
+    PICKED: "bg-info-50 text-info-700 border-info-300",
     DONE: "bg-slate-100 text-slate-500 border-slate-300",
   };
 
@@ -164,8 +164,8 @@ function ActionButton({ active, color, icon, label, onClick, loading }) {
           ? color === "start"
             ? "border-sky-300 bg-sky-50 text-sky-700 hover:bg-sky-100"
             : color === "picked"
-              ? "border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
-              : "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
+              ? "border-info-300 bg-info-50 text-info-700 hover:bg-info-100"
+              : "border-info-300 bg-info-50 text-info-800 hover:bg-info-100"
           : "border-slate-200 bg-white text-slate-400 cursor-not-allowed"
       )}
     >
@@ -198,7 +198,7 @@ function NotificationsCard({ notifications = [] }) {
               className={cls(
                 "flex items-start gap-2 rounded-lg border p-3 shadow-sm text-[13px] leading-snug",
                 n.type === "warning"
-                  ? "border-amber-200 bg-amber-50 text-amber-800"
+                  ? "border-info-200 bg-info-50 text-info-800"
                   : "border-sky-200 bg-sky-50 text-sky-800"
               )}
             >
@@ -264,7 +264,7 @@ function TripCard({
       <div className="flex flex-wrap items-start gap-4 mb-6">
         <div className="flex-1 min-w-[220px]">
           <div className="flex flex-wrap items-center gap-2 text-[11px] font-medium">
-            <span className="rounded-md border border-amber-300 bg-amber-50 text-amber-700 px-2 py-0.5 shadow-sm">
+            <span className="rounded-md border border-info-300 bg-info-50 text-info-700 px-2 py-0.5 shadow-sm">
               {isCurrent ? "Chuyến hiện tại" : "Chuyến sắp tới"}
             </span>
 
@@ -282,8 +282,8 @@ function TripCard({
           </div>
 
           {t.note ? (
-            <div className="text-xs text-amber-700 flex items-start gap-1 mt-2 leading-relaxed">
-              <AlertCircle className="h-4 w-4 text-amber-500 shrink-0" />
+            <div className="text-xs text-info-700 flex items-start gap-1 mt-2 leading-relaxed">
+              <AlertCircle className="h-4 w-4 text-info-500 shrink-0" />
               <span>Ghi chú: {t.note}</span>
             </div>
           ) : null}
@@ -315,7 +315,7 @@ function TripCard({
         </div>
 
         <div className="flex items-start gap-2">
-          <User className="h-4 w-4 text-amber-600 shrink-0" />
+          <User className="h-4 w-4 text-primary-600 shrink-0" />
           <div>
             <div className="text-slate-400 text-[11px] mb-1 uppercase tracking-wide">
               Khách hàng
@@ -327,7 +327,7 @@ function TripCard({
         </div>
 
         <div className="flex items-start gap-2">
-          <Phone className="h-4 w-4 text-amber-600 shrink-0" />
+          <Phone className="h-4 w-4 text-primary-600 shrink-0" />
           <div>
             <div className="text-slate-400 text-[11px] mb-1 uppercase tracking-wide">
               Liên hệ
@@ -339,7 +339,7 @@ function TripCard({
         </div>
 
         <div className="flex items-start gap-2">
-          <MapPin className="h-4 w-4 text-amber-600 shrink-0" />
+          <MapPin className="h-4 w-4 text-primary-600 shrink-0" />
           <div>
             <div className="text-slate-400 text-[11px] mb-1 uppercase tracking-wide">
               Quãng đường
@@ -376,7 +376,7 @@ function TripCard({
               )}
               {t.vehicle_plate && (
                 <div className="flex items-start gap-2 text-sm">
-                  <MapPin className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                  <MapPin className="h-4 w-4 text-primary-600 shrink-0 mt-0.5" />
                   <div>
                     <div className="text-slate-400 text-[11px] mb-0.5">Biển số xe</div>
                     <div className="text-slate-900 font-medium">
@@ -408,9 +408,9 @@ function TripCard({
                     {Number(t.paid_amount || 0).toLocaleString("vi-VN")} đ
                   </div>
                 </div>
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-2">
-                  <div className="text-[11px] text-amber-600 mb-1">Còn lại</div>
-                  <div className="text-base font-bold text-amber-700 tabular-nums">
+                <div className="rounded-lg border border-info-200 bg-info-50 p-2">
+                  <div className="text-[11px] text-primary-600 mb-1">Còn lại</div>
+                  <div className="text-base font-bold text-info-700 tabular-nums">
                     {Number(t.remaining_amount || 0).toLocaleString("vi-VN")} đ
                   </div>
                 </div>
@@ -424,7 +424,7 @@ function TripCard({
       {isCurrent ? (
         <div className="flex flex-col gap-3 pt-5 border-t border-slate-200">
           {!isTripToday && phase !== "ON_ROUTE" && phase !== "PICKED" && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 text-amber-700 px-3 py-2 text-xs flex items-center gap-2">
+            <div className="rounded-lg border border-info-200 bg-info-50 text-info-700 px-3 py-2 text-xs flex items-center gap-2">
               <AlertCircle className="h-4 w-4" />
               <span>Chỉ có thể bắt đầu chuyến trong ngày diễn ra. Chuyến đang diễn ra có thể hoàn thành bất cứ lúc nào.</span>
             </div>
@@ -442,7 +442,7 @@ function TripCard({
               active={phase === "ON_ROUTE" && isTripToday}
               color="picked"
               icon={
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-amber-700" />
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-info-700" />
               }
               label="Đã đón khách"
               onClick={onPicked}
@@ -451,7 +451,7 @@ function TripCard({
             <ActionButton
               active={phase === "PICKED" || phase === "ON_ROUTE"}
               color="finish"
-              icon={<Flag className="h-4 w-4 shrink-0 text-amber-700" />}
+              icon={<Flag className="h-4 w-4 shrink-0 text-info-700" />}
               label="Hoàn thành chuyến"
               onClick={onFinish}
               loading={loading}
@@ -885,8 +885,8 @@ export default function DriverDashboard() {
               {branchName}
             </div>
 
-            <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] text-amber-700 font-medium shadow-sm">
-              <span className="inline-flex h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+            <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-info-300 bg-info-50 px-2 py-1 text-[11px] text-info-700 font-medium shadow-sm">
+              <span className="inline-flex h-2 w-2 rounded-full bg-info-500 animate-pulse" />
               Sẵn sàng nhận chuyến
             </div>
           </div>

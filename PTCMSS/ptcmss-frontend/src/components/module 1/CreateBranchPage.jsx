@@ -43,7 +43,7 @@ function Toasts({ toasts }) {
                     className={cls(
                         "rounded-md px-3 py-2 text-sm shadow border",
                         t.kind === "success" &&
-                        "bg-amber-50 border-amber-300 text-amber-700",
+                        "bg-info-50 border-info-300 text-info-700",
                         t.kind === "error" &&
                         "bg-rose-50 border-rose-300 text-rose-700",
                         t.kind === "info" &&
@@ -120,7 +120,7 @@ function CreateBranchModal({
         try {
             const { createBranch } = await import("../../api/branches");
             const result = await createBranch(payload);
-
+            
             const newBranch = {
                 id: result?.id || result?.data?.id,
                 name: result?.branchName || result?.data?.branchName,

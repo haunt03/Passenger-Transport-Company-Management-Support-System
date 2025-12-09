@@ -38,7 +38,7 @@ const EXPENSE_TYPE_LABELS = {
 };
 
 const STATUS_COLORS = {
-    PENDING: "bg-amber-50 text-amber-700 border-amber-300",
+    PENDING: "bg-info-50 text-info-700 border-info-300",
     APPROVED: "bg-emerald-50 text-emerald-700 border-emerald-300",
     REJECTED: "bg-rose-50 text-rose-700 border-rose-300",
 };

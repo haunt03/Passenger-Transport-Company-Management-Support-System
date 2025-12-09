@@ -197,7 +197,7 @@ export default function TripExpenseModal({
             >
                 {/* HEADER */}
                 <div className="px-5 py-4 border-b border-slate-200 flex items-start gap-3 flex-shrink-0">
-                    <div className="flex-none rounded-xl bg-amber-50 border border-amber-200 p-2 text-amber-600 shadow-[0_0_20px_rgba(16,185,129,0.15)]">
+                    <div className="flex-none rounded-xl bg-info-50 border border-info-200 p-2 text-primary-600 shadow-[0_0_20px_rgba(16,185,129,0.15)]">
                         <Receipt className="h-5 w-5" />
                     </div>
 
@@ -313,7 +313,7 @@ export default function TripExpenseModal({
                                 "text-slate-700 bg-white hover:bg-slate-50 cursor-pointer shadow-sm"
                             )}
                         >
-                            <Upload className="h-4 w-4 text-amber-600" />
+                            <Upload className="h-4 w-4 text-primary-600" />
                             <span>Tải ảnh / Chụp hoá đơn</span>
                             <input
                                 type="file"

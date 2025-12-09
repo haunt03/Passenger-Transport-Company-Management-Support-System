@@ -16,9 +16,9 @@ function StatusBadge({ value }) {
   };
   const label = value === "ACTIVE" ? "Hoạt động" : "Vô hiệu hóa";
   return (
-      <span className={cls("inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] border", map[value] || map.INACTIVE)}>
+    <span className={cls("inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] border", map[value] || map.INACTIVE)}>
       <ShieldCheck className="h-3.5 w-3.5" />
-        {label}
+      {label}
     </span>
   );
 }

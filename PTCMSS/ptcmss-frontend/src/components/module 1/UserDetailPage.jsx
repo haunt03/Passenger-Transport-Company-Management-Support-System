@@ -297,7 +297,7 @@ export default function UserDetailPage() {
               <div className="text-sm text-red-700">{generalError}</div>
               </div>
               {!canEditTarget && (
-                <div className="text-xs text-amber-600 flex items-center gap-1.5 mt-3">
+                <div className="text-xs text-primary-600 flex items-center gap-1.5 mt-3">
                   <AlertCircle className="h-3.5 w-3.5" />
                   <span>Chỉ tài khoản Admin mới được phép chỉnh sửa người dùng này.</span>
                 </div>
@@ -426,7 +426,7 @@ export default function UserDetailPage() {
                 ))}
               </select>
               {currentUserId === Number(userId) && isCurrentUserAdmin && (
-                <div className="text-xs text-amber-600 mt-1.5 flex items-center gap-1.5">
+                <div className="text-xs text-primary-600 mt-1.5 flex items-center gap-1.5">
                   <Info className="h-3.5 w-3.5" />
                   <span>⚠️ Cẩn thận khi thay đổi vai trò của chính mình</span>
                 </div>
@@ -439,7 +439,7 @@ export default function UserDetailPage() {
                 <Building2 className="h-4 w-4 text-slate-400" />
                 <span>Chi nhánh</span>
                 {isCurrentUserManager && (
-                  <span className="text-xs text-amber-600">(Không thể thay đổi)</span>
+                  <span className="text-xs text-primary-600">(Không thể thay đổi)</span>
                 )}
               </label>
               <select
@@ -463,7 +463,7 @@ export default function UserDetailPage() {
                 <Info className="h-4 w-4 text-slate-400" />
                 <span>Trạng thái</span>
                 {isCurrentUserManager && !canEditStatus && (
-                  <span className="text-xs text-amber-600">(Không thể thay đổi)</span>
+                  <span className="text-xs text-primary-600">(Không thể thay đổi)</span>
                 )}
               </label>
               <select

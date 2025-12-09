@@ -154,7 +154,7 @@ const ORDER_STATUS_LABEL = {
 
 const ORDER_STATUS_STYLE = {
     DRAFT: "bg-slate-100 text-slate-700 ring-1 ring-slate-300",
-    PENDING: "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
+    PENDING: "bg-info-50 text-info-700 ring-1 ring-info-200",
     QUOTATION_SENT: "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200",
     CONFIRMED: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
     INPROGRESS: "bg-sky-50 text-sky-700 ring-1 ring-sky-200",
@@ -442,8 +442,37 @@ function OrdersTable({
     const start = (page - 1) * pageSize;
     const current = items.slice(start, start + pageSize);
 
-    // Cho phép sửa khi chuyến chưa khởi hành (DRAFT, PENDING, CONFIRMED, ASSIGNED)
-    const canEdit = (status) => {
+    // Kiểm tra xem đơn hàng đã quá thời gian bắt đầu chưa
+    const isStartTimePassed = (pickupTime = null) => {
+        if (!pickupTime) return false; // Không có thời gian thì coi như chưa quá
+        
+        try {
+            // Parse ngày giống như fmtDateTime: replace space thành T để parse đúng ISO format
+            const safe = String(pickupTime).replace(" ", "T");
+            const pickupDate = new Date(safe);
+            const now = new Date();
+            
+            // Kiểm tra xem parse có thành công không
+            if (!isNaN(pickupDate.getTime())) {
+                // Nếu thời gian bắt đầu đã qua (nhỏ hơn hoặc bằng thời gian hiện tại)
+                return pickupDate <= now;
+            }
+        } catch (e) {
+            console.error("Error parsing pickup time:", e);
+        }
+        
+        return false; // Nếu parse lỗi thì coi như chưa quá
+    };
+
+    // Cho phép sửa khi:
+    // 1. Status cho phép (DRAFT, PENDING, CONFIRMED, ASSIGNED, QUOTATION_SENT)
+    // 2. Chưa quá thời gian bắt đầu
+    const canEdit = (status, pickupTime = null) => {
+        // Nếu đã quá thời gian bắt đầu thì không cho sửa
+        if (isStartTimePassed(pickupTime)) {
+            return false;
+        }
+        
         const normalized = status ? status.replace(/_/g, '').toUpperCase() : '';
         return normalized === 'DRAFT' ||
             normalized === 'PENDING' ||
@@ -452,8 +481,9 @@ function OrdersTable({
             normalized === 'QUOTATIONSENT';
     };
     
-    // Cho phép hủy khi chưa khởi hành/chưa hoàn thành/chưa hủy
-    // Nếu đơn chưa đến ngày đi, vẫn cho phép hủy (trừ khi đã hoàn thành hoặc đã hủy)
+    // Cho phép hủy khi:
+    // 1. Chưa hoàn thành, chưa hủy
+    // 2. Chưa quá thời gian bắt đầu
     const canCancel = (status, pickupTime = null) => {
         const normalized = status ? status.replace(/_/g, '').toUpperCase() : '';
         
@@ -462,27 +492,12 @@ function OrdersTable({
             return false;
         }
         
-        // Nếu có thông tin ngày đi, kiểm tra xem đã đến ngày đi chưa
-        if (pickupTime) {
-            try {
-                // Parse ngày giống như fmtDateTime: replace space thành T để parse đúng ISO format
-                const safe = String(pickupTime).replace(" ", "T");
-                const pickupDate = new Date(safe);
-                const now = new Date();
-                
-                // Kiểm tra xem parse có thành công không
-                if (!isNaN(pickupDate.getTime())) {
-                    // Nếu chưa đến ngày đi, cho phép hủy (trừ khi đã hoàn thành hoặc đã hủy - đã check ở trên)
-                    if (pickupDate > now) {
-                        return true;
-                    }
-                }
-            } catch (e) {
-                console.error("Error parsing pickup time:", e);
-            }
+        // Nếu đã quá thời gian bắt đầu thì không cho hủy
+        if (isStartTimePassed(pickupTime)) {
+            return false;
         }
         
-        // Nếu đã qua ngày đi hoặc không có thông tin ngày đi, chỉ cho hủy khi chưa đang thực hiện
+        // Nếu chưa quá thời gian bắt đầu và chưa đang thực hiện thì cho phép hủy
         return normalized !== 'INPROGRESS';
     };
 
@@ -534,7 +549,7 @@ function OrdersTable({
                             {/* Lịch trình */}
                             <td className="px-3 py-2 text-[13px] text-slate-700 min-w-[180px]">
                                 <div className="flex items-start gap-2 leading-snug">
-                                    <MapPin className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" />
+                                    <MapPin className="h-3.5 w-3.5 text-primary-600 shrink-0 mt-0.5" />
                                     <div className="space-y-1">
                                         <div className="text-slate-900 font-medium">
                                             {o.pickup} → {o.dropoff}
@@ -582,8 +597,8 @@ function OrdersTable({
 
                             {/* Tổng tiền (renamed from Giá trị) */}
                             <td className="px-3 py-2 text-[13px] whitespace-nowrap tabular-nums">
-                                <div className="flex items-start gap-1 text-amber-600 font-semibold">
-                                    <DollarSign className="h-3.5 w-3.5 text-amber-600 mt-0.5" />
+                                <div className="flex items-start gap-1 text-primary-600 font-semibold">
+                                    <DollarSign className="h-3.5 w-3.5 text-primary-600 mt-0.5" />
                                     <span>{fmtVND(o.quoted_price)}</span>
                                 </div>
                                 {o.discount_amount > 0 ? (
@@ -614,16 +629,17 @@ function OrdersTable({
                                         <>
                                             <button
                                                 type="button"
-                                                disabled={!canEdit(o.status)}
+                                                disabled={!canEdit(o.status, o.pickup_time)}
                                                 onClick={() => {
-                                                    if (canEdit(o.status)) onEdit(o);
+                                                    if (canEdit(o.status, o.pickup_time)) onEdit(o);
                                                 }}
                                                 className={cls(
                                                     "rounded-md border px-2.5 py-1.5 text-[12px] flex items-center gap-1 shadow-sm",
-                                                    canEdit(o.status)
-                                                        ? "border-amber-300 text-amber-700 bg-white hover:bg-amber-50"
+                                                    canEdit(o.status, o.pickup_time)
+                                                        ? "border-primary-300 text-primary-700 bg-white hover:bg-primary-50"
                                                         : "border-slate-200 text-slate-400 bg-white cursor-not-allowed opacity-50"
                                                 )}
+                                                title={isStartTimePassed(o.pickup_time) ? "Không thể sửa đơn đã quá thời gian bắt đầu" : ""}
                                             >
                                                 <Pencil className="h-3.5 w-3.5" />
                                                 <span>Sửa</span>
@@ -641,6 +657,7 @@ function OrdersTable({
                                                         ? "border-rose-300 text-rose-700 bg-white hover:bg-rose-50"
                                                         : "border-slate-200 text-slate-400 bg-white cursor-not-allowed opacity-50"
                                                 )}
+                                                title={isStartTimePassed(o.pickup_time) ? "Không thể hủy đơn đã quá thời gian bắt đầu" : ""}
                                             >
                                                 <Trash2 className="h-3.5 w-3.5" />
                                                 <span>Hủy</span>
@@ -796,7 +813,7 @@ function OrderDetailModal({ open, order, onClose }) {
                     {/* block Lịch trình */}
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 flex flex-col gap-3">
                         <div className="text-[11px] uppercase tracking-wide text-slate-500 flex items-center gap-2 font-medium">
-                            <MapPin className="h-3.5 w-3.5 text-amber-600" />
+                            <MapPin className="h-3.5 w-3.5 text-primary-600" />
                             Lịch trình
                         </div>
                         <div className="text-slate-900 font-medium">
@@ -822,7 +839,7 @@ function OrderDetailModal({ open, order, onClose }) {
                     {/* block Giá */}
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 flex flex-col gap-2">
                         <div className="text-[11px] uppercase tracking-wide text-slate-500 flex items-center gap-2 font-medium">
-                            <DollarSign className="h-3.5 w-3.5 text-amber-600" />
+                            <DollarSign className="h-3.5 w-3.5 text-primary-600" />
                             Thông tin báo giá
                         </div>
                         <div className="text-slate-900 text-[13px] font-semibold flex items-baseline gap-2">
@@ -838,7 +855,7 @@ function OrderDetailModal({ open, order, onClose }) {
                     {/* block Notes */}
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 flex flex-col gap-2">
                         <div className="text-[11px] uppercase tracking-wide text-slate-500 flex items-center gap-2 font-medium">
-                            <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                            <AlertTriangle className="h-3.5 w-3.5 text-info-600" />
                             Ghi chú nội bộ
                         </div>
                         <div className="text-slate-700 leading-relaxed whitespace-pre-line text-[13px]">
@@ -847,8 +864,8 @@ function OrderDetailModal({ open, order, onClose }) {
 
                         {order.status === ORDER_STATUS.CANCELLED ||
                             order.status === ORDER_STATUS.DRAFT ? (
-                            <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1 max-w-fit flex items-start gap-2">
-                                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                            <div className="text-[11px] text-info-700 bg-info-50 border border-info-200 rounded-md px-2 py-1 max-w-fit flex items-start gap-2">
+                                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-info-600" />
                                 <span>
                                     Đơn đang ở trạng thái{" "}
                                     {ORDER_STATUS_LABEL[order.status]}. Hãy
@@ -1378,7 +1395,7 @@ function OrderFormModal({
                     {/* --- HÀNH TRÌNH --- */}
                     <section className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-4">
                         <div className="text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center gap-2">
-                            <MapPin className="h-3.5 w-3.5 text-amber-600" />
+                            <MapPin className="h-3.5 w-3.5 text-primary-600" />
                             Hành trình & Thời gian
                         </div>
 
@@ -1586,7 +1603,7 @@ function OrderFormModal({
                     {/* --- GIÁ / GIẢM GIÁ --- */}
                     <section className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-4">
                         <div className="text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center gap-2">
-                            <DollarSign className="h-3.5 w-3.5 text-amber-600" />
+                            <DollarSign className="h-3.5 w-3.5 text-primary-600" />
                             Báo giá
                         </div>
 
@@ -1614,7 +1631,7 @@ function OrderFormModal({
                                         {loadingPrice ? (
                                             <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />
                                         ) : (
-                                            <DollarSign className="h-3.5 w-3.5 text-amber-600" />
+                                            <DollarSign className="h-3.5 w-3.5 text-primary-600" />
                                         )}
                                         <span>Tính giá</span>
                                     </button>
@@ -2341,8 +2358,8 @@ export default function ConsultantOrdersPage() {
                             o.status ===
                             ORDER_STATUS.DRAFT
                     ) ? (
-                        <div className="flex items-start gap-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1 max-w-fit">
-                            <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                        <div className="flex items-start gap-2 text-[11px] text-info-700 bg-info-50 border border-info-200 rounded-md px-2 py-1 max-w-fit">
+                            <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-info-600" />
                             <span>
                                 Có đơn bị huỷ hoặc nháp. Hãy
                                 kiểm tra và chốt lại với
@@ -2353,7 +2370,8 @@ export default function ConsultantOrdersPage() {
                 </div>
 
                 {/* Nút tạo đơn hàng mới - góc trên bên phải */}
-                {!isManager && (
+                {/* Ẩn nút cho Manager và Accountant */}
+                {!isManager && !isAccountant && (
                     <button
                         className="rounded-md bg-sky-600 hover:bg-sky-500 text-white font-medium text-[13px] px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500/20 flex items-center gap-2 shrink-0"
                         onClick={handleCreate}
@@ -2456,21 +2474,21 @@ export default function ConsultantOrdersPage() {
                             
                             {/* Cảnh báo nếu đã đặt cọc */}
                             {cancelOrder.deposit_amount > 0 && (
-                                <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
+                                <div className="p-3 rounded-lg bg-info-50 border border-info-200">
                                     <div className="flex items-start gap-2">
-                                        <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                                        <div className="text-[12px] text-amber-800">
+                                        <AlertTriangle className="h-4 w-4 text-info-600 shrink-0 mt-0.5" />
+                                        <div className="text-[12px] text-info-800">
                                             <p className="font-semibold">Đơn hàng đã đặt cọc!</p>
                                             <p className="mt-1">
                                                 Số tiền cọc: <span className="font-medium">{new Intl.NumberFormat('vi-VN').format(cancelOrder.deposit_amount)}đ</span>
                                             </p>
-                                            <p className="mt-1">
-                                                Nếu hủy, tiền cọc có thể bị mất theo chính sách:
+                                            <p className="mt-1 font-medium text-rose-700">
+                                                ⚠️ Hủy đơn hàng sẽ mất tiền cọc theo chính sách:
                                             </p>
                                             <ul className="list-disc list-inside mt-1 text-[11px] space-y-0.5">
-                                                <li>Hủy &lt; 24h trước khởi hành: Mất 100% tiền cọc</li>
-                                                <li>Hủy &lt; 48h trước khởi hành: Mất 30% tiền cọc</li>
-                                                <li>Hủy &gt;= 48h trước khởi hành: Hoàn lại tiền cọc</li>
+                                                <li>Hủy &lt; 24h trước khởi hành: <span className="font-semibold text-rose-700">Mất 100% tiền cọc</span></li>
+                                                <li>Hủy &lt; 48h trước khởi hành: <span className="font-semibold text-rose-700">Mất 30% tiền cọc</span></li>
+                                                <li>Hủy &gt;= 48h trước khởi hành: <span className="font-semibold text-emerald-700">Hoàn lại 100% tiền cọc</span></li>
                                             </ul>
                                         </div>
                                     </div>

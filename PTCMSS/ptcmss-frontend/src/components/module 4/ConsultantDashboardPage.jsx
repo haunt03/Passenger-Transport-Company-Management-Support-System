@@ -73,7 +73,7 @@ function StatCard({ icon, label, value, sub, colorClass }) {
                     className={cls(
                         "h-9 w-9 rounded-lg flex items-center justify-center text-[13px] font-semibold",
                         // colorClass tuỳ theo thẻ: dùng nền nhạt + ring mảnh
-                        colorClass || "bg-amber-50 text-amber-700 ring-1 ring-emerald-200"
+                        colorClass || "bg-info-50 text-info-700 ring-1 ring-emerald-200"
                     )}
                 >
                     {icon}
@@ -130,7 +130,7 @@ function QueueRow({ order, onClick }) {
                 {/* Lộ trình */}
                 <div className="flex flex-col">
                     <div className="text-slate-500 text-[11px] uppercase tracking-wide flex items-center gap-1">
-                        <MapPin className="h-3.5 w-3.5 text-amber-600" />
+                        <MapPin className="h-3.5 w-3.5 text-primary-600" />
                         Lộ trình
                     </div>
                     <div className="text-slate-900 font-medium leading-relaxed">
@@ -141,7 +141,7 @@ function QueueRow({ order, onClick }) {
                 {/* Trạng thái */}
                 <div className="flex flex-col">
                     <div className="text-slate-500 text-[11px] uppercase tracking-wide flex items-center gap-1">
-                        <CheckCircle2 className="h-3.5 w-3.5 text-amber-600" />
+                        <CheckCircle2 className="h-3.5 w-3.5 text-primary-600" />
                         Trạng thái
                     </div>
                     <div className="text-slate-900 font-medium leading-relaxed">
@@ -305,14 +305,14 @@ export default function ConsultantDashboardPage() {
                     label="Đơn chờ báo giá"
                     value={stats.pending_quotes}
                     sub="Cần phản hồi sớm"
-                    colorClass="bg-amber-50 text-amber-700 ring-1 ring-amber-200"
+                    colorClass="bg-info-50 text-info-700 ring-1 ring-info-200"
                 />
                 <StatCard
                     icon={<CheckCircle2 className="h-4 w-4" />}
                     label="Đơn đã xác nhận"
                     value={stats.confirmed_orders}
                     sub="Trong tháng này"
-                    colorClass="bg-amber-50 text-amber-700 ring-1 ring-emerald-200"
+                    colorClass="bg-info-50 text-info-700 ring-1 ring-emerald-200"
                 />
                 <StatCard
                     icon={<DollarSign className="h-4 w-4" />}

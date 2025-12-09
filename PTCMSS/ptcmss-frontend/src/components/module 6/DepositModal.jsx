@@ -391,7 +391,7 @@ export default function DepositModal({
                                 <span className="text-slate-500">
                                     Còn lại:
                                 </span>{" "}
-                                <span className="tabular-nums text-amber-700 font-medium">
+                                <span className="tabular-nums text-info-700 font-medium">
                                     {fmtVND(remaining)} đ
                                 </span>
                             </div>

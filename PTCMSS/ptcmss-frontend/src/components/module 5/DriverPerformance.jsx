@@ -31,7 +31,7 @@ const DriverPerformance = ({ driverId }) => {
                     <Star
                         key={star}
                         size={16}
-                        className={star <= value ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
+                        className={star <= value ? 'fill-primary-500 text-primary-500' : 'text-gray-300'}
                     />
                 ))}
                 <span className="ml-2 text-sm font-semibold text-gray-700">
@@ -60,7 +60,7 @@ const DriverPerformance = ({ driverId }) => {
     const criteria = [
         { key: 'avgPunctuality', label: 'Đúng giờ', icon: '⏰', color: 'blue' },
         { key: 'avgAttitude', label: 'Thái độ', icon: '😊', color: 'green' },
-        { key: 'avgSafety', label: 'An toàn', icon: '🛡️', color: 'yellow' },
+        { key: 'avgSafety', label: 'An toàn', icon: '🛡️', color: 'blue' },
         { key: 'avgCompliance', label: 'Tuân thủ', icon: '✅', color: 'purple' },
     ];
 

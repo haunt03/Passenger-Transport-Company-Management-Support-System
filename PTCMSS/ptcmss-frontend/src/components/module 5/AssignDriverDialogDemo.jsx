@@ -3,7 +3,7 @@ import AssignDriverDialog from "./AssignDriverDialog.jsx";
 
 /**
  * Demo component để test AssignDriverDialog
- *
+ * 
  * Cách sử dụng:
  * 1. Import vào AppLayout.jsx hoặc route
  * 2. Truy cập /dispatch/assign-demo
@@ -40,7 +40,7 @@ export default function AssignDriverDialogDemo() {
                     <div className="space-y-4">
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                             <h2 className="font-semibold text-blue-900 mb-2">
-                                Thông tin chuyến (Mock)
+                                 Thông tin chuyến (Mock)
                             </h2>
                             <div className="text-sm text-blue-800 space-y-1">
                                 <div>Trip ID: {mockOrder.tripId}</div>
@@ -52,11 +52,11 @@ export default function AssignDriverDialogDemo() {
                             </div>
                         </div>
 
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                            <h2 className="font-semibold text-amber-900 mb-2">
-                                Lưu ý
+                        <div className="bg-info-50 border border-info-200 rounded-lg p-4">
+                            <h2 className="font-semibold text-info-900 mb-2">
+                                 Lưu ý
                             </h2>
-                            <ul className="text-sm text-amber-800 space-y-1 list-disc list-inside">
+                            <ul className="text-sm text-info-800 space-y-1 list-disc list-inside">
                                 <li>Cần có trip ID và booking ID thật trong database</li>
                                 <li>Cần đăng nhập với role ADMIN/MANAGER/COORDINATOR</li>
                                 <li>Backend phải đang chạy tại localhost:8080</li>
@@ -74,7 +74,7 @@ export default function AssignDriverDialogDemo() {
                         {result && (
                             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                                 <h2 className="font-semibold text-green-900 mb-2">
-                                    Kết quả gán
+                                     Kết quả gán
                                 </h2>
                                 <pre className="text-xs text-green-800 overflow-auto">
                                     {JSON.stringify(result, null, 2)}
@@ -84,7 +84,7 @@ export default function AssignDriverDialogDemo() {
 
                         <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
                             <h2 className="font-semibold text-slate-900 mb-2">
-                                Hướng dẫn test
+                                 Hướng dẫn test
                             </h2>
                             <ol className="text-sm text-slate-700 space-y-2 list-decimal list-inside">
                                 <li>

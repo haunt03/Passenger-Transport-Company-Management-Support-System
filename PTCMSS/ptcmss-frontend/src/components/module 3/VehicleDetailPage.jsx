@@ -106,9 +106,9 @@ function VehicleStatusBadge({ status }) {
         );
     } else if (status === "MAINTENANCE") {
         classes =
-            "bg-amber-50 text-amber-700 border-amber-200";
+            "bg-info-50 text-info-700 border-info-200";
         IconEl = (
-            <Wrench className="h-3.5 w-3.5 text-amber-600" />
+            <Wrench className="h-3.5 w-3.5 text-primary-600" />
         );
     } else if (status === "INACTIVE") {
         classes =
@@ -474,7 +474,7 @@ function VehicleProfileTab({ form, setForm, onSave, dirty, readOnly = false, isC
                     </div>
 
                     <div className="flex items-center gap-1 text-slate-600">
-                        <Wrench className="h-3.5 w-3.5 text-amber-500" />
+                        <Wrench className="h-3.5 w-3.5 text-info-500" />
                         <span>
                             Trạng thái:{" "}
                             <span className="text-slate-800 font-medium">
@@ -576,7 +576,7 @@ function TripHistoryTab({ trips }) {
                                     </td>
                                     <td className="px-3 py-2 text-slate-700">
                                         <div className="flex items-start gap-1 text-[12px] leading-relaxed">
-                                            <MapPin className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                                            <MapPin className="h-3.5 w-3.5 text-primary-600 shrink-0" />
                                             <span>{t.pickup}</span>
                                         </div>
                                     </td>
@@ -672,7 +672,7 @@ function ExpenseHistoryTab({ expenses }) {
             <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-4 space-y-4">
                 {/* header */}
                 <div className="flex items-center gap-2 text-slate-800 font-medium text-[13px]">
-                    <Wrench className="h-4 w-4 text-amber-600" />
+                    <Wrench className="h-4 w-4 text-primary-600" />
                     <span>
                         Chi phí & bảo trì ({expenses.length})
                     </span>
@@ -709,7 +709,7 @@ function ExpenseHistoryTab({ expenses }) {
                                             {e.type === "FUEL" ? (
                                                 <Fuel className="h-3.5 w-3.5 text-sky-600" />
                                             ) : (
-                                                <Wrench className="h-3.5 w-3.5 text-amber-600" />
+                                                <Wrench className="h-3.5 w-3.5 text-primary-600" />
                                             )}
                                             <span className="font-medium text-slate-900">
                                                 {e.type_label}
@@ -944,15 +944,16 @@ export default function VehicleDetailPage() {
             console.log("🔍 [VehicleDetailPage] Parsed expenses:", expenses);
             
             // Map backend data to frontend format
+            // costType đã bị xóa - có thể null cho Invoices, chỉ ExpenseRequests có expenseType
             const mappedExpenses = expenses.map((e) => ({
                 id: e.expenseId || e.id,
                 date: e.expenseDate || e.date || e.expense_date,
-                type: e.costType || e.type,
-                type_label: e.costType === "FUEL" ? "Xăng dầu" :
-                    e.costType === "TOLL" ? "Cầu đường" :
-                        e.costType === "REPAIR" ? "Sửa chữa" :
-                            e.costType === "MAINTENANCE" ? "Bảo trì" :
-                                e.type_label || e.costType || "Khác",
+                type: e.costType || e.expenseType || e.type || "OTHER",
+                type_label: (e.costType || e.expenseType) === "FUEL" ? "Xăng dầu" :
+                    (e.costType || e.expenseType) === "TOLL" ? "Cầu đường" :
+                        (e.costType || e.expenseType) === "REPAIR" ? "Sửa chữa" :
+                            (e.costType || e.expenseType) === "MAINTENANCE" ? "Bảo trì" :
+                                e.type_label || e.costType || e.expenseType || "Khác",
                 note: e.description || e.note || "—",
                 amount: e.amount || 0,
             }));

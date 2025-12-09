@@ -92,7 +92,7 @@ function RequestCard({ request }) {
         PENDING: {
             icon: Clock,
             label: "Chờ duyệt",
-            color: "bg-amber-100 text-amber-700",
+            color: "bg-info-100 text-info-700",
         },
         APPROVED: {
             icon: CheckCircle2,
@@ -118,8 +118,8 @@ function RequestCard({ request }) {
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-start justify-between gap-3 mb-3">
                 <div className="flex items-center gap-2">
-                    <div className="h-10 w-10 rounded-lg bg-amber-50 flex items-center justify-center">
-                        <DollarSign className="h-5 w-5 text-amber-600" />
+                    <div className="h-10 w-10 rounded-lg bg-info-50 flex items-center justify-center">
+                        <DollarSign className="h-5 w-5 text-primary-600" />
                     </div>
                     <div>
                         <div className="text-sm font-semibold text-slate-900">
@@ -140,10 +140,10 @@ function RequestCard({ request }) {
             <div className="space-y-2 text-sm text-slate-700">
                 <div className="flex items-center gap-2">
                     <span className="inline-flex items-center gap-1 text-slate-500">
-                        <DollarSign className="h-3.5 w-3.5 text-amber-500" />
+                        <DollarSign className="h-3.5 w-3.5 text-info-500" />
                         Số tiền:
                     </span>
-                    <span className="font-semibold text-amber-700">
+                    <span className="font-semibold text-info-700">
                         {Number(request.amount || 0).toLocaleString("vi-VN")}đ
                     </span>
                 </div>
@@ -540,7 +540,7 @@ export default function CoordinatorExpenseManagementPage() {
                     <FileText className="h-4 w-4" />
                     Danh sách yêu cầu
                     {stats.pending > 0 && (
-                        <span className="px-1.5 py-0.5 text-xs bg-amber-500 text-white rounded-full">
+                        <span className="px-1.5 py-0.5 text-xs bg-info-500 text-white rounded-full">
                             {stats.pending}
                         </span>
                     )}
@@ -767,9 +767,9 @@ export default function CoordinatorExpenseManagementPage() {
                                 <div className="text-sm text-slate-600 mb-1">Tổng yêu cầu</div>
                                 <div className="text-2xl font-bold text-slate-900">{stats.total}</div>
                             </div>
-                            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
-                                <div className="text-sm text-amber-700 mb-1">Chờ duyệt</div>
-                                <div className="text-2xl font-bold text-amber-700">{stats.pending}</div>
+                            <div className="rounded-xl border border-info-200 bg-info-50 p-4 shadow-sm">
+                                <div className="text-sm text-info-700 mb-1">Chờ duyệt</div>
+                                <div className="text-2xl font-bold text-info-700">{stats.pending}</div>
                             </div>
                             <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
                                 <div className="text-sm text-emerald-700 mb-1">Đã duyệt</div>

@@ -95,7 +95,7 @@ function Toasts({ toasts }) {
           key={t.id}
           className={cls(
             "rounded-lg px-3 py-2 text-sm border shadow bg-white",
-            t.kind === "success" && "bg-amber-50 border-amber-200 text-amber-700",
+            t.kind === "success" && "bg-info-50 border-info-200 text-info-700",
             t.kind === "error" && "bg-rose-50 border-rose-200 text-rose-700",
             t.kind === "info" && "bg-blue-50 border-blue-200 text-blue-700"
           )}
@@ -150,8 +150,8 @@ function StatusChip({ status }) {
     },
     COMPLETED: {
       label: "Hoàn thành",
-      cls: "bg-amber-50 text-amber-700 border-amber-200",
-      icon: <CheckCircle2 className="h-3.5 w-3.5 text-amber-500" />,
+      cls: "bg-info-50 text-info-700 border-info-200",
+      icon: <CheckCircle2 className="h-3.5 w-3.5 text-info-500" />,
     },
   };
   const info = map[status] || map.NOT_STARTED;
@@ -180,7 +180,7 @@ function ProgressSteps({ status }) {
               <div
                 className={cls(
                   "h-6 w-6 flex items-center justify-center rounded-full text-[11px] font-semibold border shadow-sm",
-                  done ? "bg-amber-50 border-amber-300 text-amber-700" : "bg-white border-slate-300 text-slate-400"
+                  done ? "bg-info-50 border-info-300 text-info-700" : "bg-white border-slate-300 text-slate-400"
                 )}
               >
                 {idx + 1}
@@ -205,7 +205,7 @@ function TripMetaCard({ trip }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-4 shadow-inner">
       <div className="text-[11px] uppercase tracking-wide text-slate-500 flex items-center gap-2 font-medium">
-        <StickyNote className="h-3.5 w-3.5 text-amber-500" />
+        <StickyNote className="h-3.5 w-3.5 text-info-500" />
         Thông tin chung
       </div>
       <div className="grid gap-3 text-sm text-slate-700">
@@ -254,7 +254,7 @@ function TripMetaCard({ trip }) {
         {trip.booking_note && (
           <div>
             <div className="text-xs text-slate-500">Ghi chú đơn hàng</div>
-            <div className="text-slate-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-[13px] leading-relaxed">
+            <div className="text-slate-800 bg-info-50 border border-info-200 rounded-lg px-3 py-2 text-[13px] leading-relaxed">
               {trip.booking_note}
             </div>
           </div>
@@ -291,14 +291,14 @@ function RouteCard({ pickupLocation, dropoffLocation, pickupTime, dropoffTime, h
       <div className="flex flex-col md:flex-row md:items-start gap-6">
         <div className="flex-1 flex gap-3">
           <div className="flex flex-col items-center">
-            <div className="h-3 w-3 rounded-full bg-amber-500" />
+            <div className="h-3 w-3 rounded-full bg-info-500" />
             <div className="flex-1 w-px bg-slate-300" />
             <div className="h-3 w-3 rounded-full bg-rose-500" />
           </div>
           <div className="space-y-6 text-sm text-slate-700">
             <div>
               <div className="text-[11px] text-slate-500 mb-1 flex items-center gap-1 font-medium">
-                <MapPin className="h-3.5 w-3.5 text-amber-600" />
+                <MapPin className="h-3.5 w-3.5 text-primary-600" />
                 Điểm đón
               </div>
               <div className="font-semibold text-slate-900">{pickupLocation || "—"}</div>
@@ -321,7 +321,7 @@ function RouteCard({ pickupLocation, dropoffLocation, pickupTime, dropoffTime, h
             </div>
           </div>
         </div>
-        <div className="rounded-xl border border-amber-200 bg-amber-50 text-amber-800 p-3 text-xs flex items-start gap-2">
+        <div className="rounded-xl border border-info-200 bg-info-50 text-info-800 p-3 text-xs flex items-start gap-2">
           <AlertTriangle className="h-4 w-4" />
           <div className="flex-1">
             <div className="font-medium mb-1">
@@ -334,7 +334,7 @@ function RouteCard({ pickupLocation, dropoffLocation, pickupTime, dropoffTime, h
             </div>
             <span>Đến điểm đón đúng giờ và gọi khách trước ~10 phút.</span>
             {isRoundTrip && (
-              <div className="mt-1 text-[11px] text-amber-700">
+              <div className="mt-1 text-[11px] text-info-700">
                 ⚠️ Sau khi đến điểm đến, quay lại điểm đón ban đầu.
               </div>
             )}
@@ -528,7 +528,7 @@ export default function DriverTripDetailPage() {
             <div className="flex-1 flex flex-col gap-2">
               <div className="flex flex-wrap items-start gap-3">
                 <div className="text-2xl font-semibold text-slate-900 flex items-center gap-2 leading-tight">
-                  <Flag className="h-6 w-6 text-amber-600" />
+                  <Flag className="h-6 w-6 text-primary-600" />
                   <span>Chi tiết chuyến</span>
                 </div>
                 <StatusChip status={trip.status} />
@@ -545,7 +545,7 @@ export default function DriverTripDetailPage() {
                 </div>
                 <div className="hidden sm:block text-slate-300">·</div>
                 <div className="flex items-center gap-1">
-                  <CarFront className="h-3.5 w-3.5 text-amber-600" />
+                  <CarFront className="h-3.5 w-3.5 text-primary-600" />
                   <span className="text-slate-700">
                     {trip.vehicle_plate} {trip.vehicle_type ? `· ${trip.vehicle_type}` : ""}
                   </span>
@@ -570,8 +570,8 @@ export default function DriverTripDetailPage() {
 
               {/* Đã hoàn thành - chỉ hiển thị badge */}
               {isCompleted && (
-                <div className="rounded-xl border border-amber-300 bg-amber-50 text-amber-700 text-xs font-medium px-4 py-2 flex items-center gap-2 justify-center shadow-sm">
-                  <CheckCircle2 className="h-4 w-4 text-amber-600" />
+                <div className="rounded-xl border border-info-300 bg-info-50 text-info-700 text-xs font-medium px-4 py-2 flex items-center gap-2 justify-center shadow-sm">
+                  <CheckCircle2 className="h-4 w-4 text-primary-600" />
                   Đã hoàn thành chuyến
                 </div>
               )}
@@ -617,7 +617,7 @@ export default function DriverTripDetailPage() {
                   onClick={() => setExpenseOpen(true)}
                   className="rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm text-slate-700 px-4 py-2 flex items-center justify-center gap-2 shadow-sm"
                 >
-                  <BadgeDollarSign className="h-4 w-4 text-amber-600" />
+                  <BadgeDollarSign className="h-4 w-4 text-primary-600" />
                   <span>Báo cáo chi phí</span>
                 </button>
               )}
@@ -658,9 +658,9 @@ export default function DriverTripDetailPage() {
                   <div className="text-[11px] text-emerald-600 mb-1">Đã cọc</div>
                   <div className="text-lg font-bold text-emerald-700 tabular-nums">{fmtVND(trip.deposit_amount)} đ</div>
                 </div>
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-center">
-                  <div className="text-[11px] text-amber-600 mb-1">Còn lại</div>
-                  <div className="text-lg font-bold text-amber-700 tabular-nums">{fmtVND(trip.remaining_amount)} đ</div>
+                <div className="rounded-xl border border-info-200 bg-info-50 p-3 text-center">
+                  <div className="text-[11px] text-primary-600 mb-1">Còn lại</div>
+                  <div className="text-lg font-bold text-info-700 tabular-nums">{fmtVND(trip.remaining_amount)} đ</div>
                 </div>
               </div>
             </div>
@@ -668,9 +668,9 @@ export default function DriverTripDetailPage() {
 
           {/* Card đánh giá - chỉ hiển thị khi chuyến đã hoàn thành và có rating */}
           {trip.status === "COMPLETED" && trip.rating > 0 && (
-            <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-inner">
-              <div className="text-[11px] uppercase tracking-wide text-amber-700 flex items-center gap-2 font-medium mb-3">
-                <Star className="h-3.5 w-3.5 text-amber-600 fill-amber-600" />
+            <div className="mt-5 rounded-2xl border border-info-200 bg-info-50 p-4 shadow-inner">
+              <div className="text-[11px] uppercase tracking-wide text-info-700 flex items-center gap-2 font-medium mb-3">
+                <Star className="h-3.5 w-3.5 text-primary-600 fill-amber-600" />
                 Đánh giá từ khách hàng
               </div>
               <div className="flex flex-col gap-3">
@@ -682,16 +682,16 @@ export default function DriverTripDetailPage() {
                         className={cls(
                           "h-5 w-5",
                           star <= Math.round(trip.rating)
-                            ? "text-amber-500 fill-amber-500"
+                            ? "text-info-500 fill-amber-500"
                             : "text-slate-300"
                         )}
                       />
                     ))}
                   </div>
-                  <span className="text-lg font-bold text-amber-700">{trip.rating.toFixed(1)}</span>
+                  <span className="text-lg font-bold text-info-700">{trip.rating.toFixed(1)}</span>
                 </div>
                 {trip.rating_comment && (
-                  <div className="rounded-lg border border-amber-200 bg-white p-3 text-sm text-slate-700 leading-relaxed">
+                  <div className="rounded-lg border border-info-200 bg-white p-3 text-sm text-slate-700 leading-relaxed">
                     <div className="text-xs text-slate-500 mb-1 font-medium">Nhận xét:</div>
                     <div>{trip.rating_comment}</div>
                   </div>

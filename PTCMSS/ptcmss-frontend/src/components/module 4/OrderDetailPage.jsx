@@ -89,11 +89,11 @@ const ORDER_STATUS_LABEL = {
 const ORDER_STATUS_STYLE_LIGHT = {
     DRAFT: "ring-1 ring-slate-300 bg-slate-100 text-slate-700",
     PENDING:
-        "ring-1 ring-amber-200 bg-amber-50 text-amber-700",
+        "ring-1 ring-info-200 bg-info-50 text-info-700",
     ASSIGNED:
         "ring-1 ring-sky-200 bg-sky-50 text-sky-700",
     COMPLETED:
-        "ring-1 ring-emerald-200 bg-amber-50 text-amber-700",
+        "ring-1 ring-emerald-200 bg-emerald-50 text-emerald-700",
     CANCELLED:
         "ring-1 ring-rose-200 bg-rose-50 text-rose-700",
 };
@@ -134,7 +134,7 @@ function Toasts({ toasts }) {
                     className={cls(
                         "rounded-md px-3 py-2 shadow-sm border bg-white text-slate-700",
                         t.kind === "success" &&
-                        "border-amber-200 bg-amber-50 text-amber-700",
+                        "border-info-200 bg-info-50 text-info-700",
                         t.kind === "error" &&
                         "border-rose-200 bg-rose-50 text-rose-700",
                         t.kind === "info" &&
@@ -213,7 +213,7 @@ function TripInfoCard({ trip, hireTypeName, useHighway }) {
     return (
         <div className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-4 shadow-sm">
             <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                <MapPin className="h-4 w-4 text-amber-600" />
+                <MapPin className="h-4 w-4 text-primary-600" />
                 Thông tin lịch trình
             </div>
 
@@ -247,7 +247,7 @@ function TripInfoCard({ trip, hireTypeName, useHighway }) {
                     <div className="flex gap-3">
                         {/* timeline dots */}
                         <div className="flex flex-col items-center">
-                            <div className="h-3 w-3 rounded-full bg-amber-500" />
+                            <div className="h-3 w-3 rounded-full bg-primary-500" />
                             <div className="flex-1 w-px bg-slate-300" />
                             <div className="h-3 w-3 rounded-full bg-rose-500" />
                         </div>
@@ -256,7 +256,7 @@ function TripInfoCard({ trip, hireTypeName, useHighway }) {
                             {/* Pickup */}
                             <div>
                                 <div className="mb-1 flex items-center gap-1 text-[12px] text-slate-500">
-                                    <MapPin className="h-3.5 w-3.5 text-amber-600" />
+                                    <MapPin className="h-3.5 w-3.5 text-primary-600" />
                                     <span>Điểm đón</span>
                                 </div>
                                 <div className="font-medium text-slate-900 leading-relaxed">
@@ -310,7 +310,7 @@ function TripInfoCard({ trip, hireTypeName, useHighway }) {
                         </div>
 
                         <div className="flex items-start gap-2">
-                            <CarFront className="h-4 w-4 text-amber-600 mt-0.5" />
+                            <CarFront className="h-4 w-4 text-primary-600 mt-0.5" />
                             <div className="flex flex-col">
                                 <span className="text-slate-600 mb-1">Xe: {trip.vehicle_count > 0 && <span className="text-slate-500">({trip.vehicle_count} xe)</span>}</span>
                                 {trip.vehicle_details && trip.vehicle_details.length > 0 ? (
@@ -328,9 +328,9 @@ function TripInfoCard({ trip, hireTypeName, useHighway }) {
                 </div>
 
                 {/* box nhắc nhở */}
-                <div className="lg:w-[200px] shrink-0 rounded-xl border border-amber-200 bg-amber-50 p-3 text-[12px] text-amber-800 space-y-2 h-fit">
+                <div className="lg:w-[200px] shrink-0 rounded-xl border border-info-200 bg-info-50 p-3 text-[12px] text-info-800 space-y-2 h-fit">
                     <div className="flex items-start gap-2 leading-relaxed">
-                        <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                        <AlertTriangle className="h-4 w-4 text-info-600 shrink-0" />
                         <div>
                             Hãy gọi xác nhận với khách{" "}
                             <span className="font-semibold text-slate-900">
@@ -350,7 +350,7 @@ function QuoteInfoCard({ quote }) {
     return (
         <div className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-4 shadow-sm">
             <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                <DollarSign className="h-4 w-4 text-amber-600" />
+                <DollarSign className="h-4 w-4 text-primary-600" />
                 Báo giá
             </div>
 
@@ -388,8 +388,8 @@ function QuoteInfoCard({ quote }) {
                     <div className="text-[11px] uppercase tracking-wide font-medium text-slate-500">
                         Giá cuối báo khách
                     </div>
-                    <div className="text-base font-semibold tabular-nums flex items-center gap-1 text-amber-600">
-                        <DollarSign className="h-4 w-4 text-amber-600" />
+                    <div className="text-base font-semibold tabular-nums flex items-center gap-1 text-primary-600">
+                        <DollarSign className="h-4 w-4 text-primary-600" />
                         <span>
                             {fmtVND(
                                 quote.final_price
@@ -403,14 +403,36 @@ function QuoteInfoCard({ quote }) {
 }
 
 /* 4. Thanh toán / Cọc */
-function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr, isConsultant = false, isCoordinator = false }) {
+function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr, isConsultant = false, isCoordinator = false, pickupTime = null }) {
     const remain = Math.max(0, Number(payment.remaining || 0));
     const paid = Math.max(0, Number(payment.paid || 0));
+    
+    // Kiểm tra xem đơn hàng đã quá thời gian bắt đầu chưa
+    const isStartTimePassed = React.useMemo(() => {
+        if (!pickupTime) return false; // Không có thời gian thì coi như chưa quá
+        
+        try {
+            // Parse ngày giống như fmtDateTime: replace space thành T để parse đúng ISO format
+            const safe = String(pickupTime).replace(" ", "T");
+            const pickupDate = new Date(safe);
+            const now = new Date();
+            
+            // Kiểm tra xem parse có thành công không
+            if (!isNaN(pickupDate.getTime())) {
+                // Nếu thời gian bắt đầu đã qua (nhỏ hơn hoặc bằng thời gian hiện tại)
+                return pickupDate <= now;
+            }
+        } catch (e) {
+            console.error("Error parsing pickup time:", e);
+        }
+        
+        return false; // Nếu parse lỗi thì coi như chưa quá
+    }, [pickupTime]);
 
     return (
         <div className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-4 shadow-sm">
             <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                <BadgeDollarSign className="h-4 w-4 text-amber-600" />
+                <BadgeDollarSign className="h-4 w-4 text-primary-600" />
                 Thanh toán / Cọc
             </div>
 
@@ -445,8 +467,12 @@ function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr, i
                 </div>
             )}
 
-            {/* Nút hành động - Chỉ hiển thị khi còn tiền chưa thanh toán và không phải Coordinator */}
-            {remain > 0 && !isCoordinator && (
+            {/* Nút hành động - Chỉ hiển thị khi:
+                1. Còn tiền chưa thanh toán
+                2. Không phải Coordinator
+                3. Chưa quá thời gian bắt đầu
+            */}
+            {remain > 0 && !isCoordinator && !isStartTimePassed && (
                 <>
                     <div className="grid grid-cols-2 gap-3">
                         <button
@@ -475,10 +501,18 @@ function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr, i
                 </>
             )}
             
+            {/* Thông báo khi đơn đã quá thời gian bắt đầu */}
+            {remain > 0 && !isCoordinator && isStartTimePassed && (
+                <div className="rounded-lg border border-info-200 bg-info-50 px-3 py-2 text-[12px] text-info-700 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-info-600 shrink-0" />
+                    <span>Đơn hàng đã quá thời gian bắt đầu. Không thể đặt cọc hoặc tạo QR thanh toán.</span>
+                </div>
+            )}
+            
             {/* Thông báo cho Coordinator khi còn tiền chưa thanh toán */}
             {remain > 0 && isCoordinator && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-700 flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                <div className="rounded-lg border border-info-200 bg-info-50 px-3 py-2 text-[12px] text-info-700 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-info-600 shrink-0" />
                     <span>Điều phối viên không có quyền tạo request thanh toán. Vui lòng liên hệ kế toán hoặc tư vấn viên.</span>
                 </div>
             )}
@@ -505,7 +539,7 @@ function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr, i
                                             item.paymentStatus === "PAID"
                                                 ? "bg-emerald-100 text-emerald-700"
                                                 : item.paymentStatus === "PENDING"
-                                                ? "bg-amber-100 text-amber-700"
+                                                ? "bg-info-100 text-info-700"
                                                 : "bg-slate-100 text-slate-700"
                                         )}
                                     >
@@ -686,7 +720,7 @@ function QrPaymentModal({
                                     : `Thanh toán ${bookingCode || "ORD"} - ${customerName || "Khách hàng"}`;
                                 setNote(autoNote);
                             }}
-                            className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                            className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
                         />
                         Đánh dấu là khoản đặt cọc
                     </label>
@@ -845,8 +879,8 @@ function DispatchInfoCard({ dispatch, dispatchList = [], onAssignClick, showAssi
                     Thông tin điều phối
                 </div>
 
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-[12px] text-amber-800 flex items-start gap-2 leading-relaxed">
-                    <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                <div className="rounded-xl border border-info-200 bg-info-50 p-4 text-[12px] text-info-800 flex items-start gap-2 leading-relaxed">
+                    <AlertTriangle className="h-4 w-4 text-info-600 shrink-0" />
                     <div>
                         Chưa gán tài xế/xe. Đơn đang chờ điều phối hoặc chưa xác nhận.
                     </div>
@@ -950,7 +984,7 @@ function DispatchInfoCard({ dispatch, dispatchList = [], onAssignClick, showAssi
                                 {displayList[0]?.vehicle_plate || dispatch?.vehicle_plate || "—"}
                             </div>
                             <div className="text-[11px] text-slate-500 flex items-center gap-1 leading-relaxed">
-                                <CarFront className="h-3.5 w-3.5 text-amber-600" />
+                                <CarFront className="h-3.5 w-3.5 text-primary-600" />
                                 <span>
                                     Xe đã gán cho
                                     chuyến
@@ -964,8 +998,8 @@ function DispatchInfoCard({ dispatch, dispatchList = [], onAssignClick, showAssi
                                 Trạng thái điều
                                 phối
                             </div>
-                            <div className="text-sm font-medium text-amber-700 flex items-center gap-2">
-                                <CheckCircle2 className="h-4 w-4 text-amber-600" />
+                            <div className="text-sm font-medium text-info-700 flex items-center gap-2">
+                                <CheckCircle2 className="h-4 w-4 text-info-600" />
                                 <span>
                                     Đã phân xe
                                 </span>
@@ -980,9 +1014,9 @@ function DispatchInfoCard({ dispatch, dispatchList = [], onAssignClick, showAssi
                     
                     {/* Nút gán cho xe còn lại nếu có trips chưa gán */}
                     {unassignedCount > 0 && showAssignButton && (
-                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 flex items-center justify-between">
-                            <div className="flex items-center gap-2 text-[12px] text-amber-800">
-                                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                        <div className="rounded-xl border border-info-200 bg-info-50 p-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-[12px] text-info-800">
+                                <AlertTriangle className="h-4 w-4 text-info-600 shrink-0" />
                                 <span>
                                     Còn {unassignedCount} chuyến chưa gán tài xế/xe
                                 </span>
@@ -1001,9 +1035,9 @@ function DispatchInfoCard({ dispatch, dispatchList = [], onAssignClick, showAssi
             
             {/* Nút gán cho xe còn lại nếu có nhiều xe và còn trips chưa gán */}
             {displayList.length > 1 && unassignedCount > 0 && showAssignButton && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-[12px] text-amber-800">
-                        <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                <div className="rounded-xl border border-info-200 bg-info-50 p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-[12px] text-info-800">
+                        <AlertTriangle className="h-4 w-4 text-info-600 shrink-0" />
                         <span>
                             Còn {unassignedCount} chuyến chưa gán tài xế/xe
                         </span>
@@ -1281,7 +1315,7 @@ export default function OrderDetailPage() {
                     {/* title row */}
                     <div className="flex flex-wrap items-start gap-3">
                         <div className="text-[20px] font-semibold text-slate-900 flex items-center gap-2">
-                            <ClipboardList className="h-6 w-6 text-amber-600" />
+                            <ClipboardList className="h-6 w-6 text-primary-600" />
                             <span>
                                 Đơn hàng {order.code}
                             </span>
@@ -1293,7 +1327,7 @@ export default function OrderDetailPage() {
                     {/* meta row */}
                     <div className="flex flex-wrap items-center gap-3 text-[12px] text-slate-600 leading-relaxed">
                         <div className="flex items-center gap-1">
-                            <MapPin className="h-3.5 w-3.5 text-amber-600" />
+                            <MapPin className="h-3.5 w-3.5 text-primary-600" />
                             <span className="text-slate-700">
                                 {order.trip.pickup}{" "}
                                 <ChevronRight className="h-3 w-3 text-slate-400 inline-block" />{" "}
@@ -1322,7 +1356,7 @@ export default function OrderDetailPage() {
                         </div>
 
                         <div className="flex items-center gap-1 text-slate-700">
-                            <CarFront className="h-3.5 w-3.5 text-amber-600" />
+                            <CarFront className="h-3.5 w-3.5 text-primary-600" />
                             <span>
                                 {order.trip.vehicle_category} ·{" "}
                                 {order.trip.vehicle_count} xe
@@ -1333,8 +1367,8 @@ export default function OrderDetailPage() {
                     {/* cảnh báo nếu huỷ / nháp */}
                     {(order.status === "CANCELLED" ||
                         order.status === "DRAFT") && (
-                            <div className="flex max-w-fit items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] text-amber-700">
-                                <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                            <div className="flex max-w-fit items-start gap-2 rounded-md border border-info-200 bg-info-50 px-2 py-1 text-[11px] text-info-700">
+                                <AlertTriangle className="h-3.5 w-3.5 text-info-600 shrink-0" />
                                 <span className="leading-relaxed">
                                     Đơn chưa xác nhận. Cần
                                     chốt lại với khách.
@@ -1368,6 +1402,7 @@ export default function OrderDetailPage() {
                         onGenerateQr={openQrModal}
                         isConsultant={isConsultant}
                         isCoordinator={isCoordinator}
+                        pickupTime={order.trip?.pickup_time}
                     />
                 )}
             </div>
@@ -1384,7 +1419,7 @@ export default function OrderDetailPage() {
                 {/* ghi chú nội bộ */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-4 text-sm shadow-sm">
                     <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                        <AlertTriangle className="h-4 w-4 text-amber-600" />
+                        <AlertTriangle className="h-4 w-4 text-info-600" />
                         Ghi chú nội bộ
                     </div>
 

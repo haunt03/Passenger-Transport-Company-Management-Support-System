@@ -13,24 +13,24 @@ const fmtVND = (n) => new Intl.NumberFormat("vi-VN").format(Math.max(0, Number(n
  * @param {number} props.delta - Change percentage
  * @param {boolean} props.up - Trend direction
  * @param {string} props.icon - Icon component
- * @param {string} props.color - Theme color: 'blue' | 'green' | 'red' | 'yellow' | 'purple'
+ * @param {string} props.color - Theme color: 'blue' | 'green' | 'red' | 'info' | 'purple'
  */
 export default function KpiCard({
-                                    title,
-                                    value,
-                                    format = "currency",
-                                    delta,
-                                    up,
-                                    icon: Icon,
-                                    color = "blue",
-                                    subtitle,
-                                    loading = false,
-                                }) {
+    title,
+    value,
+    format = "currency",
+    delta,
+    up,
+    icon: Icon,
+    color = "blue",
+    subtitle,
+    loading = false,
+}) {
     const colorClasses = {
         blue: "bg-sky-50 text-sky-700 border-sky-200",
-        green: "bg-amber-50 text-amber-700 border-amber-200",
+        green: "bg-info-50 text-info-700 border-info-200",
         red: "bg-rose-50 text-rose-700 border-rose-200",
-        yellow: "bg-amber-50 text-amber-700 border-amber-200",
+        yellow: "bg-info-50 text-info-700 border-info-200",
         purple: "bg-purple-50 text-purple-700 border-purple-200",
     };
 
@@ -71,7 +71,7 @@ export default function KpiCard({
                     <div
                         className={cls(
                             "text-xs flex items-center gap-1 font-medium",
-                            up ? "text-amber-600" : "text-rose-600"
+                            up ? "text-primary-600" : "text-rose-600"
                         )}
                     >
                         {up ? (

@@ -61,10 +61,10 @@ const ORDER_STATUS_LABEL = {
 const ORDER_STATUS_STYLE_LIGHT = {
     DRAFT: "ring-1 ring-slate-300 bg-slate-100 text-slate-700",
     PENDING:
-        "ring-1 ring-amber-200 bg-amber-50 text-amber-700",
+        "ring-1 ring-info-200 bg-info-50 text-info-700",
     ASSIGNED: "ring-1 ring-sky-200 bg-sky-50 text-sky-700",
     COMPLETED:
-        "ring-1 ring-emerald-200 bg-amber-50 text-amber-700",
+        "ring-1 ring-emerald-200 bg-info-50 text-info-700",
     CANCELLED:
         "ring-1 ring-rose-200 bg-rose-50 text-rose-700",
 };
@@ -107,7 +107,7 @@ function Toasts({ toasts }) {
                     className={cls(
                         "rounded-md px-3 py-2 shadow-sm border bg-white text-slate-700",
                         t.kind === "success" &&
-                        "border-amber-200 bg-amber-50 text-amber-700",
+                        "border-info-200 bg-info-50 text-info-700",
                         t.kind === "error" &&
                         "border-rose-200 bg-rose-50 text-rose-700",
                         t.kind === "info" &&
@@ -1050,8 +1050,8 @@ export default function EditOrderPage() {
     }, [status, startTime]);
 
     const lockedBanner = !canEdit && lockedReason ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 text-amber-700 text-[12px] flex items-start gap-2 px-3 py-2">
-            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+        <div className="rounded-lg border border-info-200 bg-info-50 text-info-700 text-[12px] flex items-start gap-2 px-3 py-2">
+            <AlertTriangle className="h-4 w-4 text-primary-600 shrink-0" />
             <div className="leading-relaxed">
                 {lockedReason}
             </div>
@@ -1076,7 +1076,7 @@ export default function EditOrderPage() {
                         </button>
 
                         <div className="text-[20px] font-semibold text-slate-900 flex items-center gap-2">
-                            <DollarSign className="h-6 w-6 text-amber-600" />
+                            <DollarSign className="h-6 w-6 text-primary-600" />
                             <span>
                                 Chỉnh sửa đơn ORD-{orderId}
                             </span>
@@ -1242,7 +1242,7 @@ export default function EditOrderPage() {
                     {/* --- Báo giá --- */}
                     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                         <div className="text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center gap-2 mb-4">
-                            <DollarSign className="h-4 w-4 text-amber-600" />
+                            <DollarSign className="h-4 w-4 text-primary-600" />
                             Báo giá
                         </div>
 
@@ -1381,7 +1381,7 @@ export default function EditOrderPage() {
                     {/* --- Hành trình & xe --- */}
                     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                         <div className="text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center gap-2 mb-4">
-                            <CarFront className="h-4 w-4 text-amber-600" />
+                            <CarFront className="h-4 w-4 text-primary-600" />
                             Hành trình & loại xe
                         </div>
 
@@ -1609,7 +1609,7 @@ export default function EditOrderPage() {
                                 {checkingAvailability ? (
                                     <Loader2 className="h-4 w-4 text-slate-400 animate-spin" />
                                 ) : (
-                                    <CarFront className="h-4 w-4 text-amber-600" />
+                                    <CarFront className="h-4 w-4 text-primary-600" />
                                 )}
                                 <span>{checkingAvailability ? "Đang kiểm tra..." : "Kiểm tra xe"}</span>
                             </button>
@@ -1618,7 +1618,7 @@ export default function EditOrderPage() {
                                 <div className={cls(
                                     "text-[12px]",
                                     availabilityMsg.includes("✓") ? "text-emerald-600" : 
-                                    availabilityMsg.includes("⚠") ? "text-amber-600" : "text-slate-700"
+                                    availabilityMsg.includes("⚠") ? "text-primary-600" : "text-slate-700"
                                 )}>
                                     {availabilityMsg}
                                 </div>
@@ -1633,7 +1633,7 @@ export default function EditOrderPage() {
                     {/* Ghi chú cho tài xế */}
                     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                         <div className="text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center gap-2 mb-4">
-                            <FileText className="h-4 w-4 text-amber-600" />
+                            <FileText className="h-4 w-4 text-primary-600" />
                             Ghi chú cho tài xế
                         </div>
                         <textarea
@@ -1830,7 +1830,7 @@ export default function EditOrderPage() {
                                                         </div>
                                                         <span className={cls(
                                                             "text-[10px] px-1.5 py-0.5 rounded",
-                                                            v.status === "AVAILABLE" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                                                            v.status === "AVAILABLE" ? "bg-emerald-100 text-emerald-700" : "bg-info-100 text-info-700"
                                                         )}>
                                                             {v.status === "AVAILABLE" ? "Sẵn sàng" : v.status}
                                                         </span>
@@ -1881,7 +1881,7 @@ export default function EditOrderPage() {
                                     )}
                                 </div>
                                 {cooldownRemaining > 0 && (
-                                    <div className="mt-2 text-[11px] text-amber-600 flex items-center gap-1">
+                                    <div className="mt-2 text-[11px] text-primary-600 flex items-center gap-1">
                                         <Loader2 className="h-3 w-3 animate-spin" />
                                         Có thể thay đổi sau: {Math.floor(cooldownRemaining / 60000)}:{String(Math.floor((cooldownRemaining % 60000) / 1000)).padStart(2, '0')}
                                     </div>
@@ -1931,11 +1931,11 @@ export default function EditOrderPage() {
                 </div> */}
                 {/* <div className="text-[12px] text-slate-600">
                     Nếu trạng thái là{" "}
-                    <span className="text-amber-600 font-semibold">
+                    <span className="text-primary-600 font-semibold">
                         ASSIGNED
                     </span>{" "}
                     hoặc{" "}
-                    <span className="text-amber-600 font-semibold">
+                    <span className="text-primary-600 font-semibold">
                         COMPLETED
                     </span>
                     , chỉnh sửa phải thông qua điều

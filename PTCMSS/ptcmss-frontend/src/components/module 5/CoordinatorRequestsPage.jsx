@@ -54,8 +54,8 @@ function RequestCard({ request }) {
         PAYMENT: {
             icon: DollarSign,
             label: "Yêu cầu thanh toán",
-            color: "text-amber-600",
-            bgColor: "bg-amber-50",
+            color: "text-primary-600",
+            bgColor: "bg-info-50",
         },
     };
 
@@ -63,7 +63,7 @@ function RequestCard({ request }) {
         PENDING: {
             icon: Clock,
             label: "Chờ duyệt",
-            color: "bg-amber-100 text-amber-700",
+            color: "bg-info-100 text-info-700",
         },
         APPROVED: {
             icon: CheckCircle2,
@@ -126,10 +126,10 @@ function RequestCard({ request }) {
                         {/* Số tiền */}
                         <div className="flex items-center gap-2">
                             <span className="inline-flex items-center gap-1 text-slate-500">
-                                <DollarSign className="h-3.5 w-3.5 text-amber-500" />
+                                <DollarSign className="h-3.5 w-3.5 text-info-500" />
                                 Số tiền:
                             </span>
-                            <span className="font-semibold text-amber-700">
+                            <span className="font-semibold text-info-700">
                                 {Number(request.amount || 0).toLocaleString("vi-VN")}đ
                             </span>
                         </div>
@@ -327,9 +327,9 @@ export default function CoordinatorRequestsPage() {
                         <div className="text-sm text-slate-600 mb-1">Tổng yêu cầu</div>
                         <div className="text-2xl font-bold text-slate-900">{stats.total}</div>
                     </div>
-                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
-                        <div className="text-sm text-amber-700 mb-1">Chờ duyệt</div>
-                        <div className="text-2xl font-bold text-amber-700">{stats.pending}</div>
+                    <div className="rounded-xl border border-info-200 bg-info-50 p-4 shadow-sm">
+                        <div className="text-sm text-info-700 mb-1">Chờ duyệt</div>
+                        <div className="text-2xl font-bold text-info-700">{stats.pending}</div>
                     </div>
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
                         <div className="text-sm text-emerald-700 mb-1">Đã duyệt</div>

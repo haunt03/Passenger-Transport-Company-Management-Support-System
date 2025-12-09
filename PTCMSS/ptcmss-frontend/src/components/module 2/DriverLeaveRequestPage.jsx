@@ -250,10 +250,10 @@ export default function DriverLeaveRequestPage() {
                 </div>
 
                 {/* Note */}
-                <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                <div className="mt-4 p-4 bg-info-50 border border-info-200 rounded-xl">
                     <div className="flex items-start gap-2">
-                        <Info className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                        <p className="text-xs text-amber-900 leading-relaxed">
+                        <Info className="h-4 w-4 text-primary-600 flex-shrink-0 mt-0.5" />
+                        <p className="text-xs text-info-900 leading-relaxed">
                             Lưu ý: Nếu bạn có chuyến đã gán trong khoảng thời gian xin nghỉ, điều phối viên có thể từ chối hoặc yêu cầu đổi người chạy.
                         </p>
                     </div>

@@ -531,7 +531,7 @@ export default function NotificationsWidget() {
         const severityConfig = {
             CRITICAL: { icon: AlertCircle, color: "text-red-600", bg: "bg-red-50" },
             HIGH: { icon: AlertTriangle, color: "text-orange-600", bg: "bg-orange-50" },
-            MEDIUM: { icon: Info, color: "text-amber-600", bg: "bg-amber-50" },
+            MEDIUM: { icon: Info, color: "text-primary-600", bg: "bg-info-50" },
             LOW: { icon: Info, color: "text-blue-600", bg: "bg-blue-50" },
         };
 
@@ -609,7 +609,7 @@ export default function NotificationsWidget() {
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-1.5">
                         <span className="text-slate-900 font-semibold text-sm">{config.label}</span>
-                        <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded-full border border-amber-200">
+                        <span className="px-2 py-0.5 bg-info-100 text-info-800 text-[10px] font-bold rounded-full border border-info-200">
                             Chờ duyệt
                         </span>
                     </div>
@@ -636,7 +636,7 @@ export default function NotificationsWidget() {
                         {approval.details && approval.approvalType === "EXPENSE_REQUEST" && (
                             <div className="mt-1.5 text-[11px] text-slate-500 flex items-center gap-1.5">
                                 <DollarSign className="h-3 w-3" />
-                                {approval.details.requesterName} · <span className="font-semibold text-amber-600">{approval.details.amount?.toLocaleString()} VNĐ</span>
+                                {approval.details.requesterName} · <span className="font-semibold text-primary-600">{approval.details.amount?.toLocaleString()} VNĐ</span>
                             </div>
                         )}
                     </div>
@@ -798,7 +798,7 @@ export default function NotificationsWidget() {
         
         return (
             <div 
-                className="flex items-start gap-3 px-4 py-3.5 border-b border-slate-100 hover:bg-gradient-to-r hover:from-amber-50 hover:to-white transition-all duration-200 group cursor-pointer"
+                className="flex items-start gap-3 px-4 py-3.5 border-b border-slate-100 hover:bg-gradient-to-r hover:from-info-50 hover:to-white transition-all duration-200 group cursor-pointer"
                 onClick={() => {
                     setShowDropdown(false);
                     navigate(`/orders/${booking.bookingId || booking.id}`);
@@ -806,9 +806,9 @@ export default function NotificationsWidget() {
             >
                 <div className={cls(
                     "mt-0.5 p-2 rounded-lg shadow-sm transition-transform group-hover:scale-110",
-                    isUrgent ? "bg-red-50" : "bg-amber-50"
+                    isUrgent ? "bg-red-50" : "bg-info-50"
                 )}>
-                    <CreditCard className={cls("h-4 w-4", isUrgent ? "text-red-600" : "text-amber-600")} />
+                    <CreditCard className={cls("h-4 w-4", isUrgent ? "text-red-600" : "text-primary-600")} />
                 </div>
 
                 <div className="min-w-0 flex-1">
@@ -820,7 +820,7 @@ export default function NotificationsWidget() {
                             "px-2 py-0.5 text-[10px] font-bold rounded-full border",
                             isUrgent 
                                 ? "bg-red-100 text-red-800 border-red-200" 
-                                : "bg-amber-100 text-amber-800 border-amber-200"
+                                : "bg-info-100 text-info-800 border-info-200"
                         )}>
                             Chưa cọc
                         </span>
@@ -852,7 +852,7 @@ export default function NotificationsWidget() {
                                 </span>
                                 <span className={cls(
                                     "ml-1 text-[10px] font-semibold",
-                                    isUrgent ? "text-red-600" : "text-amber-600"
+                                    isUrgent ? "text-red-600" : "text-primary-600"
                                 )}>
                                     (còn {timeRemaining})
                                 </span>
@@ -861,12 +861,12 @@ export default function NotificationsWidget() {
                     </div>
 
                     <div className="mt-2 text-[11px] text-slate-500 flex items-center gap-1">
-                        <AlertTriangle className="h-3 w-3 text-amber-500" />
+                        <AlertTriangle className="h-3 w-3 text-info-500" />
                         Yêu cầu đặt cọc trước 48h - Tài xế/xe chưa giữ lịch
                     </div>
                 </div>
 
-                <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-amber-600 transition-colors shrink-0" />
+                <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-primary-600 transition-colors shrink-0" />
             </div>
         );
     };
@@ -917,7 +917,7 @@ export default function NotificationsWidget() {
                         </span>
                     )}
                     {connected && (
-                        <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-amber-500 border-2 border-white shadow-sm"></span>
+                        <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-info-500 border-2 border-white shadow-sm"></span>
                     )}
                 </button>
             )}
@@ -964,7 +964,7 @@ export default function NotificationsWidget() {
                                     className={cls(
                                         "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-all duration-200",
                                         connected
-                                            ? "bg-gradient-to-r from-amber-50 to-amber-100 text-amber-700 border-2 border-amber-300 shadow-sm"
+                                            ? "bg-gradient-to-r from-info-50 to-info-100 text-info-700 border-2 border-info-300 shadow-sm"
                                             : "bg-slate-100 text-slate-500 border-2 border-slate-300"
                                     )}
                                     title={connected ? "WebSocket đã kết nối" : "WebSocket chưa kết nối"}
@@ -1172,8 +1172,8 @@ export default function NotificationsWidget() {
                                         if (notif.type) {
                                             if (notif.type.includes('TRIP') || notif.type.includes('ASSIGN')) {
                                                 Icon = CarFront;
-                                                iconBg = notif.read ? "bg-amber-50" : "bg-amber-100";
-                                                iconColor = notif.read ? "text-amber-500" : "text-amber-600";
+                                                iconBg = notif.read ? "bg-info-50" : "bg-info-100";
+                                                iconColor = notif.read ? "text-info-500" : "text-primary-600";
                                             } else if (notif.type.includes('EXPENSE')) {
                                                 Icon = DollarSign;
                                                 iconBg = notif.read ? "bg-emerald-50" : "bg-emerald-100";
@@ -1364,7 +1364,7 @@ export default function NotificationsWidget() {
                                 })()}
                                 
                                 <SectionHeader
-                                    icon={<CreditCard className="h-4 w-4 text-amber-600" />}
+                                    icon={<CreditCard className="h-4 w-4 text-primary-600" />}
                                     title="Đơn chưa đặt cọc"
                                     count={pendingDepositBookings.length}
                                     right={
@@ -1379,8 +1379,8 @@ export default function NotificationsWidget() {
                                 />
 
                                 {/* Info banner */}
-                                <div className="mx-4 mt-3 px-3 py-2.5 text-[11px] leading-5 text-amber-800 bg-gradient-to-r from-amber-50 to-amber-100 border border-amber-200 rounded-lg flex items-start gap-2">
-                                    <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                                <div className="mx-4 mt-3 px-3 py-2.5 text-[11px] leading-5 text-info-800 bg-gradient-to-r from-info-50 to-info-100 border border-info-200 rounded-lg flex items-start gap-2">
+                                    <AlertTriangle className="h-4 w-4 text-primary-600 shrink-0 mt-0.5" />
                                     <div>
                                         <div className="font-semibold mb-0.5">Yêu cầu đặt cọc trước 48 giờ</div>
                                         <span>Đơn chưa cọc coi như chưa xác nhận. Tài xế - xe chưa giữ lịch.</span>
@@ -1389,7 +1389,7 @@ export default function NotificationsWidget() {
 
                                 {loadingDeposit && (
                                     <div className="flex flex-col items-center justify-center px-4 py-12">
-                                        <Loader2 className="h-8 w-8 text-amber-600 animate-spin mb-3" />
+                                        <Loader2 className="h-8 w-8 text-primary-600 animate-spin mb-3" />
                                         <div className="text-sm text-slate-600 font-medium">Đang tải...</div>
                                     </div>
                                 )}
@@ -1420,15 +1420,15 @@ export default function NotificationsWidget() {
                                     />
 
                                     {error && (
-                                        <div className="mx-4 mt-3 px-4 py-3 text-[12px] leading-5 text-amber-800 bg-gradient-to-r from-amber-50 to-amber-100 border border-amber-200 rounded-lg flex items-start gap-2 shadow-sm">
-                                            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                                        <div className="mx-4 mt-3 px-4 py-3 text-[12px] leading-5 text-info-800 bg-gradient-to-r from-info-50 to-info-100 border border-info-200 rounded-lg flex items-start gap-2 shadow-sm">
+                                            <AlertTriangle className="h-4 w-4 text-primary-600 shrink-0 mt-0.5" />
                                             <div className="flex-1">
                                                 <div className="font-semibold mb-1">Lỗi tải dữ liệu</div>
                                                 <span>{error}</span>
                                             </div>
                                             <button
                                                 onClick={fetchAll}
-                                                className="shrink-0 text-amber-700 hover:text-amber-900 transition-colors"
+                                                className="shrink-0 text-info-700 hover:text-info-900 transition-colors"
                                                 title="Thử lại"
                                             >
                                                 <RefreshCw className="h-4 w-4" />
@@ -1572,11 +1572,11 @@ function ConflictResolutionModal({ conflicts, driverId, approval, onResolve }) {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
                 {/* Header */}
-                <div className="px-6 py-4 border-b border-slate-200 bg-amber-50">
+                <div className="px-6 py-4 border-b border-slate-200 bg-info-50">
                     <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center">
-                                <AlertTriangle className="h-5 w-5 text-amber-600" />
+                            <div className="h-10 w-10 rounded-full bg-info-100 flex items-center justify-center">
+                                <AlertTriangle className="h-5 w-5 text-primary-600" />
                             </div>
                             <div>
                                 <h3 className="text-lg font-semibold text-slate-900">

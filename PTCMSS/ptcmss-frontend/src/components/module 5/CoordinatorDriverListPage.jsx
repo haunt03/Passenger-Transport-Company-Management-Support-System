@@ -411,7 +411,7 @@ export default function CoordinatorDriverListPage({ readOnly = false }) {
                                                     {(() => {
                                                         const statusMap = {
                                                             "AVAILABLE": { label: "Sẵn sàng", color: "bg-green-50 text-green-700" },
-                                                            "BUSY": { label: "Đang bận", color: "bg-amber-50 text-amber-700" },
+                                                            "BUSY": { label: "Đang bận", color: "bg-info-50 text-info-700" },
                                                             "ON_LEAVE": { label: "Nghỉ phép", color: "bg-slate-50 text-slate-700" },
                                                             "INACTIVE": { label: "Không hoạt động", color: "bg-rose-50 text-rose-700" },
                                                             "ACTIVE": { label: "Hoạt động", color: "bg-green-50 text-green-700" },

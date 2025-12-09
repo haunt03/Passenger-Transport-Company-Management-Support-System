@@ -18,11 +18,11 @@ const cls = (...a) => a.filter(Boolean).join(" ");
  * Alerts Panel - System warnings and notifications
  */
 export default function AlertsPanel({
-                                        alerts = [],
-                                        onAcknowledge,
-                                        loading = false,
-                                        maxHeight = 400,
-                                    }) {
+    alerts = [],
+    onAcknowledge,
+    loading = false,
+    maxHeight = 400,
+}) {
     const getAlertIcon = (type, severity) => {
         if (severity === "CRITICAL") return AlertCircle;
         if (severity === "HIGH") return AlertTriangle;
@@ -34,7 +34,7 @@ export default function AlertsPanel({
         const colors = {
             CRITICAL: "bg-rose-50 border-rose-300 text-rose-800",
             HIGH: "bg-orange-50 border-orange-300 text-orange-800",
-            MEDIUM: "bg-amber-50 border-amber-300 text-amber-800",
+            MEDIUM: "bg-info-50 border-info-300 text-info-800",
             LOW: "bg-sky-50 border-sky-300 text-sky-800",
         };
         return colors[severity] || colors.LOW;
@@ -81,7 +81,7 @@ export default function AlertsPanel({
     if (!alerts || alerts.length === 0) {
         return (
             <div className="text-center py-8 text-slate-500 text-sm">
-                <CheckCircle className="h-12 w-12 mx-auto mb-2 text-amber-500" />
+                <CheckCircle className="h-12 w-12 mx-auto mb-2 text-info-500" />
                 <div>Không có cảnh báo nào</div>
             </div>
         );

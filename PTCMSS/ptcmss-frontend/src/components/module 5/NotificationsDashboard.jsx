@@ -623,9 +623,9 @@ export default function NotificationsDashboard() {
             {showConflictDialog && conflictingTrips.length > 0 && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowConflictDialog(false)}>
                     <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-                        <div className="px-6 py-4 border-b border-slate-200 bg-amber-50">
+                        <div className="px-6 py-4 border-b border-slate-200 bg-info-50">
                             <div className="flex items-start gap-3">
-                                <AlertTriangle className="h-6 w-6 text-amber-600 shrink-0 mt-0.5" />
+                                <AlertTriangle className="h-6 w-6 text-primary-600 shrink-0 mt-0.5" />
                                 <div className="flex-1">
                                     <h3 className="text-lg font-semibold text-slate-900">Cảnh báo: Tài xế có chuyến trong ngày nghỉ</h3>
                                     <p className="text-sm text-slate-600 mt-1">
@@ -646,11 +646,11 @@ export default function NotificationsDashboard() {
                                     const customerName = trip.customerName || trip.customer_name || "—";
                                     
                                     return (
-                                        <div key={tripId || idx} className="border border-amber-200 bg-amber-50 rounded-lg p-3">
+                                        <div key={tripId || idx} className="border border-info-200 bg-info-50 rounded-lg p-3">
                                             <div className="flex items-start justify-between gap-3">
                                                 <div className="flex-1">
                                                     <div className="flex items-center gap-2 mb-1">
-                                                        <Car className="h-4 w-4 text-amber-600" />
+                                                        <Car className="h-4 w-4 text-primary-600" />
                                                         <span className="font-semibold text-slate-900">Chuyến #{tripId}</span>
                                                     </div>
                                                     <div className="text-sm text-slate-700 space-y-1">
@@ -691,7 +691,7 @@ export default function NotificationsDashboard() {
                             <button
                                 onClick={handleUnassignConflictingTrips}
                                 disabled={checkingTrips}
-                                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-amber-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                             >
                                 {checkingTrips ? (
                                     <>
@@ -779,8 +779,8 @@ function StatsCards({ stats }) {
             label: "Tổng cảnh báo",
             value: stats.totalAlerts,
             icon: AlertTriangle,
-            color: "text-amber-600",
-            bg: "bg-amber-50",
+            color: "text-primary-600",
+            bg: "bg-info-50",
         },
         {
             label: "Cảnh báo khẩn cấp",
@@ -828,7 +828,7 @@ function AlertCard({ alert, onAcknowledge, onClick }) {
     const severityConfig = {
         CRITICAL: { icon: AlertCircle, color: "text-red-600", bg: "bg-red-50", border: "border-red-200" },
         HIGH: { icon: AlertTriangle, color: "text-orange-600", bg: "bg-orange-50", border: "border-orange-200" },
-        MEDIUM: { icon: Info, color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200" },
+        MEDIUM: { icon: Info, color: "text-primary-600", bg: "bg-info-50", border: "border-info-200" },
         LOW: { icon: Info, color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-200" },
     };
 
@@ -1045,7 +1045,7 @@ function ApprovalCard({ approval, onApprove, onReject, canApprove, approvalNote,
                                         Đã từ chối
                                     </span>
                                 ) : (
-                                    <span className="px-1.5 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-medium rounded">
+                                    <span className="px-1.5 py-0.5 bg-info-100 text-info-800 text-[10px] font-medium rounded">
                                         Chờ duyệt
                                     </span>
                                 )}
@@ -1146,7 +1146,7 @@ function DetailDialog({ item, type, onClose, onAcknowledge, onApprove, onReject,
         const severityConfig = {
             CRITICAL: { icon: AlertCircle, color: "text-red-600", bg: "bg-red-50", border: "border-red-200" },
             HIGH: { icon: AlertTriangle, color: "text-orange-600", bg: "bg-orange-50", border: "border-orange-200" },
-            MEDIUM: { icon: Info, color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200" },
+            MEDIUM: { icon: Info, color: "text-primary-600", bg: "bg-info-50", border: "border-info-200" },
             LOW: { icon: Info, color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-200" },
         };
         const config = severityConfig[item.severity] || severityConfig.MEDIUM;
@@ -1207,7 +1207,7 @@ function DetailDialog({ item, type, onClose, onAcknowledge, onApprove, onReject,
                                         className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm font-medium"
                                     >
                                         <CheckCheck className="h-4 w-4" />
-                                        Xác nhận đã biết
+                                        Xác nhận đã xử lý
                                     </button>
                                 </div>
                             )}
@@ -1252,7 +1252,7 @@ function DetailDialog({ item, type, onClose, onAcknowledge, onApprove, onReject,
                                         Đã từ chối
                                     </span>
                                 ) : (
-                                    <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs font-medium rounded mt-1 inline-block">
+                                    <span className="px-2 py-0.5 bg-info-100 text-info-800 text-xs font-medium rounded mt-1 inline-block">
                                         Chờ duyệt
                                     </span>
                                 )}
