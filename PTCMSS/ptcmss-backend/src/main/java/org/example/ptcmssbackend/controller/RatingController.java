@@ -7,9 +7,11 @@ import org.example.ptcmssbackend.dto.RatingRequest;
 import org.example.ptcmssbackend.dto.RatingResponse;
 import org.example.ptcmssbackend.dto.TripForRatingResponse;
 import org.example.ptcmssbackend.dto.response.common.ResponseData;
+import org.example.ptcmssbackend.entity.Users;
 import org.example.ptcmssbackend.service.RatingService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,6 +26,7 @@ public class RatingController {
     private final RatingService ratingService;
 
     @PostMapping
+    @PreAuthorize("hasRole('CONSULTANT') or hasRole('ADMIN')")
     public ResponseEntity<ResponseData<RatingResponse>> createRating(
             @RequestBody RatingRequest request,
             Authentication authentication) {
@@ -94,15 +97,15 @@ public class RatingController {
     }
 
     private Integer getUserIdFromAuth(Authentication authentication) {
-        if (authentication != null && authentication.getPrincipal() instanceof org.springframework.security.core.userdetails.UserDetails) {
-            String username = ((org.springframework.security.core.userdetails.UserDetails) authentication.getPrincipal()).getUsername();
-            // Parse userId from username if needed, or implement proper user lookup
-            try {
-                return Integer.parseInt(username);
-            } catch (NumberFormatException e) {
-                return 1; // Default fallback
-            }
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw new RuntimeException("Unauthenticated");
         }
-        return 1; // Default fallback
+
+        // UserServiceDetail returns Users as principal, so we can read id directly
+        if (authentication.getPrincipal() instanceof Users user) {
+            return user.getId();
+        }
+
+        throw new RuntimeException("Cannot determine current user");
     }
 }
