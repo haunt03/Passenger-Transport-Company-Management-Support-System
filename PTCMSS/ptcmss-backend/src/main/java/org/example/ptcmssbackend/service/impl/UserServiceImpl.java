@@ -1,10 +1,11 @@
 package org.example.ptcmssbackend.service.impl;
 
+import jakarta.mail.MessagingException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.ptcmssbackend.dto.request.User.ChangePasswordRequest;
 import org.example.ptcmssbackend.dto.request.User.CreateUserRequest;
 import org.example.ptcmssbackend.dto.request.User.UpdateUserRequest;
-import org.example.ptcmssbackend.dto.request.User.ChangePasswordRequest;
 import org.example.ptcmssbackend.dto.response.User.UserResponse;
 import org.example.ptcmssbackend.entity.Branches;
 import org.example.ptcmssbackend.entity.Employees;
@@ -19,10 +20,10 @@ import org.example.ptcmssbackend.repository.UsersRepository;
 import org.example.ptcmssbackend.service.EmailService;
 import org.example.ptcmssbackend.service.LocalImageService;
 import org.example.ptcmssbackend.service.UserService;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
@@ -32,7 +33,6 @@ import java.io.UnsupportedEncodingException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import jakarta.mail.MessagingException;
 
 @Slf4j
 @Service
