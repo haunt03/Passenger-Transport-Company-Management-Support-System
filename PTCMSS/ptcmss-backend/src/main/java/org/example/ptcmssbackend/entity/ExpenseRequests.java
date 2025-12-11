@@ -61,4 +61,7 @@ public class ExpenseRequests {
 
     @Column(name = "rejectionReason", length = 500)
     private String rejectionReason;
+
+    @Column(name = "receiptImages", columnDefinition = "TEXT")
+    private String receiptImages; // JSON array of image URLs: ["/uploads/file1.jpg", "/uploads/file2.jpg"]
 }
