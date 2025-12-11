@@ -213,7 +213,7 @@ function Toasts({ toasts }) {
                     className={cls(
                         "rounded-md px-3 py-2 text-sm shadow border",
                         t.kind === "success" &&
-                        "bg-amber-50 border-amber-300 text-amber-700",
+                        "bg-emerald-50 border-emerald-300 text-emerald-700",
                         t.kind === "error" &&
                         "bg-rose-50 border-rose-300 text-rose-700",
                         t.kind === "info" &&
@@ -325,20 +325,24 @@ function RevExpChart({ data = [] }) {
     const innerW = W - padding.l - padding.r;
     const innerH = H - padding.t - padding.b;
 
-    const maxY =
-        Math.max(
-            ...data.map((d) => Math.max(d.revenue, d.expense))
-        ) * 1.3;
+    // Fix: Handle empty data or all zeros
+    const values = data.length > 0 
+        ? data.map((d) => Math.max(Number(d.revenue || 0), Number(d.expense || 0)))
+        : [0];
+    const maxValue = Math.max(...values);
+    const maxY = maxValue > 0 ? maxValue * 1.3 : 100; // Default to 100 if all zeros
 
-    const barGroupW = innerW / data.length;
+    // Fix: Prevent division by zero
+    const dataLength = Math.max(1, data.length);
+    const barGroupW = innerW / dataLength;
     const barW = Math.min(
         20,
         Math.max(10, barGroupW * 0.34)
     );
-    const yTo = (val) =>
-        padding.t +
-        innerH -
-        (val / maxY) * innerH;
+    const yTo = (val) => {
+        if (maxY <= 0) return padding.t + innerH; // Bottom of chart if no data
+        return padding.t + innerH - (val / maxY) * innerH;
+    };
 
     // net path points
     const netPoints = data.map((d, i) => {
@@ -387,17 +391,20 @@ function RevExpChart({ data = [] }) {
             )}
 
             {/* bars (Doanh thu & Chi phí) */}
-            {data.map((d, i) => {
+            {data.length > 0 ? data.map((d, i) => {
                 const x0 = padding.l + i * barGroupW + (barGroupW - barW * 2 - 6) / 2;
                 const ry = 3;
 
-                const yRev = yTo(d.revenue || 0);
-                const yExp = yTo(d.expense || 0);
-                const hRev = innerH - (yRev - padding.t);
-                const hExp = innerH - (yExp - padding.t);
+                const revenue = Number(d.revenue || 0);
+                const expense = Number(d.expense || 0);
+                const yRev = yTo(revenue);
+                const yExp = yTo(expense);
+                const hRev = Math.max(0, innerH - (yRev - padding.t));
+                const hExp = Math.max(0, innerH - (yExp - padding.t));
 
-                // Validate to prevent NaN
-                if (isNaN(yRev) || isNaN(yExp) || isNaN(hRev) || isNaN(hExp)) {
+                // Validate to prevent NaN or invalid values
+                if (isNaN(yRev) || isNaN(yExp) || isNaN(hRev) || isNaN(hExp) || 
+                    !isFinite(yRev) || !isFinite(yExp) || !isFinite(hRev) || !isFinite(hExp)) {
                     return null;
                 }
 
@@ -425,11 +432,21 @@ function RevExpChart({ data = [] }) {
                             textAnchor="middle"
                             className="fill-slate-500 text-[10px] font-medium"
                         >
-                            {d.month}
+                            {d.month || `T${i + 1}`}
                         </text>
                     </g>
                 );
-            })}
+            }) : (
+                // Empty state
+                <text
+                    x={W / 2}
+                    y={H / 2}
+                    textAnchor="middle"
+                    className="fill-slate-400 text-sm"
+                >
+                    Không có dữ liệu
+                </text>
+            )}
 
             {/* net line */}
             {netPath.trim() && !netPath.includes('NaN') && (
@@ -549,7 +566,7 @@ function KpiCard({ title, value, delta, up }) {
                     className={cls(
                         "text-xs flex items-center gap-1 font-medium",
                         up
-                            ? "text-amber-600"
+                            ? "text-primary-600"
                             : "text-rose-600"
                     )}
                 >
@@ -1342,7 +1359,7 @@ export default function AccountantDashboard() {
     const loadDashboard = React.useCallback(async () => {
         setLoading(true);
         setError(null);
-
+        
         const defaultData = {
             totalRevenue: 0,
             totalExpense: 0,
@@ -1359,14 +1376,14 @@ export default function AccountantDashboard() {
             pendingApprovals: [],
             topCustomers: [],
         };
-
+        
         try {
             // Try main dashboard endpoint first
             const data = await getAccountingDashboard({
                 branchId: branchId || undefined,
                 period,
             });
-
+            
             if (data && typeof data === 'object') {
                 setDashboardData({
                     ...defaultData,
@@ -1385,22 +1402,22 @@ export default function AccountantDashboard() {
             }
         } catch (err) {
             console.error("Error loading dashboard:", err);
-
+            
             // Try fallback: load individual stats
             try {
                 const { getTotalRevenue, getTotalExpense, getARBalance } = await import("../../api/accounting");
                 const params = { branchId: branchId || undefined, period };
-
+                
                 const [revenueRes, expenseRes, arRes] = await Promise.allSettled([
                     getTotalRevenue(params),
                     getTotalExpense(params),
                     getARBalance(params),
                 ]);
-
+                
                 const revenue = revenueRes.status === 'fulfilled' ? Number(revenueRes.value?.total || revenueRes.value || 0) : 0;
                 const expense = expenseRes.status === 'fulfilled' ? Number(expenseRes.value?.total || expenseRes.value || 0) : 0;
                 const ar = arRes.status === 'fulfilled' ? Number(arRes.value?.total || arRes.value || 0) : 0;
-
+                
                 setDashboardData({
                     ...defaultData,
                     totalRevenue: revenue,
@@ -1408,7 +1425,7 @@ export default function AccountantDashboard() {
                     netProfit: revenue - expense,
                     arBalance: ar,
                 });
-
+                
                 push("Dữ liệu dashboard được tải từ nguồn phụ", "info");
             } catch (fallbackErr) {
                 console.error("Fallback also failed:", fallbackErr);
@@ -1555,32 +1572,67 @@ export default function AccountantDashboard() {
     const chartData = React.useMemo(() => {
         const revenueChart = dashboardData.revenueChart || [];
         const expenseChart = dashboardData.expenseChart || [];
-
-        // Combine revenue and expense by date
+        
+        // Combine revenue and expense by month (group daily data by month)
         const dateMap = {};
+        
+        // Process revenue data - accumulate by month
         revenueChart.forEach((item) => {
-            const month = item.date ? item.date.substring(5, 7) : "01";
-            if (!dateMap[month]) {
-                dateMap[month] = { month, revenue: 0, expense: 0 };
+            if (!item || !item.date) return;
+            try {
+                // Parse date (format: YYYY-MM-DD)
+                const dateStr = item.date.toString();
+                const month = dateStr.length >= 7 ? dateStr.substring(5, 7) : "01";
+                if (!dateMap[month]) {
+                    dateMap[month] = { month, revenue: 0, expense: 0 };
+                }
+                // Accumulate revenue (convert to millions)
+                dateMap[month].revenue += Number(item.value || 0) / 1000000;
+            } catch (e) {
+                console.warn("Error parsing revenue date:", item.date, e);
             }
-            dateMap[month].revenue = Number(item.value || 0) / 1000000; // Convert to millions
         });
+        
+        // Process expense data - accumulate by month
         expenseChart.forEach((item) => {
-            const month = item.date ? item.date.substring(5, 7) : "01";
-            if (!dateMap[month]) {
-                dateMap[month] = { month, revenue: 0, expense: 0 };
+            if (!item || !item.date) return;
+            try {
+                // Parse date (format: YYYY-MM-DD)
+                const dateStr = item.date.toString();
+                const month = dateStr.length >= 7 ? dateStr.substring(5, 7) : "01";
+                if (!dateMap[month]) {
+                    dateMap[month] = { month, revenue: 0, expense: 0 };
+                }
+                // Accumulate expense (convert to millions)
+                dateMap[month].expense += Number(item.value || 0) / 1000000;
+            } catch (e) {
+                console.warn("Error parsing expense date:", item.date, e);
             }
-            dateMap[month].expense = Number(item.value || 0) / 1000000; // Convert to millions
         });
-
-        // Generate months from data or use current year
+        
+        // Generate months array - only show months that have data or current month
+        const currentMonth = new Date().getMonth() + 1;
+        const currentMonthStr = String(currentMonth).padStart(2, '0');
         const months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
-        const result = months.map((m) => {
-            if (dateMap[m]) return dateMap[m];
+        
+        // If we have data, use all months, otherwise show last 6 months
+        const hasData = Object.keys(dateMap).length > 0;
+        const monthsToShow = hasData 
+            ? months 
+            : months.slice(Math.max(0, currentMonth - 6), currentMonth);
+        
+        const result = monthsToShow.map((m) => {
+            if (dateMap[m]) {
+                return {
+                    month: m,
+                    revenue: Number(dateMap[m].revenue.toFixed(2)),
+                    expense: Number(dateMap[m].expense.toFixed(2))
+                };
+            }
             return { month: m, revenue: 0, expense: 0 };
         });
-
-        return result;
+        
+        return result.length > 0 ? result : [{ month: currentMonthStr, revenue: 0, expense: 0 }];
     }, [dashboardData.revenueChart, dashboardData.expenseChart]);
 
     return (
@@ -1692,7 +1744,7 @@ export default function AccountantDashboard() {
                 {/* Biểu đồ Doanh thu vs Chi phí */}
                 <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                     <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 text-sm text-slate-600 flex items-center gap-2">
-                        <BadgeDollarSign className="h-4 w-4 text-amber-600" />
+                        <BadgeDollarSign className="h-4 w-4 text-primary-600" />
                         <span className="font-medium text-slate-700">
                             Doanh thu vs Chi phí
                             (tháng)
@@ -1740,7 +1792,7 @@ export default function AccountantDashboard() {
                 {/* header của queue */}
                 <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 text-sm text-slate-600 flex flex-wrap items-center gap-3">
                     <div className="flex items-center gap-2">
-                        <ReceiptText className="h-4 w-4 text-amber-600" />
+                        <ReceiptText className="h-4 w-4 text-primary-600" />
                         <div className="font-medium text-slate-700">
                             Yêu cầu chi phí
                             chờ duyệt
@@ -1861,8 +1913,8 @@ export default function AccountantDashboard() {
 
                 {/* footer note */}
                 <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 text-[11px] text-slate-500 leading-relaxed">
-                    Yêu cầu chi phí chờ duyệt: {approvalQueue.length} mục.
-                    HĐ đến hạn 7 ngày: {dashboardData.invoicesDueIn7Days || 0}.
+                   Yêu cầu chi phí chờ duyệt: {approvalQueue.length} mục.
+                    HĐ đến hạn 7 ngày: {dashboardData.invoicesDueIn7Days || 0}. 
                     HĐ quá hạn: {dashboardData.overdueInvoices || 0}.
                 </div>
             </div>
@@ -1877,7 +1929,7 @@ export default function AccountantDashboard() {
                             Yêu cầu thanh toán chờ xác nhận
                         </div>
                         {pendingPayments.length > 0 && (
-                            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-500 text-white">
+                            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-primary-500 text-white">
                                 {pendingPayments.length}
                             </span>
                         )}
@@ -1924,7 +1976,7 @@ export default function AccountantDashboard() {
                                             <span className="text-lg font-bold text-slate-900 tabular-nums">
                                                 {fmtVND(payment.amount || 0)} đ
                                             </span>
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] bg-amber-50 text-amber-700 border border-amber-300">
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] bg-info-50 text-info-700 border border-info-300">
                                                 <Clock className="h-3 w-3" />
                                                 Chờ xác nhận
                                             </span>

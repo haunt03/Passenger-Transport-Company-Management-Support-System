@@ -98,7 +98,7 @@ function Toasts({ toasts }) {
                         "rounded-md px-3 py-2 text-sm shadow border",
                         t.kind ===
                         "success" &&
-                        "bg-amber-50 border-amber-300 text-amber-700",
+                        "bg-info-50 border-info-300 text-info-700",
                         t.kind ===
                         "error" &&
                         "bg-rose-50 border-rose-300 text-rose-700",
@@ -150,7 +150,7 @@ const PALETTE = [
     {
         slice: "fill-emerald-500/80",
         legend:
-            "bg-amber-500/80 border-amber-400/30",
+            "bg-info-500/80 border-primary-400/30",
     },
     {
         slice: "fill-sky-400/80",
@@ -165,7 +165,7 @@ const PALETTE = [
     {
         slice: "fill-amber-400/80",
         legend:
-            "bg-amber-400/80 border-amber-300/30",
+            "bg-primary-400/80 border-info-300/30",
     },
     {
         slice: "fill-purple-400/80",
@@ -467,8 +467,8 @@ function FiltersBar({
                 {/* Branch */}
                 <div className="flex flex-col gap-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-[13px] text-slate-700 shadow-sm">
                     <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-slate-500" />
-                        <select
+                    <Building2 className="h-4 w-4 text-slate-500" />
+                    <select
                             value={branchId ?? ""}
                             onChange={(e) => {
                                 if (branchDisabled) return;
@@ -482,7 +482,7 @@ function FiltersBar({
                             }}
                             disabled={branchDisabled || branchLoading}
                             className="bg-transparent outline-none text-[13px] text-slate-900 disabled:text-slate-500"
-                        >
+                    >
                             {branchDisabled ? (
                                 <option value={branchId ?? ""}>
                                     {branchLoading
@@ -499,10 +499,10 @@ function FiltersBar({
                                     ))}
                                 </>
                             )}
-                        </select>
+                    </select>
                     </div>
                     {branchDisabled && (
-                        <div className={`text-[11px] ${branchError ? "text-rose-600" : "text-amber-600"}`}>
+                        <div className={`text-[11px] ${branchError ? "text-rose-600" : "text-primary-600"}`}>
                             {branchLoading
                                 ? "Đang xác định chi nhánh bạn phụ trách..."
                                 : branchError || branchHelperText || "Chỉ xem dữ liệu chi nhánh bạn phụ trách."}
@@ -1333,10 +1333,12 @@ export default function ExpenseReportPage() {
         setLoading(true);
         setError(null);
         try {
+            // costType đã bị xóa khỏi database - không gửi filter này lên backend
+            // Backend sẽ trả về tất cả expenses, không phân loại theo costType nữa
             const data = await getExpenseReport({
                 branchId: branchId || undefined,
                 vehicleId: vehicleId || undefined,
-                costType: catFilter || undefined,
+                // costType: catFilter || undefined, // Đã bị xóa - không filter nữa
                 startDate: fromDate || undefined,
                 endDate: toDate || undefined,
                 period: period || undefined,
@@ -1391,13 +1393,14 @@ export default function ExpenseReportPage() {
         );
 
     // Transform expenses from API
+    // costType đã bị xóa - tất cả Invoices sẽ có costType = null, chỉ ExpenseRequests có expenseType
     const filteredExpenses = React.useMemo(() => {
         return (reportData.expenses || []).map((exp) => ({
             id: exp.invoiceId,
             date: exp.invoiceDate ? new Date(exp.invoiceDate).toISOString().slice(0, 10) : "",
             branch: exp.branchName || "—",
             vehicle: exp.vehicleLicensePlate || "—",
-            category: exp.costType || "OTHER",
+            category: exp.costType || exp.expenseType || "OTHER", // costType có thể null, fallback sang expenseType hoặc OTHER
             amount: Number(exp.amount || 0),
             notes: exp.note || "—",
         }));
@@ -1442,10 +1445,11 @@ export default function ExpenseReportPage() {
             return;
         }
         try {
+            // costType đã bị xóa - không gửi filter này lên backend
             await exportExpenseReportToExcel({
                 branchId: branchId || undefined,
                 vehicleId: vehicleId || undefined,
-                costType: catFilter || undefined,
+                // costType: catFilter || undefined, // Đã bị xóa - không filter nữa
                 startDate: fromDate || undefined,
                 endDate: toDate || undefined,
                 period: period || undefined,

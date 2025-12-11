@@ -215,7 +215,7 @@ export default function CoordinatorIncidentListPage() {
         <CheckCircle2 className="h-3.5 w-3.5" /> Đã xử lý
       </span>
     ) : (
-      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-info-100 text-info-700 border border-info-200">
         <Clock className="h-3.5 w-3.5" /> Chưa xử lý
       </span>
     );
@@ -303,11 +303,11 @@ export default function CoordinatorIncidentListPage() {
             </div>
             <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
               <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-xl bg-amber-100 flex items-center justify-center">
-                  <Clock className="h-6 w-6 text-amber-600" />
+                <div className="h-12 w-12 rounded-xl bg-info-100 flex items-center justify-center">
+                  <Clock className="h-6 w-6 text-primary-600" />
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-amber-600">{pendingCount}</div>
+                  <div className="text-2xl font-bold text-primary-600">{pendingCount}</div>
                   <div className="text-sm text-slate-600">Chờ xử lý</div>
                 </div>
               </div>
@@ -488,7 +488,7 @@ export default function CoordinatorIncidentListPage() {
                 <div className={`h-16 w-1 rounded-full flex-shrink-0 ${
                   inc.resolved ? 'bg-emerald-500' : 
                   inc.severity === 'CRITICAL' ? 'bg-rose-500' :
-                  inc.severity === 'MAJOR' ? 'bg-amber-500' : 'bg-blue-500'
+                  inc.severity === 'MAJOR' ? 'bg-info-500' : 'bg-blue-500'
                 }`} />
 
                 <div className="flex-1 min-w-0">
@@ -500,7 +500,7 @@ export default function CoordinatorIncidentListPage() {
                         {badge(inc.resolved)}
                         <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${
                           inc.severity === "CRITICAL" ? "bg-rose-100 text-rose-700" :
-                          inc.severity === "MAJOR" ? "bg-amber-100 text-amber-700" :
+                          inc.severity === "MAJOR" ? "bg-info-100 text-info-700" :
                           "bg-blue-100 text-blue-700"
                         }`}>
                           {getSeverityLabel(inc.severity) || "Bình thường"}
@@ -571,12 +571,12 @@ export default function CoordinatorIncidentListPage() {
                   </div>
 
                   {/* Incident Description */}
-                  <div className="mb-4 p-4 bg-amber-50/50 border border-amber-200/60 rounded-xl">
+                  <div className="mb-4 p-4 bg-info-50/50 border border-info-200/60 rounded-xl">
                     <div className="flex items-center gap-2 mb-2">
-                      <AlertTriangle className="h-4 w-4 text-amber-600" />
-                      <span className="text-xs font-semibold text-amber-900 uppercase tracking-wide">Mô tả sự cố</span>
+                      <AlertTriangle className="h-4 w-4 text-primary-600" />
+                      <span className="text-xs font-semibold text-info-900 uppercase tracking-wide">Mô tả sự cố</span>
                     </div>
-                    <div className="text-sm text-amber-900 leading-relaxed">{inc.description}</div>
+                    <div className="text-sm text-info-900 leading-relaxed">{inc.description}</div>
                   </div>
 
                   {/* Resolution Details */}
@@ -646,12 +646,12 @@ export default function CoordinatorIncidentListPage() {
             {/* Content */}
             <div className="px-6 py-5 overflow-y-auto flex-1">
               {/* Incident Description */}
-              <div className="mb-6 p-4 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200/60 rounded-xl shadow-sm">
+              <div className="mb-6 p-4 bg-gradient-to-br from-amber-50 to-orange-50 border border-info-200/60 rounded-xl shadow-sm">
                 <div className="flex items-center gap-2 mb-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
-                  <div className="text-sm font-semibold text-amber-900">Mô tả sự cố</div>
+                  <AlertTriangle className="h-4 w-4 text-primary-600" />
+                  <div className="text-sm font-semibold text-info-900">Mô tả sự cố</div>
                 </div>
-                <div className="text-sm text-amber-800 leading-relaxed">{selectedIncident.description}</div>
+                <div className="text-sm text-info-800 leading-relaxed">{selectedIncident.description}</div>
               </div>
 
               {/* Action Selection */}

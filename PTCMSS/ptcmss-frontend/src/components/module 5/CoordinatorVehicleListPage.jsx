@@ -467,7 +467,7 @@ export default function CoordinatorVehicleListPage() {
                                                             <span
                                                                 className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${vehicleAvailability[vehicle.id].available
                                                                     ? "bg-emerald-50 text-emerald-700"
-                                                                    : "bg-amber-50 text-amber-700"
+                                                                    : "bg-info-50 text-info-700"
                                                                     }`}
                                                             >
                                                                 {vehicleAvailability[vehicle.id].available ? "Rảnh" : "Bận"}

@@ -380,7 +380,7 @@ export default function TripPaymentRequestModal({
                             </div>
                             <div className="flex items-center gap-2">
                               {isPending && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-amber-50 text-amber-700 border border-amber-300">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-info-50 text-info-700 border border-info-300">
                                   <Clock className="h-3 w-3" />
                                   Chờ xác nhận
                                 </span>
@@ -443,7 +443,7 @@ export default function TripPaymentRequestModal({
             <div className="border-t border-slate-200 pt-2">
               <div className="flex justify-between text-[14px] mb-1">
                 <span className="text-slate-700 font-medium">Còn lại cần thu:</span>
-                <span className={calculatedRemainingAmount.isOverLimit ? "font-bold text-rose-600" : "font-bold text-amber-600"}>
+                <span className={calculatedRemainingAmount.isOverLimit ? "font-bold text-rose-600" : "font-bold text-primary-600"}>
                   {fmtVND(calculatedRemainingAmount.amount)} đ
                 </span>
               </div>
@@ -458,7 +458,7 @@ export default function TripPaymentRequestModal({
                 </div>
               )}
               {calculatedRemainingAmount.pendingTotal > 0 && !calculatedRemainingAmount.isOverLimit && !calculatedRemainingAmount.hasPending && (
-                <div className="text-xs text-amber-600 mt-1">
+                <div className="text-xs text-primary-600 mt-1">
                   (Đã có {fmtVND(calculatedRemainingAmount.pendingTotal)}đ đang chờ duyệt)
                 </div>
               )}
@@ -538,7 +538,7 @@ export default function TripPaymentRequestModal({
               </button>
             </div>
             {paymentMethod === "TRANSFER" && (
-              <div className="mt-2 text-[11px] text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              <div className="mt-2 text-[11px] text-primary-600 bg-info-50 border border-info-200 rounded-lg px-3 py-2">
                 💡 Khi chọn chuyển khoản, hệ thống sẽ tự động tạo mã QR với số tiền còn lại
               </div>
             )}
@@ -560,7 +560,7 @@ export default function TripPaymentRequestModal({
               <div className="text-center text-[11px] text-slate-600">
                 <div className="font-medium mb-1">Số tiền: {fmtVND(amount)} đ</div>
                 {qrData.expiresAt && (
-                  <div className="text-amber-600">
+                  <div className="text-primary-600">
                     Mã QR hết hạn: {new Date(qrData.expiresAt).toLocaleString("vi-VN")}
                   </div>
                 )}
@@ -600,8 +600,8 @@ export default function TripPaymentRequestModal({
           </div>
 
           {/* Info */}
-          <div className="flex items-start gap-2 text-[11px] text-slate-600 leading-relaxed bg-amber-50 border border-amber-200 rounded-lg p-3">
-            <Info className="h-4 w-4 mt-0.5 text-amber-500 shrink-0" />
+          <div className="flex items-start gap-2 text-[11px] text-slate-600 leading-relaxed bg-info-50 border border-info-200 rounded-lg p-3">
+            <Info className="h-4 w-4 mt-0.5 text-info-500 shrink-0" />
             <div>
               Sau khi gửi, yêu cầu sẽ được chuyển đến <b>Kế toán</b> để xác nhận.
               Bạn cần thu tiền từ khách trước khi hoàn thành chuyến.

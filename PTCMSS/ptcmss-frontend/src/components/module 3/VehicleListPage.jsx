@@ -119,9 +119,9 @@ function VehicleStatusBadge({ status }) {
         );
     } else {
         clsColor =
-            "bg-amber-50 text-amber-700 border-amber-200";
+            "bg-info-50 text-info-700 border-info-200";
         IconEl = (
-            <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+            <AlertTriangle className="h-3.5 w-3.5 text-primary-600" />
         );
     }
 
@@ -460,7 +460,7 @@ function CreateVehicleModal({
                                 Chi nhánh quản lý{" "}
                                 <span className="text-red-500">*</span>
                                 {isManager && (
-                                    <span className="text-amber-600 ml-1">(Tự động)</span>
+                                    <span className="text-primary-600 ml-1">(Tự động)</span>
                                 )}
                             </div>
                             {isManager ? (

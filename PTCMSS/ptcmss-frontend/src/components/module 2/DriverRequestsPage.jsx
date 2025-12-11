@@ -77,8 +77,8 @@ function RequestCard({ request, onCancel, cancellingId }) {
         PAYMENT: {
             icon: DollarSign,
             label: "Yêu cầu thanh toán",
-            color: "text-amber-600",
-            bgColor: "bg-amber-50",
+            color: "text-primary-600",
+            bgColor: "bg-info-50",
         },
     };
 
@@ -86,7 +86,7 @@ function RequestCard({ request, onCancel, cancellingId }) {
         PENDING: {
             icon: Clock,
             label: "Chờ duyệt",
-            color: "bg-amber-100 text-amber-700",
+            color: "bg-info-100 text-info-700",
         },
         APPROVED: {
             icon: CheckCircle2,
@@ -168,10 +168,10 @@ function RequestCard({ request, onCancel, cancellingId }) {
                         {/* Số tiền */}
                         <div className="flex items-center gap-2">
                             <span className="inline-flex items-center gap-1 text-slate-500">
-                                <DollarSign className="h-3.5 w-3.5 text-amber-500" />
+                                <DollarSign className="h-3.5 w-3.5 text-info-500" />
                                 Số tiền:
                             </span>
-                            <span className="font-semibold text-amber-700">
+                            <span className="font-semibold text-info-700">
                                 {Number(request.amount || 0).toLocaleString("vi-VN")}đ
                             </span>
                         </div>

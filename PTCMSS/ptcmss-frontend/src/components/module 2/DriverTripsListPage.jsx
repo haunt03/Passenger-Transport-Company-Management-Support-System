@@ -104,7 +104,7 @@ function TripCard({ trip, onClick }) {
                 </span>
                 {trip.status === "COMPLETED" && rating > 0 && (
                     <div className="flex items-center gap-1 bg-white/80 px-2 py-1 rounded-lg">
-                        <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
+                        <Star className="h-4 w-4 text-info-500 fill-amber-500" />
                         <span className="text-sm font-bold text-slate-900">{rating.toFixed(1)}</span>
                     </div>
                 )}

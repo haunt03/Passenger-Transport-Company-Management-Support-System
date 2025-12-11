@@ -31,7 +31,7 @@ const RatingManagementPage = () => {
             // Call real API to get completed trips
             const response = await getCompletedTripsForRating();
             let tripsData = response.data || response || [];
-
+            
             // Double-check: chỉ lấy trips COMPLETED (phòng trường hợp API trả về sai)
             tripsData = tripsData.filter(trip => trip.status === 'COMPLETED');
 
@@ -123,7 +123,7 @@ const RatingManagementPage = () => {
             );
         }
         return (
-            <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">
+            <span className="px-3 py-1 bg-primary-100 text-primary-800 rounded-full text-sm font-medium">
                 Chưa đánh giá
             </span>
         );
@@ -147,7 +147,7 @@ const RatingManagementPage = () => {
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div className="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-500">
+                <div className="bg-white rounded-lg shadow p-6 border-l-4 border-primary-500">
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm text-gray-600 mb-1">Chưa đánh giá</p>
@@ -155,8 +155,8 @@ const RatingManagementPage = () => {
                                 {trips.filter(t => !t.hasRating).length}
                             </p>
                         </div>
-                        <div className="bg-yellow-100 p-3 rounded-full">
-                            <Star className="text-yellow-600" size={24} />
+                        <div className="bg-primary-100 p-3 rounded-full">
+                            <Star className="text-primary-600" size={24} />
                         </div>
                     </div>
                 </div>
@@ -208,9 +208,9 @@ const RatingManagementPage = () => {
                         <button
                             onClick={() => setFilterStatus('pending')}
                             className={`px-4 py-2 rounded-lg font-medium transition-colors ${filterStatus === 'pending'
-                                ? 'bg-yellow-600 text-white'
+                                ? 'bg-primary-600 text-white'
                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
+                                }`}
                         >
                             Chưa đánh giá
                         </button>
@@ -219,7 +219,7 @@ const RatingManagementPage = () => {
                             className={`px-4 py-2 rounded-lg font-medium transition-colors ${filterStatus === 'rated'
                                 ? 'bg-green-600 text-white'
                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
+                                }`}
                         >
                             Đã đánh giá
                         </button>
@@ -228,7 +228,7 @@ const RatingManagementPage = () => {
                             className={`px-4 py-2 rounded-lg font-medium transition-colors ${filterStatus === 'all'
                                 ? 'bg-blue-600 text-white'
                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
+                                }`}
                         >
                             Tất cả
                         </button>
@@ -247,140 +247,140 @@ const RatingManagementPage = () => {
                     <div className="overflow-x-auto">
                         <table className="w-full table-fixed">
                             <thead className="bg-gray-50 border-b">
-                            <tr>
-                                <th className="w-24 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Chuyến
-                                </th>
-                                <th className="w-40 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Tài xế
-                                </th>
-                                <th className="w-36 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Khách hàng
-                                </th>
-                                <th className="w-56 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Tuyến đường
-                                </th>
-                                <th className="w-32 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Thời gian
-                                </th>
-                                <th className="w-28 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Trạng thái
-                                </th>
-                                <th className="w-32 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Đánh giá
-                                </th>
-                                <th className="w-32 px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Thao tác
-                                </th>
-                            </tr>
+                                <tr>
+                                    <th className="w-24 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Chuyến
+                                    </th>
+                                    <th className="w-40 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Tài xế
+                                    </th>
+                                    <th className="w-36 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Khách hàng
+                                    </th>
+                                    <th className="w-56 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Tuyến đường
+                                    </th>
+                                    <th className="w-32 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Thời gian
+                                    </th>
+                                    <th className="w-28 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Trạng thái
+                                    </th>
+                                    <th className="w-32 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Đánh giá
+                                    </th>
+                                    <th className="w-32 px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Thao tác
+                                    </th>
+                                </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                            {filteredTrips.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((trip) => (
-                                <tr key={trip.tripId} className="hover:bg-gray-50 align-top">
-                                    <td className="px-4 py-4">
-                                        <div className="text-sm font-medium text-gray-900">#{trip.tripId}</div>
-                                        <div className="text-sm text-gray-500">Đơn #{trip.bookingId}</div>
-                                    </td>
-                                    <td className="px-4 py-4">
-                                        <div className="flex items-center">
-                                            <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
-                                                <User className="text-blue-600" size={20} />
+                                {filteredTrips.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((trip) => (
+                                    <tr key={trip.tripId} className="hover:bg-gray-50 align-top">
+                                        <td className="px-4 py-4">
+                                            <div className="text-sm font-medium text-gray-900">#{trip.tripId}</div>
+                                            <div className="text-sm text-gray-500">Đơn #{trip.bookingId}</div>
+                                        </td>
+                                        <td className="px-4 py-4">
+                                            <div className="flex items-center">
+                                                <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                                    <User className="text-blue-600" size={20} />
+                                                </div>
+                                                <div className="ml-3">
+                                                    <div className="text-sm font-medium text-gray-900 truncate">{trip.driverName}</div>
+                                                </div>
                                             </div>
-                                            <div className="ml-3">
-                                                <div className="text-sm font-medium text-gray-900 truncate">{trip.driverName}</div>
+                                        </td>
+                                        <td className="px-4 py-4">
+                                            <div className="text-sm text-gray-900 truncate">{trip.customerName}</div>
+                                        </td>
+                                        <td className="px-4 py-4">
+                                            <div className="flex items-start gap-2">
+                                                <MapPin className="text-gray-400 flex-shrink-0 mt-0.5" size={16} />
+                                                <div className="text-sm min-w-0">
+                                                    <div className="text-gray-900 truncate">{trip.startLocation}</div>
+                                                    <div className="text-gray-500 truncate">→ {trip.endLocation}</div>
+                                                </div>
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-4">
-                                        <div className="text-sm text-gray-900 truncate">{trip.customerName}</div>
-                                    </td>
-                                    <td className="px-4 py-4">
-                                        <div className="flex items-start gap-2">
-                                            <MapPin className="text-gray-400 flex-shrink-0 mt-0.5" size={16} />
-                                            <div className="text-sm min-w-0">
-                                                <div className="text-gray-900 truncate">{trip.startLocation}</div>
-                                                <div className="text-gray-500 truncate">→ {trip.endLocation}</div>
+                                        </td>
+                                        <td className="px-4 py-4">
+                                            <div className="text-sm text-gray-900 whitespace-nowrap">
+                                                {new Date(trip.endTime).toLocaleDateString('vi-VN')}
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-4">
-                                        <div className="text-sm text-gray-900 whitespace-nowrap">
-                                            {new Date(trip.endTime).toLocaleDateString('vi-VN')}
-                                        </div>
-                                        <div className="text-sm text-gray-500 whitespace-nowrap">
-                                            {new Date(trip.endTime).toLocaleTimeString('vi-VN', {
-                                                hour: '2-digit',
-                                                minute: '2-digit'
-                                            })}
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-4">
-                                        {trip.status === 'COMPLETED' ? (
-                                            <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                                            <div className="text-sm text-gray-500 whitespace-nowrap">
+                                                {new Date(trip.endTime).toLocaleTimeString('vi-VN', {
+                                                    hour: '2-digit',
+                                                    minute: '2-digit'
+                                                })}
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-4">
+                                            {trip.status === 'COMPLETED' ? (
+                                                <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
                                                     Hoàn thành
                                                 </span>
-                                        ) : (
-                                            <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
+                                            ) : (
+                                                <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
                                                     {trip.status || 'N/A'}
                                                 </span>
-                                        )}
-                                    </td>
-                                    <td className="px-4 py-4">
-                                        {trip.hasRating && trip.rating ? (
-                                            (() => {
-                                                // Lấy overallRating, nếu không có thì tính từ các rating khác
-                                                let overallRating = trip.rating.overallRating;
-                                                if (overallRating === null || overallRating === undefined) {
-                                                    // Tính trung bình từ 4 tiêu chí
-                                                    const ratings = [
-                                                        trip.rating.punctualityRating,
-                                                        trip.rating.attitudeRating,
-                                                        trip.rating.safetyRating,
-                                                        trip.rating.complianceRating
-                                                    ].filter(r => r !== null && r !== undefined);
-                                                    if (ratings.length > 0) {
-                                                        overallRating = ratings.reduce((sum, r) => sum + Number(r), 0) / ratings.length;
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-4">
+                                            {trip.hasRating && trip.rating ? (
+                                                (() => {
+                                                    // Lấy overallRating, nếu không có thì tính từ các rating khác
+                                                    let overallRating = trip.rating.overallRating;
+                                                    if (overallRating === null || overallRating === undefined) {
+                                                        // Tính trung bình từ 4 tiêu chí
+                                                        const ratings = [
+                                                            trip.rating.punctualityRating,
+                                                            trip.rating.attitudeRating,
+                                                            trip.rating.safetyRating,
+                                                            trip.rating.complianceRating
+                                                        ].filter(r => r !== null && r !== undefined);
+                                                        if (ratings.length > 0) {
+                                                            overallRating = ratings.reduce((sum, r) => sum + Number(r), 0) / ratings.length;
+                                                        }
                                                     }
-                                                }
-                                                const ratingValue = overallRating !== null && overallRating !== undefined
-                                                    ? Number(overallRating)
-                                                    : 0;
-                                                return ratingValue > 0 ? (
-                                                    <StarRating
-                                                        rating={ratingValue}
-                                                        size={16}
-                                                    />
-                                                ) : (
-                                                    <span className="text-sm text-gray-400">Đang tính...</span>
-                                                );
-                                            })()
-                                        ) : (
-                                            <span className="text-sm text-gray-400">Chưa có</span>
-                                        )}
-                                    </td>
-                                    <td className="px-4 py-4 text-right">
-                                        {trip.hasRating ? (
-                                            <button
-                                                onClick={() => handleRateClick(trip)}
-                                                className="text-blue-600 hover:text-blue-900 text-sm font-medium whitespace-nowrap"
-                                            >
-                                                Xem chi tiết
-                                            </button>
-                                        ) : trip.status === 'COMPLETED' ? (
-                                            <button
-                                                onClick={() => handleRateClick(trip)}
-                                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium whitespace-nowrap"
-                                            >
-                                                Đánh giá
-                                            </button>
-                                        ) : (
-                                            <span className="text-sm text-gray-400">
+                                                    const ratingValue = overallRating !== null && overallRating !== undefined
+                                                        ? Number(overallRating)
+                                                        : 0;
+                                                    return ratingValue > 0 ? (
+                                                        <StarRating
+                                                            rating={ratingValue}
+                                                            size={16}
+                                                        />
+                                                    ) : (
+                                                        <span className="text-sm text-gray-400">Đang tính...</span>
+                                                    );
+                                                })()
+                                            ) : (
+                                                <span className="text-sm text-gray-400">Chưa có</span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-4 text-right">
+                                            {trip.hasRating ? (
+                                                <button
+                                                    onClick={() => handleRateClick(trip)}
+                                                    className="text-blue-600 hover:text-blue-900 text-sm font-medium whitespace-nowrap"
+                                                >
+                                                    Xem chi tiết
+                                                </button>
+                                            ) : trip.status === 'COMPLETED' ? (
+                                                <button
+                                                    onClick={() => handleRateClick(trip)}
+                                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium whitespace-nowrap"
+                                                >
+                                                    Đánh giá
+                                                </button>
+                                            ) : (
+                                                <span className="text-sm text-gray-400">
                                                     Chưa hoàn thành
                                                 </span>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))}
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
                             </tbody>
                         </table>
                     </div>

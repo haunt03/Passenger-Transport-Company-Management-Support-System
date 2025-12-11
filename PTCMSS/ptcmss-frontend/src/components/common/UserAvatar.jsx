@@ -1,4 +1,4 @@
- import React from "react";
+import React from "react";
 
 const BRAND_COLOR = "#0079BC";
 

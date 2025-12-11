@@ -1,6 +1,6 @@
 /**
  * Example: Tích hợp Performance vào Driver Detail Page
- *
+ * 
  * File này là ví dụ minh họa cách tích hợp hiển thị hiệu suất tài xế
  * vào trang chi tiết tài xế.
  */
@@ -61,9 +61,9 @@ const DriverDetailWithPerformance = () => {
                         </div>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-sm font-medium ${driver.status === 'Available' ? 'bg-green-100 text-green-800' :
-                        driver.status === 'On_Trip' ? 'bg-blue-100 text-blue-800' :
-                            'bg-gray-100 text-gray-800'
-                    }`}>
+                            driver.status === 'On_Trip' ? 'bg-blue-100 text-blue-800' :
+                                'bg-gray-100 text-gray-800'
+                        }`}>
                         {driver.status}
                     </span>
                 </div>
@@ -76,9 +76,9 @@ const DriverDetailWithPerformance = () => {
                         <button
                             onClick={() => setActiveTab('info')}
                             className={`px-6 py-3 font-medium transition-colors ${activeTab === 'info'
-                                ? 'text-blue-600 border-b-2 border-blue-600'
-                                : 'text-gray-600 hover:text-gray-800'
-                            }`}
+                                    ? 'text-blue-600 border-b-2 border-blue-600'
+                                    : 'text-gray-600 hover:text-gray-800'
+                                }`}
                         >
                             <div className="flex items-center gap-2">
                                 <User size={18} />
@@ -88,9 +88,9 @@ const DriverDetailWithPerformance = () => {
                         <button
                             onClick={() => setActiveTab('performance')}
                             className={`px-6 py-3 font-medium transition-colors ${activeTab === 'performance'
-                                ? 'text-blue-600 border-b-2 border-blue-600'
-                                : 'text-gray-600 hover:text-gray-800'
-                            }`}
+                                    ? 'text-blue-600 border-b-2 border-blue-600'
+                                    : 'text-gray-600 hover:text-gray-800'
+                                }`}
                         >
                             <div className="flex items-center gap-2">
                                 <Award size={18} />

@@ -463,7 +463,7 @@ function CalendarGrid({
                         <span className={cls(
                           "rounded-md border text-[10px] font-medium px-1.5 py-[2px] leading-none whitespace-nowrap",
                           isApproved
-                            ? "border-amber-300 bg-amber-50 text-amber-700"
+                            ? "border-info-300 bg-info-50 text-info-700"
                             : "border-slate-300 bg-slate-100 text-slate-600"
                         )}>
                           {isApproved ? "Nghỉ" : "Chờ duyệt"}

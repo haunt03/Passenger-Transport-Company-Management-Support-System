@@ -7,38 +7,38 @@ import { getDriverProfileByUser, reportIncident, getDriverDashboard, getDriverSc
 
 // Các mức độ nghiêm trọng với mô tả chi tiết
 const SEVERITIES = [
-    {
-        value: "MINOR",
-        label: "Nhẹ",
-        color: "text-blue-700 bg-blue-50 border-blue-200",
-        icon: Info,
-        description: "Sự cố nhỏ, không ảnh hưởng đến an toàn"
-    },
-    {
-        value: "MAJOR",
-        label: "Trung bình",
-        color: "text-amber-700 bg-amber-50 border-amber-200",
-        icon: AlertCircle,
-        description: "Sự cố cần xử lý, có thể ảnh hưởng đến lịch trình"
-    },
-    {
-        value: "CRITICAL",
-        label: "Nghiêm trọng",
-        color: "text-rose-700 bg-rose-50 border-rose-200",
-        icon: AlertTriangle,
-        description: "Sự cố nghiêm trọng, cần xử lý khẩn cấp"
-    },
+  {
+    value: "MINOR",
+    label: "Nhẹ",
+    color: "text-blue-700 bg-blue-50 border-blue-200",
+    icon: Info,
+    description: "Sự cố nhỏ, không ảnh hưởng đến an toàn"
+  },
+  {
+    value: "MAJOR",
+    label: "Trung bình",
+    color: "text-info-700 bg-info-50 border-info-200",
+    icon: AlertCircle,
+    description: "Sự cố cần xử lý, có thể ảnh hưởng đến lịch trình"
+  },
+  {
+    value: "CRITICAL",
+    label: "Nghiêm trọng",
+    color: "text-rose-700 bg-rose-50 border-rose-200",
+    icon: AlertTriangle,
+    description: "Sự cố nghiêm trọng, cần xử lý khẩn cấp"
+  },
 ];
 
 // Các loại sự cố thường gặp
 const INCIDENT_TYPES = [
-    { value: "ACCIDENT", label: "Tai nạn giao thông" },
-    { value: "VEHICLE_BREAKDOWN", label: "Xe hỏng" },
-    { value: "TRAFFIC_JAM", label: "Kẹt xe nghiêm trọng" },
-    { value: "WEATHER", label: "Thời tiết xấu" },
-    { value: "CUSTOMER_ISSUE", label: "Vấn đề với khách hàng" },
-    { value: "ROAD_CONDITION", label: "Đường xấu/ngập nước" },
-    { value: "OTHER", label: "Khác" },
+  { value: "ACCIDENT", label: "Tai nạn giao thông" },
+  { value: "VEHICLE_BREAKDOWN", label: "Xe hỏng" },
+  { value: "TRAFFIC_JAM", label: "Kẹt xe nghiêm trọng" },
+  { value: "WEATHER", label: "Thời tiết xấu" },
+  { value: "CUSTOMER_ISSUE", label: "Vấn đề với khách hàng" },
+  { value: "ROAD_CONDITION", label: "Đường xấu/ngập nước" },
+  { value: "OTHER", label: "Khác" },
 ];
 
 export default function DriverReportIncidentPage() {
@@ -365,7 +365,7 @@ export default function DriverReportIncidentPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-amber-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
       </div>
     );
   }
@@ -431,7 +431,7 @@ export default function DriverReportIncidentPage() {
                           ID: {currentTrip.tripId}
                         </span>
                         {currentTrip.status === "ONGOING" && (
-                          <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-md font-medium">
+                          <span className="text-xs px-2 py-0.5 bg-info-100 text-info-700 rounded-md font-medium">
                             Đang diễn ra
                           </span>
                         )}
@@ -486,7 +486,7 @@ export default function DriverReportIncidentPage() {
                   <select
                     value={selectedTrip?.tripId || ""}
                     onChange={(e) => handleTripSelect(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-info-500 focus:border-transparent"
                   >
                     <option value="">-- Chọn chuyến đi --</option>
                     {availableTrips.map((trip) => {
@@ -507,7 +507,7 @@ export default function DriverReportIncidentPage() {
                       <div className="flex items-center gap-2 mb-2">
                         <div className="font-medium text-slate-700">Thông tin chuyến:</div>
                         {selectedTrip.status === "ONGOING" && (
-                          <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-md font-medium text-[10px]">
+                          <span className="px-2 py-0.5 bg-info-100 text-info-700 rounded-md font-medium text-[10px]">
                             Đang diễn ra
                           </span>
                         )}
@@ -548,7 +548,7 @@ export default function DriverReportIncidentPage() {
                     value={tripIdInput}
                     onChange={(e) => handleManualInput(e.target.value)}
                     placeholder="Nhập mã chuyến đi (Trip ID)"
-                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-info-500 focus:border-transparent"
                   />
                   <p className="text-xs text-slate-500 mt-1">Ví dụ: 123, 456</p>
                   {availableTrips.length > 0 && (
@@ -568,14 +568,14 @@ export default function DriverReportIncidentPage() {
 
               {/* No trips available */}
               {availableTrips.length === 0 && !currentTrip && (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                  <p className="text-sm text-amber-800 mb-2">Không có chuyến đi nào hôm nay.</p>
+                <div className="p-3 bg-info-50 border border-info-200 rounded-lg">
+                  <p className="text-sm text-info-800 mb-2">Không có chuyến đi nào hôm nay.</p>
                   <input
                     type="text"
                     value={tripIdInput}
                     onChange={(e) => handleManualInput(e.target.value)}
                     placeholder="Nhập mã chuyến đi (Trip ID)"
-                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-info-500 focus:border-transparent"
                   />
                 </div>
               )}
@@ -590,7 +590,7 @@ export default function DriverReportIncidentPage() {
               <select
                 value={incidentType}
                 onChange={(e) => setIncidentType(e.target.value)}
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-info-500 focus:border-transparent"
                 required
               >
                 <option value="">-- Chọn loại sự cố --</option>
@@ -647,7 +647,7 @@ export default function DriverReportIncidentPage() {
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                   placeholder="Nhập địa điểm, tên đường hoặc tọa độ. Gõ để được gợi ý..."
-                  className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-info-500 focus:border-transparent"
                 />
               </div>
               {/* <p className="text-xs text-slate-500 mt-1">
@@ -691,7 +691,7 @@ export default function DriverReportIncidentPage() {
                 onChange={(e) => setDescription(e.target.value)}
                 rows={5}
                 placeholder="Mô tả chi tiết tình huống, thiệt hại (nếu có), và những gì bạn đã làm..."
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none"
+                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-info-500 focus:border-transparent resize-none"
                 required
               />
               <div className="flex items-center justify-between mt-1">
@@ -740,13 +740,13 @@ export default function DriverReportIncidentPage() {
         </form>
 
         {/* Help Section */}
-        <div className="mt-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
+        <div className="mt-6 bg-info-50 border border-info-200 rounded-lg p-4">
           <div className="flex items-start gap-3">
-            <Clock className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-            <div className="text-sm text-amber-800">
+            <Clock className="h-5 w-5 text-primary-600 shrink-0 mt-0.5" />
+            <div className="text-sm text-info-800">
               <p className="font-medium mb-1">Cần hỗ trợ khẩn cấp?</p>
               <p className="text-xs">
-                Liên hệ ngay với điều phối viên qua hotline: <strong className="text-amber-900">1900-xxxx</strong>
+                Liên hệ ngay với điều phối viên qua hotline: <strong className="text-info-900">1900-xxxx</strong>
               </p>
             </div>
           </div>

@@ -63,7 +63,7 @@ function Toasts({ toasts }) {
                     className={cls(
                         "rounded-md px-3 py-2 text-sm shadow border",
                         t.kind === "success" &&
-                        "bg-amber-50 border-amber-300 text-amber-700",
+                        "bg-info-50 border-info-300 text-info-700",
                         t.kind === "error" &&
                         "bg-rose-50 border-rose-300 text-rose-700",
                         t.kind === "info" &&
@@ -102,7 +102,7 @@ function KpiBlock({
                         className={cls(
                             "inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md border font-medium",
                             up
-                                ? "bg-amber-50 text-amber-700 border-amber-300"
+                                ? "bg-info-50 text-info-700 border-info-300"
                                 : "bg-rose-50 text-rose-700 border-rose-300"
                         )}
                     >
@@ -198,7 +198,7 @@ function VehiclePerfTable({ rows }) {
     return (
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex flex-wrap items-center gap-2 text-sm">
-                <div className="h-8 w-8 rounded-md bg-amber-100 text-amber-600 border border-amber-200 flex items-center justify-center shadow-sm">
+                <div className="h-8 w-8 rounded-md bg-info-100 text-primary-600 border border-info-200 flex items-center justify-center shadow-sm">
                     <Car className="h-4 w-4" />
                 </div>
 
@@ -603,7 +603,7 @@ export default function ManagerDashboardPro() {
                         deltaPct={null}
                         up={true}
                         icon={
-                            <TrendingUp className="h-3.5 w-3.5 text-amber-600" />
+                            <TrendingUp className="h-3.5 w-3.5 text-primary-600" />
                         }
                     />
 

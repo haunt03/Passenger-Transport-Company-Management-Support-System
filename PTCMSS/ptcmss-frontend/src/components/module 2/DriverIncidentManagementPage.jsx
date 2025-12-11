@@ -37,7 +37,7 @@ const SEVERITIES = [
   {
     value: "MAJOR",
     label: "Trung bình",
-    color: "text-amber-700 bg-amber-50 border-amber-200",
+    color: "text-info-700 bg-info-50 border-info-200",
     icon: AlertCircle,
     description: "Sự cố cần xử lý, có thể ảnh hưởng đến lịch trình"
   },
@@ -125,7 +125,7 @@ const getSeverityLabel = (severity) => {
 const SEVERITY_COLORS = {
   MINOR: { color: "text-blue-700", bg: "bg-blue-50", border: "border-blue-200" },
   NORMAL: { color: "text-slate-700", bg: "bg-slate-50", border: "border-slate-200" },
-  MAJOR: { color: "text-amber-700", bg: "bg-amber-50", border: "border-amber-200" },
+  MAJOR: { color: "text-info-700", bg: "bg-info-50", border: "border-info-200" },
   CRITICAL: { color: "text-rose-700", bg: "bg-rose-50", border: "border-rose-200" },
 };
 
@@ -480,7 +480,7 @@ export default function DriverIncidentManagementPage() {
   const getResolutionBadge = (incident) => {
     if (!incident.resolved) {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-amber-100 text-amber-700 border border-amber-200">
+        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-info-100 text-info-700 border border-info-200">
           <Clock className="h-3.5 w-3.5" /> Chờ xử lý
         </span>
       );
@@ -570,7 +570,7 @@ export default function DriverIncidentManagementPage() {
             <FileText className="h-4 w-4" />
             Danh sách sự cố
             {pendingCount > 0 && (
-              <span className="px-1.5 py-0.5 text-xs bg-amber-500 text-white rounded-full">
+              <span className="px-1.5 py-0.5 text-xs bg-info-500 text-white rounded-full">
                 {pendingCount}
               </span>
             )}
@@ -603,7 +603,7 @@ export default function DriverIncidentManagementPage() {
                             ID: {currentTrip.tripId}
                           </span>
                           {currentTrip.status === "ONGOING" && (
-                            <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-md font-medium">
+                            <span className="text-xs px-2 py-0.5 bg-info-100 text-info-700 rounded-md font-medium">
                               Đang diễn ra
                             </span>
                           )}
@@ -842,11 +842,11 @@ export default function DriverIncidentManagementPage() {
             </div>
             <div className="bg-white rounded-lg border border-slate-200 p-4">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-amber-100 flex items-center justify-center">
-                  <Clock className="h-5 w-5 text-amber-600" />
+                <div className="h-10 w-10 rounded-lg bg-info-100 flex items-center justify-center">
+                  <Clock className="h-5 w-5 text-primary-600" />
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-amber-600">{pendingCount}</div>
+                  <div className="text-2xl font-bold text-primary-600">{pendingCount}</div>
                   <div className="text-sm text-slate-600">Chờ xử lý</div>
                 </div>
               </div>
@@ -883,7 +883,7 @@ export default function DriverIncidentManagementPage() {
                 onClick={() => setFilter("pending")}
                 className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
                   filter === "pending"
-                    ? "bg-amber-600 text-white"
+                    ? "bg-primary-600 text-white"
                     : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
                 }`}
               >

@@ -64,7 +64,7 @@ const STATUS_LABEL = {
 function StatusBadge({ status }) {
     const map = {
         UNPAID:
-            "bg-amber-50 text-amber-700 border-amber-300",
+            "bg-info-50 text-info-700 border-info-300",
         PAID: "bg-emerald-50 text-emerald-700 border-emerald-300",
         OVERDUE:
             "bg-rose-50 text-rose-700 border-rose-300",
@@ -1913,7 +1913,7 @@ export default function InvoiceManagement() {
                     <Clock className="h-4 w-4" />
                     Yêu cầu thanh toán chờ xác nhận
                     {pendingCount > 0 && (
-                        <span className="ml-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-500 text-white">
+                        <span className="ml-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-info-500 text-white">
                             {pendingCount}
                         </span>
                     )}
@@ -2003,7 +2003,7 @@ export default function InvoiceManagement() {
                 <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
                     <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
                         <div className="text-sm text-gray-600 flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-amber-500" />
+                            <Clock className="h-4 w-4 text-info-500" />
                             Yêu cầu thanh toán từ tài xế/tư vấn viên đang chờ xác nhận
                         </div>
                         <button
@@ -2039,7 +2039,7 @@ export default function InvoiceManagement() {
                                                 <span className="text-lg font-bold text-gray-900 tabular-nums">
                                                     {fmtVND(payment.amount || 0)} đ
                                                 </span>
-                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-amber-50 text-amber-700 border border-amber-300">
+                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-info-50 text-info-700 border border-info-300">
                                                     <Clock className="h-3 w-3" />
                                                     Chờ xác nhận
                                                 </span>
@@ -2282,7 +2282,7 @@ function PaymentHistoryModal({ open, invoiceId, paymentHistory, loading, onClose
                 return "bg-rose-50 text-rose-700 border-rose-300";
             case "PENDING":
             default:
-                return "bg-amber-50 text-amber-700 border-amber-300";
+                return "bg-info-50 text-info-700 border-info-300";
         }
     };
     

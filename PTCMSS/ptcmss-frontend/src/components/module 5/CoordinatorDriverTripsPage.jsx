@@ -80,8 +80,8 @@ function TripStatusBadge({ status }) {
         classes = "bg-sky-50 text-sky-700 border-sky-200";
         IconEl = <CarFront className="h-3.5 w-3.5 text-sky-600" />;
     } else if (status === "SCHEDULED" || status === "PENDING") {
-        classes = "bg-amber-50 text-amber-700 border-amber-200";
-        IconEl = <Clock className="h-3.5 w-3.5 text-amber-600" />;
+        classes = "bg-info-50 text-info-700 border-info-200";
+        IconEl = <Clock className="h-3.5 w-3.5 text-primary-600" />;
     } else if (status === "CANCELLED") {
         classes = "bg-gray-50 text-gray-700 border-gray-200";
         IconEl = <X className="h-3.5 w-3.5 text-gray-600" />;
@@ -329,7 +329,7 @@ export default function CoordinatorDriverTripsPage() {
                     </div>
                     <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
                         <div className="text-xs text-slate-500 mb-1">Đã lên lịch</div>
-                        <div className="text-2xl font-bold text-amber-600">
+                        <div className="text-2xl font-bold text-primary-600">
                             {trips.filter((t) => t.status === "SCHEDULED" || t.status === "PENDING").length}
                         </div>
                     </div>
@@ -383,7 +383,7 @@ export default function CoordinatorDriverTripsPage() {
                                                 </td>
                                                 <td className="px-4 py-3 text-slate-700">
                                                     <div className="flex items-start gap-1 text-[12px] leading-relaxed max-w-[200px]">
-                                                        <MapPin className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" />
+                                                        <MapPin className="h-3.5 w-3.5 text-primary-600 shrink-0 mt-0.5" />
                                                         <span className="truncate">{trip.pickupLocation || trip.pickup_location || trip.pickup || "—"}</span>
                                                     </div>
                                                 </td>
@@ -453,6 +453,11 @@ export default function CoordinatorDriverTripsPage() {
         </div>
     );
 }
+
+
+
+
+
 
 
 

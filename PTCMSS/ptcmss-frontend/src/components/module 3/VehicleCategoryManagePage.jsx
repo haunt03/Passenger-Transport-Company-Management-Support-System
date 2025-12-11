@@ -327,12 +327,12 @@ function VehicleCategoryCreateModal({ open, onClose, onCreated, existingCategori
                                     {suggestions.map((cat) => (
                                         <div
                                             key={cat.id}
-                                            className="px-3 py-2 text-[12px] text-slate-700 hover:bg-amber-50 cursor-pointer flex items-center gap-2"
+                                            className="px-3 py-2 text-[12px] text-slate-700 hover:bg-info-50 cursor-pointer flex items-center gap-2"
                                             onClick={() => {
                                                 // Không cho chọn vì đã tồn tại
                                             }}
                                         >
-                                            <AlertTriangle className="h-3 w-3 text-amber-500" />
+                                            <AlertTriangle className="h-3 w-3 text-info-500" />
                                             <span className="font-medium">{cat.name}</span>
                                             <span className="text-slate-400">({cat.seats} ghế)</span>
                                         </div>

@@ -83,14 +83,14 @@ const DriverRatingDashboard = () => {
     const getRatingColor = (rating) => {
         if (rating >= 4.5) return 'text-green-600';
         if (rating >= 4.0) return 'text-blue-600';
-        if (rating >= 3.5) return 'text-yellow-600';
+        if (rating >= 3.5) return 'text-primary-600';
         return 'text-red-600';
     };
 
     const getRatingBadge = (rating) => {
         if (rating >= 4.5) return { label: 'Xuất sắc', color: 'bg-green-100 text-green-800' };
         if (rating >= 4.0) return { label: 'Tốt', color: 'bg-blue-100 text-blue-800' };
-        if (rating >= 3.5) return { label: 'Khá', color: 'bg-yellow-100 text-yellow-800' };
+        if (rating >= 3.5) return { label: 'Khá', color: 'bg-primary-100 text-primary-800' };
         return { label: 'Cần cải thiện', color: 'bg-red-100 text-red-800' };
     };
 
@@ -129,14 +129,14 @@ const DriverRatingDashboard = () => {
                     </div>
                 </div>
 
-                <div className="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-500">
+                <div className="bg-white rounded-lg shadow p-6 border-l-4 border-primary-500">
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm text-gray-600 mb-1">Đánh giá TB</p>
                             <p className="text-3xl font-bold text-gray-800">{stats.avgRating}</p>
                         </div>
-                        <div className="bg-yellow-100 p-3 rounded-full">
-                            <Star className="text-yellow-600 fill-yellow-600" size={24} />
+                        <div className="bg-primary-100 p-3 rounded-full">
+                            <Star className="text-primary-600 fill-primary-600" size={24} />
                         </div>
                     </div>
                 </div>
@@ -236,10 +236,10 @@ const DriverRatingDashboard = () => {
                                     {/* Rank Badge */}
                                     {index < 3 && sortBy === 'rating' && avgRating > 0 && (
                                         <div className="flex justify-end mb-2">
-                                            <span className={`px-2 py-1 rounded-full text-xs font-bold ${index === 0 ? 'bg-yellow-100 text-yellow-800' :
-                                                index === 1 ? 'bg-gray-100 text-gray-800' :
-                                                    'bg-orange-100 text-orange-800'
-                                            }`}>
+                                            <span className={`px-2 py-1 rounded-full text-xs font-bold ${index === 0 ? 'bg-primary-100 text-primary-800' :
+                                                    index === 1 ? 'bg-gray-100 text-gray-800' :
+                                                        'bg-orange-100 text-orange-800'
+                                                }`}>
                                                 #{index + 1}
                                             </span>
                                         </div>
@@ -309,7 +309,7 @@ const DriverRatingDashboard = () => {
                                                     <span className="w-16 text-gray-600">🛡️ An toàn</span>
                                                     <div className="flex-1 bg-gray-200 rounded-full h-2">
                                                         <div
-                                                            className="bg-yellow-500 h-2 rounded-full"
+                                                            className="bg-primary-500 h-2 rounded-full"
                                                             style={{ width: `${(driver.performance.avgSafety / 5) * 100}%` }}
                                                         />
                                                     </div>

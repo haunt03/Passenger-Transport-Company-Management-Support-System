@@ -126,7 +126,7 @@ export default function ReportRevenuePage() {
             try {
                 const branchesData = await listBranches({ size: 100 });
                 console.log("[ReportRevenuePage] Branches loaded:", branchesData);
-
+                
                 // Handle paginated response - backend returns {items: [...], pageNo, pageSize, totalElements, totalPages}
                 if (branchesData?.items && Array.isArray(branchesData.items)) {
                     setBranches(branchesData.items);
@@ -318,8 +318,8 @@ export default function ReportRevenuePage() {
                 {/* grid bộ lọc */}
                 <div className={cls(
                     "grid gap-4 text-[13px]",
-                    isRestrictedView
-                        ? "grid-cols-1 md:grid-cols-2"
+                    isRestrictedView 
+                        ? "grid-cols-1 md:grid-cols-2" 
                         : "grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
                 )}>
                     {/* Từ ngày */}
@@ -443,8 +443,8 @@ export default function ReportRevenuePage() {
 
                 {/* Hiển thị chi nhánh cho Manager/Accountant */}
                 {isRestrictedView && (
-                    <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                        <div className="flex items-center gap-2 text-[13px] text-amber-800">
+                    <div className="mt-3 p-3 bg-info-50 border border-info-200 rounded-lg">
+                        <div className="flex items-center gap-2 text-[13px] text-info-800">
                             <Building2 className="h-4 w-4" />
                             <span className="font-medium">Chi nhánh:</span>
                             <span>{userBranchName || "Đang tải..."}</span>
@@ -520,59 +520,59 @@ export default function ReportRevenuePage() {
                                 minWidth={0}
                             >
                                 <LineChart data={chartData}>
-                                    <CartesianGrid
-                                        stroke="#E5E7EB"
-                                        strokeDasharray="3 3"
-                                    />
-                                    <XAxis
-                                        dataKey="date"
-                                        stroke="#6B7280"
-                                        fontSize={11}
-                                        tickMargin={8}
-                                    />
-                                    <YAxis
-                                        stroke="#6B7280"
-                                        fontSize={11}
-                                        tickFormatter={(v) =>
-                                            v / 1_000_000 +
-                                            "M"
-                                        }
-                                    />
-                                    <Tooltip
-                                        formatter={(val) =>
-                                            fmtVND(val) + " đ"
-                                        }
-                                        labelStyle={{
-                                            fontSize:
-                                                "12px",
-                                            color: "#374151",
-                                        }}
-                                        itemStyle={{
-                                            fontSize:
-                                                "12px",
-                                            color: "#111827",
-                                        }}
-                                    />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="revenue"
-                                        stroke={BRAND_COLOR}
-                                        strokeWidth={2}
-                                        dot={{
-                                            r: 3,
-                                            strokeWidth: 1,
-                                            stroke: BRAND_COLOR,
-                                            fill: "#fff",
-                                        }}
-                                        activeDot={{
-                                            r: 4,
-                                            strokeWidth: 1,
-                                            stroke: BRAND_COLOR,
-                                            fill: "#fff",
-                                        }}
-                                    />
-                                </LineChart>
-                            </ResponsiveContainer>
+                                <CartesianGrid
+                                    stroke="#E5E7EB"
+                                    strokeDasharray="3 3"
+                                />
+                                <XAxis
+                                    dataKey="date"
+                                    stroke="#6B7280"
+                                    fontSize={11}
+                                    tickMargin={8}
+                                />
+                                <YAxis
+                                    stroke="#6B7280"
+                                    fontSize={11}
+                                    tickFormatter={(v) =>
+                                        v / 1_000_000 +
+                                        "M"
+                                    }
+                                />
+                                <Tooltip
+                                    formatter={(val) =>
+                                        fmtVND(val) + " đ"
+                                    }
+                                    labelStyle={{
+                                        fontSize:
+                                            "12px",
+                                        color: "#374151",
+                                    }}
+                                    itemStyle={{
+                                        fontSize:
+                                            "12px",
+                                        color: "#111827",
+                                    }}
+                                />
+                                <Line
+                                    type="monotone"
+                                    dataKey="revenue"
+                                    stroke={BRAND_COLOR}
+                                    strokeWidth={2}
+                                    dot={{
+                                        r: 3,
+                                        strokeWidth: 1,
+                                        stroke: BRAND_COLOR,
+                                        fill: "#fff",
+                                    }}
+                                    activeDot={{
+                                        r: 4,
+                                        strokeWidth: 1,
+                                        stroke: BRAND_COLOR,
+                                        fill: "#fff",
+                                    }}
+                                />
+                            </LineChart>
+                        </ResponsiveContainer>
                         ) : (
                             <div className="w-full h-[220px] flex items-center justify-center text-gray-400 text-sm">
                                 Đang tải biểu đồ...

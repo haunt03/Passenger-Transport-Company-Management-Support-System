@@ -1449,7 +1449,7 @@ export default function CreateOrderPage() {
 
             {/* DEBUG PANEL - Remove this after testing */}
             {/* {process.env.NODE_ENV === 'development' && (
-                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs">
+                <div className="mb-4 p-3 bg-info-50 border border-info-200 rounded-lg text-xs">
                     <div className="font-bold mb-2">🔍 Debug Info:</div>
                     <div>loadingBranch: {String(loadingBranch)}</div>
                     <div>isAdmin: {String(isAdmin)}</div>
@@ -1703,7 +1703,7 @@ export default function CreateOrderPage() {
                     {/* Phần NOTE cho tài xế */}
                     <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                         <div className="flex items-center gap-2 text-slate-900 text-[14px] font-semibold mb-4">
-                            <AlertTriangle className="h-4 w-4 text-amber-600" />
+                            <AlertTriangle className="h-4 w-4 text-primary-600" />
                             <span>Ghi chú cho tài xế</span>
                         </div>
                         <textarea
@@ -1721,7 +1721,7 @@ export default function CreateOrderPage() {
                     {/* Phần 4: GIÁ BÁO KHÁCH */}
                     <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                         <div className="flex items-center gap-2 text-slate-900 text-[14px] font-semibold mb-4">
-                            <DollarSign className="h-4 w-4 text-amber-600" />
+                            <DollarSign className="h-4 w-4 text-primary-600" />
                             <span>Báo giá</span>
                             {calculatingPrice ? (
                                 <span className="text-[11px] text-slate-500 flex items-center gap-1 font-normal">
@@ -1778,7 +1778,7 @@ export default function CreateOrderPage() {
                                     disabled={calculatingDistance}
                                 />
                                 {distanceError && (
-                                    <div className="text-[11px] text-amber-600 mt-1 flex items-center gap-1">
+                                    <div className="text-[11px] text-primary-600 mt-1 flex items-center gap-1">
                                         <AlertTriangle className="h-3 w-3" />
                                         {distanceError}
                                     </div>
@@ -1829,7 +1829,7 @@ export default function CreateOrderPage() {
                                     placeholder="0"
                                 />
                                 <div className="text-[11px] text-slate-500 mt-1">
-                                    Số tiền giảm: <span className="font-semibold text-amber-600">{fmtVND(discount)} đ</span>
+                                    Số tiền giảm: <span className="font-semibold text-primary-600">{fmtVND(discount)} đ</span>
                                 </div>
                                 <input
                                     value={
@@ -2175,7 +2175,7 @@ export default function CreateOrderPage() {
                             {/* Note / cảnh báo */}
                             <div className="md:col-span-2">
                                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-[12px] text-slate-600 flex items-start gap-2 leading-relaxed">
-                                    <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                                    <AlertTriangle className="h-4 w-4 text-primary-600 shrink-0" />
                                     <div>
                                         Hãy xác nhận lại điểm
                                         đón, số lượng hành lý
@@ -2205,13 +2205,13 @@ export default function CreateOrderPage() {
 
                     {availabilityInfo &&
                         !availabilityInfo.ok ? (
-                        <div className="rounded-lg border border-amber-200 bg-amber-50 text-amber-700 text-[12px] p-3 flex items-center justify-between">
+                        <div className="rounded-lg border border-info-200 bg-info-50 text-info-700 text-[12px] p-3 flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                                <AlertTriangle className="h-4 w-4 text-primary-600 shrink-0" />
                                 <span>
                                     Không đủ xe {selectedCategory?.name || "loại này"} cho khung giờ này
                                     {(availabilityInfo.alternativeCategories?.length > 0 || availabilityInfo.nextAvailableSlots?.length > 0) && (
-                                        <span className="text-amber-600"> - có gợi ý thay thế!</span>
+                                        <span className="text-primary-600"> - có gợi ý thay thế!</span>
                                     )}
                                 </span>
                             </div>
@@ -2219,7 +2219,7 @@ export default function CreateOrderPage() {
                                 <button
                                     type="button"
                                     onClick={() => setShowSuggestionDialog(true)}
-                                    className="px-3 py-1.5 rounded-md bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-medium transition-colors flex items-center gap-1.5 shadow-sm"
+                                    className="px-3 py-1.5 rounded-md bg-primary-600 hover:bg-primary-700 text-white text-[11px] font-medium transition-colors flex items-center gap-1.5 shadow-sm"
                                 >
                                     <Sparkles className="h-3.5 w-3.5" />
                                     Xem gợi ý
@@ -2252,7 +2252,7 @@ export default function CreateOrderPage() {
                                 </p>
                                 <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
                                     {recentBookingSuggestion.customerName || "Khách hàng cũ"}
-                                    <Sparkles className="h-4 w-4 text-amber-500" />
+                                    <Sparkles className="h-4 w-4 text-info-500" />
                                 </h3>
                                 <p className="text-sm text-slate-600 mt-1">
                                     Hệ thống tìm thấy đơn gần nhất của khách này. Bạn có muốn tự động điền lại theo lịch sử để tiết kiệm thời gian không?
@@ -2322,7 +2322,7 @@ export default function CreateOrderPage() {
                     <div className="p-6 space-y-5">
                         {/* Header */}
                         <div className="flex items-start gap-4">
-                            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-amber-100 to-orange-100 text-amber-600 flex items-center justify-center shadow-inner">
+                            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-primary-100 to-primary-200 text-primary-600 flex items-center justify-center shadow-inner">
                                 <AlertTriangle className="h-7 w-7" />
                             </div>
                             <div className="flex-1">
@@ -2331,7 +2331,7 @@ export default function CreateOrderPage() {
                                 </h3>
                                 <p className="text-sm text-slate-500 mt-1">
                                     Cần <span className="font-medium text-slate-700">{availabilityInfo.needed}</span> xe {selectedCategory?.name || ""}, 
-                                    hiện chỉ còn <span className="font-medium text-amber-600">{availabilityInfo.count}</span> xe rảnh.
+                                    hiện chỉ còn <span className="font-medium text-primary-600">{availabilityInfo.count}</span> xe rảnh.
                                     Vui lòng chọn một trong các gợi ý bên dưới.
                                 </p>
                             </div>
