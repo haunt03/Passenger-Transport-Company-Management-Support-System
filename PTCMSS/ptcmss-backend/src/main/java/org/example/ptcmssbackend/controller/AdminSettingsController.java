@@ -6,8 +6,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.ptcmssbackend.dto.request.QrSettingsUpdateRequest;
-import org.example.ptcmssbackend.dto.response.common.ApiResponse;
 import org.example.ptcmssbackend.dto.response.QrSettingsResponse;
+import org.example.ptcmssbackend.dto.response.common.ApiResponse;
 import org.example.ptcmssbackend.entity.AppSetting;
 import org.example.ptcmssbackend.service.AppSettingService;
 import org.springframework.http.ResponseEntity;
@@ -34,29 +34,37 @@ public class AdminSettingsController {
     public ResponseEntity<ApiResponse<QrSettingsResponse>> getQrSettings() {
         try {
             Map<String, String> settings = appSettingService.getQrSettings();
-
+            
             // Get metadata from DB if exists
             AppSetting bankCodeSetting = appSettingService.getAllSettings().stream()
                     .filter(s -> s.getKey().equals(AppSettingService.QR_BANK_CODE))
                     .findFirst()
                     .orElse(null);
-
+            
+            // Get username from Employee if exists
+            String updatedByUsername = null;
+            if (bankCodeSetting != null && bankCodeSetting.getUpdatedBy() != null) {
+                updatedByUsername = bankCodeSetting.getUpdatedBy().getUser() != null 
+                        ? bankCodeSetting.getUpdatedBy().getUser().getUsername() 
+                        : null;
+            }
+            
             QrSettingsResponse response = QrSettingsResponse.builder()
                     .bankCode(settings.get(AppSettingService.QR_BANK_CODE))
                     .accountNumber(settings.get(AppSettingService.QR_ACCOUNT_NUMBER))
                     .accountName(settings.get(AppSettingService.QR_ACCOUNT_NAME))
                     .descriptionPrefix(settings.get(AppSettingService.QR_DESCRIPTION_PREFIX))
                     .updatedAt(bankCodeSetting != null ? bankCodeSetting.getUpdatedAt() : null)
-                    .updatedBy(bankCodeSetting != null ? bankCodeSetting.getUpdatedBy() : null)
+                    .updatedBy(updatedByUsername)
                     .source(bankCodeSetting != null ? "database" : "config")
                     .build();
-
+            
             ApiResponse<QrSettingsResponse> apiResponse = ApiResponse.<QrSettingsResponse>builder()
                     .success(true)
                     .message("Lấy cấu hình QR thành công")
                     .data(response)
                     .build();
-
+            
             return ResponseEntity.ok(apiResponse);
         } catch (Exception e) {
             log.error("Error getting QR settings", e);
@@ -77,17 +85,17 @@ public class AdminSettingsController {
             Authentication authentication) {
         try {
             String username = authentication.getName();
-
+            
             // Validate and update settings
             Map<String, String> settingsMap = new HashMap<>();
             settingsMap.put(AppSettingService.QR_BANK_CODE, request.getBankCode());
             settingsMap.put(AppSettingService.QR_ACCOUNT_NUMBER, request.getAccountNumber());
             settingsMap.put(AppSettingService.QR_ACCOUNT_NAME, request.getAccountName());
-            settingsMap.put(AppSettingService.QR_DESCRIPTION_PREFIX,
+            settingsMap.put(AppSettingService.QR_DESCRIPTION_PREFIX, 
                     request.getDescriptionPrefix() != null ? request.getDescriptionPrefix() : "PTCMSS");
-
+            
             appSettingService.updateSettings(settingsMap, username);
-
+            
             // Return updated settings
             QrSettingsResponse response = QrSettingsResponse.builder()
                     .bankCode(request.getBankCode())
@@ -98,15 +106,15 @@ public class AdminSettingsController {
                     .updatedBy(username)
                     .source("database")
                     .build();
-
+            
             log.info("Admin {} updated QR settings", username);
-
+            
             ApiResponse<QrSettingsResponse> apiResponse = ApiResponse.<QrSettingsResponse>builder()
                     .success(true)
                     .message("Cập nhật cấu hình QR thành công")
                     .data(response)
                     .build();
-
+            
             return ResponseEntity.ok(apiResponse);
         } catch (Exception e) {
             log.error("Error updating QR settings", e);

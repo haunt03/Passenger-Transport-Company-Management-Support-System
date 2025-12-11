@@ -21,6 +21,6 @@ public class ExpenseRequestResponse {
     private String vehiclePlate;
     private Integer requesterUserId;
     private String requesterName;
-    private List<String> attachments;
     private Instant createdAt;
+    private List<String> receiptImages; // List of image URLs
 }

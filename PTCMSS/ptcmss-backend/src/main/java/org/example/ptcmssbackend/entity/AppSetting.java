@@ -32,8 +32,9 @@ public class AppSetting {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
-    @Column(name = "updated_by", length = 100)
-    private String updatedBy;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "updated_by")
+    private Employees updatedBy;
 
     @PrePersist
     @PreUpdate

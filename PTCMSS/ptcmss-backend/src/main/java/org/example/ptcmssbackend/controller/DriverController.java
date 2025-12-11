@@ -9,12 +9,7 @@ import org.example.ptcmssbackend.dto.request.Driver.CreateDriverRequest;
 import org.example.ptcmssbackend.dto.request.Driver.DriverDayOffRequest;
 import org.example.ptcmssbackend.dto.request.Driver.DriverProfileUpdateRequest;
 import org.example.ptcmssbackend.dto.request.Driver.ReportIncidentRequest;
-import org.example.ptcmssbackend.dto.response.Driver.DriverDashboardResponse;
-import org.example.ptcmssbackend.dto.response.Driver.DriverDayOffResponse;
-import org.example.ptcmssbackend.dto.response.Driver.DriverProfileResponse;
-import org.example.ptcmssbackend.dto.response.Driver.DriverResponse;
-import org.example.ptcmssbackend.dto.response.Driver.DriverScheduleResponse;
-import org.example.ptcmssbackend.dto.response.Driver.TripIncidentResponse;
+import org.example.ptcmssbackend.dto.response.Driver.*;
 import org.example.ptcmssbackend.dto.response.common.ResponseData;
 import org.example.ptcmssbackend.dto.response.common.ResponseError;
 import org.example.ptcmssbackend.service.DispatchService;
@@ -43,14 +38,31 @@ public class DriverController {
     @Operation(summary = "Dashboard tài xế", description = "Hiển thị chuyến đi hiện tại và lịch trình sắp tới của tài xế.")
     @GetMapping("/{driverId}/dashboard")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','DRIVER','COORDINATOR')")
-    public ResponseData<DriverDashboardResponse> getDriverDashboard(
+    public ResponseEntity<ResponseData<DriverDashboardResponse>> getDriverDashboard(
             @Parameter(description = "ID tài xế") @PathVariable Integer driverId) {
         try{
-            return new ResponseData<>(HttpStatus.OK.value(),
+            DriverDashboardResponse dashboard = driverService.getDashboard(driverId);
+            return ResponseEntity.ok(new ResponseData<>(HttpStatus.OK.value(),
                     "Get driver dashboard successfully",
-                    driverService.getDashboard(driverId));
+                    dashboard));
+        } catch (RuntimeException e) {
+            log.error("Get driver dashboard failed for driverId {}: {}", driverId, e.getMessage());
+            if (e.getMessage() != null && e.getMessage().contains("Không tìm thấy")) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(new ResponseData<>(HttpStatus.NOT_FOUND.value(),
+                                e.getMessage(),
+                                null));
+            }
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ResponseData<>(HttpStatus.BAD_REQUEST.value(),
+                            e.getMessage() != null ? e.getMessage() : "Lỗi khi lấy dashboard tài xế",
+                            null));
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            log.error("Get driver dashboard failed for driverId {}: {}", driverId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ResponseData<>(HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                            "Lỗi hệ thống khi lấy dashboard tài xế",
+                            null));
         }
     }
 
@@ -64,17 +76,17 @@ public class DriverController {
             @Parameter(description = "ID tài xế") @PathVariable Integer driverId,
             @Parameter(description = "Ngày bắt đầu (ISO format: yyyy-MM-ddTHH:mm:ssZ)") @RequestParam(required = false) String startDate,
             @Parameter(description = "Ngày kết thúc (ISO format: yyyy-MM-ddTHH:mm:ssZ)") @RequestParam(required = false) String endDate) {
-        try{
-            log.info("Get driver schedule for driver {} from {} to {}", driverId, startDate, endDate);
-            java.time.Instant start = startDate != null ? java.time.Instant.parse(startDate) : null;
-            java.time.Instant end = endDate != null ? java.time.Instant.parse(endDate) : null;
-            return new ResponseData<>(HttpStatus.OK.value(),
-                    "Get driver schedule successfully",
-                    driverService.getSchedule(driverId, start, end));
-        } catch (Exception e) {
-            log.error("Get driver schedule failed", e);
-            throw new RuntimeException(e);
-        }
+         try{
+             log.info("Get driver schedule for driver {} from {} to {}", driverId, startDate, endDate);
+             java.time.Instant start = startDate != null ? java.time.Instant.parse(startDate) : null;
+             java.time.Instant end = endDate != null ? java.time.Instant.parse(endDate) : null;
+             return new ResponseData<>(HttpStatus.OK.value(),
+                     "Get driver schedule successfully",
+                     driverService.getSchedule(driverId, start, end));
+         } catch (Exception e) {
+             log.error("Get driver schedule failed", e);
+             throw new RuntimeException(e);
+         }
     }
 
     // ======================================================
@@ -100,16 +112,34 @@ public class DriverController {
     @Operation(summary = "Xem hồ sơ theo userId", description = "Dùng khi FE chỉ có userId trong session")
     @GetMapping("/by-user/{userId}/profile")
     @PreAuthorize("hasAnyRole('DRIVER', 'MANAGER', 'ADMIN')")
-    public ResponseData<DriverProfileResponse> getDriverProfileByUser(
+    public ResponseEntity<ResponseData<DriverProfileResponse>> getDriverProfileByUser(
             @Parameter(description = "ID user") @PathVariable Integer userId) {
         try {
-            log.info("Get driver profile by userId successfully");
-            return new ResponseData<>(HttpStatus.OK.value(),
+            log.info("Get driver profile by userId: {}", userId);
+            DriverProfileResponse profile = driverService.getProfileByUserId(userId);
+            return ResponseEntity.ok(new ResponseData<>(HttpStatus.OK.value(),
                     "Get driver profile by userId successfully",
-                    driverService.getProfileByUserId(userId));
+                    profile));
+        } catch (RuntimeException e) {
+            log.error("Get driver profile by userId failed for userId {}: {}", userId, e.getMessage());
+            // Trả về 404 nếu không tìm thấy driver
+            if (e.getMessage() != null && e.getMessage().contains("Không tìm thấy")) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(new ResponseData<>(HttpStatus.NOT_FOUND.value(),
+                                e.getMessage(),
+                                null));
+            }
+            // Trả về 400 cho các lỗi khác
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ResponseData<>(HttpStatus.BAD_REQUEST.value(),
+                            e.getMessage() != null ? e.getMessage() : "Lỗi khi lấy thông tin tài xế",
+                            null));
         } catch (Exception e) {
-            log.error("Get driver profile by userId failed", e);
-            throw new RuntimeException(e);
+            log.error("Get driver profile by userId failed for userId {}: {}", userId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ResponseData<>(HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                            "Lỗi hệ thống khi lấy thông tin tài xế",
+                            null));
         }
     }
 
@@ -120,10 +150,10 @@ public class DriverController {
             @Parameter(description = "ID tài xế") @PathVariable Integer driverId,
             @RequestBody DriverProfileUpdateRequest request) {
         try{
-            log.info("Update driver profile successfully");
-            return new ResponseData<>(HttpStatus.OK.value(),
-                    "Update driver profile successfully",
-                    driverService.updateProfile(driverId, request));
+           log.info("Update driver profile successfully");
+           return new ResponseData<>(HttpStatus.OK.value(),
+                   "Update driver profile successfully",
+                   driverService.updateProfile(driverId, request));
         } catch (Exception e) {
             log.error("Update driver profile failed", e);
             throw new RuntimeException(e);
@@ -165,7 +195,7 @@ public class DriverController {
             throw new RuntimeException(e);
         }
     }
-
+    
     @Operation(summary = "Hủy yêu cầu nghỉ phép", description = "Tài xế hủy yêu cầu nghỉ phép đã gửi (PENDING hoặc APPROVED). Trạng thái tài xế sẽ chuyển về ACTIVE.")
     @DeleteMapping("/{driverId}/dayoff/{dayOffId}")
     @PreAuthorize("hasRole('DRIVER')")
@@ -218,7 +248,7 @@ public class DriverController {
             return new ResponseData<>(HttpStatus.OK.value(),
                     "Complete trip successfully", result);
         } catch (Exception e) {
-            log.error("[DriverController] Complete trip failed - tripId: {}, driverId: {}, error: {}",
+            log.error("[DriverController] Complete trip failed - tripId: {}, driverId: {}, error: {}", 
                     tripId, driverId, e.getMessage(), e);
             String errorMessage = e.getMessage() != null ? e.getMessage() : "Complete trip failed";
             return new ResponseError(HttpStatus.BAD_REQUEST.value(), errorMessage);
@@ -250,12 +280,12 @@ public class DriverController {
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseData<DriverResponse> createDriver(@RequestBody CreateDriverRequest request) {
-        try{
-            log.info("Create driver: ", request);
-            return new ResponseData<>(HttpStatus.OK.value(), "Tạo tài xế thành công", driverService.createDriver(request));
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+      try{
+          log.info("Create driver: ", request);
+          return new ResponseData<>(HttpStatus.OK.value(), "Tạo tài xế thành công", driverService.createDriver(request));
+      } catch (Exception e) {
+          throw new RuntimeException(e);
+      }
     }
 
     // =====================================================================
