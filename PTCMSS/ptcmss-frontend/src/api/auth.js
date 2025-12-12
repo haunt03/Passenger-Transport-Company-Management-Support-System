@@ -37,7 +37,7 @@ export async function login({ username, password }) {
 
 export async function refresh() {
     const refreshToken = localStorage.getItem("refresh_token");
-    if (!refreshToken) throw new Error("NO_REFRESH_TOKEN");
+    if (!refreshToken) throw new Error("Thiếu refresh token. Vui lòng đăng nhập lại.");
     const data = await apiFetch(`/api/auth/refresh-token?refreshToken=${encodeURIComponent(refreshToken)}`, {
         method: "POST",
         auth: false,
