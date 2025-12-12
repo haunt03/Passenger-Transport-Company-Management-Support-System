@@ -41,7 +41,8 @@ public class AppConfig implements WebMvcConfigurer {
             "/set-password",
             "/ws/**",                // WebSocket endpoint
             "/topic/**",             // WebSocket topic subscriptions
-            "/app/**"                // WebSocket app destination prefix
+            "/app/**",               // WebSocket app destination prefix
+            "/actuator/**"           // Spring Boot Actuator endpoints (health, info)
     };
 
     @Bean
