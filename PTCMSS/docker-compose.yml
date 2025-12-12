@@ -18,7 +18,7 @@ services:
 
   backend:
     build:
-      context: ./PTCMSS-Backend
+      context: ./ptcmss-backend
       dockerfile: Dockerfile
     container_name: ptcmss-backend
     restart: always
