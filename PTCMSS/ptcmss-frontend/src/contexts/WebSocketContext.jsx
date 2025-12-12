@@ -97,8 +97,9 @@ export const WebSocketProvider = ({ children }) => {
 
     useEffect(() => {
         // Create STOMP client with SockJS
+        const apiBase = (import.meta?.env?.VITE_API_BASE || "http://localhost:8080").replace(/\/$/, "");
         const client = new Client({
-            webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
+            webSocketFactory: () => new SockJS(`${apiBase}/ws`),
             debug: (str) => {
                 console.log('[WebSocket Debug]', str);
             },
