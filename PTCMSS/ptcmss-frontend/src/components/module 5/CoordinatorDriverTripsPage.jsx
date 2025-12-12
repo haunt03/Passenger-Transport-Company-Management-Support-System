@@ -359,57 +359,57 @@ export default function CoordinatorDriverTripsPage() {
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left text-[13px]">
                                     <thead className="text-[11px] uppercase tracking-wide bg-slate-100/60 border-b border-slate-200 text-slate-500">
-                                        <tr>
-                                            <th className="px-4 py-3 font-medium">Mã chuyến</th>
-                                            <th className="px-4 py-3 font-medium">Khách hàng</th>
-                                            <th className="px-4 py-3 font-medium">Địa điểm đón</th>
-                                            <th className="px-4 py-3 font-medium">Địa điểm đến</th>
-                                            <th className="px-4 py-3 font-medium">Thời gian đón</th>
-                                            <th className="px-4 py-3 font-medium">Thời gian đến</th>
-                                            <th className="px-4 py-3 font-medium text-right">Trạng thái</th>
-                                        </tr>
+                                    <tr>
+                                        <th className="px-4 py-3 font-medium">Mã chuyến</th>
+                                        <th className="px-4 py-3 font-medium">Khách hàng</th>
+                                        <th className="px-4 py-3 font-medium">Địa điểm đón</th>
+                                        <th className="px-4 py-3 font-medium">Địa điểm đến</th>
+                                        <th className="px-4 py-3 font-medium">Thời gian đón</th>
+                                        <th className="px-4 py-3 font-medium">Thời gian đến</th>
+                                        <th className="px-4 py-3 font-medium text-right">Trạng thái</th>
+                                    </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-200">
-                                        {paginatedTrips.map((trip) => (
-                                            <tr key={trip.tripId || trip.id} className="hover:bg-slate-50 transition-colors">
-                                                <td className="px-4 py-3 font-medium text-slate-900 whitespace-nowrap">
-                                                    {trip.tripCode || trip.code || `#${trip.tripId || trip.id}`}
-                                                </td>
-                                                <td className="px-4 py-3 text-slate-700">
-                                                    <div className="font-medium">{trip.customerName || trip.customer_name || "—"}</div>
-                                                    {trip.customerPhone && (
-                                                        <div className="text-[11px] text-slate-500">{trip.customerPhone || trip.customer_phone}</div>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3 text-slate-700">
-                                                    <div className="flex items-start gap-1 text-[12px] leading-relaxed max-w-[200px]">
-                                                        <MapPin className="h-3.5 w-3.5 text-primary-600 shrink-0 mt-0.5" />
-                                                        <span className="truncate">{trip.pickupLocation || trip.pickup_location || trip.pickup || "—"}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-slate-700">
-                                                    <div className="flex items-start gap-1 text-[12px] leading-relaxed max-w-[200px]">
-                                                        <MapPin className="h-3.5 w-3.5 text-green-600 shrink-0 mt-0.5" />
-                                                        <span className="truncate">{trip.dropoffLocation || trip.dropoff_location || trip.dropoff || "—"}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
-                                                    <div className="flex items-start gap-1 text-[12px] leading-relaxed">
-                                                        <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                                                        <span>{fmtDateTimeShort(trip.startTime || trip.start_time || trip.pickupTime || trip.pickup_time)}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
-                                                    <div className="flex items-start gap-1 text-[12px] leading-relaxed">
-                                                        <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                                                        <span>{fmtDateTimeShort(trip.endTime || trip.end_time || trip.dropoffTime || trip.dropoff_time)}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-right">
-                                                    <TripStatusBadge status={trip.status} />
-                                                </td>
-                                            </tr>
-                                        ))}
+                                    {paginatedTrips.map((trip) => (
+                                        <tr key={trip.tripId || trip.id} className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-4 py-3 font-medium text-slate-900 whitespace-nowrap">
+                                                {trip.tripCode || trip.code || `#${trip.tripId || trip.id}`}
+                                            </td>
+                                            <td className="px-4 py-3 text-slate-700">
+                                                <div className="font-medium">{trip.customerName || trip.customer_name || "—"}</div>
+                                                {trip.customerPhone && (
+                                                    <div className="text-[11px] text-slate-500">{trip.customerPhone || trip.customer_phone}</div>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 text-slate-700">
+                                                <div className="flex items-start gap-1 text-[12px] leading-relaxed max-w-[200px]">
+                                                    <MapPin className="h-3.5 w-3.5 text-primary-600 shrink-0 mt-0.5" />
+                                                    <span className="truncate">{trip.pickupLocation || trip.pickup_location || trip.pickup || "—"}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-slate-700">
+                                                <div className="flex items-start gap-1 text-[12px] leading-relaxed max-w-[200px]">
+                                                    <MapPin className="h-3.5 w-3.5 text-green-600 shrink-0 mt-0.5" />
+                                                    <span className="truncate">{trip.dropoffLocation || trip.dropoff_location || trip.dropoff || "—"}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
+                                                <div className="flex items-start gap-1 text-[12px] leading-relaxed">
+                                                    <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                                                    <span>{fmtDateTimeShort(trip.startTime || trip.start_time || trip.pickupTime || trip.pickup_time)}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
+                                                <div className="flex items-start gap-1 text-[12px] leading-relaxed">
+                                                    <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                                                    <span>{fmtDateTimeShort(trip.endTime || trip.end_time || trip.dropoffTime || trip.dropoff_time)}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 whitespace-nowrap text-right">
+                                                <TripStatusBadge status={trip.status} />
+                                            </td>
+                                        </tr>
+                                    ))}
                                     </tbody>
                                 </table>
                             </div>
@@ -453,6 +453,15 @@ export default function CoordinatorDriverTripsPage() {
         </div>
     );
 }
+
+
+
+
+
+
+
+
+
 
 
 

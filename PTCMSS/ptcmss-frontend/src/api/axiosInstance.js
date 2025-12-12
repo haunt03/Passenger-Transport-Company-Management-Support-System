@@ -41,7 +41,7 @@ async function get(path, { params, responseType } = {}) {
         if (token) headers["Authorization"] = `Bearer ${token}`;
         const resp = await fetch(url, { method: "GET", headers, credentials: "include" });
         if (!resp.ok) {
-            const err = new Error("API_ERROR");
+            const err = new Error("Lỗi máy chủ");
             err.status = resp.status;
             throw err;
         }

@@ -35,17 +35,19 @@ import { useNotifications } from "./hooks/useNotifications";
 
 // Menu items cho từng role - hiển thị flat list, không dùng accordion
 const SIDEBAR_ITEMS_BY_ROLE = {
-    // Consultant (Tư vấn viên - 5 options)
+    // Consultant (Tư vấn viên - 7 options)
     [ROLES.CONSULTANT]: [
-        { label: "Bảng điều khiển", to: "/orders/dashboard", icon: LayoutDashboard },
+        { label: "Bảng điều khiển", to: "/orders/dashboard", icon: LayoutDashboard, exact: true },
         { label: "Danh sách đơn hàng", to: "/orders", icon: ClipboardList },
         { label: "Tạo đơn hàng", to: "/orders/new", icon: ClipboardList },
+        { label: "Danh sách khách hàng", to: "/consultant/customers", icon: Users },
         { label: "Danh sách xe", to: "/consultant/vehicles", icon: CarFront },
         { label: "Danh sách tài xế", to: "/consultant/drivers", icon: Users },
+        { label: "Đánh giá tài xế", to: "/consultant/ratings", icon: BarChart3 },
     ],
     // Driver (Tài xế - 8 options)
     [ROLES.DRIVER]: [
-        { label: "Bảng điều khiển", to: "/driver/dashboard", icon: LayoutDashboard },
+        { label: "Bảng điều khiển", to: "/driver/dashboard", icon: LayoutDashboard, exact: true },
         { label: "Lịch làm việc", to: "/driver/schedule", icon: CalendarClock },
         { label: "Danh sách chuyến", to: "/driver/trips-list", icon: ClipboardList },
         { label: "Quản lý sự cố", to: "/driver/incidents", icon: AlertTriangle },
@@ -56,18 +58,17 @@ const SIDEBAR_ITEMS_BY_ROLE = {
     ],
     // Coordinator (Điều phối viên - 7 options)
     [ROLES.COORDINATOR]: [
-        { label: "Bảng điều khiển", to: "/dispatch", icon: LayoutDashboard },
+        { label: "Bảng điều khiển", to: "/dispatch", icon: LayoutDashboard, exact: true },
         { label: "Cảnh báo chờ duyệt", to: "/dispatch/notifications-dashboard", icon: Bell },
         { label: "Sự cố chuyến đi", to: "/dispatch/incidents", icon: AlertTriangle },
         { label: "Danh sách đơn", to: "/coordinator/orders", icon: ClipboardList },
         { label: "Danh sách tài xế", to: "/coordinator/drivers", icon: Users },
         { label: "Danh sách xe", to: "/coordinator/vehicles", icon: CarFront },
         { label: "Quản lý yêu cầu", to: "/coordinator/expense-management", icon: DollarSign },
-        { label: "Đánh giá tài xế", to: "/dispatch/ratings", icon: BarChart3 },
     ],
     // Accountant (Kế toán - 8 options)
     [ROLES.ACCOUNTANT]: [
-        { label: "Bảng điều khiển", to: "/accounting", icon: LayoutDashboard },
+        { label: "Bảng điều khiển", to: "/accounting", icon: LayoutDashboard, exact: true },
         { label: "Báo cáo doanh thu", to: "/accounting/revenue-report", icon: BarChart3 },
         { label: "Báo cáo chi phí", to: "/accounting/expenses", icon: DollarSign },
         { label: "Danh sách hóa đơn", to: "/accounting/invoices", icon: ClipboardList },
@@ -76,11 +77,12 @@ const SIDEBAR_ITEMS_BY_ROLE = {
         { label: "Danh sách nhân viên", to: "/accountant/users", icon: Users },
         { label: "Danh sách xe", to: "/accountant/vehicles", icon: CarFront },
     ],
-    // Manager (Quản lý - 6 options)
+    // Manager (Quản lý - 8 options)
     [ROLES.MANAGER]: [
-        { label: "Bảng điều khiển", to: "/analytics/manager", icon: LayoutDashboard },
+        { label: "Bảng điều khiển", to: "/analytics/manager", icon: LayoutDashboard, exact: true },
         { label: "Báo cáo doanh thu", to: "/accounting/revenue-report", icon: BarChart3 },
         { label: "Báo cáo chi phí", to: "/accounting/expenses", icon: DollarSign },
+        { label: "Danh sách đơn hàng", to: "/manager/orders", icon: ClipboardList },
         { label: "Danh sách nhân viên", to: "/admin/users", icon: Users },
         { label: "Danh sách xe", to: "/vehicles", icon: CarFront },
         { label: "Danh sách khách hàng", to: "/manager/customers", icon: Users },
@@ -193,6 +195,26 @@ function SidebarNav() {
         return SIDEBAR_ITEMS_BY_ROLE[role] || [];
     }, [role]);
 
+    // Chỉ highlight mục khớp đường dẫn dài nhất để tránh chọn cả trang cha/lẫn trang con
+    const activeIndex = React.useMemo(() => {
+        let bestIdx = -1;
+        let bestLen = -1;
+        const path = location.pathname;
+        menuItems.forEach((item, idx) => {
+            const to = item.to || "";
+            if (!to) return;
+            const exact = path === to;
+            const prefix = path.startsWith(to.endsWith("/") ? to : `${to}/`);
+            if (exact || prefix) {
+                if (to.length > bestLen) {
+                    bestLen = to.length;
+                    bestIdx = idx;
+                }
+            }
+        });
+        return bestIdx;
+    }, [location.pathname, menuItems]);
+
     return (
         <aside className="w-64 bg-white border-r border-slate-200 flex flex-col shadow-sm fixed left-0 top-0 bottom-0 z-10">
             {/* brand / account mini */}
@@ -210,13 +232,13 @@ function SidebarNav() {
             <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1 text-sm scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent hover:scrollbar-thumb-slate-400">
                 {menuItems.map((item, index) => {
                     const Icon = item.icon;
-                    const isActive = location.pathname === item.to ||
-                        (item.to !== "/" && location.pathname.startsWith(item.to));
+                    const isActive = index === activeIndex;
 
                     return (
                         <NavLink
                             key={`${item.to}-${index}`}
                             to={item.to}
+                            end={item.exact}
                             className={({ isActive: navActive }) => {
                                 const active = navActive || isActive;
                                 const base = "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] transition-all duration-200 ease-in-out";
@@ -839,17 +861,26 @@ export default function AppLayout() {
                         }
                     />
                     <Route
+                        path="/consultant/ratings"
+                        element={
+                            <ProtectedRoute roles={[ROLES.ADMIN, ROLES.CONSULTANT]}>
+                                <RatingManagementPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    {/* Backward compatibility: dispatch ratings now redirect to consultant view */}
+                    <Route
                         path="/dispatch/ratings"
                         element={
                             <ProtectedRoute roles={[ROLES.ADMIN, ROLES.COORDINATOR]}>
-                                <RatingManagementPage />
+                                <Navigate to="/consultant/ratings" replace />
                             </ProtectedRoute>
                         }
                     />
                     <Route
                         path="/drivers/:driverId/ratings"
                         element={
-                            <ProtectedRoute roles={[ROLES.ADMIN, ROLES.COORDINATOR]}>
+                            <ProtectedRoute roles={[ROLES.ADMIN, ROLES.CONSULTANT]}>
                                 <DriverRatingsPage />
                             </ProtectedRoute>
                         }
@@ -915,6 +946,14 @@ export default function AppLayout() {
 
                     {/* Consultant specific routes */}
                     <Route
+                        path="/consultant/customers"
+                        element={
+                            <ProtectedRoute roles={[ROLES.CONSULTANT]}>
+                                <CustomerListPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
                         path="/consultant/vehicles"
                         element={
                             <ProtectedRoute roles={[ROLES.CONSULTANT]}>
@@ -958,6 +997,14 @@ export default function AppLayout() {
                     />
 
                     {/* Manager specific routes */}
+                    <Route
+                        path="/manager/orders"
+                        element={
+                            <ProtectedRoute roles={[ROLES.MANAGER]}>
+                                <ConsultantOrderListPage readOnly />
+                            </ProtectedRoute>
+                        }
+                    />
                     <Route
                         path="/manager/customers"
                         element={

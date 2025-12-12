@@ -38,7 +38,7 @@ const ROLE_ALIAS = {
 const ROLE_HOME_PATH = {
   [ROLES.ADMIN]: "/analytics/admin",
   [ROLES.MANAGER]: "/analytics/manager",
-  [ROLES.CONSULTANT]: "/orders",
+  [ROLES.CONSULTANT]: "/orders/dashboard", // Bảng điều khiển đầu tiên
   [ROLES.COORDINATOR]: "/dispatch",
   [ROLES.DRIVER]: "/driver/dashboard",
   [ROLES.ACCOUNTANT]: "/accounting",
