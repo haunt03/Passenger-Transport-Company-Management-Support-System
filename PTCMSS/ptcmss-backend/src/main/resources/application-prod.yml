@@ -12,3 +12,8 @@ server:
 management:
   endpoints:
     web.exposure.include: health,info
+jwt:
+  expriMinutes: 3600
+  expireDate: 5
+  accesskey: 2mfGKBhdCa0K8X2uV1Fzn9o6sR8V0s5GUelGlxsFQAc=
+  refreshkey: /AqIfLpfbWqy36D3VBmkskYtmnpsJrLpRx00WVRnJlE=
