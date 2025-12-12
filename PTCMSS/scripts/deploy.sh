@@ -5,10 +5,10 @@
 
 set -e  # Dừng nếu có lỗi
 
-echo " Bắt đầu deploy PTCMSS..."
+echo "🚀 Bắt đầu deploy PTCMSS..."
 
 # Đường dẫn project (có thể thay đổi)
-PROJECT_DIR="${VPS_DEPLOY_PATH:-/root/PTCMSS}"
+PROJECT_DIR="${VPS_DEPLOY_PATH:-/root/PTCMSS/PTCMSS}"
 
 # Chuyển đến thư mục project
 cd "$PROJECT_DIR" || exit 1
@@ -47,4 +47,3 @@ docker compose logs --tail=50
 echo "✅ Deploy hoàn tất!"
 echo "🌐 Backend: http://$(hostname -I | awk '{print $1}'):8080"
 echo "🌐 Frontend: http://$(hostname -I | awk '{print $1}'):5173"
-
