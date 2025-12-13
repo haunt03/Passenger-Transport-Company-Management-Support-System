@@ -7,6 +7,11 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: true
+    defer-datasource-initialization: true  # IMPORTANT: Run data.sql AFTER Hibernate creates tables
+  sql:
+    init:
+      mode: always  # Run data.sql on startup
+      continue-on-error: false  # Stop if SQL script fails
 server:
   port: 8080
 management:
