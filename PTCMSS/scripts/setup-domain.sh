@@ -43,8 +43,144 @@ else
     echo -e "${GREEN}✅ Nginx đã được cài đặt${NC}"
 fi
 
-# 3. Tạo file cấu hình Nginx
-echo -e "${YELLOW}📝 Đang tạo file cấu hình Nginx...${NC}"
+# 3. Tạo file cấu hình Nginx (chỉ HTTP trước, SSL sẽ được thêm sau khi có certificate)
+echo -e "${YELLOW}📝 Đang tạo file cấu hình Nginx (HTTP tạm thời)...${NC}"
+
+cat > "$NGINX_CONFIG" <<EOF
+# Upstream cho Backend
+upstream backend {
+    server 127.0.0.1:8080;
+}
+
+# Upstream cho Frontend
+upstream frontend {
+    server 127.0.0.1:5173;
+}
+
+# Frontend - HTTP (tạm thời, sẽ được certbot cập nhật thành HTTPS)
+server {
+    listen 80;
+    server_name $DOMAIN www.$DOMAIN;
+
+    access_log /var/log/nginx/ptcmss-frontend-access.log;
+    error_log /var/log/nginx/ptcmss-frontend-error.log;
+
+    location / {
+        proxy_pass http://frontend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+    }
+
+    location /ws {
+        proxy_pass http://backend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+
+# Backend API - HTTP (tạm thời, sẽ được certbot cập nhật thành HTTPS)
+server {
+    listen 80;
+    server_name $API_DOMAIN;
+
+    access_log /var/log/nginx/ptcmss-backend-access.log;
+    error_log /var/log/nginx/ptcmss-backend-error.log;
+
+    add_header Access-Control-Allow-Origin "http://$DOMAIN" always;
+    add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS" always;
+    add_header Access-Control-Allow-Headers "Authorization, Content-Type" always;
+    add_header Access-Control-Allow-Credentials "true" always;
+
+    if (\$request_method = 'OPTIONS') {
+        return 204;
+    }
+
+    location / {
+        proxy_pass http://backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_buffering off;
+    }
+
+    location /ws {
+        proxy_pass http://backend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 86400;
+    }
+}
+EOF
+
+# 4. Tạo symbolic link
+if [ -L "$NGINX_ENABLED" ]; then
+    rm "$NGINX_ENABLED"
+fi
+ln -s "$NGINX_CONFIG" "$NGINX_ENABLED"
+
+# 5. Kiểm tra cấu hình Nginx
+echo -e "${YELLOW}🔍 Đang kiểm tra cấu hình Nginx...${NC}"
+if nginx -t; then
+    echo -e "${GREEN}✅ Cấu hình Nginx hợp lệ${NC}"
+else
+    echo -e "${RED}❌ Cấu hình Nginx không hợp lệ${NC}"
+    exit 1
+fi
+
+# 5.1. Reload Nginx để áp dụng cấu hình HTTP
+echo -e "${YELLOW}🔄 Đang reload Nginx với cấu hình HTTP...${NC}"
+systemctl reload nginx
+echo -e "${GREEN}✅ Nginx đã được reload${NC}"
+
+# 6. Cài đặt Certbot (nếu chưa có)
+if ! command -v certbot &> /dev/null; then
+    echo -e "${YELLOW}📦 Đang cài đặt Certbot...${NC}"
+    apt install certbot python3-certbot-nginx -y
+    echo -e "${GREEN}✅ Đã cài đặt Certbot${NC}"
+else
+    echo -e "${GREEN}✅ Certbot đã được cài đặt${NC}"
+fi
+
+# 7. Mở firewall
+echo -e "${YELLOW}🔥 Đang cấu hình firewall...${NC}"
+ufw allow 'Nginx Full' || true
+ufw allow 80/tcp || true
+ufw allow 443/tcp || true
+
+# 8. Lấy SSL certificate (chỉ lấy certificate, không tự động cập nhật Nginx)
+echo -e "${YELLOW}🔐 Đang lấy SSL certificate...${NC}"
+echo -e "${YELLOW}⚠️  Đảm bảo domain $DOMAIN và $API_DOMAIN đã trỏ về IP VPS trước khi tiếp tục!${NC}"
+read -p "Nhấn Enter để tiếp tục hoặc Ctrl+C để hủy..."
+
+# Reload Nginx để đảm bảo cấu hình HTTP đang chạy
+systemctl reload nginx
+
+# Lấy certificate bằng webroot hoặc standalone method
+certbot certonly --nginx -d "$DOMAIN" -d "www.$DOMAIN" -d "$API_DOMAIN" --non-interactive --agree-tos --email admin@$DOMAIN || {
+    echo -e "${RED}❌ Không thể lấy SSL certificate. Kiểm tra lại DNS và thử lại.${NC}"
+    exit 1
+}
+
+# 8.1. Cập nhật lại cấu hình Nginx với đầy đủ settings sau khi có certificate
+echo -e "${YELLOW}📝 Đang cập nhật cấu hình Nginx với SSL...${NC}"
 
 cat > "$NGINX_CONFIG" <<EOF
 # Upstream cho Backend
@@ -158,45 +294,13 @@ server {
 }
 EOF
 
-# 4. Tạo symbolic link
-if [ -L "$NGINX_ENABLED" ]; then
-    rm "$NGINX_ENABLED"
-fi
-ln -s "$NGINX_CONFIG" "$NGINX_ENABLED"
-
-# 5. Kiểm tra cấu hình Nginx
-echo -e "${YELLOW}🔍 Đang kiểm tra cấu hình Nginx...${NC}"
+# Kiểm tra lại cấu hình
 if nginx -t; then
-    echo -e "${GREEN}✅ Cấu hình Nginx hợp lệ${NC}"
+    echo -e "${GREEN}✅ Cấu hình Nginx với SSL hợp lệ${NC}"
 else
     echo -e "${RED}❌ Cấu hình Nginx không hợp lệ${NC}"
     exit 1
 fi
-
-# 6. Cài đặt Certbot (nếu chưa có)
-if ! command -v certbot &> /dev/null; then
-    echo -e "${YELLOW}📦 Đang cài đặt Certbot...${NC}"
-    apt install certbot python3-certbot-nginx -y
-    echo -e "${GREEN}✅ Đã cài đặt Certbot${NC}"
-else
-    echo -e "${GREEN}✅ Certbot đã được cài đặt${NC}"
-fi
-
-# 7. Mở firewall
-echo -e "${YELLOW}🔥 Đang cấu hình firewall...${NC}"
-ufw allow 'Nginx Full' || true
-ufw allow 80/tcp || true
-ufw allow 443/tcp || true
-
-# 8. Lấy SSL certificate
-echo -e "${YELLOW}🔐 Đang lấy SSL certificate...${NC}"
-echo -e "${YELLOW}⚠️  Đảm bảo domain $DOMAIN và $API_DOMAIN đã trỏ về IP VPS trước khi tiếp tục!${NC}"
-read -p "Nhấn Enter để tiếp tục hoặc Ctrl+C để hủy..."
-
-certbot --nginx -d "$DOMAIN" -d "www.$DOMAIN" -d "$API_DOMAIN" --non-interactive --agree-tos --email admin@$DOMAIN || {
-    echo -e "${RED}❌ Không thể lấy SSL certificate. Kiểm tra lại DNS và thử lại.${NC}"
-    exit 1
-}
 
 # 9. Reload Nginx
 echo -e "${YELLOW}🔄 Đang reload Nginx...${NC}"
