@@ -1,50 +1,52 @@
-services:
-  mysql:
-    image: mysql:8.0.43-debian
-    container_name: ptcmss-mysql
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: ptcmss_db        # <-- đổi từ 'root' thành 'ptcmss_db'
-    ports:
-      - "3306:3306"    # nếu máy bạn có MySQL cài sẵn, đổi thành "3307:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
+  services:
+    mysql:
+      image: mysql:8.0.43-debian
+      container_name: ptcmss-mysql
+      restart: always
+      environment:
+        MYSQL_ROOT_PASSWORD: root
+        MYSQL_DATABASE: ptcmss_db        # <-- đổi từ 'root' thành 'ptcmss_db'
+      ports:
+        - "3306:3306"    # nếu máy bạn có MySQL cài sẵn, đổi thành "3307:3306"
+      volumes:
+        - mysql_data:/var/lib/mysql
+      healthcheck:
+        test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+        interval: 5s
+        timeout: 3s
+        retries: 10
 
-  backend:
-    build:
-      context: ./ptcmss-backend
-      dockerfile: Dockerfile
-    container_name: ptcmss-backend
-    restart: always
-    depends_on:
-      mysql:
-        condition: service_healthy
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/ptcmss_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: root
-      SPRING_PROFILES_ACTIVE: prod
-    ports:
-      - "8080:8080"
+    backend:
+      build:
+        context: ./ptcmss-backend
+        dockerfile: Dockerfile
+      container_name: ptcmss-backend
+      restart: always
+      depends_on:
+        mysql:
+          condition: service_healthy
+      environment:
+        SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/ptcmss_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+        SPRING_DATASOURCE_USERNAME: root
+        SPRING_DATASOURCE_PASSWORD: root
+        SPRING_PROFILES_ACTIVE: prod
+      ports:
+        - "8080:8080"
 
-  frontend:
-    build:
-      context: ./ptcmss-frontend
-      dockerfile: Dockerfile
-      args:
-        VITE_API_BASE: http://42.96.17.108:8080
-    container_name: ptcmss-frontend
-    restart: always
-    depends_on:
-      - backend
-    ports:
-      - "5173:80"
+    frontend:
+      build:
+        context: ./ptcmss-frontend
+        dockerfile: Dockerfile
+        args:
+          # Domain: hethongvantai.site
+          # Sau khi setup SSL, đổi thành: https://api.hethongvantai.site
+          VITE_API_BASE: https://api.hethongvantai.site
+      container_name: ptcmss-frontend
+      restart: always
+      depends_on:
+        - backend
+      ports:
+        - "5173:80"
 
-volumes:
-  mysql_data:
+  volumes:
+    mysql_data:
