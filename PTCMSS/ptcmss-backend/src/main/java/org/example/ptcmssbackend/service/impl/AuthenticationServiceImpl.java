@@ -17,6 +17,7 @@ import java.io.UnsupportedEncodingException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.core.env.Environment;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final JwtService jwtService;
     private final EmailService emailService;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+    private final Environment environment;
 
     @Override
     public TokenResponse getAccessToken(LoginRequest request) {
@@ -146,8 +148,10 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     @Override
     public String verifyAccount(String token) {
-        final String frontendSetPasswordUrl = "http://localhost:5173/set-password";
-        final String frontendErrorUrl = "http://localhost:5173/verification-error";
+        // Lấy frontend URL từ config, fallback về localhost nếu không có
+        String frontendBaseUrl = environment.getProperty("app.frontend-url", "https://hethongvantai.site");
+        final String frontendSetPasswordUrl = frontendBaseUrl + "/set-password";
+        final String frontendErrorUrl = frontendBaseUrl + "/verification-error";
 
         if (!org.springframework.util.StringUtils.hasLength(token)) {
             log.error("[VERIFY] Token is blank");

@@ -12,6 +12,17 @@ spring:
     init:
       mode: always  # Run data.sql on startup
       continue-on-error: false  # Stop if SQL script fails
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME:hethonghotroquanlycongtyvantai@gmail.com}
+    password: ${MAIL_PASSWORD:fzzqyukjsbvegvym}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 server:
   port: 8080
   address: 0.0.0.0  # Lắng nghe trên tất cả interfaces, không chỉ localhost
@@ -23,3 +34,8 @@ jwt:
   expireDate: 5
   accesskey: 2mfGKBhdCa0K8X2uV1Fzn9o6sR8V0s5GUelGlxsFQAc=
   refreshkey: /AqIfLpfbWqy36D3VBmkskYtmnpsJrLpRx00WVRnJlE=
+
+# Application URLs for email links and redirects
+app:
+  base-url: ${APP_BASE_URL:https://api.hethongvantai.site}
+  frontend-url: ${APP_FRONTEND_URL:https://hethongvantai.site}
