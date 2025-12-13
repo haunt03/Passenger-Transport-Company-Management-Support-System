@@ -42,9 +42,14 @@ public class EmailService {
         String htmlContent;
         try {
             htmlContent = templateEngine.process("verify-email", context);
+            log.debug("Email template 'verify-email' processed successfully");
+        } catch (org.thymeleaf.exceptions.TemplateInputException e) {
+            // Template not found - use fallback HTML
+            log.info("Template 'verify-email' not found, using fallback HTML. This is normal if template file is missing.");
+            htmlContent = buildVerificationEmailHtml(fullName, username, verificationUrl);
         } catch (Exception e) {
-            // Fallback to simple HTML if template not found
-            log.warn("Template 'verify-email' not found, using fallback HTML: {}", e.getMessage());
+            // Other errors - use fallback HTML
+            log.warn("Error processing email template, using fallback HTML: {}", e.getMessage());
             htmlContent = buildVerificationEmailHtml(fullName, username, verificationUrl);
         }
 

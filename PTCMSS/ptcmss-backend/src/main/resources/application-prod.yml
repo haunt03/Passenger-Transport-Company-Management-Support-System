@@ -39,3 +39,8 @@ jwt:
 app:
   base-url: ${APP_BASE_URL:https://api.hethongvantai.site}
   frontend-url: ${APP_FRONTEND_URL:https://hethongvantai.site}
+
+# Logging configuration
+logging:
+  level:
+    org.thymeleaf: WARN  # Giảm log level của Thymeleaf để tránh ERROR khi template không tìm thấy (fallback sẽ xử lý)
