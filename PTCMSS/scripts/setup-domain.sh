@@ -296,6 +296,12 @@ server {
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_buffering off;
+        
+        # Ẩn CORS headers từ backend để tránh trùng lặp (Nginx đã xử lý CORS)
+        proxy_hide_header Access-Control-Allow-Origin;
+        proxy_hide_header Access-Control-Allow-Methods;
+        proxy_hide_header Access-Control-Allow-Headers;
+        proxy_hide_header Access-Control-Allow-Credentials;
     }
 
     location /ws {
@@ -308,6 +314,12 @@ server {
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_read_timeout 86400;
+        
+        # Ẩn CORS headers từ backend để tránh trùng lặp (Nginx đã xử lý CORS)
+        proxy_hide_header Access-Control-Allow-Origin;
+        proxy_hide_header Access-Control-Allow-Methods;
+        proxy_hide_header Access-Control-Allow-Headers;
+        proxy_hide_header Access-Control-Allow-Credentials;
     }
 }
 EOF
