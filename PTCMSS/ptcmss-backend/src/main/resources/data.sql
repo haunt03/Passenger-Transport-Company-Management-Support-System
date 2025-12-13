@@ -48,11 +48,11 @@ INSERT IGNORE INTO users (userId, roleId, fullName, username, passwordHash, emai
 (28,4,'Tài xế HCM D','driver_hcm_d','$2a$10$6GS3l5b0VDGXI9dm3GaPN.1uGCEbwXExR.uJEHp9KmeduOZmEq3HC','driver.hcm.d@ptcmss.com','0912345204','ACTIVE',1,NOW());
 
 -- Branches (4) - Insert with NULL managerId first to avoid circular FK dependency
-INSERT IGNORE INTO branches (branchId, branchName, location, managerId, status, createdAt, phone) VALUES
-(1,'Chi nhánh Hà Nội','123 Láng Hạ, Đống Đa, Hà Nội',NULL,'ACTIVE',NOW(),'024-1234567'),
-(2,'Chi nhánh Đà Nẵng','456 Nguyễn Văn Linh, Hải Châu, Đà Nẵng',NULL,'ACTIVE',NOW(),'0236-123456'),
-(3,'Chi nhánh TP. HCM','789 Võ Thị Sáu, Quận 3, TP. HCM',NULL,'ACTIVE',NOW(),'028-12345678'),
-(4,'Chi nhánh Hải Phòng','10 Lê Hồng Phong, Ngô Quyền, Hải Phòng',NULL,'INACTIVE',NOW(),'0225-123456');
+INSERT IGNORE INTO branches (branchId, branchName, location, managerId, status, createdAt) VALUES
+(1,'Chi nhánh Hà Nội','123 Láng Hạ, Đống Đa, Hà Nội',NULL,'ACTIVE',NOW()),
+(2,'Chi nhánh Đà Nẵng','456 Nguyễn Văn Linh, Hải Châu, Đà Nẵng',NULL,'ACTIVE',NOW()),
+(3,'Chi nhánh TP. HCM','789 Võ Thị Sáu, Quận 3, TP. HCM',NULL,'ACTIVE',NOW()),
+(4,'Chi nhánh Hải Phòng','10 Lê Hồng Phong, Ngô Quyền, Hải Phòng',NULL,'INACTIVE',NOW());
 
 -- Employees (28: mỗi user có 1 employee record tương ứng)
 -- Note: Using alias syntax instead of VALUES() to avoid deprecation warning
