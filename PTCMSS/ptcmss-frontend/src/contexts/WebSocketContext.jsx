@@ -97,7 +97,15 @@ export const WebSocketProvider = ({ children }) => {
 
     useEffect(() => {
         // Create STOMP client with SockJS
-        const apiBase = (import.meta?.env?.VITE_API_BASE || "http://localhost:8080").replace(/\/$/, "");
+        let apiBase = (import.meta?.env?.VITE_API_BASE || "http://localhost:8080").replace(/\/$/, "");
+        
+        // Ensure WebSocket uses WSS when page is loaded over HTTPS
+        // SockJS should handle this automatically, but we ensure it explicitly
+        if (window.location.protocol === 'https:' && apiBase.startsWith('http://')) {
+            // If page is HTTPS but API base is HTTP, convert to HTTPS
+            apiBase = apiBase.replace('http://', 'https://');
+        }
+        
         const client = new Client({
             webSocketFactory: () => new SockJS(`${apiBase}/ws`),
             debug: (str) => {
