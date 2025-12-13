@@ -15,6 +15,7 @@ import org.example.ptcmssbackend.repository.RolesRepository;
 import org.example.ptcmssbackend.repository.DriverRepository;
 import org.example.ptcmssbackend.service.EmployeeService;
 import org.example.ptcmssbackend.service.EmailService;
+import org.springframework.core.env.Environment;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -35,6 +36,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     private final DriverRepository driverRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
+    private final Environment environment;
 
     @Override
     public List<Employees> findAll() {
@@ -73,44 +75,44 @@ public class EmployeeServiceImpl implements EmployeeService {
     public Employees createEmployee(org.example.ptcmssbackend.dto.request.Employee.CreateEmployeeRequest request) {
         System.out.println("=== Creating Employee ===");
         System.out.println("Request: userId=" + request.getUserId() + ", branchId=" + request.getBranchId() + ", roleId=" + request.getRoleId());
-        
+
         // Tìm User, Branch, Role từ ID
         Users user = usersRepository.findById(request.getUserId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng với ID: " + request.getUserId()));
         System.out.println("Found user: " + user.getId() + " - " + user.getFullName());
-        
+
         Branches branch = branchesRepository.findById(request.getBranchId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy chi nhánh với ID: " + request.getBranchId()));
         System.out.println("Found branch: " + branch.getId() + " - " + branch.getBranchName());
-        
+
         Roles role = rolesRepository.findById(request.getRoleId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy vai trò với ID: " + request.getRoleId()));
         System.out.println("Found role: " + role.getId() + " - " + role.getRoleName());
-        
+
         // Kiểm tra xem user đã là employee chưa
         if (employeeRepository.existsByUser_Id(request.getUserId())) {
             throw new RuntimeException("Người dùng này đã là nhân viên");
         }
-        
+
         // Tạo Employee mới
         Employees employee = new Employees();
         employee.setUser(user);
         employee.setBranch(branch);
         employee.setRole(role);
-        
+
         System.out.println("Employee before save - User: " + employee.getUser() + ", Branch: " + employee.getBranch() + ", Role: " + employee.getRole());
-        
+
         // Set status
         if (request.getStatus() != null && !request.getStatus().isEmpty()) {
             employee.setStatus(EmployeeStatus.valueOf(request.getStatus().toUpperCase()));
         } else {
             employee.setStatus(EmployeeStatus.ACTIVE);
         }
-        
+
         System.out.println("Saving employee...");
         Employees saved = employeeRepository.save(employee);
         System.out.println("Employee saved with ID: " + saved.getEmployeeId());
-        
+
         return saved;
     }
 
@@ -119,7 +121,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     public Employees updateEmployee(Integer id, org.example.ptcmssbackend.dto.request.Employee.UpdateEmployeeRequest request) {
         System.out.println("=== Updating Employee ===");
         System.out.println("Employee ID: " + id + ", branchId=" + request.getBranchId() + ", roleId=" + request.getRoleId());
-        
+
         // Tìm employee hiện tại với eager loading
         Employees employee = employeeRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy nhân viên với ID: " + id));
@@ -203,21 +205,21 @@ public class EmployeeServiceImpl implements EmployeeService {
         if (usersRepository.findByUsername(request.getUsername()).isPresent()) {
             throw new RuntimeException("Tên đăng nhập đã tồn tại: " + request.getUsername());
         }
-        
+
         // Kiểm tra email đã tồn tại chưa (nếu có)
         if (request.getEmail() != null && !request.getEmail().isEmpty()) {
             if (usersRepository.findByEmail(request.getEmail()).isPresent()) {
                 throw new RuntimeException("Email đã tồn tại: " + request.getEmail());
             }
         }
-        
+
         // Kiểm tra phone đã tồn tại chưa (nếu có)
         if (request.getPhone() != null && !request.getPhone().isEmpty()) {
             if (usersRepository.findByPhone(request.getPhone()).isPresent()) {
                 throw new RuntimeException("Số điện thoại đã tồn tại: " + request.getPhone());
             }
         }
-        
+
         // Tìm Branch và Role
         Branches branch = branchesRepository.findById(request.getBranchId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy chi nhánh với ID: " + request.getBranchId()));
@@ -262,7 +264,7 @@ public class EmployeeServiceImpl implements EmployeeService {
                 }
             }
         }
-        
+
         // 1. Tạo User mới (KHÔNG CÓ PASSWORD - sẽ tạo sau khi verify email)
         Users user = new Users();
         user.setUsername(request.getUsername());
@@ -275,51 +277,52 @@ public class EmployeeServiceImpl implements EmployeeService {
         user.setStatus(UserStatus.INACTIVE); // Chưa kích hoạt - chờ verify email
         user.setEmailVerified(false);
         user.setVerificationToken(java.util.UUID.randomUUID().toString()); // Tạo verification token
-        
+
         System.out.println("Saving user...");
         Users savedUser = usersRepository.save(user);
         System.out.println("User saved with ID: " + savedUser.getId());
-        
+
         // 2. Tạo Employee với User vừa tạo
         Employees employee = new Employees();
         employee.setUser(savedUser);
         employee.setBranch(branch);
         employee.setRole(role);
-        
+
         // Set status
         if (request.getStatus() != null && !request.getStatus().isEmpty()) {
             employee.setStatus(EmployeeStatus.valueOf(request.getStatus().toUpperCase()));
         } else {
             employee.setStatus(EmployeeStatus.ACTIVE);
         }
-        
+
         System.out.println("Saving employee...");
         Employees savedEmployee = employeeRepository.save(employee);
         System.out.println("Employee saved with ID: " + savedEmployee.getEmployeeId());
-        
+
         // 2.1 Nếu role là DRIVER, tự động tạo Driver record
         if ("DRIVER".equalsIgnoreCase(role.getRoleName()) || "Tài xế".equalsIgnoreCase(role.getRoleName())) {
             System.out.println("Creating Driver record for employee...");
             Drivers driver = new Drivers();
             driver.setEmployee(savedEmployee);
             driver.setBranch(branch);
-            
+
             // Set license number from request
             if (request.getLicenseNumber() != null && !request.getLicenseNumber().trim().isEmpty()) {
                 driver.setLicenseNumber(request.getLicenseNumber().trim());
             } else {
                 throw new RuntimeException("Số bằng lái là bắt buộc đối với tài xế");
             }
-            
+
             // Các thông tin chi tiết về xe,... sẽ được cập nhật sau
             driverRepository.save(driver);
             System.out.println("Driver record created successfully with license: " + driver.getLicenseNumber());
         }
-        
+
         // 3. Gửi email verification (nếu có email)
         if (savedUser.getEmail() != null && !savedUser.getEmail().isEmpty()) {
             try {
-                String baseUrl = "http://localhost:8080"; // TODO: Get from config
+                // Lấy baseUrl từ config, fallback về localhost nếu không có
+                String baseUrl = environment.getProperty("app.base-url", "https://api.hethongvantai.site");
                 // Link verification sẽ vừa verify email vừa cho phép set password
                 String verificationUrl = baseUrl + "/api/auth/verify?token=" + savedUser.getVerificationToken();
                 emailService.sendVerificationEmail(
@@ -334,7 +337,7 @@ public class EmployeeServiceImpl implements EmployeeService {
                 // Không throw exception - vẫn tạo user thành công
             }
         }
-        
+
         return savedEmployee;
     }
 
@@ -347,19 +350,19 @@ public class EmployeeServiceImpl implements EmployeeService {
     public List<Employees> findAvailableManagers(Integer excludeBranchId) {
         // Lấy tất cả managers
         List<Employees> allManagers = findByRoleName("Manager");
-        
+
         // Lấy danh sách chi nhánh
         List<Branches> branches = branchesRepository.findAll();
-        
+
         // Lọc ra managers chưa được gán hoặc đang quản lý chi nhánh excludeBranchId
         return allManagers.stream()
                 .filter(manager -> {
                     // Tìm chi nhánh có manager này
                     boolean isAssigned = branches.stream()
-                            .anyMatch(branch -> 
-                                branch.getManager() != null && 
-                                branch.getManager().getEmployeeId().equals(manager.getEmployeeId()) &&
-                                (excludeBranchId == null || !branch.getId().equals(excludeBranchId))
+                            .anyMatch(branch ->
+                                    branch.getManager() != null &&
+                                            branch.getManager().getEmployeeId().equals(manager.getEmployeeId()) &&
+                                            (excludeBranchId == null || !branch.getId().equals(excludeBranchId))
                             );
                     return !isAssigned;
                 })
