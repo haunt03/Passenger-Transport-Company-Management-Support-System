@@ -173,8 +173,26 @@ read -p "Nhấn Enter để tiếp tục hoặc Ctrl+C để hủy..."
 # Reload Nginx để đảm bảo cấu hình HTTP đang chạy
 systemctl reload nginx
 
-# Lấy certificate bằng webroot hoặc standalone method
-certbot certonly --nginx -d "$DOMAIN" -d "www.$DOMAIN" -d "$API_DOMAIN" --non-interactive --agree-tos --email admin@$DOMAIN || {
+# Kiểm tra DNS cho www subdomain (optional - chỉ thêm nếu có DNS)
+WWW_DOMAIN=""
+WWW_IP=$(dig +short "www.$DOMAIN" 2>/dev/null | head -n1)
+if [ -n "$WWW_IP" ]; then
+    WWW_DOMAIN="-d www.$DOMAIN"
+    echo -e "${GREEN}✅ Tìm thấy DNS cho www.$DOMAIN, sẽ thêm vào certificate${NC}"
+else
+    echo -e "${YELLOW}⚠️  Không tìm thấy DNS cho www.$DOMAIN, sẽ bỏ qua (không bắt buộc)${NC}"
+fi
+
+# Lấy certificate (chỉ cho domain chính và API, www là optional)
+CERTBOT_DOMAINS="-d $DOMAIN -d $API_DOMAIN"
+if [ -n "$WWW_DOMAIN" ]; then
+    CERTBOT_DOMAINS="$CERTBOT_DOMAINS $WWW_DOMAIN"
+fi
+
+echo -e "${YELLOW}📋 Đang lấy certificate cho: $DOMAIN, $API_DOMAIN${NC}"
+[ -n "$WWW_DOMAIN" ] && echo -e "${YELLOW}   (và www.$DOMAIN)${NC}"
+
+certbot certonly --nginx $CERTBOT_DOMAINS --non-interactive --agree-tos --email admin@$DOMAIN || {
     echo -e "${RED}❌ Không thể lấy SSL certificate. Kiểm tra lại DNS và thử lại.${NC}"
     exit 1
 }
