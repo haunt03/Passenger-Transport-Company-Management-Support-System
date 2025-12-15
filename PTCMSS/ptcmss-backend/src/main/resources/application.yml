@@ -1,40 +1,81 @@
 spring:
-  datasource:
-    url: jdbc:mysql://mysql:3306/ptcmss_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-    username: root
-    password: root
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
-    defer-datasource-initialization: true  # IMPORTANT: Run data.sql AFTER Hibernate creates tables
-  sql:
-    init:
-      mode: always  # Run data.sql on startup
-      continue-on-error: false  # Stop if SQL script fails
+    defer-datasource-initialization: true
+    properties:
+      hibernate:
+        physical_naming_strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+
   mail:
     host: smtp.gmail.com
     port: 587
-    username: ${MAIL_USERNAME:hethonghotroquanlycongtyvantai@gmail.com}
-    password: ${MAIL_PASSWORD:fzzqyukjsbvegvym}
+    username: hethonghotroquanlycongtyvantai@gmail.com
+    password: dhkn hjag btur xwcf
     properties:
       mail:
         smtp:
           auth: true
           starttls:
             enable: true
-server:
-  port: 8080
-  address: 0.0.0.0  # Lắng nghe trên tất cả interfaces, không chỉ localhost
-management:
-  endpoints:
-    web.exposure.include: health,info
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+# Keys / API (đặt ENV để tránh lộ)
+serpapi:
+  key: ${SERPAPI_KEY:d403ede6a15a2684e960ee9be9eb913a534330bf909263934657741c7f326742}
+
+graphhopper:
+  api-key: ${GRAPHHOPPER_KEY:56f6f3a5-1958-408c-8788-225991ec1d3d}
+
+payment:
+  qr:
+    provider-url: https://img.vietqr.io/image
+    bank-code: ${PAYMENT_BANK_CODE:970423}
+    account-number: ${PAYMENT_BANK_ACCOUNT_NUMBER:00005505543}
+    account-name: ${PAYMENT_BANK_ACCOUNT_NAME:NGUYEN THUY HAU}
+    template: compact
+    description-prefix: PTCMSS
+    expires-in-minutes: 120
+
+springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_ENABLED:true}
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: ${SWAGGER_UI_ENABLED:true}
+    path: /swagger-ui.html
+
+openapi:
+  service:
+    api-docs: ${OPENAPI_API_DOCS:PTCMSS}
+    server: ${OPENAPI_SERVER:http://localhost:8080}
+    title: ${OPENAPI_TITLE:Transport Application}
+    version: ${OPENAPI_VERSION:1.0.0}
+
 jwt:
   expriMinutes: 3600
   expireDate: 5
   accesskey: 2mfGKBhdCa0K8X2uV1Fzn9o6sR8V0s5GUelGlxsFQAc=
   refreshkey: /AqIfLpfbWqy36D3VBmkskYtmnpsJrLpRx00WVRnJlE=
+server:
+  port: ${SERVER_PORT:8080}
 
-# Application base URL for email links
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  health:
+    mail:
+      enabled: ${MANAGEMENT_HEALTH_MAIL_ENABLED:false}
+
+logging:
+  level:
+    org.thymeleaf: ${THYMELEAF_LOG_LEVEL:WARN}
+
 app:
-  base-url: ${APP_BASE_URL:https://api.hethongvantai.site}
+  base-url: ${APP_BASE_URL:http://localhost:8080}
+  frontend-url: ${APP_FRONTEND_URL:http://localhost:5173}

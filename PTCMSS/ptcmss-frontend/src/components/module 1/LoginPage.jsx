@@ -186,7 +186,7 @@ export default function LoginPage() {
                         {/* Title */}
                         <div className="space-y-2">
                             <div className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
-                                Hệ thống hỗ trợ quản lý công ty vận tải hành khách
+                                FleetOps Console
                             </div>
                             <div className="text-sm text-slate-500 font-medium">
                                 Đăng nhập hệ thống điều hành
