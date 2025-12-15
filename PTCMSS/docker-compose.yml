@@ -1,52 +1,67 @@
-  services:
-    mysql:
-      image: mysql:8.0.43-debian
-      container_name: ptcmss-mysql
-      restart: always
-      environment:
-        MYSQL_ROOT_PASSWORD: root
-        MYSQL_DATABASE: ptcmss_db        # <-- đổi từ 'root' thành 'ptcmss_db'
-      ports:
-        - "3306:3306"    # nếu máy bạn có MySQL cài sẵn, đổi thành "3307:3306"
-      volumes:
-        - mysql_data:/var/lib/mysql
-      healthcheck:
-        test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
-        interval: 5s
-        timeout: 3s
-        retries: 10
+services:
+  mysql:
+    image: mysql:8.0.43-debian
+    container_name: ptcmss-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: ptcmss_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
-    backend:
-      build:
-        context: ./ptcmss-backend
-        dockerfile: Dockerfile
-      container_name: ptcmss-backend
-      restart: always
-      depends_on:
-        mysql:
-          condition: service_healthy
-      environment:
-        SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/ptcmss_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-        SPRING_DATASOURCE_USERNAME: root
-        SPRING_DATASOURCE_PASSWORD: root
-        SPRING_PROFILES_ACTIVE: prod
-      ports:
-        - "8080:8080"
+  backend:
+    build:
+      context: ./ptcmss-backend
+      dockerfile: Dockerfile
+    container_name: ptcmss-backend
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
 
-    frontend:
-      build:
-        context: ./ptcmss-frontend
-        dockerfile: Dockerfile
-        args:
-          # Domain: hethongvantai.site
-          # Sau khi setup SSL, đổi thành: https://api.hethongvantai.site
-          VITE_API_BASE: https://api.hethongvantai.site
-      container_name: ptcmss-frontend
-      restart: always
-      depends_on:
-        - backend
-      ports:
-        - "5173:80"
+      # 1) DB (cái này bạn đang set đúng)
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/ptcmss_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
 
-  volumes:
-    mysql_data:
+      # 2) JWT (BẮT BUỘC nếu app verify token)
+      JWT_ACCESS_KEY: "2mfGKBhdCa0K8X2uV1Fzn9o6sR8V0s5GUelGlxsFQAc="
+      JWT_REFRESH_KEY: "/AqIfLpfbWqy36D3VBmkskYtmnpsJrLpRx00WVRnJlE="
+
+      # 3) Mail (để gửi verify mail) -> dùng Gmail App Password 16 ký tự
+      MAIL_USERNAME: "hethonghotroquanlycongtyvantai@gmail.com"
+      MAIL_PASSWORD: "dhkn hjag btur xwcf"
+
+      # 4) URL dùng để tạo link trong email
+      APP_BASE_URL: "https://api.hethongvantai.site"
+      APP_FRONTEND_URL: "https://hethongvantai.site"
+
+      # 5) Nếu bạn muốn prod cũng chạy data.sql thì bật (không thì bỏ)
+      # SQL_INIT_MODE: "always"
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: ./ptcmss-frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE: https://api.hethongvantai.site
+    container_name: ptcmss-frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+volumes:
+  mysql_data:
