@@ -3,108 +3,189 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Xác thực tài khoản</title>
+    <title>Xác thực tài khoản - TranspoManager</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
+        * {
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
         }
-        .container {
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f5f7fa;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .email-container {
             max-width: 600px;
             margin: 0 auto;
             background-color: #ffffff;
-            border-radius: 10px;
-            padding: 30px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            margin-top: 20px;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .email-header {
+            background: linear-gradient(135deg, #0079BC 0%, #005a8b 100%);
+            padding: 40px 30px;
+            text-align: center;
+            color: #ffffff;
+        }
+
+        .email-header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .email-header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .email-body {
+            padding: 40px 30px;
+        }
+        .greeting {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1e293b;
             margin-bottom: 20px;
         }
-        .header {
-            text-align: center;
+        .greeting .name {
             color: #0079BC;
-            margin-bottom: 30px;
-        }
-        .header h1 {
-            margin: 0;
-            font-size: 24px;
         }
         .content {
-            line-height: 1.6;
-            color: #333333;
+            color: #475569;
+            font-size: 15px;
+            margin-bottom: 30px;
+            line-height: 1.8;
         }
-        .button {
-            display: inline-block;
-            padding: 12px 30px;
-            background-color: #0079BC;
-            color: #ffffff;
-            text-decoration: none;
-            border-radius: 5px;
-            margin: 20px 0;
+        .button-container {
             text-align: center;
+            margin: 35px 0;
         }
-        .button:hover {
-            background-color: #005a8b;
+        .verify-button {
+            display: inline-block;
+            padding: 16px 40px;
+            background: linear-gradient(135deg, #0079BC 0%, #005a8b 100%);
+            color: #ffffff !important;
+            text-decoration: none;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 16px;
+            box-shadow: 0 4px 12px rgba(0, 121, 188, 0.3);
+            transition: all 0.3s ease;
+        }
+        .verify-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 121, 188, 0.4);
         }
         .info-box {
-            background-color: #f8f9fa;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
             border-left: 4px solid #0079BC;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 4px;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 30px 0;
         }
-        .footer {
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #eeeeee;
-            color: #666666;
-            font-size: 12px;
-            text-align: center;
+        .info-box p {
+            color: #0c4a6e;
+            font-size: 14px;
+            margin: 0;
         }
         .warning {
-            color: #dc3545;
+            background-color: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 30px 0;
+        }
+        .warning p {
+            color: #92400e;
             font-size: 14px;
-            margin-top: 20px;
+            margin: 0;
+        }
+        .email-footer {
+            background-color: #f8fafc;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e2e8f0;
+        }
+        .email-footer p {
+            color: #64748b;
+            font-size: 13px;
+            margin: 5px 0;
+        }
+        .email-footer .company {
+            color: #0079BC;
+            font-weight: 600;
+        }
+        .divider {
+            height: 1px;
+            background: linear-gradient(to right, transparent, #e2e8f0, transparent);
+            margin: 30px 0;
+        }
+        @media only screen and (max-width: 600px) {
+            .email-container {
+                border-radius: 0;
+            }
+            .email-header, .email-body, .email-footer {
+                padding: 25px 20px;
+            }
+            .verify-button {
+                padding: 14px 30px;
+                font-size: 15px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>✨ Chào mừng đến TranspoManager</h1>
+    <div class="email-container">
+        <!-- Header -->
+        <div class="email-header">
+            <h1>TranspoManager</h1>
+            <p>Hệ thống quản lý vận tải</p>
         </div>
-        
-        <div class="content">
-            <p>Xin chào <strong th:text="${fullName}">Người dùng</strong>,</p>
-            
-            <p>Tài khoản của bạn đã được tạo thành công trong hệ thống quản lý vận tải TranspoManager.</p>
-            
+
+        <!-- Body -->
+        <div class="email-body">
+            <div class="greeting">
+                Xin chào <span class="name" th:text="${fullName}">Người dùng</span>
+            </div>
+
+            <div class="content">
+                <p>Bạn đã được tạo tài khoản nhân viên tại hệ thống <strong>TranspoManager</strong> của chúng tôi.</p>
+                <p>Để bắt đầu sử dụng hệ thống, vui lòng xác thực tài khoản và thiết lập mật khẩu lần đầu bằng cách nhấn vào nút bên dưới:</p>
+            </div>
+
+            <!-- Username Info Box -->
+            <div class="info-box" style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-left: 4px solid #0079BC; padding: 20px; border-radius: 8px; margin: 30px 0;">
+                <p style="color: #0c4a6e; font-size: 14px; margin: 0 0 10px 0;"><strong>👤 Tên đăng nhập của bạn:</strong></p>
+                <p style="color: #0079BC; font-size: 18px; font-weight: 700; font-family: 'Courier New', monospace; margin: 0;" th:text="${username}">username</p>
+            </div>
+
+            <div class="button-container">
+                <a th:href="${verifyUrl}" class="verify-button" target="_blank">
+                    ✨ Xác thực tài khoản ngay
+                </a>
+            </div>
+
             <div class="info-box">
-                <p><strong>Tên đăng nhập:</strong> <code th:text="${username}">username</code></p>
+                <p><strong>Lưu ý:</strong> Liên kết xác thực sẽ hết hạn sau 24 giờ. Vui lòng thực hiện xác thực sớm nhất có thể.</p>
             </div>
-            
-            <p>Để kích hoạt tài khoản và thiết lập mật khẩu, vui lòng nhấp vào nút bên dưới:</p>
-            
-            <div style="text-align: center;">
-                <a th:href="${verifyUrl}" class="button">Xác thực tài khoản</a>
+
+            <div class="divider"></div>
+
+            <div class="warning">
+                <p><strong>Bảo mật:</strong> Nếu bạn không yêu cầu tạo tài khoản này, vui lòng bỏ qua email này hoặc liên hệ với quản trị viên hệ thống.</p>
             </div>
-            
-            <p>Hoặc copy và dán link sau vào trình duyệt:</p>
-            <p style="word-break: break-all; color: #0079BC; font-size: 12px;" th:text="${verifyUrl}">verification-url</p>
-            
-            <p class="warning">
-                ⚠️ <strong>Lưu ý:</strong> Link xác thực sẽ hết hạn sau 24 giờ. Vui lòng xác thực sớm để kích hoạt tài khoản.
-            </p>
-            
-            <p>Nếu bạn không tạo tài khoản này, vui lòng bỏ qua email này.</p>
         </div>
-        
-        <div class="footer">
-            <p>Trân trọng,<br><strong>TranspoManager - Hệ thống quản lý vận tải</strong></p>
+
+        <!-- Footer -->
+        <div class="email-footer">
+            <p><span class="company">TranspoManager</span> - Hệ thống quản lý vận tải</p>
             <p>Email này được gửi tự động, vui lòng không trả lời.</p>
+            <p style="margin-top: 15px; font-size: 12px; color: #94a3b8;">
+                © 2025 TranspoManager. All rights reserved.
+            </p>
         </div>
     </div>
 </body>
 </html>
-
