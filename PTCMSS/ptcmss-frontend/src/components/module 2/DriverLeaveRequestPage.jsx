@@ -185,7 +185,7 @@ export default function DriverLeaveRequestPage() {
 
         try {
             const uid = getCookie("userId");
-            if (!uid) throw new Error("NO_USER");
+            if (!uid) throw new Error("Không tìm thấy thông tin tài khoản. Vui lòng đăng nhập lại.");
             const profile = await getDriverProfileByUser(uid);
             await requestDayOff(profile.driverId, { startDate, endDate, reason: reason.trim() });
             await new Promise((r) => setTimeout(r, 500));

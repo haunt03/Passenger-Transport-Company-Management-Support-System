@@ -1,60 +1,87 @@
-﻿// EditOrderPage.jsx (LIGHT THEME)
+﻿// OrderDetailPage.jsx (LIGHT THEME, hooked with light DepositModal)
 import React from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { getBooking, updateBooking, calculatePrice, assignBooking } from "../../api/bookings";
-import { calculateDistance } from "../../api/graphhopper";
-import { listVehicleCategories } from "../../api/vehicleCategories";
-import { listBranches } from "../../api/branches";
-import { listDriversByBranch } from "../../api/drivers";
-import { listVehicles } from "../../api/vehicles";
-import { listHireTypes } from "../../api/hireTypes";
-import { getCurrentRole, ROLES } from "../../utils/session";
-import PlaceAutocomplete from "../common/PlaceAutocomplete";
+import { useParams } from "react-router-dom";
 import {
-    ArrowLeft,
+    getBooking,
+    addBookingPayment,
+    listBookingPayments,
+    generateBookingQrPayment,
+} from "../../api/bookings";
+import { getCurrentRole, getStoredUserId, ROLES } from "../../utils/session";
+import AssignDriverDialog from "../module 5/AssignDriverDialog";
+import {
+    ClipboardList,
     User,
     Phone,
     Mail,
     MapPin,
-    Calendar,
+    Clock,
     CarFront,
+    Users,
     DollarSign,
     AlertTriangle,
-    Save,
-    Loader2,
-    Navigation,
-    Users,
-    FileText,
-    Search,
-    ChevronDown,
+    CheckCircle2,
+    Truck,
+    BadgeDollarSign,
+    ChevronRight,
     X,
-    Plus,
+    QrCode,
+    Copy,
 } from "lucide-react";
 
+//  dùng modal light theme thay vì bản dark
+import DepositModal from "../module 6/DepositModal.jsx";
+
 /**
- * EditOrderPage (Module 4.S5)
+ * View Order Detail (Module 4.S4)
  *
- * Rule:
- *  - Chỉ cho sửa nếu status là DRAFT hoặc PENDING
- *  - Nếu ASSIGNED / COMPLETED -> khóa form, hiện cảnh báo
+ * API design:
+ *  GET /api/orders/{orderId}
+ *  {
+ *    id, code, status,
+ *    customer: { name, phone, email },
+ *    trip: {
+ *      pickup, dropoff, pickup_time, dropoff_eta,
+ *      pax_count, vehicle_category, vehicle_count
+ *    },
+ *    quote: { base_price, discount_amount, final_price },
+ *    payment: { paid, remaining },
+ *    dispatch: { driver_name, driver_phone, vehicle_plate }
+ *  }
  *
- * API target sau này:
- *   GET /api/orders/{orderId}
- *   PUT /api/orders/{orderId}
+ * Chức năng trang:
+ *  - Xem chi tiết đơn hàng (read-only)
+ *  - Ghi nhận thanh toán / đặt cọc (DepositModal - M6.S3)
+ *  - Sau khi ghi nhận thanh toán => cập nhật phần payment hiển thị
+ *  - Toast feedback
  */
 
-/* ---------------- helpers ---------------- */
+/* ---------- utils ---------- */
 const cls = (...a) => a.filter(Boolean).join(" ");
-const fmtMoney = (n) =>
+
+const fmtDateTime = (isoLike) => {
+    if (!isoLike) return "—";
+    const safe = String(isoLike).replace(" ", "T");
+    const d = new Date(safe);
+    if (isNaN(d.getTime())) return isoLike;
+    const dd = String(d.getDate()).padStart(2, "0");
+    const MM = String(d.getMonth() + 1).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    return `${dd}/${MM}/${yyyy} ${hh}:${mm}`;
+};
+
+const fmtVND = (n) =>
     new Intl.NumberFormat("vi-VN").format(
         Math.max(0, Number(n || 0))
     ) + " đ";
 
-/* ---------------- trạng thái đơn ---------------- */
+/* ---------- status pill ---------- */
 const ORDER_STATUS_LABEL = {
     DRAFT: "Nháp",
     PENDING: "Chờ xử lý",
-    ASSIGNED: "Đã phân xe/tài xế",
+    ASSIGNED: "Đã phân xe",
     COMPLETED: "Hoàn thành",
     CANCELLED: "Đã huỷ",
 };
@@ -63,40 +90,39 @@ const ORDER_STATUS_STYLE_LIGHT = {
     DRAFT: "ring-1 ring-slate-300 bg-slate-100 text-slate-700",
     PENDING:
         "ring-1 ring-info-200 bg-info-50 text-info-700",
-    ASSIGNED: "ring-1 ring-sky-200 bg-sky-50 text-sky-700",
+    ASSIGNED:
+        "ring-1 ring-sky-200 bg-sky-50 text-sky-700",
     COMPLETED:
-        "ring-1 ring-emerald-200 bg-info-50 text-info-700",
+        "ring-1 ring-emerald-200 bg-emerald-50 text-emerald-700",
     CANCELLED:
         "ring-1 ring-rose-200 bg-rose-50 text-rose-700",
 };
 
-function StatusPill({ status }) {
+function OrderStatusPill({ status }) {
     return (
         <span
             className={cls(
-                "inline-flex items-center gap-1 rounded-md px-2 py-[2px] text-[11px] font-medium",
+                "inline-flex items-center rounded-md px-2 py-[2px] text-[11px] font-medium whitespace-nowrap",
                 ORDER_STATUS_STYLE_LIGHT[status] ||
                 "ring-1 ring-slate-300 bg-slate-100 text-slate-700"
             )}
         >
-            <span>
-                {ORDER_STATUS_LABEL[status] || status}
-            </span>
+            {ORDER_STATUS_LABEL[status] || status}
         </span>
     );
 }
 
-/* ---------------- Toast mini (light style) ---------------- */
+/* ---------- Toast system (light) ---------- */
 function useToasts() {
     const [toasts, setToasts] = React.useState([]);
-    const pushToast = React.useCallback((msg, kind = "info", ttl = 2600) => {
+    const push = React.useCallback((msg, kind = "info", ttl = 2400) => {
         const id = Math.random().toString(36).slice(2);
         setToasts((arr) => [...arr, { id, msg, kind }]);
         setTimeout(() => {
             setToasts((arr) => arr.filter((t) => t.id !== id));
         }, ttl);
     }, []);
-    return { toasts, pushToast };
+    return { toasts, push };
 }
 
 function Toasts({ toasts }) {
@@ -122,2028 +148,1411 @@ function Toasts({ toasts }) {
     );
 }
 
-// Removed MOCK_CATEGORIES and MOCK_BRANCHES - chỉ dùng data từ API, báo lỗi nếu không fetch được
-
-/* ---------------- giả lập data GET /api/orders/{orderId} ---------------- */
-const MOCK_ORDER = {
-    id: 10045,
-    code: "ORD-2025-118",
-    branch_id: "HN",
-    status: "PENDING", // thử "ASSIGNED" để thấy form khoá
-    customer_phone: "0901234567",
-    customer_name: "Công ty ABC",
-    customer_email: "booking@abc.com",
-    pickup: "Sân bay Nội Bài - T1",
-    dropoff: "Khách sạn Pearl Westlake, Tây Hồ",
-    start_time: "2025-10-26T08:30",
-    end_time: "2025-10-26T12:00",
-    pax: 3,
-    vehicles_needed: 1,
-    category_id: "SEDAN4",
-    category_label: "Sedan 4 chỗ",
-    system_price: 1500000,
-    discount_amount: 100000,
-    discount_reason:
-        "Khách quen / hợp đồng tháng",
-    final_price: 1400000,
-};
-
-/* ========================= MAIN PAGE ========================= */
-export default function EditOrderPage() {
-    const { toasts, pushToast } = useToasts();
-    const { orderId } = useParams();
-    const navigate = useNavigate();
-    const location = useLocation();
-    const seedOrder = location?.state?.order;
-
-    const role = React.useMemo(() => getCurrentRole(), []);
-    const isConsultant = role === ROLES.CONSULTANT;
-
-    /* --- trạng thái đơn hàng --- */
-    const [status, setStatus] = React.useState("PENDING");
-
-    /* --- thông tin đặt cọc --- */
-    const [paidAmount, setPaidAmount] = React.useState(0); // Số tiền đã thanh toán/cọc
-
-    /* --- chi nhánh --- */
-    const [branchId, setBranchId] = React.useState("");
-
-    /* --- khách hàng --- */
-    const [customerPhone, setCustomerPhone] = React.useState("");
-    const [customerName, setCustomerName] = React.useState("");
-    const [customerEmail, setCustomerEmail] = React.useState("");
-
-    /* --- hình thức thuê --- */
-    const [hireType, setHireType] = React.useState("ONE_WAY"); // ONE_WAY | ROUND_TRIP | DAILY
-    const [hireTypeId, setHireTypeId] = React.useState("");
-    const [hireTypeName, setHireTypeName] = React.useState("");
-    const [hireTypesList, setHireTypesList] = React.useState([]);
-
-    /* --- hành trình --- */
-    const [pickup, setPickup] = React.useState("");
-    const [dropoff, setDropoff] = React.useState("");
-    const [startTime, setStartTime] = React.useState("");
-    const [endTime, setEndTime] = React.useState("");
-    const [distanceKm, setDistanceKm] = React.useState("");
-    const [calculatingDistance, setCalculatingDistance] = React.useState(false);
-    const [distanceError, setDistanceError] = React.useState("");
-
-    /* --- thông số xe --- */
-    const [pax, setPax] = React.useState("1");
-    // Multiple vehicle selections: [{ categoryId, quantity }]
-    const [vehicleSelections, setVehicleSelections] = React.useState([
-        { categoryId: "", quantity: 1 }
-    ]);
-    const [categories, setCategories] = React.useState([]);
-    const [selectedCategory, setSelectedCategory] = React.useState(null);
-
-    // Helper: thêm loại xe
-    const addVehicleSelection = () => {
-        if (vehicleSelections.length >= 5) {
-            pushToast("Tối đa 5 loại xe", "error");
-            return;
-        }
-        const unusedCategory = categories.find(c =>
-            !vehicleSelections.some(v => v.categoryId === String(c.id))
-        );
-        setVehicleSelections([...vehicleSelections, {
-            categoryId: unusedCategory ? String(unusedCategory.id) : "",
-            quantity: 1
-        }]);
-    };
-
-    // Helper: xóa loại xe
-    const removeVehicleSelection = (index) => {
-        if (vehicleSelections.length <= 1) {
-            pushToast("Cần ít nhất 1 loại xe", "error");
-            return;
-        }
-        setVehicleSelections(vehicleSelections.filter((_, i) => i !== index));
-    };
-
-    // Helper: cập nhật loại xe
-    const updateVehicleSelection = (index, field, value) => {
-        const updated = [...vehicleSelections];
-
-        // Nếu đang thay đổi categoryId, kiểm tra trùng lặp
-        if (field === 'categoryId') {
-            const isDuplicate = vehicleSelections.some((v, i) =>
-                i !== index && v.categoryId === value && value !== ""
-            );
-
-            if (isDuplicate) {
-                pushToast("Loại xe này đã được chọn. Vui lòng chọn loại xe khác hoặc tăng số lượng.", "error");
-                return;
-            }
-        }
-
-        updated[index] = { ...updated[index], [field]: field === 'quantity' ? Number(value) || 1 : value };
-        setVehicleSelections(updated);
-    };
-    const [branches, setBranches] = React.useState([]);
-
-    const [availabilityMsg, setAvailabilityMsg] =
-        React.useState("");
-    const [checkingAvailability, setCheckingAvailability] = React.useState(false);
-
-    /* --- ghi chú --- */
-    const [bookingNote, setBookingNote] = React.useState("");
-
-    /* --- giá --- */
-    const [systemPrice, setSystemPrice] = React.useState(0);
-    const [discountAmount, setDiscountAmount] = React.useState("0");
-    const [discountReason, setDiscountReason] = React.useState("");
-    const [finalPrice, setFinalPrice] = React.useState(0);
-
-    // assignment
-    const [driverId, setDriverId] = React.useState("");
-    const [vehicleId, setVehicleId] = React.useState("");
-    const [tripIds, setTripIds] = React.useState([]); // Store trip IDs for assignment
-    const [driversList, setDriversList] = React.useState([]);
-    const [vehiclesList, setVehiclesList] = React.useState([]);
-    const [loadingDrivers, setLoadingDrivers] = React.useState(false);
-    const [loadingVehicles, setLoadingVehicles] = React.useState(false);
-    const [driverSearch, setDriverSearch] = React.useState("");
-    const [vehicleSearch, setVehicleSearch] = React.useState("");
-    const [showDriverDropdown, setShowDriverDropdown] = React.useState(false);
-    const [showVehicleDropdown, setShowVehicleDropdown] = React.useState(false);
-
-    // Assigned driver/vehicle info and cooldown
-    const [assignedDriver, setAssignedDriver] = React.useState(null);
-    const [assignedVehicle, setAssignedVehicle] = React.useState(null);
-    const [assignedDriverId, setAssignedDriverId] = React.useState(null); // Raw ID from API
-    const [assignedVehicleId, setAssignedVehicleId] = React.useState(null); // Raw ID from API
-    const [lastAssignmentTime, setLastAssignmentTime] = React.useState(null);
-    const [cooldownRemaining, setCooldownRemaining] = React.useState(0);
-
-    /* --- submit state --- */
-    const [submittingDraft, setSubmittingDraft] =
-        React.useState(false);
-    const [submittingUpdate, setSubmittingUpdate] =
-        React.useState(false);
-
-    /* --- quyền sửa --- */
-    // Check: status phải là DRAFT/PENDING/CONFIRMED/ASSIGNED và còn >= 12h trước chuyến
-    // HOẶC: đơn đặt cọc (paidAmount > 0) nhưng chưa bắt đầu chuyến (status chưa ONGOING/COMPLETED và startTime chưa đến)
-    const canEdit = React.useMemo(() => {
-        const editableStatuses = ["DRAFT", "PENDING", "CONFIRMED", "ASSIGNED", "QUOTATION_SENT"];
-        const hasDeposit = paidAmount > 0;
-
-        // Nếu đã hủy (CANCELLED) thì không cho sửa
-        if (status === "CANCELLED") {
-            return false;
-        }
-
-        // Nếu đơn đặt cọc và chưa bắt đầu chuyến → cho phép sửa/hủy
-        if (hasDeposit) {
-            // Kiểm tra xem chuyến đã bắt đầu chưa
-            const tripStarted = status === "ONGOING" || status === "COMPLETED";
-            const tripTimePassed = startTime ? new Date(startTime) <= new Date() : false;
-
-            // Nếu chưa bắt đầu (status chưa ONGOING/COMPLETED và thời gian chưa đến)
-            if (!tripStarted && !tripTimePassed) {
-                return true; // Cho phép sửa/hủy đơn đặt cọc chưa bắt đầu
-            }
-        }
-
-        // Logic thông thường: status phải trong danh sách editable
-        if (!editableStatuses.includes(status)) {
-            return false;
-        }
-
-        // Check thời gian: phải còn >= 12h trước chuyến
-        // TRỪ KHI: đơn đặt cọc (paidAmount > 0) - thì không cần check 12h
-        if (startTime && !hasDeposit) {
-            const tripStart = new Date(startTime);
-            const now = new Date();
-            const hoursUntilTrip = (tripStart - now) / (1000 * 60 * 60);
-            if (hoursUntilTrip < 12) {
-                return false; // Còn < 12h, không cho sửa (trừ khi đã đặt cọc)
-            }
-        }
-
-        return true;
-    }, [status, startTime, paidAmount]);
-
-    // helper ISO
-    const toIsoZ = (s) => {
-        if (!s) return null;
-        const d = new Date(s);
-        if (Number.isNaN(d.getTime())) return s;
-        return d.toISOString();
-    };
-
-    // seed from navigation state if exists (instant prefill)
-    React.useEffect(() => {
-        if (!seedOrder) return;
-        setCustomerName(seedOrder.customer_name || "");
-        setCustomerPhone(seedOrder.customer_phone || "");
-        setPickup(seedOrder.pickup || "");
-        setDropoff(seedOrder.dropoff || "");
-        if (seedOrder.pickup_time) {
-            const d = new Date(String(seedOrder.pickup_time).replace(" ", "T"));
-            if (!Number.isNaN(d.getTime())) setStartTime(d.toISOString().slice(0, 16));
-        }
-        if (seedOrder.dropoff_eta) {
-            const d2 = new Date(String(seedOrder.dropoff_eta).replace(" ", "T"));
-            if (!Number.isNaN(d2.getTime())) setEndTime(d2.toISOString().slice(0, 16));
-        }
-        // Note: seedOrder không có thông tin về nhiều loại xe, nên bỏ qua phần này
-        // vehicleSelections sẽ được load từ API khi fetch booking
-        if (seedOrder.quoted_price != null) {
-            setFinalPrice(Number(seedOrder.quoted_price));
-        }
-    }, [seedOrder]);
-
-    // load booking + categories
-    React.useEffect(() => {
-        (async () => {
-            try {
-                const cats = await listVehicleCategories();
-                if (Array.isArray(cats) && cats.length > 0) {
-                    const mapped = cats.map(c => ({
-                        id: String(c.id),
-                        categoryName: c.categoryName,
-                        seats: c.seats || 0
-                    }));
-                    setCategories(mapped);
-                } else {
-                    pushToast("Không thể tải danh mục xe: Dữ liệu trống", "error");
-                }
-            } catch (err) {
-                console.error("Failed to load categories:", err);
-                pushToast("Không thể tải danh mục xe: " + (err.message || "Lỗi không xác định"), "error");
-            }
-            try {
-                const br = await listBranches({ page: 0 });
-                const items = Array.isArray(br?.items) ? br.items : (Array.isArray(br) ? br : []);
-                // Filter chỉ lấy branches ACTIVE
-                const activeItems = items.filter(b => !b.status || b.status === "ACTIVE");
-                if (activeItems.length > 0) {
-                    setBranches(activeItems);
-                } else {
-                    pushToast("Không thể tải chi nhánh: Không có chi nhánh hoạt động", "error");
-                }
-            } catch (err) {
-                console.error("Failed to load branches:", err);
-                pushToast("Không thể tải chi nhánh: " + (err.message || "Lỗi không xác định"), "error");
-            }
-            try {
-                if (!orderId) return;
-                const b = await getBooking(orderId);
-                const t = (b.trips && b.trips[0]) || {};
-                setStatus(b.status || "PENDING");
-                setBranchId(String(b.branchId || ""));
-                // Load thông tin đặt cọc
-                setPaidAmount(Number(b.paidAmount || b.totalPaid || 0));
-                setCustomerPhone(b.customer?.phone || "");
-                setCustomerName(b.customer?.fullName || "");
-                setCustomerEmail(b.customer?.email || "");
-                // Load hire type info
-                if (b.hireTypeId) setHireTypeId(String(b.hireTypeId));
-                if (b.hireTypeName) setHireTypeName(b.hireTypeName);
-                setPickup(t.startLocation || "");
-                setDropoff(t.endLocation || "");
-                // Convert UTC to local datetime-local format (YYYY-MM-DDTHH:mm)
-                if (t.startTime) {
-                    const d = new Date(t.startTime);
-                    if (!Number.isNaN(d.getTime())) {
-                        const localStr = d.getFullYear() + '-' +
-                            String(d.getMonth() + 1).padStart(2, '0') + '-' +
-                            String(d.getDate()).padStart(2, '0') + 'T' +
-                            String(d.getHours()).padStart(2, '0') + ':' +
-                            String(d.getMinutes()).padStart(2, '0');
-                        setStartTime(localStr);
-                    }
-                }
-                if (t.endTime) {
-                    const d2 = new Date(t.endTime);
-                    if (!Number.isNaN(d2.getTime())) {
-                        const localStr2 = d2.getFullYear() + '-' +
-                            String(d2.getMonth() + 1).padStart(2, '0') + '-' +
-                            String(d2.getDate()).padStart(2, '0') + 'T' +
-                            String(d2.getHours()).padStart(2, '0') + ':' +
-                            String(d2.getMinutes()).padStart(2, '0');
-                        setEndTime(localStr2);
-                    }
-                }
-                setDistanceKm(String(t.distance || ""));
-                // Load pax from trip or booking
-                const paxValue = t.paxCount || b.paxCount || 1;
-                setPax(String(paxValue));
-
-                // Load tất cả loại xe từ booking
-                if (Array.isArray(b.vehicles) && b.vehicles.length > 0) {
-                    const vehicleItems = b.vehicles.map(v => ({
-                        categoryId: String(v.vehicleCategoryId || ""),
-                        quantity: Number(v.quantity || 1)
-                    }));
-                    setVehicleSelections(vehicleItems);
-                } else {
-                    // Nếu không có vehicles, giữ mặc định
-                    setVehicleSelections([{ categoryId: "", quantity: 1 }]);
-                }
-                setSystemPrice(Number(b.estimatedCost || 0));
-                setDiscountAmount(String(b.discountAmount || 0));
-                setFinalPrice(Number(b.totalCost || 0));
-                // Load note
-                setBookingNote(b.note || "");
-                // Load trip IDs for assignment
-                if (Array.isArray(b.trips) && b.trips.length > 0) {
-                    const ids = b.trips.map(t => t.tripId || t.id).filter(Boolean);
-                    setTripIds(ids);
-                    // Load assigned driver/vehicle info from first trip
-                    const firstTrip = b.trips[0];
-                    if (firstTrip.driverId || firstTrip.driver) {
-                        const dId = firstTrip.driverId || firstTrip.driver?.driverId;
-                        setAssignedDriverId(dId);
-                        // If we have full driver info from API, use it
-                        if (firstTrip.driver?.driverName || firstTrip.driver?.fullName) {
-                            setAssignedDriver({
-                                id: dId,
-                                name: firstTrip.driver?.driverName || firstTrip.driver?.fullName,
-                                phone: firstTrip.driver?.phone || ""
-                            });
-                        }
-                    }
-                    if (firstTrip.vehicleId || firstTrip.vehicle) {
-                        const vId = firstTrip.vehicleId || firstTrip.vehicle?.vehicleId;
-                        setAssignedVehicleId(vId);
-                        // If we have full vehicle info from API, use it
-                        if (firstTrip.vehicle?.licensePlate) {
-                            setAssignedVehicle({
-                                id: vId,
-                                licensePlate: firstTrip.vehicle?.licensePlate,
-                                categoryName: firstTrip.vehicle?.categoryName || ""
-                            });
-                        }
-                    }
-                }
-            } catch { }
-        })();
-    }, [orderId]);
-
-    // Load hire types once
-    React.useEffect(() => {
-        (async () => {
-            try {
-                const resp = await listHireTypes();
-                const list = Array.isArray(resp) ? resp : (resp?.data || []);
-                setHireTypesList(list);
-            } catch (err) {
-                console.error("Failed to load hire types:", err);
-            }
-        })();
-    }, []);
-
-    // Map hireTypeId -> hireType code when both are available
-    React.useEffect(() => {
-        if (!hireTypeId || hireTypesList.length === 0) return;
-        const found = hireTypesList.find(h => String(h.id) === String(hireTypeId));
-        if (found && found.code && found.code !== hireType) {
-            setHireType(found.code);
-        }
-    }, [hireTypeId, hireTypesList]);
-
-    // Map hireType code -> hireTypeId to keep payload đúng
-    React.useEffect(() => {
-        if (!hireType || hireTypesList.length === 0) return;
-        const found = hireTypesList.find(h => h.code === hireType);
-        if (found && String(found.id) !== String(hireTypeId)) {
-            setHireTypeId(String(found.id));
-        }
-    }, [hireType, hireTypesList]);
-
-    // Với thuê theo ngày, chỉ dùng date (YYYY-MM-DD)
-    React.useEffect(() => {
-        const isDaily = hireType === "DAILY" || hireType === "MULTI_DAY";
-        if (!isDaily) return;
-
-        setStartTime(prev => (prev && prev.includes("T") ? prev.split("T")[0] : prev));
-        setEndTime(prev => (prev && prev.includes("T") ? prev.split("T")[0] : prev));
-    }, [hireType]);
-
-    // Update selectedCategory khi vehicleSelections thay đổi (lấy loại xe đầu tiên)
-    React.useEffect(() => {
-        if (vehicleSelections.length > 0 && vehicleSelections[0].categoryId && categories.length > 0) {
-            const found = categories.find(c => String(c.id) === String(vehicleSelections[0].categoryId));
-            if (found) {
-                setSelectedCategory(found);
-            } else {
-                setSelectedCategory(null);
-            }
-        } else {
-            setSelectedCategory(null);
-        }
-    }, [vehicleSelections, categories]);
-
-    // Update assigned driver info when driversList is loaded
-    React.useEffect(() => {
-        if (assignedDriverId && driversList.length > 0 && !assignedDriver) {
-            const found = driversList.find(d => String(d.id) === String(assignedDriverId));
-            if (found) {
-                setAssignedDriver({
-                    id: found.id,
-                    name: found.name,
-                    phone: found.phone || ""
-                });
-            }
-        }
-    }, [assignedDriverId, driversList, assignedDriver]);
-
-    // Update assigned vehicle info when vehiclesList is loaded
-    React.useEffect(() => {
-        if (assignedVehicleId && vehiclesList.length > 0 && !assignedVehicle) {
-            const found = vehiclesList.find(v => String(v.id) === String(assignedVehicleId));
-            if (found) {
-                setAssignedVehicle({
-                    id: found.id,
-                    licensePlate: found.licensePlate,
-                    categoryName: found.categoryName || ""
-                });
-            }
-        }
-    }, [assignedVehicleId, vehiclesList, assignedVehicle]);
-
-    // Load drivers và vehicles khi branchId thay đổi
-    React.useEffect(() => {
-        if (!branchId) return;
-
-        // Load drivers
-        (async () => {
-            setLoadingDrivers(true);
-            try {
-                const drivers = await listDriversByBranch(branchId);
-                const list = Array.isArray(drivers) ? drivers : (drivers?.data || []);
-                setDriversList(list.map(d => ({
-                    id: d.driverId || d.id,
-                    name: d.driverName || d.fullName || d.name || `Driver #${d.driverId || d.id}`,
-                    phone: d.phone || "",
-                    status: d.status || "AVAILABLE"
-                })));
-            } catch (err) {
-                console.error("Failed to load drivers:", err);
-                setDriversList([]);
-            } finally {
-                setLoadingDrivers(false);
-            }
-        })();
-
-        // Load vehicles - lấy tất cả xe của branch (không filter theo categoryId vì có thể có nhiều loại)
-        (async () => {
-            setLoadingVehicles(true);
-            try {
-                const vehicles = await listVehicles({ branchId });
-                const list = Array.isArray(vehicles) ? vehicles : (vehicles?.data || []);
-                setVehiclesList(list.map(v => ({
-                    id: v.vehicleId || v.id,
-                    licensePlate: v.licensePlate || `#${v.vehicleId || v.id}`,
-                    categoryName: v.categoryName || "",
-                    status: v.status || "AVAILABLE"
-                })));
-            } catch (err) {
-                console.error("Failed to load vehicles:", err);
-                setVehiclesList([]);
-            } finally {
-                setLoadingVehicles(false);
-            }
-        })();
-    }, [branchId]);
-
-    // Filter drivers and vehicles based on search
-    const filteredDrivers = React.useMemo(() => {
-        if (!driverSearch) return driversList;
-        const search = driverSearch.toLowerCase();
-        return driversList.filter(d =>
-            d.name.toLowerCase().includes(search) ||
-            d.phone.toLowerCase().includes(search)
-        );
-    }, [driversList, driverSearch]);
-
-    const filteredVehicles = React.useMemo(() => {
-        if (!vehicleSearch) return vehiclesList;
-        const search = vehicleSearch.toLowerCase();
-        return vehiclesList.filter(v =>
-            v.licensePlate.toLowerCase().includes(search) ||
-            v.categoryName.toLowerCase().includes(search)
-        );
-    }, [vehiclesList, vehicleSearch]);
-
-    // Get selected driver/vehicle info
-    const selectedDriver = React.useMemo(() =>
-            driversList.find(d => String(d.id) === String(driverId)),
-        [driversList, driverId]
-    );
-    const selectedVehicle = React.useMemo(() =>
-            vehiclesList.find(v => String(v.id) === String(vehicleId)),
-        [vehiclesList, vehicleId]
-    );
-
-    // Close dropdowns when clicking outside
-    React.useEffect(() => {
-        const handleClickOutside = (e) => {
-            if (!e.target.closest('.driver-dropdown-container')) {
-                setShowDriverDropdown(false);
-            }
-            if (!e.target.closest('.vehicle-dropdown-container')) {
-                setShowVehicleDropdown(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
-    // Cooldown timer for reassignment (5 minutes)
-    React.useEffect(() => {
-        if (!lastAssignmentTime) {
-            setCooldownRemaining(0);
-            return;
-        }
-        const COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
-        const updateCooldown = () => {
-            const elapsed = Date.now() - lastAssignmentTime;
-            const remaining = Math.max(0, COOLDOWN_MS - elapsed);
-            setCooldownRemaining(remaining);
-        };
-        updateCooldown();
-        const interval = setInterval(updateCooldown, 1000);
-        return () => clearInterval(interval);
-    }, [lastAssignmentTime]);
-
-    // Auto-calculate distance when both pickup and dropoff are entered
-    React.useEffect(() => {
-        const timeoutId = setTimeout(async () => {
-            if (!pickup || !dropoff) {
-                setDistanceError("");
-                return;
-            }
-
-            // Only calculate if both fields have reasonable length and in edit mode
-            if (pickup.trim().length < 5 || dropoff.trim().length < 5 || !canEdit) {
-                return;
-            }
-
-            setCalculatingDistance(true);
-            setDistanceError("");
-
-            try {
-                const result = await calculateDistance(pickup, dropoff);
-                setDistanceKm(String(result.distance));
-                pushToast(`Khoảng cách: ${result.formattedDistance} (~${result.formattedDuration})`, "success");
-            } catch (error) {
-                console.error("Distance calculation error:", error);
-                setDistanceError("Không tính được khoảng cách tự động.");
-                pushToast("Không tính được khoảng cách tự động", "error");
-            } finally {
-                setCalculatingDistance(false);
-            }
-        }, 1500); // Debounce 1.5 seconds
-
-        return () => clearTimeout(timeoutId);
-    }, [pickup, dropoff, canEdit]);
-
-    /* --- tự tính finalPrice khi thay đổi discount/systemPrice --- */
-    React.useEffect(() => {
-        const disc = Number(
-            String(discountAmount || "0").replace(
-                /[^0-9]/g,
-                ""
-            )
-        );
-        const sysP = Number(systemPrice || 0);
-        const fp = Math.max(0, sysP - disc);
-        setFinalPrice(fp);
-    }, [discountAmount, systemPrice]);
-
-    // Detect weekend and holiday from startTime (phải khai báo trước useEffect sử dụng)
-    const isWeekend = React.useMemo(() => {
-        if (!startTime) return false;
-        const date = new Date(startTime);
-        const day = date.getDay();
-        return day === 0 || day === 6; // Sunday or Saturday
-    }, [startTime]);
-
-    const isHoliday = React.useMemo(() => {
-        if (!startTime) return false;
-        const date = new Date(startTime);
-        const month = date.getMonth();
-        const day = date.getDate();
-        // Vietnamese holidays (simplified - có thể mở rộng sau)
-        const holidays = [
-            { month: 0, day: 1 },   // New Year
-            { month: 3, day: 30 },  // Liberation Day
-            { month: 4, day: 1 },   // Labor Day
-            { month: 8, day: 2 },   // National Day
-        ];
-        return holidays.some(h => h.month === month && h.day === day);
-    }, [startTime]);
-
-    /* --- tự động tính lại giá khi thay đổi các tham số --- */
-    React.useEffect(() => {
-        if (!canEdit) return; // Chỉ tính khi có quyền sửa
-
-        const timeoutId = setTimeout(async () => {
-            // Chỉ tính nếu có đủ thông tin
-            if (!startTime) {
-                return;
-            }
-            // Kiểm tra có ít nhất 1 loại xe được chọn
-            const validSelections = vehicleSelections.filter(v => v.categoryId && Number(v.categoryId) > 0);
-            if (validSelections.length === 0) {
-                return;
-            }
-            if (hireType !== "ONE_WAY" && !endTime) {
-                return;
-            }
-
-            try {
-                const startISO = toIsoZ(startTime);
-                const endISO = hireType === "ONE_WAY" && !endTime
-                    ? toIsoZ(new Date(new Date(startTime).getTime() + 2 * 60 * 60 * 1000).toISOString())
-                    : toIsoZ(endTime);
-
-                const vehicleCategoryIds = validSelections.map(v => Number(v.categoryId));
-                const quantities = validSelections.map(v => Number(v.quantity || 1));
-
-                const price = await calculatePrice({
-                    vehicleCategoryIds: vehicleCategoryIds,
-                    quantities: quantities,
-                    distance: Number(distanceKm || 0),
-                    useHighway: false,
-                    hireTypeId: hireTypeId ? Number(hireTypeId) : undefined,
-                    isHoliday: isHoliday,
-                    isWeekend: isWeekend,
-                    startTime: startISO,
-                    endTime: endISO,
-                });
-                const base = Number(price || 0);
-                if (base > 0) {
-                    setSystemPrice(base);
-                }
-            } catch (err) {
-                console.error("Auto calculate price error:", err);
-                // Không hiển thị toast vì có thể user đang nhập dở
-            }
-        }, 1500); // Debounce 1.5 seconds
-
-        return () => clearTimeout(timeoutId);
-    }, [hireTypeId, isHoliday, isWeekend, startTime, endTime, distanceKm, vehicleSelections, hireType, canEdit]);
-
-    /* --- check availability (real call) --- */
-    const checkAvailability = async () => {
-        const validSelections = vehicleSelections.filter(v => v.categoryId && Number(v.categoryId) > 0);
-        if (validSelections.length === 0 || !branchId) {
-            setAvailabilityMsg("Thiếu loại xe hoặc chi nhánh");
-            pushToast("Vui lòng chọn loại xe và chi nhánh trước", "error");
-            return;
-        }
-        if (!startTime || !endTime) {
-            setAvailabilityMsg("Thiếu thời gian đón/trả");
-            pushToast("Vui lòng nhập thời gian đón và trả", "error");
-            return;
-        }
-
-        setCheckingAvailability(true);
-        setAvailabilityMsg("");
-
-        try {
-            const { checkVehicleAvailability } = await import("../../api/bookings");
-            // Check từng loại xe
-            let allAvailable = true;
-            let messages = [];
-
-            for (const selection of validSelections) {
-                const result = await checkVehicleAvailability({
-                    branchId: Number(branchId),
-                    categoryId: Number(selection.categoryId),
-                    startTime: toIsoZ(startTime),
-                    endTime: toIsoZ(endTime),
-                    quantity: Number(selection.quantity || 1),
-                });
-
-                const category = categories.find(c => String(c.id) === String(selection.categoryId));
-                const categoryName = category?.categoryName || `Loại ${selection.categoryId}`;
-
-                if (result?.ok || result?.available) {
-                    const count = result.availableCount || result.count || 0;
-                    messages.push(`${categoryName}: Còn ${count} xe`);
-                } else {
-                    allAvailable = false;
-                    messages.push(`${categoryName}: Hết xe`);
-                }
-            }
-
-            if (allAvailable) {
-                setAvailabilityMsg(`✓ Khả dụng: ${messages.join(", ")}`);
-                pushToast(`Xe còn sẵn`, "success");
-            } else {
-                setAvailabilityMsg(`⚠ Cảnh báo: ${messages.join(", ")}`);
-                pushToast("Một số loại xe đã hết", "error");
-            }
-        } catch (e) {
-            console.error("Check availability error:", e);
-            setAvailabilityMsg("Không kiểm tra được - thử lại sau");
-            pushToast("Không kiểm tra được khả dụng xe: " + (e.message || "Lỗi"), "error");
-        } finally {
-            setCheckingAvailability(false);
-        }
-    };
-
-    /* --- recalc system price --- */
-    const recalcPrice = async () => {
-        if (!startTime) {
-            pushToast("Vui lòng nhập thời gian đón trước", "error");
-            return;
-        }
-        const validSelections = vehicleSelections.filter(v => v.categoryId && Number(v.categoryId) > 0);
-        if (validSelections.length === 0) {
-            pushToast("Vui lòng chọn ít nhất 1 loại xe trước", "error");
-            return;
-        }
-        try {
-            const startISO = toIsoZ(startTime);
-            // ONE_WAY: endTime = startTime + 2 giờ (mặc định)
-            const endISO = hireType === "ONE_WAY" && !endTime
-                ? toIsoZ(new Date(new Date(startTime).getTime() + 2 * 60 * 60 * 1000).toISOString())
-                : toIsoZ(endTime);
-
-            const vehicleCategoryIds = validSelections.map(v => Number(v.categoryId));
-            const quantities = validSelections.map(v => Number(v.quantity || 1));
-
-            const price = await calculatePrice({
-                vehicleCategoryIds: vehicleCategoryIds,
-                quantities: quantities,
-                distance: Number(distanceKm || 0),
-                useHighway: false,
-                hireTypeId: hireTypeId ? Number(hireTypeId) : undefined,
-                isHoliday: isHoliday,
-                isWeekend: isWeekend,
-                startTime: startISO,
-                endTime: endISO,
-            });
-            const base = Number(price || 0);
-            setSystemPrice(base);
-            pushToast("Đã tính lại giá hệ thống: " + base.toLocaleString("vi-VN") + "đ", "info");
-        } catch (err) {
-            console.error("Calculate price error:", err);
-            pushToast("Không tính được giá tự động: " + (err.message || "Lỗi"), "error");
-        }
-    };
-
-    /* --- PUT status=DRAFT --- */
-    const onSaveDraft = async () => {
-        // Validate thông tin khách hàng
-        if (!customerPhone || customerPhone.trim().length < 10) {
-            pushToast("Số điện thoại không hợp lệ (cần ít nhất 10 số)", "error");
-            return;
-        }
-        if (!customerName || customerName.trim().length < 2) {
-            pushToast("Vui lòng nhập tên khách hàng", "error");
-            return;
-        }
-
-        // Validate điểm đón/trả
-        if (!pickup || pickup.trim().length < 3) {
-            pushToast("Vui lòng nhập điểm đón", "error");
-            return;
-        }
-        if (!dropoff || dropoff.trim().length < 3) {
-            pushToast("Vui lòng nhập điểm đến", "error");
-            return;
-        }
-
-        // Validate time
-        if (!startTime) {
-            pushToast("Vui lòng nhập thời gian đón", "error");
-            return;
-        }
-        // Với hình thức 1 chiều (ONE_WAY), không bắt buộc endTime
-        if (hireType !== "ONE_WAY" && !endTime) {
-            pushToast("Vui lòng nhập thời gian kết thúc", "error");
-            return;
-        }
-
-        const startDate = new Date(startTime);
-        const endDate = new Date(endTime);
-        const now = new Date();
-
-        // Check if start time is in the past
-        if (startDate < now) {
-            pushToast("Thời gian đón phải lớn hơn thời gian hiện tại", "error");
-            return;
-        }
-
-        // Check if end time is after start time
-        if (endDate <= startDate) {
-            pushToast("Thời gian kết thúc phải sau thời gian đón", "error");
-            return;
-        }
-
-        // Validate số khách - chỉ validate nếu không phải consultant (vì consultant không nhập số khách)
-        if (!isConsultant) {
-            const paxNum = Number(pax || 0);
-            if (paxNum < 1) {
-                pushToast("Số khách phải >= 1", "error");
-                return;
-            }
-            if (selectedCategory && selectedCategory.seats && paxNum >= selectedCategory.seats) {
-                pushToast(`Số khách phải < ${selectedCategory.seats} (số ghế xe)`, "error");
-                return;
-            }
-        }
-
-        // Validate loại xe
-        const validSelections = vehicleSelections.filter(v => v.categoryId && Number(v.categoryId) > 0);
-        if (validSelections.length === 0) {
-            pushToast("Vui lòng chọn ít nhất 1 loại xe", "error");
-            return;
-        }
-        for (const selection of validSelections) {
-            if (Number(selection.quantity || 0) < 1) {
-                pushToast("Số lượng xe phải >= 1", "error");
-                return;
-            }
-        }
-
-        setSubmittingDraft(true);
-
-        const cleanDiscount = Number(
-            String(discountAmount || "0").replace(/[^0-9]/g, "")
-        );
-
-        const req = {
-            customer: { fullName: customerName.trim(), phone: customerPhone.trim(), email: customerEmail?.trim() || null },
-            branchId: Number(branchId || 0) || undefined,
-            hireTypeId: hireTypeId ? Number(hireTypeId) : undefined,
-            trips: [{
-                startLocation: pickup.trim(),
-                endLocation: dropoff.trim(),
-                startTime: toIsoZ(startTime),
-                endTime: hireType === "ONE_WAY" && !endTime ? undefined : toIsoZ(endTime),
-                distance: distanceKm ? Number(distanceKm) : undefined,
-                paxCount: isConsultant ? undefined : paxNum
-            }],
-            vehicles: vehicleSelections
-                .filter(v => v.categoryId && Number(v.categoryId) > 0)
-                .map(v => ({
-                    vehicleCategoryId: Number(v.categoryId),
-                    quantity: Number(v.quantity || 1)
-                })),
-            estimatedCost: Number(systemPrice || 0),
-            discountAmount: cleanDiscount,
-            totalCost: Number(finalPrice || 0),
-            note: bookingNote?.trim() || null,
-        };
-        try {
-            await updateBooking(orderId, req);
-            pushToast('Đã lưu thay đổi.', 'success');
-            navigate('/orders', { state: { refresh: true, toast: 'Đã lưu thay đổi.' } });
-        } catch (err) {
-            pushToast('Lưu thất bại: ' + (err.response?.data?.message || err.message || 'Lỗi không xác định'), 'error');
-        }
-
-        setSubmittingDraft(false);
-    };
-
-    /* --- PUT status=PENDING --- */
-    const onSubmitOrder = async () => {
-        // Validate time
-        if (startTime && endTime) {
-            const startDate = new Date(startTime);
-            const endDate = new Date(endTime);
-            const now = new Date();
-
-            // Check if start time is in the past
-            if (startDate < now) {
-                pushToast("Thời gian đón phải lớn hơn hoặc bằng thời gian hiện tại", "error");
-                return;
-            }
-
-            // Check if end time is after start time
-            if (endDate <= startDate) {
-                pushToast("Thời gian kết thúc phải sau thời gian đón", "error");
-                return;
-            }
-        }
-
-        setSubmittingUpdate(true);
-
-        const cleanDiscount = Number(
-            String(discountAmount || "0").replace(
-                /[^0-9]/g,
-                ""
-            )
-        );
-
-        const req2 = {
-            customer: { fullName: customerName, phone: customerPhone, email: customerEmail },
-            branchId: Number(branchId || 0) || undefined,
-            hireTypeId: hireTypeId ? Number(hireTypeId) : undefined,
-            trips: [{ startLocation: pickup, endLocation: dropoff, startTime: toIsoZ(startTime), endTime: hireType === "ONE_WAY" && !endTime ? undefined : toIsoZ(endTime), distance: distanceKm ? Number(distanceKm) : undefined }],
-            vehicles: vehicleSelections
-                .filter(v => v.categoryId && Number(v.categoryId) > 0)
-                .map(v => ({
-                    vehicleCategoryId: Number(v.categoryId),
-                    quantity: Number(v.quantity || 1)
-                })),
-            estimatedCost: Number(systemPrice || 0),
-            discountAmount: cleanDiscount,
-            totalCost: Number(finalPrice || 0),
-            status: 'PENDING',
-        };
-        try {
-            await updateBooking(orderId, req2);
-            setStatus('PENDING');
-            pushToast('Đã cập nhật đơn hàng.', 'success');
-            navigate('/orders', { state: { refresh: true, toast: 'Đã cập nhật đơn hàng.' } });
-        } catch (err) {
-            pushToast('Cập nhật đơn thất bại: ' + (err.response?.data?.message || err.message || 'Lỗi không xác định'), 'error');
-        }
-
-        setSubmittingUpdate(false);
-    };
-
-    // Assign driver/vehicle to all trips
-    const [assigning, setAssigning] = React.useState(false);
-    const onAssign = async () => {
-        if (tripIds.length === 0) {
-            pushToast("Không tìm thấy chuyến để gán. Vui lòng tải lại trang.", "error");
-            return;
-        }
-
-        // Check cooldown
-        if (cooldownRemaining > 0) {
-            const mins = Math.floor(cooldownRemaining / 60000);
-            const secs = Math.floor((cooldownRemaining % 60000) / 1000);
-            pushToast(`Vui lòng đợi ${mins}:${String(secs).padStart(2, '0')} để thay đổi tài xế/xe`, "error");
-            return;
-        }
-
-        setAssigning(true);
-        try {
-            await assignBooking(orderId, {
-                driverId: driverId ? Number(driverId) : undefined,
-                vehicleId: vehicleId ? Number(vehicleId) : undefined,
-                tripIds: tripIds,
-            });
-            pushToast("Đã gán tài xế/xe cho đơn hàng", "success");
-            // Store assigned info and start cooldown
-            if (driverId && selectedDriver) {
-                setAssignedDriverId(driverId);
-                setAssignedDriver({ ...selectedDriver });
-            }
-            if (vehicleId && selectedVehicle) {
-                setAssignedVehicleId(vehicleId);
-                setAssignedVehicle({ ...selectedVehicle });
-            }
-            setLastAssignmentTime(Date.now());
-            // Reset selection
-            setDriverId("");
-            setVehicleId("");
-        } catch (e) {
-            console.error("Assign error:", e);
-            const msg = e.response?.data?.message || e.message || "Lỗi không xác định";
-            pushToast("Gán tài xế/xe thất bại: " + msg, "error");
-        } finally {
-            setAssigning(false);
-        }
-    };
-
-    /* ---------------- styles / shared ---------------- */
-    const labelCls =
-        "text-[12px] text-slate-600 mb-1 flex items-center gap-1";
-    const inputEnabledCls =
-        "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500";
-    const inputDisabledCls =
-        "w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-400 placeholder:text-slate-400 outline-none cursor-not-allowed";
-    const textareaEnabledCls =
-        "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500";
-    const textareaDisabledCls =
-        "w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-400 placeholder:text-slate-400 outline-none cursor-not-allowed";
-
-    const selectEnabledCls =
-        "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500";
-    const selectDisabledCls =
-        "w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-400 outline-none cursor-not-allowed";
-
-    const makeInputCls = (base) =>
-        canEdit ? base.enabled : base.disabled;
-    const disableInputProps = canEdit
-        ? {}
-        : { disabled: true, readOnly: true };
-
-    // Với role Tư vấn viên: cho phép chỉnh "Ghi chú cho tài xế" miễn là chuyến CHƯA bắt đầu,
-    // kể cả khi đã qua mốc 12h không cho sửa các thông tin khác.
-    const canEditDriverNote = React.useMemo(() => {
-        if (!isConsultant) {
-            return canEdit;
-        }
-        if (!startTime) {
-            return true;
-        }
-        const tripStart = new Date(startTime);
-        const now = new Date();
-        return tripStart.getTime() > now.getTime();
-    }, [isConsultant, canEdit, startTime]);
-
-    /* ---------------- locked banner ---------------- */
-    const lockedReason = React.useMemo(() => {
-        const editableStatuses = ["DRAFT", "PENDING", "CONFIRMED", "ASSIGNED", "QUOTATION_SENT"];
-        const hasDeposit = paidAmount > 0;
-
-        // Nếu đã hủy thì không cho sửa
-        if (status === "CANCELLED") {
-            return `Đơn hàng đã bị hủy. Không thể chỉnh sửa.`;
-        }
-
-        // Nếu đơn đặt cọc và chưa bắt đầu, cho phép sửa
-        if (hasDeposit) {
-            const tripStarted = status === "ONGOING" || status === "COMPLETED";
-            const tripTimePassed = startTime ? new Date(startTime) <= new Date() : false;
-            if (!tripStarted && !tripTimePassed) {
-                return null; // Cho phép sửa đơn đặt cọc chưa bắt đầu
-            }
-            // Nếu đã bắt đầu thì hiển thị lý do
-            if (tripStarted) {
-                return `Chuyến đi đã bắt đầu (${ORDER_STATUS_LABEL[status] || status}). Không thể chỉnh sửa.`;
-            }
-            if (tripTimePassed) {
-                return `Thời gian chuyến đi đã đến. Không thể chỉnh sửa.`;
-            }
-        }
-
-        if (!editableStatuses.includes(status)) {
-            return `Đơn hàng ở trạng thái ${ORDER_STATUS_LABEL[status] || status}. Không thể chỉnh sửa.`;
-        }
-
-        if (startTime && !hasDeposit) {
-            // startTime đã được convert sang local format (YYYY-MM-DDTHH:mm)
-            const tripStart = new Date(startTime);
-            const now = new Date();
-            const diffMs = tripStart.getTime() - now.getTime();
-            const hoursUntilTrip = diffMs / (1000 * 60 * 60);
-
-            if (hoursUntilTrip < 12) {
-                const absHours = Math.abs(hoursUntilTrip);
-                const hours = Math.floor(absHours);
-                const minutes = Math.floor((absHours - hours) * 60);
-
-                if (hoursUntilTrip < 0) {
-                    return `Chuyến đi đã diễn ra ${hours} giờ ${minutes} phút trước. Không thể chỉnh sửa.`;
-                }
-                return `Chỉ còn ${hours} giờ ${minutes} phút trước chuyến đi. Cần >= 12 giờ để chỉnh sửa.`;
-            }
-        }
-        return null;
-    }, [status, startTime, paidAmount]);
-
-    const lockedBanner = !canEdit && lockedReason ? (
-        <div className="rounded-lg border border-info-200 bg-info-50 text-info-700 text-[12px] flex items-start gap-2 px-3 py-2">
-            <AlertTriangle className="h-4 w-4 text-primary-600 shrink-0" />
-            <div className="leading-relaxed">
-                {lockedReason}
+/* ---------- Section cards (LIGHT THEME) ---------- */
+
+/* 1. Thông tin khách hàng */
+function CustomerInfoCard({ customer }) {
+    return (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-4 shadow-sm">
+            <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                <User className="h-4 w-4 text-sky-600" />
+                Thông tin khách hàng
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4 text-sm">
+                <div className="space-y-2">
+                    <div className="text-[12px] text-slate-500">
+                        Tên khách hàng
+                    </div>
+                    <div className="text-base font-medium text-slate-900 leading-tight">
+                        {customer.name || "—"}
+                    </div>
+                </div>
+
+                <div className="space-y-2">
+                    <div className="text-[12px] text-slate-500">
+                        Số điện thoại
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-slate-700 leading-tight break-all">
+                        <Phone className="h-4 w-4 text-sky-600 shrink-0" />
+                        <a
+                            className="text-sky-600 hover:underline"
+                            href={
+                                "tel:" +
+                                (customer.phone || "")
+                            }
+                        >
+                            {customer.phone || "—"}
+                        </a>
+                    </div>
+                </div>
+
+                <div className="space-y-2 sm:col-span-2">
+                    <div className="text-[12px] text-slate-500">
+                        Email
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-slate-700 break-all">
+                        <Mail className="h-4 w-4 text-slate-400 shrink-0" />
+                        <span>
+                            {customer.email || "—"}
+                        </span>
+                    </div>
+                </div>
             </div>
         </div>
-    ) : null;
+    );
+}
 
-    /* ---------------- RENDER ---------------- */
+/* 2. Thông tin lịch trình */
+function TripInfoCard({ trip, hireTypeName, useHighway }) {
+    // Format chi tiết xe: "1×Xe 45 chỗ, 2×Xe 16 chỗ"
+    const vehicleDetailsText = trip.vehicle_details && trip.vehicle_details.length > 0
+        ? trip.vehicle_details.map(v => `${v.quantity}×${v.name}`).join(", ")
+        : (trip.vehicle_category ? `${trip.vehicle_count || 1}×${trip.vehicle_category}` : "—");
+    
+    return (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-4 shadow-sm">
+            <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                <MapPin className="h-4 w-4 text-primary-600" />
+                Thông tin lịch trình
+            </div>
+
+            {/* Hình thức thuê & Thông tin chung */}
+            <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 flex flex-wrap gap-x-6 gap-y-2 text-[13px]">
+                <div className="flex items-center gap-2">
+                    <ClipboardList className="h-4 w-4 text-sky-600" />
+                    <span className="text-slate-600">Hình thức:</span>
+                    <span className="font-semibold text-sky-700">
+                        {hireTypeName || "—"}
+                    </span>
+                </div>
+                {trip.distance > 0 && (
+                    <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-slate-500" />
+                        <span className="text-slate-600">Khoảng cách:</span>
+                        <span className="font-medium text-slate-900">{trip.distance} km</span>
+                    </div>
+                )}
+                {useHighway && (
+                    <div className="flex items-center gap-2">
+                        <Truck className="h-4 w-4 text-emerald-600" />
+                        <span className="font-medium text-emerald-700">Có đi cao tốc</span>
+                    </div>
+                )}
+            </div>
+
+            <div className="grid lg:grid-cols-[1fr_auto] gap-6">
+                {/* Lộ trình chi tiết */}
+                <div className="flex flex-col gap-4 text-sm">
+                    <div className="flex gap-3">
+                        {/* timeline dots */}
+                        <div className="flex flex-col items-center">
+                            <div className="h-3 w-3 rounded-full bg-primary-500" />
+                            <div className="flex-1 w-px bg-slate-300" />
+                            <div className="h-3 w-3 rounded-full bg-rose-500" />
+                        </div>
+
+                        <div className="space-y-4">
+                            {/* Pickup */}
+                            <div>
+                                <div className="mb-1 flex items-center gap-1 text-[12px] text-slate-500">
+                                    <MapPin className="h-3.5 w-3.5 text-primary-600" />
+                                    <span>Điểm đón</span>
+                                </div>
+                                <div className="font-medium text-slate-900 leading-relaxed">
+                                    {trip.pickup || "—"}
+                                </div>
+
+                                <div className="mt-1 flex items-center gap-1 text-[12px] text-slate-500">
+                                    <Clock className="h-3.5 w-3.5 text-slate-400" />
+                                    <span>
+                                        Thời gian đi:{" "}
+                                        <span className="font-medium text-slate-900 tabular-nums">
+                                            {fmtDateTime(trip.pickup_time)}
+                                        </span>
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Dropoff */}
+                            <div>
+                                <div className="mb-1 flex items-center gap-1 text-[12px] text-slate-500">
+                                    <MapPin className="h-3.5 w-3.5 text-rose-600" />
+                                    <span>Điểm đến</span>
+                                </div>
+                                <div className="font-medium text-slate-900 leading-relaxed">
+                                    {trip.dropoff || "—"}
+                                </div>
+
+                                <div className="mt-1 flex items-center gap-1 text-[12px] text-slate-500">
+                                    <Clock className="h-3.5 w-3.5 text-slate-400" />
+                                    <span>
+                                        Thời gian về:{" "}
+                                        <span className="font-medium text-slate-900 tabular-nums">
+                                            {fmtDateTime(trip.dropoff_eta)}
+                                        </span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* meta box - Thông tin xe */}
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex flex-col gap-2 text-[13px] text-slate-700">
+                        <div className="flex items-center gap-2">
+                            <Users className="h-4 w-4 text-slate-500" />
+                            <span>
+                                Sức chứa:{" "}
+                                <span className="font-medium text-slate-900">
+                                    {trip.pax_count > 0 ? `${trip.pax_count} chỗ` : "—"}
+                                </span>
+                            </span>
+                        </div>
+
+                        <div className="flex items-start gap-2">
+                            <CarFront className="h-4 w-4 text-primary-600 mt-0.5" />
+                            <div className="flex flex-col">
+                                <span className="text-slate-600 mb-1">Xe: {trip.vehicle_count > 0 && <span className="text-slate-500">({trip.vehicle_count} xe)</span>}</span>
+                                {trip.vehicle_details && trip.vehicle_details.length > 0 ? (
+                                    trip.vehicle_details.map((v, idx) => (
+                                        <span key={idx} className="font-medium text-slate-900">
+                                            • {v.quantity}×{v.name}
+                                        </span>
+                                    ))
+                                ) : (
+                                    <span className="font-medium text-slate-900">{vehicleDetailsText || "—"}</span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* box nhắc nhở */}
+                <div className="lg:w-[200px] shrink-0 rounded-xl border border-info-200 bg-info-50 p-3 text-[12px] text-info-800 space-y-2 h-fit">
+                    <div className="flex items-start gap-2 leading-relaxed">
+                        <AlertTriangle className="h-4 w-4 text-info-600 shrink-0" />
+                        <div>
+                            Hãy gọi xác nhận với khách{" "}
+                            <span className="font-semibold text-slate-900">
+                                trước giờ đón ~10 phút
+                            </span>{" "}
+                            và đảm bảo xe đúng loại.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* 3. Báo giá */
+function QuoteInfoCard({ quote }) {
+    return (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-4 shadow-sm">
+            <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                <DollarSign className="h-4 w-4 text-primary-600" />
+                Báo giá
+            </div>
+
+            <div className="grid sm:grid-cols-3 gap-4 text-sm">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex flex-col gap-1">
+                    <div className="text-[11px] uppercase tracking-wide font-medium text-slate-500">
+                        Giá gốc (ước tính)
+                    </div>
+                    <div className="tabular-nums font-semibold text-slate-900">
+                        {fmtVND(quote.base_price)}
+                    </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex flex-col gap-1">
+                    <div className="text-[11px] uppercase tracking-wide font-medium text-slate-500">
+                        Giảm giá
+                    </div>
+                    <div className="tabular-nums font-semibold text-slate-900">
+                        {fmtVND(
+                            quote.discount_amount
+                        )}
+                    </div>
+                    {Number(
+                        quote.discount_amount
+                    ) > 0 ? (
+                        <div className="text-[11px] text-slate-500 leading-relaxed">
+                            (Duyệt bởi quản lý /
+                            chăm sóc khách
+                            hàng)
+                        </div>
+                    ) : null}
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex flex-col gap-1">
+                    <div className="text-[11px] uppercase tracking-wide font-medium text-slate-500">
+                        Giá cuối báo khách
+                    </div>
+                    <div className="text-base font-semibold tabular-nums flex items-center gap-1 text-primary-600">
+                        <DollarSign className="h-4 w-4 text-primary-600" />
+                        <span>
+                            {fmtVND(
+                                quote.final_price
+                            )}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* 4. Thanh toán / Cọc */
+function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr, isConsultant = false, isCoordinator = false, pickupTime = null }) {
+    const remain = Math.max(0, Number(payment.remaining || 0));
+    const paid = Math.max(0, Number(payment.paid || 0));
+    
+    // Kiểm tra xem đơn hàng đã quá thời gian bắt đầu chưa
+    const isStartTimePassed = React.useMemo(() => {
+        if (!pickupTime) return false; // Không có thời gian thì coi như chưa quá
+        
+        try {
+            // Parse ngày giống như fmtDateTime: replace space thành T để parse đúng ISO format
+            const safe = String(pickupTime).replace(" ", "T");
+            const pickupDate = new Date(safe);
+            const now = new Date();
+            
+            // Kiểm tra xem parse có thành công không
+            if (!isNaN(pickupDate.getTime())) {
+                // Nếu thời gian bắt đầu đã qua (nhỏ hơn hoặc bằng thời gian hiện tại)
+                return pickupDate <= now;
+            }
+        } catch (e) {
+            console.error("Error parsing pickup time:", e);
+        }
+        
+        return false; // Nếu parse lỗi thì coi như chưa quá
+    }, [pickupTime]);
+
+    return (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-4 shadow-sm">
+            <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                <BadgeDollarSign className="h-4 w-4 text-primary-600" />
+                Thanh toán / Cọc
+            </div>
+
+            {/* Số liệu tóm tắt */}
+            <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 flex flex-col gap-1">
+                    <div className="text-[11px] uppercase tracking-wide font-medium text-emerald-700">Đã thu</div>
+                    <div className="text-lg font-bold tabular-nums text-emerald-700 flex items-center gap-1">
+                        <DollarSign className="h-4 w-4" />
+                        <span>{fmtVND(paid)}</span>
+                    </div>
+                </div>
+
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 flex flex-col gap-1">
+                    <div className="text-[11px] uppercase tracking-wide font-medium text-rose-700">Còn lại</div>
+                    <div className="text-lg font-bold tabular-nums text-rose-700 flex items-center gap-1">
+                        <DollarSign className="h-4 w-4" />
+                        <span>{fmtVND(remain)}</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Trạng thái & ghi chú */}
+            {remain <= 0 ? (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-700 flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span className="font-medium">Đã thanh toán đủ</span>
+                </div>
+            ) : (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-600 leading-relaxed">
+                    Khách sẽ thanh toán phần còn lại sau chuyến hoặc khi xuất hóa đơn.
+                </div>
+            )}
+
+            {/* Nút hành động - Chỉ hiển thị khi:
+                1. Còn tiền chưa thanh toán
+                2. Không phải Coordinator
+                3. Chưa quá thời gian bắt đầu
+            */}
+            {remain > 0 && !isCoordinator && !isStartTimePassed && (
+                <>
+                    <div className="grid grid-cols-2 gap-3">
+                        <button
+                            className="rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-medium text-[13px] px-4 py-2.5 shadow-sm flex items-center justify-center gap-2 transition-colors"
+                            onClick={onOpenDeposit}
+                        >
+                            <BadgeDollarSign className="h-4 w-4" />
+                            <span>{isConsultant ? "Yêu cầu đặt cọc" : "Ghi nhận thanh toán"}</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            className="rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium text-[13px] px-4 py-2.5 shadow-sm flex items-center justify-center gap-2 transition-colors"
+                            onClick={onGenerateQr}
+                        >
+                            <QrCode className="h-4 w-4 text-sky-600" />
+                            <span>Tạo QR</span>
+                        </button>
+                    </div>
+
+                    <div className="text-[11px] text-slate-500 text-center leading-relaxed px-2">
+                        {isConsultant 
+                            ? "Tạo yêu cầu thu cọc/thanh toán để kế toán xác nhận, hoặc gửi QR cho khách."
+                            : "Ghi nhận tiền mặt/chuyển khoản hoặc gửi mã QR để khách tự thanh toán."}
+                    </div>
+                </>
+            )}
+            
+            {/* Thông báo khi đơn đã quá thời gian bắt đầu */}
+            {remain > 0 && !isCoordinator && isStartTimePassed && (
+                <div className="rounded-lg border border-info-200 bg-info-50 px-3 py-2 text-[12px] text-info-700 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-info-600 shrink-0" />
+                    <span>Đơn hàng đã quá thời gian bắt đầu. Không thể đặt cọc hoặc tạo QR thanh toán.</span>
+                </div>
+            )}
+            
+            {/* Thông báo cho Coordinator khi còn tiền chưa thanh toán */}
+            {remain > 0 && isCoordinator && (
+                <div className="rounded-lg border border-info-200 bg-info-50 px-3 py-2 text-[12px] text-info-700 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-info-600 shrink-0" />
+                    <span>Điều phối viên không có quyền tạo request thanh toán. Vui lòng liên hệ kế toán hoặc tư vấn viên.</span>
+                </div>
+            )}
+
+            {/* Lịch sử thanh toán */}
+            <div className="border-t border-slate-200 pt-4 space-y-3">
+                <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Lịch sử thanh toán</div>
+                {history.length ? (
+                    <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                        {history.map((item) => (
+                            <div
+                                key={item.invoiceId}
+                                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-[12px] space-y-1.5"
+                            >
+                                <div className="flex justify-between items-start gap-2">
+                                    <span className="font-bold text-base text-slate-900 tabular-nums">{fmtVND(item.amount || 0)}</span>
+                                    <span className="text-[11px] text-slate-500 whitespace-nowrap">{item.createdAt ? fmtDateTime(item.createdAt) : "--"}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-[11px]">
+                                    <span className="text-slate-600">{item.paymentMethod || "Không có"}</span>
+                                    <span
+                                        className={cls(
+                                            "font-semibold px-2 py-0.5 rounded-md",
+                                            item.paymentStatus === "PAID"
+                                                ? "bg-emerald-100 text-emerald-700"
+                                                : item.paymentStatus === "PENDING"
+                                                ? "bg-info-100 text-info-700"
+                                                : "bg-slate-100 text-slate-700"
+                                        )}
+                                    >
+                                        {item.paymentStatus === "PAID" 
+                                            ? "Đã thanh toán" 
+                                            : item.paymentStatus === "PENDING"
+                                            ? "Chờ xác nhận"
+                                            : item.paymentStatus === "UNPAID"
+                                            ? "Chưa thanh toán"
+                                            : item.paymentStatus || "Chưa thanh toán"}
+                                    </span>
+                                </div>
+                                {item.note ? (
+                                    <div className="text-[11px] text-slate-600 break-words leading-relaxed pt-1 border-t border-slate-200">{item.note}</div>
+                                ) : null}
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-[12px] text-slate-500">
+                        Chưa có khoản thanh toán nào.
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function QrPaymentModal({
+    open,
+    bookingCode,
+    customerName,
+    defaultAmount = 0,
+    onClose,
+    onGenerate,
+}) {
+    const [amountStr, setAmountStr] = React.useState("");
+    const [note, setNote] = React.useState("");
+    const [deposit, setDeposit] = React.useState(true);
+    const [loading, setLoading] = React.useState(false);
+    const [error, setError] = React.useState("");
+    const [result, setResult] = React.useState(null);
+    const [copied, setCopied] = React.useState(false);
+    const [useFallbackImage, setUseFallbackImage] = React.useState(false);
+
+    React.useEffect(() => {
+        if (open) {
+            const initAmount = Math.max(0, Number(defaultAmount || 0));
+            setAmountStr(initAmount > 0 ? String(initAmount) : "");
+
+            // Mặc định coi QR là khoản đặt cọc khi mở popup
+            setDeposit(true);
+            const autoNote = `Cọc đơn ${bookingCode || "ORD"} - ${customerName || "Khách hàng"}`;
+            setNote(autoNote);
+
+            setResult(null);
+            setError("");
+            setCopied(false);
+            setUseFallbackImage(false);
+        }
+    }, [open, defaultAmount, bookingCode, customerName]);
+
+    if (!open) return null;
+
+    const amount = Math.max(0, Number(amountStr || 0));
+
+    const handleGenerate = async () => {
+        if (!amount || amount <= 0) {
+            setError("Vui lòng nhập số tiền hợp lệ");
+            return;
+        }
+        setLoading(true);
+        setError("");
+        try {
+            const response = await (onGenerate?.({ amount, note, deposit }));
+            setResult(response || null);
+        } catch (err) {
+            const apiMessage = err?.data?.message || err?.message;
+            setError(apiMessage || "Không thể tạo QR thanh toán");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const copyQrText = async () => {
+        if (!result?.qrText) return;
+        try {
+            await navigator?.clipboard?.writeText(result.qrText);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch (e) {
+            setCopied(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+            <div
+                className="absolute inset-0 bg-slate-900/40"
+                onClick={onClose}
+            />
+            <div
+                className="relative z-[1001] w-full max-w-xl max-h-[90vh] rounded-2xl border border-slate-200 bg-white shadow-2xl flex flex-col overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* Header - fixed */}
+                <div className="flex items-start justify-between gap-4 p-6 pb-4 border-b border-slate-200 shrink-0">
+                    <div>
+                        <div className="text-[11px] uppercase tracking-wide font-medium text-slate-500 flex items-center gap-2">
+                            <QrCode className="h-4 w-4 text-sky-600" />
+                            Tạo mã QR thanh toán
+                        </div>
+                        <div className="text-base font-semibold text-slate-900">
+                            {bookingCode ? `Đơn ${bookingCode}` : "Đơn hàng"}
+                        </div>
+                        {customerName ? (
+                            <div className="text-[12px] text-slate-500">
+                                {customerName}
+                            </div>
+                        ) : null}
+                    </div>
+                    <button
+                        type="button"
+                        className="text-slate-400 hover:text-slate-600"
+                        onClick={onClose}
+                    >
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
+
+                {/* Content - scrollable */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                    <div className="flex flex-col gap-1">
+                        <label className="text-[12px] font-medium text-slate-600">
+                            Số tiền (VND)
+                        </label>
+                        <input
+                            type="number"
+                            min="0"
+                            step="1000"
+                            inputMode="numeric"
+                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-200"
+                            placeholder="Nhập số tiền cần thu"
+                            value={amountStr}
+                            onChange={(e) => setAmountStr(e.target.value)}
+                        />
+                        <div className="text-[11px] text-slate-500">
+                            Gợi ý: {fmtVND(defaultAmount || 0)}
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <label className="text-[12px] font-medium text-slate-600">
+                            Nội dung hiển thị
+                        </label>
+                        <input
+                            type="text"
+                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-200"
+                            placeholder="Ví dụ: Cọc đơn ORDx"
+                            value={note}
+                            onChange={(e) => setNote(e.target.value)}
+                        />
+                        <div className="text-[11px] text-slate-500">
+                            Tự động tạo dựa trên thông tin đơn hàng. Bạn có thể chỉnh sửa nếu cần.
+                        </div>
+                    </div>
+
+                    {/* Cho phép đánh dấu là cọc / thanh toán, dùng để set flag deposit cho backend */}
+                    <label className="inline-flex items-center gap-2 text-[12px] text-slate-600">
+                        <input
+                            type="checkbox"
+                            checked={deposit}
+                            onChange={(e) => {
+                                const isDeposit = e.target.checked;
+                                setDeposit(isDeposit);
+                                const autoNote = isDeposit
+                                    ? `Cọc đơn ${bookingCode || "ORD"} - ${customerName || "Khách hàng"}`
+                                    : `Thanh toán ${bookingCode || "ORD"} - ${customerName || "Khách hàng"}`;
+                                setNote(autoNote);
+                            }}
+                            className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                        />
+                        Đánh dấu là khoản đặt cọc
+                    </label>
+
+                    {error ? (
+                        <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
+                            {error}
+                        </div>
+                    ) : null}
+
+                    {/* Chỉ hiển thị nút khi chưa tạo QR */}
+                    {!result && (
+                        <div className="flex items-center justify-end gap-2 pt-2">
+                            <button
+                                type="button"
+                                className="text-[13px] font-medium text-slate-500 hover:text-slate-700"
+                                onClick={onClose}
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                type="button"
+                                className="rounded-md bg-sky-600 px-4 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-sky-500 disabled:opacity-60"
+                                onClick={handleGenerate}
+                                disabled={loading}
+                            >
+                                {loading ? "Đang tạo..." : "Tạo QR"}
+                            </button>
+                        </div>
+                    )}
+
+                    {result ? (
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3 mt-4">
+                            <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                                Mã QR đã tạo
+                            </div>
+
+                            {(() => {
+                                const fallbackImageUrl = result?.qrText
+                                    ? `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(
+                                        result.qrText
+                                    )}`
+                                    : null;
+                                const qrImgSrc =
+                                    useFallbackImage || !result?.qrImageUrl
+                                        ? fallbackImageUrl
+                                        : result?.qrImageUrl;
+                                if (qrImgSrc) {
+                                    return (
+                                        <div className="flex flex-col items-center gap-2">
+                                            <img
+                                                src={qrImgSrc}
+                                                alt="QR thanh toán"
+                                                className="w-full max-h-[280px] object-contain rounded-lg border border-white shadow-sm bg-white"
+                                                onError={() => {
+                                                    if (!useFallbackImage) {
+                                                        setUseFallbackImage(true);
+                                                    }
+                                                }}
+                                            />
+                                            {useFallbackImage && (
+                                                <span className="text-[11px] text-slate-500">
+                                                    Đang sử dụng ảnh QR dự phòng.
+                                                </span>
+                                            )}
+                                        </div>
+                                    );
+                                }
+                                return (
+                                    <div className="rounded-lg border border-dashed border-slate-300 bg-white px-3 py-5 text-center text-[12px] text-slate-500">
+                                        Không có hình ảnh QR, dùng chuỗi bên dưới để thanh toán.
+                                    </div>
+                                );
+                            })()}
+
+                            <div className="grid sm:grid-cols-2 gap-3 text-[12px] text-slate-600">
+                                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                                    <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                                        Số tiền
+                                    </div>
+                                    <div className="text-base font-semibold text-slate-900">
+                                        {fmtVND(result.amount || 0)}
+                                    </div>
+                                </div>
+                                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                                    <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                                        Hiệu lực đến
+                                    </div>
+                                    <div className="text-sm font-medium text-slate-900">
+                                        {result.expiresAt ? fmtDateTime(result.expiresAt) : "Không giới hạn"}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {result.note ? (
+                                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-600">
+                                    <div className="text-[11px] uppercase tracking-wide text-slate-400 mb-1">
+                                        Ghi chú
+                                    </div>
+                                    <div className="break-words">
+                                        {result.note}
+                                    </div>
+                                </div>
+                            ) : null}
+
+                            {result.qrText ? (
+                                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-600 flex flex-col gap-2">
+                                    <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                                        Chuỗi QR
+                                    </div>
+                                    <div className="break-all text-slate-800">
+                                        {result.qrText}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="self-start inline-flex items-center gap-1 rounded-md border border-slate-200 px-3 py-1 text-[12px] font-medium text-slate-600 hover:bg-slate-100"
+                                        onClick={copyQrText}
+                                    >
+                                        <Copy className="h-3.5 w-3.5" />
+                                        {copied ? "Đã sao chép" : "Sao chép"}
+                                    </button>
+                                </div>
+                            ) : null}
+                        </div>
+                    ) : null}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* 5. Điều phối */
+function DispatchInfoCard({ dispatch, dispatchList = [], onAssignClick, showAssignButton = false, allTrips = [] }) {
+    // Check if has any assignment (backward compatibility)
+    const hasAssign = dispatchList && dispatchList.length > 0
+        ? dispatchList.some(d => d.driver_name || d.driver_phone || d.vehicle_plate)
+        : (dispatch && (dispatch.driver_name || dispatch.driver_phone || dispatch.vehicle_plate));
+    
+    // Tính số trips chưa gán
+    const assignedTripIds = new Set(
+        (dispatchList || [])
+            .filter(d => d.tripId && d.driver_name && d.vehicle_plate)
+            .map(d => d.tripId)
+    );
+    
+    const unassignedCount = (allTrips || []).filter(t => {
+        const tripId = t.id || t.tripId;
+        return tripId && !assignedTripIds.has(tripId);
+    }).length;
+
+    if (!hasAssign) {
+        return (
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-4 shadow-sm">
+                <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                    <Truck className="h-4 w-4 text-sky-600" />
+                    Thông tin điều phối
+                </div>
+
+                <div className="rounded-xl border border-info-200 bg-info-50 p-4 text-[12px] text-info-800 flex items-start gap-2 leading-relaxed">
+                    <AlertTriangle className="h-4 w-4 text-info-600 shrink-0" />
+                    <div>
+                        Chưa gán tài xế/xe. Đơn đang chờ điều phối hoặc chưa xác nhận.
+                    </div>
+                </div>
+
+                {/* Button gán chuyến cho Coordinator */}
+                {showAssignButton && (
+                    <button
+                        onClick={onAssignClick}
+                        className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 text-sm font-semibold shadow-sm transition-colors flex items-center justify-center gap-2"
+                    >
+                        <Truck className="h-4 w-4" />
+                        Gán chuyến
+                    </button>
+                )}
+            </div>
+        );
+    }
+
+    // Use dispatchList if available, otherwise fallback to single dispatch
+    const displayList = dispatchList && dispatchList.length > 0 ? dispatchList : [dispatch];
+
+    return (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-4 shadow-sm">
+            <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                <Truck className="h-4 w-4 text-sky-600" />
+                Thông tin điều phối
+            </div>
+
+            {/* Hiển thị danh sách tài xế/xe nếu có nhiều */}
+            {displayList.length > 1 ? (
+                <div className="space-y-3">
+                    {displayList.map((item, idx) => (
+                        <div key={item.tripId || idx} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <div className="text-[11px] font-medium text-slate-500 mb-2">
+                                {item.vehicle_category || `Xe ${idx + 1}`}
+                            </div>
+                            <div className="text-[10px] text-slate-400 mb-2">
+                                Xe {idx + 1} {item.tripId ? `(Chuyến #${item.tripId})` : ''}
+                            </div>
+                            <div className="grid grid-cols-2 gap-3 text-sm">
+                                <div>
+                                    <div className="text-[11px] text-slate-500 mb-1">Tài xế</div>
+                                    <div className="font-medium text-slate-900 leading-tight">
+                                        {item.driver_name || "—"}
+                                    </div>
+                                    {item.driver_phone && (
+                                        <div className="text-[12px] text-slate-600 flex items-center gap-1 break-all leading-relaxed mt-1">
+                                            <Phone className="h-3.5 w-3.5 text-sky-600 shrink-0" />
+                                            <a
+                                                className="text-sky-600 hover:underline"
+                                                href={`tel:${item.driver_phone}`}
+                                            >
+                                                {item.driver_phone}
+                                            </a>
+                                        </div>
+                                    )}
+                                </div>
+                                <div>
+                                    <div className="text-[11px] text-slate-500 mb-1">Biển số xe</div>
+                                    <div className="font-medium text-slate-900">
+                                        {item.vehicle_plate || "—"}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                /* Hiển thị single (backward compatibility) */
+                <div className="space-y-4">
+                    <div className="grid sm:grid-cols-3 gap-4 text-sm">
+                        {/* Tài xế */}
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex flex-col gap-1">
+                            <div className="text-[11px] uppercase tracking-wide font-medium text-slate-500">
+                                Tài xế
+                            </div>
+                            <div className="font-medium text-slate-900 leading-tight">
+                                {displayList[0]?.driver_name || dispatch?.driver_name || "—"}
+                            </div>
+                            <div className="text-[12px] text-slate-600 flex items-center gap-2 break-all leading-relaxed">
+                                <Phone className="h-3.5 w-3.5 text-sky-600 shrink-0" />
+                                <a
+                                    className="text-sky-600 hover:underline"
+                                    href={
+                                        "tel:" +
+                                        (displayList[0]?.driver_phone || dispatch?.driver_phone || "")
+                                    }
+                                >
+                                    {displayList[0]?.driver_phone || dispatch?.driver_phone || "—"}
+                                </a>
+                            </div>
+                        </div>
+
+                        {/* Biển số xe */}
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex flex-col gap-1">
+                            <div className="text-[11px] uppercase tracking-wide font-medium text-slate-500">
+                                Biển số xe
+                            </div>
+                            <div className="font-medium text-slate-900">
+                                {displayList[0]?.vehicle_plate || dispatch?.vehicle_plate || "—"}
+                            </div>
+                            <div className="text-[11px] text-slate-500 flex items-center gap-1 leading-relaxed">
+                                <CarFront className="h-3.5 w-3.5 text-primary-600" />
+                                <span>
+                                    Xe đã gán cho
+                                    chuyến
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Trạng thái điều phối */}
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex flex-col gap-1">
+                            <div className="text-[11px] uppercase tracking-wide font-medium text-slate-500">
+                                Trạng thái điều
+                                phối
+                            </div>
+                            <div className="text-sm font-medium text-info-700 flex items-center gap-2">
+                                <CheckCircle2 className="h-4 w-4 text-info-600" />
+                                <span>
+                                    Đã phân xe
+                                </span>
+                            </div>
+                            <div className="text-[11px] text-slate-500 leading-relaxed">
+                                Hệ thống đã gửi
+                                thông tin chuyến
+                                cho tài xế.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {/* Nút gán cho xe còn lại nếu có trips chưa gán */}
+                    {unassignedCount > 0 && showAssignButton && (
+                        <div className="rounded-xl border border-info-200 bg-info-50 p-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-[12px] text-info-800">
+                                <AlertTriangle className="h-4 w-4 text-info-600 shrink-0" />
+                                <span>
+                                    Còn {unassignedCount} chuyến chưa gán tài xế/xe
+                                </span>
+                            </div>
+                            <button
+                                onClick={onAssignClick}
+                                className="rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 text-sm font-semibold shadow-sm transition-colors flex items-center gap-2"
+                            >
+                                <Truck className="h-4 w-4" />
+                                Gán cho xe còn lại
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+            
+            {/* Nút gán cho xe còn lại nếu có nhiều xe và còn trips chưa gán */}
+            {displayList.length > 1 && unassignedCount > 0 && showAssignButton && (
+                <div className="rounded-xl border border-info-200 bg-info-50 p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-[12px] text-info-800">
+                        <AlertTriangle className="h-4 w-4 text-info-600 shrink-0" />
+                        <span>
+                            Còn {unassignedCount} chuyến chưa gán tài xế/xe
+                        </span>
+                    </div>
+                    <button
+                        onClick={onAssignClick}
+                        className="rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 text-sm font-semibold shadow-sm transition-colors flex items-center gap-2"
+                    >
+                        <Truck className="h-4 w-4" />
+                        Gán cho xe còn lại
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
+
+/* ---------- MAIN PAGE ---------- */
+export default function OrderDetailPage() {
+    const { toasts, push } = useToasts();
+    const { orderId } = useParams();
+
+    // Check role - ẩn phần thanh toán cho Consultant và Accountant
+    const currentRole = React.useMemo(() => getCurrentRole(), []);
+    const isConsultant = currentRole === ROLES.CONSULTANT;
+    const isAccountant = currentRole === ROLES.ACCOUNTANT;
+    const isCoordinator = currentRole === ROLES.COORDINATOR;
+
+    const [order, setOrder] = React.useState(null);
+    const [loading, setLoading] = React.useState(true);
+    const [paymentHistory, setPaymentHistory] = React.useState([]);
+    const [qrModalOpen, setQrModalOpen] = React.useState(false);
+    const [assignDialogOpen, setAssignDialogOpen] = React.useState(false);
+
+    const mapBookingToOrder = (b) => {
+        if (!b) return null;
+        const trips = Array.isArray(b.trips) ? b.trips : [];
+        const firstTrip = trips.length ? trips[0] : {};
+        const vehicleCount = Array.isArray(b.vehicles) ? b.vehicles.reduce((sum, v) => sum + (v.quantity || 0), 0) : 0;
+        const vehicleCategory = Array.isArray(b.vehicles) && b.vehicles.length ? b.vehicles[0].categoryName : "";
+        // Tính tổng sức chứa từ vehicles
+        const totalCapacity = Array.isArray(b.vehicles) 
+            ? b.vehicles.reduce((sum, v) => sum + ((v.capacity || 0) * (v.quantity || 1)), 0) 
+            : 0;
+        // Chi tiết các loại xe
+        const vehicleDetails = Array.isArray(b.vehicles) 
+            ? b.vehicles.map(v => ({
+                name: v.categoryName || '',
+                quantity: v.quantity || 1,
+                capacity: v.capacity || 0,
+            }))
+            : [];
+        const discount = Number(b.discountAmount || 0);
+        const basePrice = Number(b.estimatedCost || 0);
+        const finalPrice = Number(b.totalCost || 0);
+        
+        // Map tất cả trips với thông tin tài xế/xe
+        // Lấy danh sách vehicle categories từ booking để map với từng trip
+        const vehicleCategories = Array.isArray(b.vehicles) 
+            ? b.vehicles.flatMap(v => {
+                const qty = v.quantity || 1;
+                return Array(qty).fill(v.categoryName || '');
+            })
+            : [];
+        const hasMixedVehicleCategories =
+            Array.isArray(b.vehicles) && b.vehicles.length > 1
+                ? new Set(b.vehicles.map(v => v.categoryName || '')).size > 1
+                : false;
+        
+        const dispatchList = trips.map((trip, idx) => ({
+            tripId: trip.id || trip.tripId || null,
+            driver_name: trip.driverName || '',
+            driver_phone: trip.driverPhone || '',
+            vehicle_plate: trip.vehicleLicensePlate || '',
+            vehicle_id: trip.vehicleId || null,
+            vehicle_category: idx < vehicleCategories.length ? vehicleCategories[idx] : '',
+        }));
+        
+        return {
+            id: b.id,
+            code: `ORD-${b.id}`,
+            status: b.status === 'CONFIRMED' ? 'ASSIGNED' : (b.status || 'PENDING'),
+            branchId: b.branchId,
+            customerId: b.customer?.id,
+            customer: {
+                name: b.customer?.fullName || '',
+                phone: b.customer?.phone || '',
+                email: b.customer?.email || '',
+            },
+            trip: {
+                id: firstTrip.id || firstTrip.tripId || null,
+                pickup: firstTrip.startLocation || '',
+                dropoff: firstTrip.endLocation || '',
+                pickup_time: firstTrip.startTime || '',
+                dropoff_eta: firstTrip.endTime || '',
+                pax_count: totalCapacity, // Tổng sức chứa
+                vehicle_category: vehicleCategory,
+                vehicle_count: vehicleCount,
+                vehicle_details: vehicleDetails, // Chi tiết các loại xe
+                distance: firstTrip.distance || null,
+            },
+            // Thông tin hình thức thuê
+            hireTypeName: b.hireTypeName || '',
+            useHighway: b.useHighway || false,
+            quote: {
+                base_price: basePrice,
+                discount_amount: discount,
+                final_price: finalPrice,
+            },
+            payment: {
+                paid: Number(b.paidAmount || 0),
+                remaining: Number(b.remainingAmount || 0),
+            },
+            // Dispatch info - giữ backward compatibility với single dispatch
+            dispatch: dispatchList.length > 0 ? {
+                driver_name: dispatchList[0].driver_name || '',
+                driver_phone: dispatchList[0].driver_phone || '',
+                vehicle_plate: dispatchList[0].vehicle_plate || '',
+            } : {
+                driver_name: '',
+                driver_phone: '',
+                vehicle_plate: '',
+            },
+            // Thêm danh sách dispatch cho nhiều xe
+            dispatchList: dispatchList,
+            trips: trips, // Lưu toàn bộ trips để dùng trong AssignDriverDialog
+            hasMixedVehicleCategories,
+            notes_internal: b.note || '',
+            branch_name: b.branchName || b.branch?.name || '',
+        };
+    };
+
+    const fetchOrder = React.useCallback(async () => {
+        if (!orderId) return;
+        setLoading(true);
+        try {
+            const data = await getBooking(orderId);
+            const mapped = mapBookingToOrder(data);
+            setOrder(mapped);
+        } catch (e) {
+            push('Không tải được chi tiết đơn hàng', 'error');
+        } finally {
+            setLoading(false);
+        }
+    }, [orderId, push]);
+
+    React.useEffect(() => {
+        fetchOrder();
+    }, [fetchOrder]);
+
+    const fetchPayments = React.useCallback(async () => {
+        if (!order?.id) return;
+        try {
+            const list = await listBookingPayments(order.id);
+            setPaymentHistory(Array.isArray(list) ? list : []);
+        } catch (e) {
+            push('Không tải được lịch sử thanh toán', 'error');
+        }
+    }, [order?.id, push]);
+
+    React.useEffect(() => {
+        fetchPayments();
+    }, [fetchPayments]);
+
+    // modal thanh toán/cọc
+    const [depositOpen, setDepositOpen] = React.useState(false);
+
+    const openDeposit = () => {
+        setDepositOpen(true);
+    };
+
+    const openQrModal = () => {
+        setQrModalOpen(true);
+    };
+
+    const openAssignDialog = () => {
+        setAssignDialogOpen(true);
+    };
+
+    const handleAssignSuccess = async (payload) => {
+        try {
+            await fetchOrder();
+            
+            // Kiểm tra xem còn trips chưa gán không
+            const updatedOrder = await getBooking(orderId);
+            const mapped = mapBookingToOrder(updatedOrder);
+            const allTrips = mapped.trips || [];
+            const dispatchList = mapped.dispatchList || [];
+            
+            // Tạo map của trips đã gán
+            const assignedTripIds = new Set(
+                dispatchList
+                    .filter(d => d.tripId && d.driver_name && d.vehicle_plate)
+                    .map(d => d.tripId)
+            );
+            
+            // Lọc ra trips chưa gán
+            const unassignedTrips = allTrips.filter(t => {
+                const tripId = t.id || t.tripId;
+                return tripId && !assignedTripIds.has(tripId);
+            });
+            
+            if (unassignedTrips.length > 0) {
+                // Còn trips chưa gán - tự động mở lại dialog sau 1 giây
+                push(`Đã gán chuyến thành công. Còn ${unassignedTrips.length} chuyến chưa gán.`, "info");
+                setTimeout(() => {
+                    setAssignDialogOpen(true);
+                }, 1000);
+            } else {
+                // Đã gán hết
+                push("Đã gán tất cả chuyến thành công", "success");
+            }
+        } catch (e) {
+            push("Không thể tải lại dữ liệu", "error");
+        }
+    };
+
+    // callback khi ghi nhận thanh toán thành công (DepositModal đã xử lý API call)
+    const handleDepositSubmitted = async (payload, ctx) => {
+        // DepositModal đã gọi createDeposit/recordPayment bên trong
+        // Chỉ cần refresh data và hiển thị thông báo
+        try {
+            await fetchOrder();
+            await fetchPayments();
+            push(`Đã ghi nhận thanh toán +${Number(payload.amount || 0).toLocaleString('vi-VN')}đ cho đơn ${order.id}`, 'success');
+        } catch (e) {
+            push('Không thể tải lại dữ liệu', 'error');
+        }
+    };
+
+    const handleQrGenerate = React.useCallback(
+        async ({ amount, note, deposit }) => {
+            const bookingId = order?.id ?? orderId;
+            if (!bookingId) {
+                throw new Error('ORDER_NOT_READY');
+            }
+            try {
+                const response = await generateBookingQrPayment(bookingId, {
+                    amount,
+                    note,
+                    deposit,
+                });
+                await fetchPayments();
+                push('Đã tạo yêu cầu thanh toán QR', 'success');
+                return response;
+            } catch (e) {
+                push('Tạo QR thanh toán thất bại', 'error');
+                throw e;
+            }
+        },
+        [order?.id, orderId, fetchPayments, push]
+    );
+
+    // header summary numbers
+    const finalPrice = order?.quote?.final_price || 0;
+    const paid = order?.payment?.paid || 0;
+    const remain = Math.max(0, finalPrice - paid);
+
+    if (loading || !order) {
+        return (
+            <div className="min-h-screen bg-slate-50 text-slate-900 p-5">
+                <Toasts toasts={toasts} />
+                <div className="rounded-xl border border-slate-200 bg-white p-6 text-slate-600">Đang tải chi tiết đơn hàng...</div>
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 p-5">
             <Toasts toasts={toasts} />
 
             {/* HEADER */}
             <div className="flex flex-col lg:flex-row lg:items-start gap-4 mb-6">
-                <div className="flex-1 flex flex-col gap-3">
+                <div className="flex-1 flex flex-col gap-2">
+                    {/* title row */}
                     <div className="flex flex-wrap items-start gap-3">
-                        <button
-                            onClick={() => navigate("/orders")}
-                            className="rounded-md border border-slate-300 bg-white hover:bg-slate-50 px-2 py-2 text-[12px] text-slate-700 flex items-center gap-2 shadow-sm"
-                        >
-                            <ArrowLeft className="h-4 w-4 text-slate-500" />
-                            <span>Danh sách đơn</span>
-                        </button>
-
                         <div className="text-[20px] font-semibold text-slate-900 flex items-center gap-2">
-                            <DollarSign className="h-6 w-6 text-primary-600" />
+                            <ClipboardList className="h-6 w-6 text-primary-600" />
                             <span>
-                                Chỉnh sửa đơn ORD-{orderId}
+                                Đơn hàng {order.code}
                             </span>
                         </div>
 
-                        <StatusPill status={status} />
+                        <OrderStatusPill status={order.status} />
                     </div>
 
-                    <div className="text-[12px] text-slate-500 flex flex-wrap items-center gap-2 leading-relaxed">
-                        Cập nhật thông tin báo giá / hành
-                        trình trước khi chốt cho điều phối.
+                    {/* meta row */}
+                    <div className="flex flex-wrap items-center gap-3 text-[12px] text-slate-600 leading-relaxed">
+                        <div className="flex items-center gap-1">
+                            <MapPin className="h-3.5 w-3.5 text-primary-600" />
+                            <span className="text-slate-700">
+                                {order.trip.pickup}{" "}
+                                <ChevronRight className="h-3 w-3 text-slate-400 inline-block" />{" "}
+                                {order.trip.dropoff}
+                            </span>
+                        </div>
+
+                        <div className="hidden sm:block text-slate-400">
+                            •
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                            <Clock className="h-3.5 w-3.5 text-slate-400" />
+                            <span className="text-slate-700">
+                                Đón lúc{" "}
+                                <span className="font-medium text-slate-900 tabular-nums">
+                                    {fmtDateTime(
+                                        order.trip.pickup_time
+                                    )}
+                                </span>
+                            </span>
+                        </div>
+
+                        <div className="hidden sm:block text-slate-400">
+                            •
+                        </div>
+
+                        <div className="flex items-center gap-1 text-slate-700">
+                            <CarFront className="h-3.5 w-3.5 text-primary-600" />
+                            <span>
+                                {order.trip.vehicle_category} ·{" "}
+                                {order.trip.vehicle_count} xe
+                            </span>
+                        </div>
                     </div>
 
-                    {lockedBanner}
+                    {/* cảnh báo nếu huỷ / nháp */}
+                    {(order.status === "CANCELLED" ||
+                        order.status === "DRAFT") && (
+                            <div className="flex max-w-fit items-start gap-2 rounded-md border border-info-200 bg-info-50 px-2 py-1 text-[11px] text-info-700">
+                                <AlertTriangle className="h-3.5 w-3.5 text-info-600 shrink-0" />
+                                <span className="leading-relaxed">
+                                    Đơn chưa xác nhận. Cần
+                                    chốt lại với khách.
+                                </span>
+                            </div>
+                        )}
                 </div>
 
-                <div className="flex flex-col gap-2 w-full max-w-[250px]">
-                    {/* Lưu thay đổi */}
-                    <button
-                        disabled={
-                            !canEdit || submittingDraft
-                        }
-                        onClick={onSaveDraft}
-                        className={cls(
-                            "rounded-md font-medium text-[13px] px-4 py-2 flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed",
-                            canEdit
-                                ? "bg-sky-600 hover:bg-sky-500 text-white"
-                                : "bg-slate-200 text-slate-400 cursor-not-allowed"
-                        )}
-                    >
-                        <Save className="h-4 w-4" />
-                        {submittingDraft
-                            ? "Đang lưu..."
-                            : "Lưu thay đổi"}
-                    </button>
+                {/* Bỏ bảng thanh toán summary - thông tin đã có trong PaymentInfoCard */}
+            </div>
+
+            {/* BODY GRID */}
+            <div className="grid xl:grid-cols-2 gap-5 mb-5">
+                <CustomerInfoCard
+                    customer={order.customer}
+                />
+                <TripInfoCard 
+                    trip={order.trip} 
+                    hireTypeName={order.hireTypeName}
+                    useHighway={order.useHighway}
+                />
+            </div>
+
+            <div className={`grid ${isAccountant ? 'xl:grid-cols-1' : 'xl:grid-cols-2'} gap-5 mb-5`}>
+                <QuoteInfoCard quote={order.quote} />
+                {!isAccountant && (
+                    <PaymentInfoCard
+                        payment={order.payment}
+                        history={paymentHistory}
+                        onOpenDeposit={openDeposit}
+                        onGenerateQr={openQrModal}
+                        isConsultant={isConsultant}
+                        isCoordinator={isCoordinator}
+                        pickupTime={order.trip?.pickup_time}
+                    />
+                )}
+            </div>
+
+            <div className="grid xl:grid-cols-2 gap-5">
+                <DispatchInfoCard
+                    dispatch={order.dispatch}
+                    dispatchList={order.dispatchList}
+                    onAssignClick={openAssignDialog}
+                    showAssignButton={isCoordinator}
+                    allTrips={order.trips || []}
+                />
+
+                {/* ghi chú nội bộ */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-4 text-sm shadow-sm">
+                    <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                        <AlertTriangle className="h-4 w-4 text-info-600" />
+                        Ghi chú nội bộ
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-[13px] leading-relaxed text-slate-700 whitespace-pre-line">
+                        {order.notes_internal ||
+                            "Không có ghi chú."}
+                    </div>
+
+                    <div className="flex items-start gap-2 text-[11px] text-slate-500 leading-relaxed">
+                        <X className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        <span>
+                            Ghi chú chỉ nội bộ,
+                            KH không thấy.
+                        </span>
+                    </div>
                 </div>
             </div>
 
-            {/* FORM GRID */}
-            <div className="grid xl:grid-cols-2 gap-6">
-                {/* LEFT COLUMN */}
-                <div className="space-y-6">
-                    {/* --- Thông tin khách hàng --- */}
-                    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <div className="text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center gap-2 mb-4">
-                            <User className="h-4 w-4 text-sky-600" />
-                            Thông tin khách hàng
-                        </div>
+            {/* Assign Driver Dialog - cho Coordinator */}
+            {isCoordinator && order && (() => {
+                // Lọc ra các trips chưa gán (không có driver hoặc vehicle trong dispatchList)
+                const allTrips = order.trips || [];
+                const dispatchList = order.dispatchList || [];
+                
+                // Tạo map của trips đã gán (có driver và vehicle)
+                const assignedTripIds = new Set(
+                    dispatchList
+                        .filter(d => {
+                            // Trip được coi là đã gán nếu có cả driver_name và vehicle_plate
+                            return d.tripId && d.driver_name && d.vehicle_plate;
+                        })
+                        .map(d => d.tripId)
+                );
+                
+                // Lọc ra trips chưa gán
+                const unassignedTrips = allTrips.filter(t => {
+                    const tripId = t.id || t.tripId;
+                    // Trip chưa gán nếu không có trong danh sách đã gán
+                    return tripId && !assignedTripIds.has(tripId);
+                });
+                
+                const unassignedTripIds = unassignedTrips.map(t => {
+                    const tripId = t.id || t.tripId;
+                    return tripId ? Number(tripId) : null;
+                }).filter(id => id !== null);
+                
+                // Nếu không có trip nào chưa gán, dùng trip đầu tiên (fallback)
+                const firstUnassignedTrip = unassignedTrips[0];
+                const defaultTripId = firstUnassignedTrip 
+                    ? (firstUnassignedTrip.id || firstUnassignedTrip.tripId)
+                    : (order.trip?.id || order.trips?.[0]?.id || order.trips?.[0]?.tripId);
+                
+                // Tìm đúng vehicle_category của trip đang được gán
+                let vehicleCategoryForTrip = order.trip?.vehicle_category; // Fallback
+                if (defaultTripId && order.dispatchList) {
+                    const tripDispatch = order.dispatchList.find(d => d.tripId === defaultTripId);
+                    if (tripDispatch?.vehicle_category) {
+                        vehicleCategoryForTrip = tripDispatch.vehicle_category;
+                    }
+                }
+                // Nếu không tìm thấy trong dispatchList, tìm trong trips
+                if (!vehicleCategoryForTrip && defaultTripId && order.trips) {
+                    const tripIndex = order.trips.findIndex(t => (t.id || t.tripId) === defaultTripId);
+                    if (tripIndex >= 0 && order.dispatchList && order.dispatchList[tripIndex]) {
+                        vehicleCategoryForTrip = order.dispatchList[tripIndex].vehicle_category;
+                    }
+                }
+                
+                return (
+                    <AssignDriverDialog
+                        open={assignDialogOpen}
+                        order={{
+                            id: order.id,
+                            bookingId: order.id,
+                            tripId: defaultTripId,
+                            tripIds: unassignedTripIds.length > 0 ? unassignedTripIds : undefined,
+                            code: order.code,
+                            pickup_time: order.trip?.pickup_time,
+                            vehicle_type: vehicleCategoryForTrip,
+                            vehicle_count: order.trip?.vehicle_count || 1,
+                            branch_name: order.branch_name,
+                        }}
+                        onClose={() => setAssignDialogOpen(false)}
+                        onAssigned={handleAssignSuccess}
+                    />
+                );
+            })()}
 
-                        {/* Phone */}
-                        <div className="mb-3">
-                            <label className={labelCls}>
-                                <Phone className="h-3.5 w-3.5 text-slate-400" />
-                                <span>Số điện thoại</span>
-                            </label>
-                            <input
-                                className={makeInputCls({
-                                    enabled: inputEnabledCls,
-                                    disabled: inputDisabledCls,
-                                })}
-                                value={customerPhone}
-                                onChange={(e) =>
-                                    setCustomerPhone(
-                                        e.target.value
-                                    )
-                                }
-                                placeholder="VD: 0901234567"
-                                {...disableInputProps}
-                            />
-                            <div className="text-[11px] text-slate-400 mt-1">
-                                Nhập SĐT để auto-fill khách
-                                cũ (gọi backend sau này).
-                            </div>
-                        </div>
+            {/* Payment modals - ẩn với Accountant */}
+            {!isAccountant && (
+                <>
+                    <QrPaymentModal
+                        open={qrModalOpen}
+                        bookingCode={order.code}
+                        customerName={order.customer.name}
+                        defaultAmount={remain}
+                        onClose={() => setQrModalOpen(false)}
+                        onGenerate={handleQrGenerate}
+                    />
 
-                        {/* Name */}
-                        <div className="mb-3">
-                            <label className={labelCls}>
-                                <User className="h-3.5 w-3.5 text-slate-400" />
-                                <span>
-                                    Tên khách hàng / Công
-                                    ty
-                                </span>
-                            </label>
-                            <input
-                                className={makeInputCls({
-                                    enabled: inputEnabledCls,
-                                    disabled: inputDisabledCls,
-                                })}
-                                value={customerName}
-                                onChange={(e) =>
-                                    setCustomerName(
-                                        e.target.value
-                                    )
-                                }
-                                placeholder="Công ty ABC"
-                                {...disableInputProps}
-                            />
-                        </div>
-
-                        {/* Email */}
-                        <div className="mb-3">
-                            <label className={labelCls}>
-                                <Mail className="h-3.5 w-3.5 text-slate-400" />
-                                <span>Email</span>
-                            </label>
-                            <input
-                                className={makeInputCls({
-                                    enabled: inputEnabledCls,
-                                    disabled: inputDisabledCls,
-                                })}
-                                value={customerEmail}
-                                onChange={(e) =>
-                                    setCustomerEmail(
-                                        e.target.value
-                                    )
-                                }
-                                placeholder="booking@abc.com"
-                                {...disableInputProps}
-                            />
-                        </div>
-                    </div>
-
-                    {/* --- Hình thức thuê --- */}
-                    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <div className="text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center gap-2 mb-4">
-                            <CarFront className="h-4 w-4 text-emerald-600" />
-                            Hình thức thuê xe
-                        </div>
-
-                        <div className="flex flex-wrap gap-2 text-[13px]">
-                            {[
-                                { key: "ONE_WAY", label: "Một chiều" },
-                                { key: "ROUND_TRIP", label: "Hai chiều" },
-                                { key: "DAILY", label: "Theo ngày" },
-                            ].map((opt) => (
-                                <button
-                                    key={opt.key}
-                                    type="button"
-                                    onClick={() => canEdit && !isConsultant && setHireType(opt.key)}
-                                    className={cls(
-                                        "px-3 py-2 rounded-md border text-[13px] flex items-center gap-2 shadow-sm",
-                                        hireType === opt.key
-                                            ? "ring-1 ring-emerald-200 bg-emerald-50 border-emerald-200 text-emerald-700"
-                                            : "border-slate-300 bg-white hover:bg-slate-50 text-slate-700",
-                                        (!canEdit || isConsultant) && "cursor-not-allowed opacity-60"
-                                    )}
-                                    disabled={!canEdit || isConsultant}
-                                >
-                                    <CarFront className="h-4 w-4" />
-                                    <span>{opt.label}</span>
-                                </button>
-                            ))}
-                        </div>
-
-                        {hireTypeName && (
-                            <div className="mt-3 text-[12px] text-slate-500">
-                                Từ hệ thống: <span className="font-medium text-slate-700">{hireTypeName}</span>
-                            </div>
+                    {/* Deposit / Payment modal */}
+                    <DepositModal
+                        open={depositOpen}
+                        context={{
+                            type: "order",
+                            id: order.id,
+                            branchId: order.branchId,
+                            customerId: order.customerId,
+                            title:
+                                order.customer.name +
+                                " · " +
+                                order.trip.pickup +
+                                " → " +
+                                order.trip.dropoff,
+                        }}
+                        /* Tổng & Đã trả truyền cho modal light */
+                        totals={{
+                            total: order.quote.final_price,
+                            paid: order.payment.paid,
+                        }}
+                        /* Số mặc định = phần còn lại */
+                        defaultAmount={Math.max(
+                            0,
+                            order.quote.final_price -
+                            order.payment.paid
                         )}
-                    </div>
-
-                    {/* --- Báo giá --- */}
-                    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <div className="text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center gap-2 mb-4">
-                            <DollarSign className="h-4 w-4 text-primary-600" />
-                            Báo giá
-                        </div>
-
-                        {/* Giá hệ thống */}
-                        <div className="mb-3">
-                            <label className="text-[12px] text-slate-600 mb-1 block">
-                                Giá hệ thống (tự tính)
-                            </label>
-                            <div className="flex gap-2">
-                                <input
-                                    className="flex-1 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-700 tabular-nums font-medium cursor-not-allowed"
-                                    value={fmtMoney(
-                                        systemPrice
-                                    )}
-                                    disabled
-                                    readOnly
-                                />
-                                <button
-                                    type="button"
-                                    className={cls(
-                                        "rounded-md text-[12px] px-3 py-2 border shadow-sm",
-                                        canEdit
-                                            ? "border-slate-300 bg-white hover:bg-slate-50 text-slate-700"
-                                            : "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
-                                    )}
-                                    disabled={!canEdit}
-                                    onClick={recalcPrice}
-                                >
-                                    Tính lại
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Giảm giá */}
-                        <div className="mb-3">
-                            <label className="text-[12px] text-slate-600 mb-1 block">
-                                Giảm giá (VND)
-                            </label>
-                            <input
-                                className={makeInputCls({
-                                    enabled: cls(
-                                        inputEnabledCls,
-                                        "tabular-nums"
-                                    ),
-                                    disabled: cls(
-                                        inputDisabledCls,
-                                        "tabular-nums"
-                                    ),
-                                })}
-                                value={discountAmount}
-                                onChange={(e) =>
-                                    setDiscountAmount(
-                                        e.target.value.replace(
-                                            /[^0-9]/g,
-                                            ""
-                                        )
-                                    )
-                                }
-                                placeholder="100000"
-                                {...disableInputProps}
-                            />
-                            <div className="text-[11px] text-slate-400 mt-1">
-                                Ví dụ: khách thân / hợp
-                                đồng tháng...
-                            </div>
-                        </div>
-
-                        {/* Lý do giảm giá */}
-                        <div className="mb-3">
-                            <label className="text-[12px] text-slate-600 mb-1 block">
-                                Lý do giảm giá
-                            </label>
-                            <textarea
-                                rows={2}
-                                className={makeInputCls({
-                                    enabled: textareaEnabledCls,
-                                    disabled: textareaDisabledCls,
-                                })}
-                                value={discountReason}
-                                onChange={(e) =>
-                                    setDiscountReason(
-                                        e.target.value
-                                    )
-                                }
-                                placeholder="Khách ký hợp đồng 3 tháng, chiết khấu 100k/chuyến."
-                                {...disableInputProps}
-                            />
-                        </div>
-
-                        {/* Giá báo khách */}
-                        <div className="mb-1">
-                            <label className="text-[12px] text-slate-600 mb-1 block">
-                                Giá báo khách (VND)
-                            </label>
-                            <input
-                                className={makeInputCls({
-                                    enabled: cls(
-                                        inputEnabledCls,
-                                        "tabular-nums font-semibold"
-                                    ),
-                                    disabled: cls(
-                                        inputDisabledCls,
-                                        "tabular-nums font-semibold"
-                                    ),
-                                })}
-                                value={finalPrice}
-                                onChange={(e) => {
-                                    if (!canEdit)
-                                        return;
-                                    const clean =
-                                        e.target.value.replace(
-                                            /[^0-9]/g,
-                                            ""
-                                        );
-                                    setFinalPrice(
-                                        Number(
-                                            clean ||
-                                            0
-                                        )
-                                    );
-                                }}
-                                placeholder="1400000"
-                                {...disableInputProps}
-                            />
-                        </div>
-
-                        <div className="text-[11px] text-slate-400">
-                            Đây là giá cuối cùng gửi cho
-                            khách.
-                        </div>
-                    </div>
-                </div>
-
-                {/* RIGHT COLUMN */}
-                <div className="space-y-6">
-                    {/* --- Hành trình & xe --- */}
-                    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <div className="text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center gap-2 mb-4">
-                            <CarFront className="h-4 w-4 text-primary-600" />
-                            Hành trình & loại xe
-                        </div>
-
-                        {/* Điểm đón */}
-                        <div className="mb-3">
-                            <label className={labelCls}>
-                                <MapPin className="h-3.5 w-3.5 text-emerald-600" />
-                                <span>Điểm đón *</span>
-                            </label>
-                            <PlaceAutocomplete
-                                value={pickup}
-                                onChange={setPickup}
-                                placeholder="VD: Hồ Hoàn Kiếm, Sân bay Nội Bài..."
-                                className={makeInputCls({
-                                    enabled: inputEnabledCls,
-                                    disabled: inputDisabledCls,
-                                })}
-                                disabled={!canEdit}
-                            />
-                        </div>
-
-                        {/* Điểm đến */}
-                        <div className="mb-3">
-                            <label className={labelCls}>
-                                <MapPin className="h-3.5 w-3.5 text-rose-600" />
-                                <span>Điểm đến *</span>
-                            </label>
-                            <PlaceAutocomplete
-                                value={dropoff}
-                                onChange={setDropoff}
-                                placeholder="VD: Trung tâm Hà Nội, Phố cổ..."
-                                className={makeInputCls({
-                                    enabled: inputEnabledCls,
-                                    disabled: inputDisabledCls,
-                                })}
-                                disabled={!canEdit}
-                            />
-                        </div>
-
-                        {/* Thời gian đón / Ngày bắt đầu */}
-                        <div className="mb-3">
-                            <label className={labelCls}>
-                                <Calendar className="h-3.5 w-3.5 text-slate-400" />
-                                <span>
-                                    {hireType === "DAILY" || hireType === "MULTI_DAY"
-                                        ? "Ngày bắt đầu"
-                                        : "Thời gian đón"}
-                                </span>
-                            </label>
-                            <input
-                                type={hireType === "DAILY" || hireType === "MULTI_DAY" ? "date" : "datetime-local"}
-                                className={makeInputCls({
-                                    enabled: inputEnabledCls,
-                                    disabled: inputDisabledCls,
-                                })}
-                                value={startTime}
-                                onChange={(e) =>
-                                    setStartTime(
-                                        e.target.value
-                                    )
-                                }
-                                {...disableInputProps}
-                            />
-                        </div>
-
-                        {/* Kết thúc dự kiến / Ngày kết thúc - Với ONE_WAY không bắt buộc */}
-                        <div className="mb-3">
-                            <label className={labelCls}>
-                                <Calendar className="h-3.5 w-3.5 text-slate-400" />
-                                <span>
-                                    {hireType === "DAILY" || hireType === "MULTI_DAY"
-                                        ? "Ngày kết thúc"
-                                        : hireType === "ONE_WAY"
-                                            ? "Thời gian kết thúc (dự kiến) - Tùy chọn"
-                                            : "Thời gian kết thúc (dự kiến)"}
-                                </span>
-                            </label>
-                            <input
-                                type={hireType === "DAILY" || hireType === "MULTI_DAY" ? "date" : "datetime-local"}
-                                className={makeInputCls({
-                                    enabled: inputEnabledCls,
-                                    disabled: inputDisabledCls,
-                                })}
-                                value={endTime}
-                                onChange={(e) =>
-                                    setEndTime(
-                                        e.target.value
-                                    )
-                                }
-                                {...disableInputProps}
-                            />
-                            {hireType === "ONE_WAY" && (
-                                <div className="text-[11px] text-slate-400 mt-1">
-                                    Với hình thức một chiều, thời gian kết thúc là tùy chọn. Hệ thống sẽ tự tính nếu không nhập.
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Số khách - chỉ hiển thị nếu không phải consultant */}
-                        {!isConsultant && (
-                            <div className="mb-3">
-                                <label className={labelCls}>
-                                    <Users className="h-3.5 w-3.5 text-slate-400" />
-                                    <span>Số khách</span>
-                                    {selectedCategory && selectedCategory.seats > 0 && (
-                                        <span className="text-[11px] text-slate-500 font-normal ml-1">
-                                            (Tối đa: {selectedCategory.seats - 1})
-                                        </span>
-                                    )}
-                                </label>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    max={selectedCategory && selectedCategory.seats ? selectedCategory.seats - 1 : undefined}
-                                    className={makeInputCls({
-                                        enabled: inputEnabledCls,
-                                        disabled: inputDisabledCls,
-                                    })}
-                                    value={pax}
-                                    onChange={(e) => {
-                                        const val = e.target.value.replace(/[^0-9]/g, "");
-                                        setPax(val);
-                                    }}
-                                    placeholder="1"
-                                    {...disableInputProps}
-                                />
-                                {selectedCategory && selectedCategory.seats && Number(pax) >= selectedCategory.seats && (
-                                    <div className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
-                                        <AlertTriangle className="h-3 w-3" />
-                                        Số khách phải nhỏ hơn {selectedCategory.seats} (số ghế)
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Danh sách loại xe yêu cầu */}
-                        <div className="mb-3">
-                            <div className="flex items-center justify-between mb-2">
-                                <label className="text-[12px] text-slate-600 font-medium">
-                                    Loại xe yêu cầu
-                                </label>
-                                {canEdit && vehicleSelections.length < 5 && (
-                                    <button
-                                        type="button"
-                                        onClick={addVehicleSelection}
-                                        className="text-[11px] text-sky-600 hover:text-sky-700 flex items-center gap-1"
-                                    >
-                                        <Plus className="h-3.5 w-3.5" />
-                                        Thêm loại xe
-                                    </button>
-                                )}
-                            </div>
-
-                            <div className="space-y-2">
-                                {vehicleSelections.map((selection, index) => {
-                                    const selectedCat = categories.find(c => String(c.id) === String(selection.categoryId));
-                                    return (
-                                        <div key={index} className="flex gap-2 items-start">
-                                            <div className="flex-1">
-                                                <select
-                                                    className={makeInputCls({
-                                                        enabled: selectEnabledCls,
-                                                        disabled: selectDisabledCls,
-                                                    })}
-                                                    value={selection.categoryId}
-                                                    onChange={(e) => updateVehicleSelection(index, 'categoryId', e.target.value)}
-                                                    {...disableInputProps}
-                                                >
-                                                    <option value="">-- Chọn loại xe --</option>
-                                                    {categories
-                                                        .filter(c =>
-                                                            !selection.categoryId ||
-                                                            String(c.id) === String(selection.categoryId) ||
-                                                            !vehicleSelections.some((v, i) => i !== index && String(v.categoryId) === String(c.id))
-                                                        )
-                                                        .map((c) => (
-                                                            <option key={c.id} value={String(c.id)}>
-                                                                {c.categoryName || c.label}
-                                                            </option>
-                                                        ))}
-                                                </select>
-                                            </div>
-                                            <div className="w-20">
-                                                <input
-                                                    type="number"
-                                                    min="1"
-                                                    className={makeInputCls({
-                                                        enabled: inputEnabledCls,
-                                                        disabled: inputDisabledCls,
-                                                    })}
-                                                    value={selection.quantity}
-                                                    onChange={(e) => updateVehicleSelection(index, 'quantity', e.target.value.replace(/[^0-9]/g, "") || "1")}
-                                                    placeholder="1"
-                                                    {...disableInputProps}
-                                                />
-                                            </div>
-                                            {canEdit && vehicleSelections.length > 1 && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeVehicleSelection(index)}
-                                                    className={cls(
-                                                        "rounded-md border border-slate-300 bg-white hover:bg-slate-50 px-2 py-2 text-slate-700 flex items-center",
-                                                        !canEdit && "opacity-50 cursor-not-allowed"
-                                                    )}
-                                                    disabled={!canEdit}
-                                                >
-                                                    <X className="h-4 w-4" />
-                                                </button>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-
-                            {vehicleSelections.length === 0 && (
-                                <div className="text-[11px] text-slate-400 mt-1">
-                                    Chưa có loại xe nào được chọn
-                                </div>
-                            )}
-
-                            {vehicleSelections.length > 0 && (
-                                <div className="text-[11px] text-slate-600 mt-2 flex items-center gap-1">
-                                    <CarFront className="h-3.5 w-3.5" />
-                                    <span>
-                                        Tổng: {vehicleSelections.reduce((sum, v) => sum + (Number(v.quantity) || 0), 0)} xe
-                                        {vehicleSelections.filter(v => v.categoryId && Number(v.categoryId) > 0).length > 1 &&
-                                            ` (${vehicleSelections.filter(v => v.categoryId && Number(v.categoryId) > 0).length} loại)`
-                                        }
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Chi nhánh phụ trách - Ẩn với Consultant */}
-                        {!isConsultant && (
-                            <div className="mb-4">
-                                <label className="text-[12px] text-slate-600 mb-1 block">
-                                    Chi nhánh phụ trách
-                                </label>
-                                <select
-                                    className={makeInputCls({
-                                        enabled: selectEnabledCls,
-                                        disabled: selectDisabledCls,
-                                    })}
-                                    value={branchId}
-                                    onChange={(e) =>
-                                        setBranchId(
-                                            e.target.value
-                                        )
-                                    }
-                                    {...disableInputProps}
-                                >
-                                    {branches.length > 0 ? (
-                                        branches.map((b) => (
-                                            <option key={b.id} value={String(b.id)}>
-                                                {b.branchName || b.label}
-                                            </option>
-                                        ))
-                                    ) : (
-                                        <option value="">Không có chi nhánh (lỗi tải dữ liệu)</option>
-                                    )}
-                                </select>
-                            </div>
-                        )}
-
-                        {/* Kiểm tra khả dụng xe */}
-                        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-                            <button
-                                type="button"
-                                className={cls(
-                                    "rounded-md border text-[12px] px-3 py-2 flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed",
-                                    canEdit && !checkingAvailability
-                                        ? "border-slate-300 bg-white hover:bg-slate-50 text-slate-700"
-                                        : "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
-                                )}
-                                disabled={!canEdit || checkingAvailability}
-                                onClick={checkAvailability}
-                            >
-                                {checkingAvailability ? (
-                                    <Loader2 className="h-4 w-4 text-slate-400 animate-spin" />
-                                ) : (
-                                    <CarFront className="h-4 w-4 text-primary-600" />
-                                )}
-                                <span>{checkingAvailability ? "Đang kiểm tra..." : "Kiểm tra xe"}</span>
-                            </button>
-
-                            {availabilityMsg ? (
-                                <div className={cls(
-                                    "text-[12px]",
-                                    availabilityMsg.includes("✓") ? "text-emerald-600" :
-                                        availabilityMsg.includes("⚠") ? "text-primary-600" : "text-slate-700"
-                                )}>
-                                    {availabilityMsg}
-                                </div>
-                            ) : (
-                                <div className="text-[11px] text-slate-400 leading-relaxed">
-                                    Hệ thống sẽ cảnh báo nếu hết xe khả dụng.
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Ghi chú cho tài xế */}
-                    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <div className="text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center gap-2 mb-4">
-                            <FileText className="h-4 w-4 text-primary-600" />
-                            Ghi chú cho tài xế
-                        </div>
-                        <textarea
-                            rows={3}
-                            className={
-                                canEditDriverNote
-                                    ? cls(textareaEnabledCls, "resize-none")
-                                    : cls(textareaDisabledCls, "resize-none")
-                            }
-                            value={bookingNote}
-                            onChange={(e) => {
-                                if (!canEditDriverNote) return;
-                                setBookingNote(e.target.value);
-                            }}
-                            placeholder="VD: Đón thêm 1 khách ở 123 Trần Hưng Đạo lúc 8h30, hành lý cồng kềnh..."
-                            {...(canEditDriverNote ? {} : { disabled: true, readOnly: true })}
-                        />
-                        <div className="text-[11px] text-slate-400 mt-2">
-                            Ghi chú này sẽ hiển thị cho tài xế trong chi tiết chuyến đi.
-                        </div>
-                    </div>
-
-                    {/* Gán tài xế / xe - Ẩn với Tư vấn viên */}
-                    {!isConsultant && (
-                        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                            <div className="text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center gap-2 mb-4">
-                                <CarFront className="h-4 w-4 text-sky-600" />
-                                Gán tài xế / phân xe
-                            </div>
-
-                            <div className="grid md:grid-cols-2 gap-4 text-[13px]">
-                                {/* Driver Dropdown */}
-                                <div className="relative driver-dropdown-container">
-                                    <label className={labelCls}>
-                                        <User className="h-3.5 w-3.5 text-slate-400" />
-                                        <span>Tài xế</span>
-                                        {loadingDrivers && <Loader2 className="h-3 w-3 animate-spin ml-1" />}
-                                    </label>
-                                    <div className="relative">
-                                        <div
-                                            className={cls(
-                                                "flex items-center gap-2 cursor-pointer",
-                                                inputEnabledCls
-                                            )}
-                                            onClick={() => setShowDriverDropdown(!showDriverDropdown)}
-                                        >
-                                            <Search className="h-4 w-4 text-slate-400" />
-                                            <input
-                                                type="text"
-                                                className="flex-1 bg-transparent outline-none text-sm"
-                                                placeholder={selectedDriver ? "" : "Tìm tài xế..."}
-                                                value={showDriverDropdown ? driverSearch : (selectedDriver?.name || "")}
-                                                onChange={(e) => {
-                                                    setDriverSearch(e.target.value);
-                                                    setShowDriverDropdown(true);
-                                                }}
-                                                onFocus={() => setShowDriverDropdown(true)}
-                                            />
-                                            {selectedDriver && !showDriverDropdown && (
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setDriverId("");
-                                                        setDriverSearch("");
-                                                    }}
-                                                    className="p-0.5 hover:bg-slate-100 rounded"
-                                                >
-                                                    <X className="h-3.5 w-3.5 text-slate-400" />
-                                                </button>
-                                            )}
-                                            <ChevronDown className={cls("h-4 w-4 text-slate-400 transition-transform", showDriverDropdown && "rotate-180")} />
-                                        </div>
-
-                                        {showDriverDropdown && (
-                                            <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-auto">
-                                                {loadingDrivers ? (
-                                                    <div className="p-3 text-center text-slate-500 text-sm">
-                                                        <Loader2 className="h-4 w-4 animate-spin mx-auto mb-1" />
-                                                        Đang tải...
-                                                    </div>
-                                                ) : filteredDrivers.length === 0 ? (
-                                                    <div className="p-3 text-center text-slate-500 text-sm">
-                                                        Không tìm thấy tài xế
-                                                    </div>
-                                                ) : (
-                                                    filteredDrivers.map(d => (
-                                                        <div
-                                                            key={d.id}
-                                                            className={cls(
-                                                                "px-3 py-2 cursor-pointer hover:bg-slate-50 flex items-center justify-between",
-                                                                String(d.id) === String(driverId) && "bg-sky-50"
-                                                            )}
-                                                            onClick={() => {
-                                                                setDriverId(String(d.id));
-                                                                setDriverSearch("");
-                                                                setShowDriverDropdown(false);
-                                                            }}
-                                                        >
-                                                            <div>
-                                                                <div className="font-medium text-slate-900">{d.name}</div>
-                                                                {d.phone && <div className="text-[11px] text-slate-500">{d.phone}</div>}
-                                                            </div>
-                                                            <span className={cls(
-                                                                "text-[10px] px-1.5 py-0.5 rounded",
-                                                                d.status === "AVAILABLE" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
-                                                            )}>
-                                                            {d.status === "AVAILABLE" ? "Sẵn sàng" : d.status}
-                                                        </span>
-                                                        </div>
-                                                    ))
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                    {selectedDriver && (
-                                        <div className="text-[11px] text-emerald-600 mt-1">
-                                            ✓ Đã chọn: {selectedDriver.name}
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Vehicle Dropdown */}
-                                <div className="relative vehicle-dropdown-container">
-                                    <label className={labelCls}>
-                                        <CarFront className="h-3.5 w-3.5 text-slate-400" />
-                                        <span>Xe</span>
-                                        {loadingVehicles && <Loader2 className="h-3 w-3 animate-spin ml-1" />}
-                                    </label>
-                                    <div className="relative">
-                                        <div
-                                            className={cls(
-                                                "flex items-center gap-2 cursor-pointer",
-                                                inputEnabledCls
-                                            )}
-                                            onClick={() => setShowVehicleDropdown(!showVehicleDropdown)}
-                                        >
-                                            <Search className="h-4 w-4 text-slate-400" />
-                                            <input
-                                                type="text"
-                                                className="flex-1 bg-transparent outline-none text-sm"
-                                                placeholder={selectedVehicle ? "" : "Tìm xe (biển số)..."}
-                                                value={showVehicleDropdown ? vehicleSearch : (selectedVehicle?.licensePlate || "")}
-                                                onChange={(e) => {
-                                                    setVehicleSearch(e.target.value);
-                                                    setShowVehicleDropdown(true);
-                                                }}
-                                                onFocus={() => setShowVehicleDropdown(true)}
-                                            />
-                                            {selectedVehicle && !showVehicleDropdown && (
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setVehicleId("");
-                                                        setVehicleSearch("");
-                                                    }}
-                                                    className="p-0.5 hover:bg-slate-100 rounded"
-                                                >
-                                                    <X className="h-3.5 w-3.5 text-slate-400" />
-                                                </button>
-                                            )}
-                                            <ChevronDown className={cls("h-4 w-4 text-slate-400 transition-transform", showVehicleDropdown && "rotate-180")} />
-                                        </div>
-
-                                        {showVehicleDropdown && (
-                                            <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-auto">
-                                                {loadingVehicles ? (
-                                                    <div className="p-3 text-center text-slate-500 text-sm">
-                                                        <Loader2 className="h-4 w-4 animate-spin mx-auto mb-1" />
-                                                        Đang tải...
-                                                    </div>
-                                                ) : filteredVehicles.length === 0 ? (
-                                                    <div className="p-3 text-center text-slate-500 text-sm">
-                                                        Không tìm thấy xe
-                                                    </div>
-                                                ) : (
-                                                    filteredVehicles.map(v => (
-                                                        <div
-                                                            key={v.id}
-                                                            className={cls(
-                                                                "px-3 py-2 cursor-pointer hover:bg-slate-50 flex items-center justify-between",
-                                                                String(v.id) === String(vehicleId) && "bg-sky-50"
-                                                            )}
-                                                            onClick={() => {
-                                                                setVehicleId(String(v.id));
-                                                                setVehicleSearch("");
-                                                                setShowVehicleDropdown(false);
-                                                            }}
-                                                        >
-                                                            <div>
-                                                                <div className="font-medium text-slate-900">{v.licensePlate}</div>
-                                                                {v.categoryName && <div className="text-[11px] text-slate-500">{v.categoryName}</div>}
-                                                            </div>
-                                                            <span className={cls(
-                                                                "text-[10px] px-1.5 py-0.5 rounded",
-                                                                v.status === "AVAILABLE" ? "bg-emerald-100 text-emerald-700" : "bg-info-100 text-info-700"
-                                                            )}>
-                                                            {v.status === "AVAILABLE" ? "Sẵn sàng" : v.status}
-                                                        </span>
-                                                        </div>
-                                                    ))
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                    {selectedVehicle && (
-                                        <div className="text-[11px] text-emerald-600 mt-1">
-                                            ✓ Đã chọn: {selectedVehicle.licensePlate} {selectedVehicle.categoryName && `(${selectedVehicle.categoryName})`}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Hiển thị thông tin đã gán */}
-                            {(assignedDriver || assignedVehicle || assignedDriverId || assignedVehicleId) && (
-                                <div className="mt-4 p-3 rounded-lg border border-emerald-200 bg-emerald-50">
-                                    <div className="text-[11px] uppercase tracking-wide text-emerald-700 font-medium mb-2">
-                                        Đã gán cho đơn hàng
-                                    </div>
-                                    <div className="grid md:grid-cols-2 gap-3 text-[13px]">
-                                        {(assignedDriver || assignedDriverId) && (
-                                            <div className="flex items-start gap-2">
-                                                <User className="h-4 w-4 text-emerald-600 mt-0.5" />
-                                                <div>
-                                                    <div className="text-[11px] text-slate-500 mb-0.5">Tài xế:</div>
-                                                    <div className="font-medium text-slate-900">
-                                                        {assignedDriver?.name || `Đang tải... (ID: ${assignedDriverId})`}
-                                                    </div>
-                                                    {assignedDriver?.phone && <div className="text-[11px] text-slate-500">{assignedDriver.phone}</div>}
-                                                </div>
-                                            </div>
-                                        )}
-                                        {(assignedVehicle || assignedVehicleId) && (
-                                            <div className="flex items-start gap-2">
-                                                <CarFront className="h-4 w-4 text-emerald-600 mt-0.5" />
-                                                <div>
-                                                    <div className="text-[11px] text-slate-500 mb-0.5">Xe:</div>
-                                                    <div className="font-medium text-slate-900">
-                                                        {assignedVehicle?.licensePlate || `Đang tải... (ID: ${assignedVehicleId})`}
-                                                    </div>
-                                                    {assignedVehicle?.categoryName && <div className="text-[11px] text-slate-500">{assignedVehicle.categoryName}</div>}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                    {cooldownRemaining > 0 && (
-                                        <div className="mt-2 text-[11px] text-primary-600 flex items-center gap-1">
-                                            <Loader2 className="h-3 w-3 animate-spin" />
-                                            Có thể thay đổi sau: {Math.floor(cooldownRemaining / 60000)}:{String(Math.floor((cooldownRemaining % 60000) / 1000)).padStart(2, '0')}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            <div className="mt-4 flex items-center gap-3">
-                                <button
-                                    type="button"
-                                    onClick={onAssign}
-                                    disabled={(!driverId && !vehicleId) || cooldownRemaining > 0 || assigning}
-                                    className={cls(
-                                        "rounded-md font-medium text-[13px] px-4 py-2 shadow-sm flex items-center gap-2",
-                                        (driverId || vehicleId) && cooldownRemaining === 0
-                                            ? "bg-sky-600 hover:bg-sky-500 text-white"
-                                            : "bg-slate-200 text-slate-400 cursor-not-allowed"
-                                    )}
-                                >
-                                    {assigning ? <Loader2 className="h-4 w-4 animate-spin" /> : <CarFront className="h-4 w-4" />}
-                                    {assigning ? "Đang gán..." : (cooldownRemaining > 0 ? "Đang chờ..." : "Gán tài xế / xe")}
-                                </button>
-                                <div className="text-[11px] text-slate-500">
-                                    {cooldownRemaining > 0
-                                        ? `Đợi ${Math.floor(cooldownRemaining / 60000)}:${String(Math.floor((cooldownRemaining % 60000) / 1000)).padStart(2, '0')} để thay đổi`
-                                        : (!driverId && !vehicleId
-                                            ? "Chọn ít nhất tài xế hoặc xe để gán"
-                                            : "Áp dụng cho toàn bộ chuyến của đơn.")}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* FOOTNOTE */}
-            <div className="text-[11px] text-slate-500 mt-8 leading-relaxed">
-                {/* <div className="text-slate-700 font-mono text-[11px]">
-                    PUT /api/orders/{MOCK_ORDER.id}
-                </div>
-                <div>
-                    Trạng thái hiện tại:{" "}
-                    <span className="text-slate-900 font-semibold">
-                        {ORDER_STATUS_LABEL[status] ||
-                            status}
-                    </span>
-                </div> */}
-                {/* <div className="text-[12px] text-slate-600">
-                    Nếu trạng thái là{" "}
-                    <span className="text-primary-600 font-semibold">
-                        ASSIGNED
-                    </span>{" "}
-                    hoặc{" "}
-                    <span className="text-primary-600 font-semibold">
-                        COMPLETED
-                    </span>
-                    , chỉnh sửa phải thông qua điều
-                    phối viên.
-                </div> */}
-            </div>
+                        // modeLabel="Thanh toán"
+                        allowOverpay={false}
+                        onClose={() => setDepositOpen(false)}
+                        onSubmitted={handleDepositSubmitted}
+                    />
+                </>
+            )}
         </div>
     );
 }

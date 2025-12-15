@@ -1,46 +1,39 @@
 spring:
+  config:
+    activate:
+      on-profile: prod
+
   datasource:
-    url: jdbc:mysql://mysql:3306/ptcmss_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-    username: root
-    password: root
+    url: jdbc:mysql://${DB_HOST:mysql}:${DB_PORT:3306}/${DB_NAME:ptcmss_db}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
+
   jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-    defer-datasource-initialization: true  # IMPORTANT: Run data.sql AFTER Hibernate creates tables
+    show-sql: ${JPA_SHOW_SQL:false}
+    properties:
+      hibernate:
+        format_sql: ${HIBERNATE_FORMAT_SQL:false}
+        dialect: org.hibernate.dialect.MySQLDialect
+
   sql:
     init:
-      mode: always  # Run data.sql on startup
-      continue-on-error: false  # Stop if SQL script fails
-  mail:
-    host: smtp.gmail.com
-    port: 587
-    username: ${MAIL_USERNAME:hethonghotroquanlycongtyvantai@gmail.com}
-    password: ${MAIL_PASSWORD:fzzqyukjsbvegvym}
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
-server:
-  port: 8080
-  address: 0.0.0.0  # Lắng nghe trên tất cả interfaces, không chỉ localhost
-management:
-  endpoints:
-    web.exposure.include: health,info
-jwt:
-  expriMinutes: 3600
-  expireDate: 5
-  accesskey: 2mfGKBhdCa0K8X2uV1Fzn9o6sR8V0s5GUelGlxsFQAc=
-  refreshkey: /AqIfLpfbWqy36D3VBmkskYtmnpsJrLpRx00WVRnJlE=
+      mode: ${SQL_INIT_MODE:never}   # nếu bạn cần seed demo trên prod => set ENV SQL_INIT_MODE=always
+      continue-on-error: false
 
-# Application URLs for email links and redirects
+server:
+  port: ${SERVER_PORT:8080}
+  address: 0.0.0.0
+
+springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_ENABLED:false}
+  swagger-ui:
+    enabled: ${SWAGGER_UI_ENABLED:false}
+
+openapi:
+  service:
+    server: ${OPENAPI_SERVER:https://api.hethongvantai.site}
+
 app:
   base-url: ${APP_BASE_URL:https://api.hethongvantai.site}
   frontend-url: ${APP_FRONTEND_URL:https://hethongvantai.site}
-
-# Logging configuration
-logging:
-  level:
-    org.thymeleaf: WARN  # Giảm log level của Thymeleaf để tránh ERROR khi template không tìm thấy (fallback sẽ xử lý)

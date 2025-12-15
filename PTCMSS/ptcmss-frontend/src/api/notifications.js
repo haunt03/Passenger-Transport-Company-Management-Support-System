@@ -18,7 +18,7 @@ export function getDriverNotifications({ userId, page = 1, limit = 20 } = {}) {
       const { getStoredUserId } = require("../utils/session");
       userId = getStoredUserId();
     } catch (err) {
-      throw new Error("USER_ID_REQUIRED");
+      throw new Error("Cần xác định tài khoản người dùng.");
     }
   }
   
@@ -97,7 +97,7 @@ export function getPendingApprovals(branchId) {
 export function approveApprovalRequest(historyId, { userId, note } = {}) {
   const resolvedUserId = userId ?? getStoredUserId();
   if (!resolvedUserId) {
-    throw new Error("USER_ID_REQUIRED");
+    throw new Error("Cần xác định tài khoản người dùng.");
   }
   return apiFetch(`/api/notifications/approvals/${historyId}/approve`, {
     method: "POST",
@@ -108,7 +108,7 @@ export function approveApprovalRequest(historyId, { userId, note } = {}) {
 export function rejectApprovalRequest(historyId, { userId, note } = {}) {
   const resolvedUserId = userId ?? getStoredUserId();
   if (!resolvedUserId) {
-    throw new Error("USER_ID_REQUIRED");
+    throw new Error("Cần xác định tài khoản người dùng.");
   }
   return apiFetch(`/api/notifications/approvals/${historyId}/reject`, {
     method: "POST",
@@ -123,7 +123,7 @@ export function rejectApprovalRequest(historyId, { userId, note } = {}) {
 export function deleteNotification(notificationId, userId) {
   const resolvedUserId = userId ?? getStoredUserId();
   if (!resolvedUserId) {
-    throw new Error("USER_ID_REQUIRED");
+    throw new Error("Cần xác định tài khoản người dùng.");
   }
   return apiFetch(`/api/notifications/${notificationId}?userId=${resolvedUserId}`, {
     method: "DELETE",
@@ -137,7 +137,7 @@ export function deleteNotification(notificationId, userId) {
 export function deleteNotificationByApproval(approvalType, relatedEntityId, userId) {
   const resolvedUserId = userId ?? getStoredUserId();
   if (!resolvedUserId) {
-    throw new Error("USER_ID_REQUIRED");
+    throw new Error("Cần xác định tài khoản người dùng.");
   }
   const params = new URLSearchParams({
     approvalType,
@@ -156,7 +156,7 @@ export function deleteNotificationByApproval(approvalType, relatedEntityId, user
 export function dismissApproval(approvalHistoryId, userId) {
   const resolvedUserId = userId ?? getStoredUserId();
   if (!resolvedUserId) {
-    throw new Error("USER_ID_REQUIRED");
+    throw new Error("Cần xác định tài khoản người dùng.");
   }
   return apiFetch(`/api/notifications/approvals/${approvalHistoryId}?userId=${resolvedUserId}`, {
     method: "DELETE",

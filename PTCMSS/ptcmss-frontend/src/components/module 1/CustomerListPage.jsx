@@ -33,8 +33,9 @@ export default function CustomerListPage() {
     const currentRole = getCurrentRole();
     const currentUserId = getStoredUserId();
     const isManager = currentRole === ROLES.MANAGER;
+    const isConsultant = currentRole === ROLES.CONSULTANT;
 
-    // Manager's branch info
+    // Manager/Consultant's branch info
     const [managerBranchId, setManagerBranchId] = useState(null);
     const [managerBranchName, setManagerBranchName] = useState("");
 
@@ -60,9 +61,9 @@ export default function CustomerListPage() {
     const [loadingTrips, setLoadingTrips] = useState(false);
     const [tripsError, setTripsError] = useState(null);
 
-    // Load Manager's branch info
+    // Load Manager/Consultant's branch info
     useEffect(() => {
-        if (!isManager || !currentUserId) return;
+        if ((!isManager && !isConsultant) || !currentUserId) return;
 
         (async () => {
             try {
@@ -71,18 +72,19 @@ export default function CustomerListPage() {
                 if (emp?.branchId) {
                     setManagerBranchId(emp.branchId);
                     setManagerBranchName(emp.branchName || "");
-                    // Tự động set branchId filter cho manager
+                    // Tự động set branchId filter cho manager/consultant
                     setBranchId(String(emp.branchId));
-                    console.log("[CustomerListPage] Manager branch loaded:", {
+                    console.log("[CustomerListPage] Branch loaded:", {
+                        role: currentRole,
                         branchId: emp.branchId,
                         branchName: emp.branchName
                     });
                 }
             } catch (err) {
-                console.error("Error loading manager branch:", err);
+                console.error("Error loading branch:", err);
             }
         })();
-    }, [isManager, currentUserId]);
+    }, [isManager, isConsultant, currentUserId, currentRole]);
 
     // Load branches for filter
     useEffect(() => {
@@ -282,7 +284,7 @@ export default function CustomerListPage() {
                         <div>
                             <h1 className="text-2xl font-bold text-slate-900">Danh sách khách hàng</h1>
                             <p className="text-sm text-slate-600">
-                                {isManager && managerBranchName ? (
+                                {(isManager || isConsultant) && managerBranchName ? (
                                     <>Chi nhánh: <span className="font-medium text-slate-700">{managerBranchName}</span> • Tổng: {totalElements} khách hàng</>
                                 ) : (
                                     <>Quản lý thông tin khách hàng • Tổng: {totalElements} khách hàng</>
@@ -309,8 +311,8 @@ export default function CustomerListPage() {
                                 />
                             </div>
 
-                            {/* Branch - Hidden for Manager */}
-                            {!isManager && (
+                            {/* Branch - Hidden for Manager/Consultant */}
+                            {!isManager && !isConsultant && (
                                 <div className="relative">
                                     <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                                     <select
