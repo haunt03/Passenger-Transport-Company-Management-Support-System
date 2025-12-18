@@ -10,7 +10,6 @@ import org.example.ptcmssbackend.dto.response.dispatch.AssignRespone;
 import org.example.ptcmssbackend.dto.response.dispatch.DispatchDashboardResponse;
 import org.example.ptcmssbackend.dto.response.dispatch.PendingTripResponse;
 import org.example.ptcmssbackend.entity.*;
-import org.example.ptcmssbackend.entity.TripDriverId;
 import org.example.ptcmssbackend.enums.BookingStatus;
 import org.example.ptcmssbackend.enums.DriverDayOffStatus;
 import org.example.ptcmssbackend.enums.TripStatus;
@@ -19,6 +18,7 @@ import org.example.ptcmssbackend.repository.*;
 import org.example.ptcmssbackend.service.BookingService;
 import org.example.ptcmssbackend.service.DispatchService;
 import org.example.ptcmssbackend.service.SystemSettingService;
+import org.example.ptcmssbackend.service.TripOccupancyService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,13 +26,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -68,6 +62,7 @@ public class DispatchServiceImpl implements DispatchService {
     private final BookingService bookingService; // để tái dùng hàm assign của BookingService
     private final org.example.ptcmssbackend.service.WebSocketNotificationService webSocketNotificationService;
     private final SystemSettingService systemSettingService;
+    private final TripOccupancyService tripOccupancyService;
     private final BookingVehicleDetailsRepository bookingVehicleDetailsRepository;
     private final VehicleCategoryPricingRepository vehicleCategoryRepository;
     private final InvoiceRepository invoiceRepository;
@@ -289,16 +284,18 @@ public class DispatchServiceImpl implements DispatchService {
         
         // Get all drivers and vehicles in branch
         List<Drivers> allDrivers = driverRepository.findByBranchId(branchId);
+        log.info("[Dispatch] Found {} drivers in branch {} for trip {}", allDrivers.size(), branchId, trip.getId());
         
         // QUAN TRỌNG: Chỉ lấy xe đúng loại cho trip này
         List<Vehicles> allVehicles;
         if (requiredCategoryId != null) {
             allVehicles = vehicleRepository.filterVehicles(requiredCategoryId, branchId, VehicleStatus.AVAILABLE);
-            log.info("[Dispatch] Filtering vehicles by category {} for trip {} (trip index: {})", 
-                    requiredCategoryId, trip.getId(), tripIndex);
+            log.info("[Dispatch] Filtering vehicles by category {} for trip {} (trip index: {}), found {} vehicles", 
+                    requiredCategoryId, trip.getId(), tripIndex, allVehicles.size());
         } else {
             allVehicles = vehicleRepository.findByBranch_IdAndStatus(branchId, VehicleStatus.AVAILABLE);
-            log.warn("[Dispatch] No category mapping found for trip {}, using all available vehicles", trip.getId());
+            log.warn("[Dispatch] No category mapping found for trip {}, using all available vehicles, found {}", 
+                    trip.getId(), allVehicles.size());
         }
         
         LocalDate tripDate = trip.getStartTime().atZone(ZoneId.systemDefault()).toLocalDate();
@@ -306,6 +303,14 @@ public class DispatchServiceImpl implements DispatchService {
         // Evaluate driver candidates with fairness scoring
         List<org.example.ptcmssbackend.dto.response.dispatch.AssignmentSuggestionResponse.DriverCandidate> driverCandidates = 
             evaluateDriverCandidates(allDrivers, trip, tripDate);
+        
+        long eligibleCount = driverCandidates.stream().filter(d -> d.isEligible()).count();
+        log.info("[Dispatch] Evaluated {} drivers, {} eligible for trip {}", 
+                driverCandidates.size(), eligibleCount, trip.getId());
+        if (eligibleCount == 0 && driverCandidates.size() > 0) {
+            log.warn("[Dispatch] No eligible drivers found! Reasons for first driver: {}", 
+                    driverCandidates.isEmpty() ? "N/A" : driverCandidates.get(0).getReasons());
+        }
         
         // Evaluate vehicle candidates - chỉ lấy xe đúng loại
         List<org.example.ptcmssbackend.dto.response.dispatch.AssignmentSuggestionResponse.VehicleCandidate> vehicleCandidates = 
@@ -598,20 +603,50 @@ public class DispatchServiceImpl implements DispatchService {
             }
             
             // 3) Check time overlap với các trips khác (ngoài cùng booking)
-            List<TripVehicles> overlaps = tripVehicleRepository.findOverlapsForVehicle(
-                    v.getId(),
-                    trip.getStartTime(),
-                    trip.getEndTime()
-            );
-            boolean busy = overlaps.stream().anyMatch(tv ->
-                    tv.getTrip().getStatus() != TripStatus.CANCELLED
-                            && !tv.getTrip().getId().equals(trip.getId())
-            );
-            if (busy) {
+            // IMPORTANT: dùng "busy-until" ước lượng theo distance + vận tốc trung bình + buffer
+            if (trip.getStartTime() == null) {
                 eligible = false;
-                reasons.add("Trùng giờ với chuyến khác");
+                reasons.add("Thiếu thời gian khởi hành");
             } else {
-                reasons.add("Rảnh tại thời điểm này");
+                final Instant targetStart = trip.getStartTime();
+                Instant targetBusyUntilTmp = tripOccupancyService.computeBusyUntil(
+                        trip.getBooking() != null && trip.getBooking().getHireType() != null ? trip.getBooking().getHireType().getCode() : null,
+                        trip.getStartTime(),
+                        trip.getEndTime(),
+                        trip.getDistance() != null ? trip.getDistance().doubleValue() : null,
+                        trip.getStartLocation(),
+                        trip.getEndLocation()
+                );
+                final Instant targetBusyUntil = targetBusyUntilTmp != null ? targetBusyUntilTmp : targetStart.plusSeconds(3600);
+
+                List<TripVehicles> vehicleTrips = tripVehicleRepository.findAllByVehicleId(v.getId());
+                boolean busy = vehicleTrips.stream().anyMatch(tv -> {
+                    Trips other = tv.getTrip();
+                    if (other == null || other.getBooking() == null) return false;
+                    if (other.getStatus() == TripStatus.CANCELLED || other.getStatus() == TripStatus.COMPLETED) return false;
+                    if (other.getId().equals(trip.getId())) return false;
+                    // Nếu cùng booking thì đã bị chặn ở bước 2) nên không cần tính overlap ở đây
+                    if (trip.getBooking() != null && other.getBooking().getId().equals(trip.getBooking().getId())) return false;
+                    if (other.getStartTime() == null) return true;
+
+                    Instant otherBusyUntil = tripOccupancyService.computeBusyUntil(
+                            other.getBooking().getHireType() != null ? other.getBooking().getHireType().getCode() : null,
+                            other.getStartTime(),
+                            other.getEndTime(),
+                            other.getDistance() != null ? other.getDistance().doubleValue() : null,
+                            other.getStartLocation(),
+                            other.getEndLocation()
+                    );
+                    if (otherBusyUntil == null) return true;
+                    return other.getStartTime().isBefore(targetBusyUntil) && targetStart.isBefore(otherBusyUntil);
+                });
+
+                if (busy) {
+                    eligible = false;
+                    reasons.add("Trùng lịch (ước lượng theo km/vận tốc)");
+                } else {
+                    reasons.add("Rảnh tại thời điểm này (ước lượng theo km/vận tốc)");
+                }
             }
 
             // 4) Check capacity vs required seats của trip này (từ category, không phải max của booking)
@@ -1381,21 +1416,52 @@ public class DispatchServiceImpl implements DispatchService {
         log.info("[Dispatch] Reassigning - bookingId: {}, tripIds: {}, driverId: {}, vehicleId: {}", 
                 request.getBookingId(), request.getTripIds(), request.getDriverId(), request.getVehicleId());
         
+        // Validate: Chỉ cho phép reassign cho chuyến đã gán (ASSIGNED) nhưng chưa bắt đầu
+        // Không cho phép reassign chuyến ONGOING hoặc COMPLETED
+        List<Trips> tripsToReassign = new ArrayList<>();
+        if (request.getTripIds() != null && !request.getTripIds().isEmpty()) {
+            for (Integer tid : request.getTripIds()) {
+                Trips trip = tripRepository.findById(tid)
+                        .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến: " + tid));
+                tripsToReassign.add(trip);
+            }
+        } else if (request.getBookingId() != null) {
+            tripsToReassign = tripRepository.findByBooking_Id(request.getBookingId());
+        }
+        
+        // Validate trip status - chỉ cho phép reassign SCHEDULED hoặc ASSIGNED
+        for (Trips trip : tripsToReassign) {
+            if (trip.getStatus() == TripStatus.ONGOING) {
+                throw new RuntimeException(
+                        String.format("Không thể đổi tài xế/xe cho chuyến #%d đang thực hiện. " +
+                                "Vui lòng chờ chuyến hoàn thành hoặc liên hệ quản lý.", trip.getId()));
+            }
+            if (trip.getStatus() == TripStatus.COMPLETED) {
+                throw new RuntimeException(
+                        String.format("Không thể đổi tài xế/xe cho chuyến #%d đã hoàn thành.", trip.getId()));
+            }
+            if (trip.getStatus() == TripStatus.CANCELLED) {
+                throw new RuntimeException(
+                        String.format("Không thể đổi tài xế/xe cho chuyến #%d đã bị hủy.", trip.getId()));
+            }
+            
+            // Kiểm tra chuyến chưa bắt đầu (theo thời gian)
+            if (trip.getStartTime() != null && Instant.now().isAfter(trip.getStartTime())) {
+                throw new RuntimeException(
+                        String.format("Không thể đổi tài xế/xe cho chuyến #%d đã quá thời gian khởi hành (%s). " +
+                                "Vui lòng cập nhật trạng thái chuyến trước.", 
+                                trip.getId(), trip.getStartTime()));
+            }
+        }
+        
         // Validate vehicle category if changing vehicle
         if (request.getVehicleId() != null) {
             validateVehicleCategoryForReassign(request);
         }
         
         // Unassign current assignments
-        if (request.getTripIds() != null && !request.getTripIds().isEmpty()) {
-            for (Integer tid : request.getTripIds()) {
-                unassign(tid, request.getNote());
-            }
-        } else if (request.getBookingId() != null) {
-            List<Trips> trips = tripRepository.findByBooking_Id(request.getBookingId());
-            for (Trips t : trips) {
-                unassign(t.getId(), request.getNote());
-            }
+        for (Trips t : tripsToReassign) {
+            unassign(t.getId(), request.getNote());
         }
         
         // Assign with new driver/vehicle
@@ -1546,7 +1612,38 @@ public class DispatchServiceImpl implements DispatchService {
         String hireTypeName = null;
         if (booking.getHireType() != null) {
             hireType = booking.getHireType().getCode(); // ONE_WAY, ROUND_TRIP, etc.
-            hireTypeName = booking.getHireType().getName(); // "Một chiều", "Hai chiều", etc.
+            
+            // Với ROUND_TRIP, cần lấy startTime sớm nhất và endTime muộn nhất từ TẤT CẢ trips trong booking
+            // để xác định chính xác "(trong ngày)" hay "(khác ngày)"
+            Instant startTimeForSuffix = trip.getStartTime();
+            Instant endTimeForSuffix = trip.getEndTime();
+            
+            if ("ROUND_TRIP".equals(hireType)) {
+                // Lấy tất cả trips trong booking
+                List<Trips> allBookingTrips = tripRepository.findByBooking_Id(booking.getId());
+                if (!allBookingTrips.isEmpty()) {
+                    // Lấy startTime sớm nhất
+                    startTimeForSuffix = allBookingTrips.stream()
+                            .map(Trips::getStartTime)
+                            .filter(java.util.Objects::nonNull)
+                            .min(Instant::compareTo)
+                            .orElse(trip.getStartTime());
+                    
+                    // Lấy endTime muộn nhất
+                    endTimeForSuffix = allBookingTrips.stream()
+                            .map(Trips::getEndTime)
+                            .filter(java.util.Objects::nonNull)
+                            .max(Instant::compareTo)
+                            .orElse(trip.getEndTime());
+                }
+            }
+            
+            hireTypeName = calculateHireTypeNameWithSuffix(
+                    booking.getHireType().getName(),
+                    booking.getHireType().getCode(),
+                    startTimeForSuffix,
+                    endTimeForSuffix
+            );
         }
         
         return TripDetailResponse.builder()
@@ -1591,6 +1688,39 @@ public class DispatchServiceImpl implements DispatchService {
 
     private TripListItemResponse buildTripListItem(Trips trip) {
         Bookings booking = trip.getBooking();
+        
+        // Tính toán hireTypeName với suffix cho ROUND_TRIP
+        String hireTypeName = null;
+        if (booking != null && booking.getHireType() != null) {
+            // Với ROUND_TRIP, cần lấy startTime sớm nhất và endTime muộn nhất từ TẤT CẢ trips trong booking
+            Instant startTimeForSuffix = trip.getStartTime();
+            Instant endTimeForSuffix = trip.getEndTime();
+            
+            if ("ROUND_TRIP".equals(booking.getHireType().getCode())) {
+                List<Trips> allBookingTrips = tripRepository.findByBooking_Id(booking.getId());
+                if (!allBookingTrips.isEmpty()) {
+                    startTimeForSuffix = allBookingTrips.stream()
+                            .map(Trips::getStartTime)
+                            .filter(java.util.Objects::nonNull)
+                            .min(Instant::compareTo)
+                            .orElse(trip.getStartTime());
+                    
+                    endTimeForSuffix = allBookingTrips.stream()
+                            .map(Trips::getEndTime)
+                            .filter(java.util.Objects::nonNull)
+                            .max(Instant::compareTo)
+                            .orElse(trip.getEndTime());
+                }
+            }
+            
+            hireTypeName = calculateHireTypeNameWithSuffix(
+                    booking.getHireType().getName(),
+                    booking.getHireType().getCode(),
+                    startTimeForSuffix,
+                    endTimeForSuffix
+            );
+        }
+        
         TripListItemResponse.TripListItemResponseBuilder builder = TripListItemResponse.builder()
                 .tripId(trip.getId())
                 .bookingId(booking != null ? booking.getId() : null)
@@ -1600,9 +1730,7 @@ public class DispatchServiceImpl implements DispatchService {
                 .routeSummary(routeLabel(trip))
                 .startTime(trip.getStartTime())
                 .endTime(trip.getEndTime())
-                .hireTypeName(booking != null && booking.getHireType() != null
-                        ? booking.getHireType().getName()
-                        : null)
+                .hireTypeName(hireTypeName)
                 .status(trip.getStatus() != null ? trip.getStatus().name() : null);
 
         List<TripDrivers> tripDrivers = tripDriverRepository.findByTripId(trip.getId());
@@ -2014,16 +2142,39 @@ public class DispatchServiceImpl implements DispatchService {
             }
             
             // Check trùng giờ với các trips khác (ngoài cùng booking)
-            List<TripVehicles> overlaps = tripVehicleRepository.findOverlapsForVehicle(
-                    v.getId(),
+            // IMPORTANT: dùng "busy-until" ước lượng theo distance + vận tốc trung bình + buffer
+            if (trip.getStartTime() == null) continue;
+            final Instant targetStart = trip.getStartTime();
+            Instant targetBusyUntilTmp = tripOccupancyService.computeBusyUntil(
+                    booking.getHireType() != null ? booking.getHireType().getCode() : null,
                     trip.getStartTime(),
-                    trip.getEndTime()
+                    trip.getEndTime(),
+                    trip.getDistance() != null ? trip.getDistance().doubleValue() : null,
+                    trip.getStartLocation(),
+                    trip.getEndLocation()
             );
-            // bỏ các trip đã bị cancel
-            boolean busy = overlaps.stream().anyMatch(tv ->
-                    tv.getTrip().getStatus() != TripStatus.CANCELLED
-                            && !tv.getTrip().getId().equals(trip.getId())
-            );
+            final Instant targetBusyUntil = targetBusyUntilTmp != null ? targetBusyUntilTmp : targetStart.plusSeconds(3600);
+
+            List<TripVehicles> vehicleTrips = tripVehicleRepository.findAllByVehicleId(v.getId());
+            boolean busy = vehicleTrips.stream().anyMatch(tv -> {
+                Trips other = tv.getTrip();
+                if (other == null || other.getBooking() == null) return false;
+                if (other.getStatus() == TripStatus.CANCELLED || other.getStatus() == TripStatus.COMPLETED) return false;
+                if (other.getId().equals(trip.getId())) return false;
+                if (other.getBooking().getId().equals(booking.getId())) return false;
+                if (other.getStartTime() == null) return true;
+
+                Instant otherBusyUntil = tripOccupancyService.computeBusyUntil(
+                        other.getBooking().getHireType() != null ? other.getBooking().getHireType().getCode() : null,
+                        other.getStartTime(),
+                        other.getEndTime(),
+                        other.getDistance() != null ? other.getDistance().doubleValue() : null,
+                        other.getStartLocation(),
+                        other.getEndLocation()
+                );
+                if (otherBusyUntil == null) return true;
+                return other.getStartTime().isBefore(targetBusyUntil) && targetStart.isBefore(otherBusyUntil);
+            });
             if (busy) continue;
 
             if (provisionalAssignments != null) {
@@ -2153,7 +2304,7 @@ public class DispatchServiceImpl implements DispatchService {
             return false; // Không có bằng lái -> không hợp lệ
         }
         if (seats == null || seats <= 0) {
-            return true; // Không có thông tin số ghế -> bỏ qua check
+             return true; // Không có thông tin số ghế -> bỏ qua check
         }
         
         String upperClass = licenseClass.toUpperCase().trim();
@@ -2182,16 +2333,104 @@ public class DispatchServiceImpl implements DispatchService {
         return false;
     }
 
+    private Instant busyUntil(Trips t) {
+        if (t == null || t.getStartTime() == null) return null;
+        String hireTypeCode = t.getBooking() != null && t.getBooking().getHireType() != null ? t.getBooking().getHireType().getCode() : null;
+        Instant busy = tripOccupancyService.computeBusyUntil(
+                hireTypeCode,
+                t.getStartTime(),
+                t.getEndTime(),
+                t.getDistance() != null ? t.getDistance().doubleValue() : null,
+                t.getStartLocation(),
+                t.getEndLocation()
+        );
+        return busy != null ? busy : t.getStartTime().plusSeconds(3600);
+    }
+
     private boolean hasTimeOverlap(Trips t1, Trips t2) {
         if (t1 == null || t2 == null) return true;
         Instant s1 = t1.getStartTime();
-        Instant e1 = t1.getEndTime();
         Instant s2 = t2.getStartTime();
-        Instant e2 = t2.getEndTime();
-        if (s1 == null || e1 == null || s2 == null || e2 == null) {
-            return true;
-        }
+        Instant e1 = busyUntil(t1);
+        Instant e2 = busyUntil(t2);
+        if (s1 == null || e1 == null || s2 == null || e2 == null) return true;
         return s1.isBefore(e2) && s2.isBefore(e1);
+    }
+    
+    /**
+     * Helper method: Tính toán hireTypeName với suffix "(trong ngày)" hoặc "(khác ngày)" cho ROUND_TRIP
+     */
+    private String calculateHireTypeNameWithSuffix(String baseName, String hireTypeCode, Instant startTime, Instant endTime) {
+        if (baseName == null || hireTypeCode == null) {
+            return baseName;
+        }
+        
+        // Chỉ thêm suffix cho ROUND_TRIP (Hai chiều)
+        if (!"ROUND_TRIP".equals(hireTypeCode)) {
+            return baseName;
+        }
+        
+        if (startTime == null || endTime == null) {
+            return baseName;
+        }
+        
+        // Loại bỏ suffix cũ nếu có (tránh duplicate: "Thuê 2 chiều (trong ngày) (khác ngày)")
+        String cleanBaseName = baseName;
+        if (cleanBaseName.contains(" (trong ngày)")) {
+            cleanBaseName = cleanBaseName.replace(" (trong ngày)", "");
+        }
+        if (cleanBaseName.contains(" (khác ngày)")) {
+            cleanBaseName = cleanBaseName.replace(" (khác ngày)", "");
+        }
+        
+        // Kiểm tra xem có phải trong ngày không
+        boolean isSameDay = isSameDayTrip(startTime, endTime);
+        if (isSameDay) {
+            return cleanBaseName + " (trong ngày)";
+        } else {
+            return cleanBaseName + " (khác ngày)";
+        }
+    }
+    
+    /**
+     * Helper method: Kiểm tra xem có phải chuyến trong ngày không
+     * Chuyến trong ngày: Khởi hành từ 6h sáng, về 7-8h tối (hoặc đến 10-11h đêm cùng ngày)
+     */
+    private boolean isSameDayTrip(Instant startTime, Instant endTime) {
+        if (startTime == null || endTime == null) {
+            return false;
+        }
+        
+        try {
+            // Lấy cấu hình từ SystemSettings
+            int startHour = getSystemSettingInt("SAME_DAY_TRIP_START_HOUR", 6);
+            int endHour = getSystemSettingInt("SAME_DAY_TRIP_END_HOUR", 23);
+            
+            java.time.ZonedDateTime startZoned = startTime.atZone(ZoneId.systemDefault());
+            java.time.ZonedDateTime endZoned = endTime.atZone(ZoneId.systemDefault());
+            
+            // Check cùng ngày
+            if (!startZoned.toLocalDate().equals(endZoned.toLocalDate())) {
+                return false;
+            }
+            
+            // Check giờ khởi hành >= 6h sáng
+            int startHourOfDay = startZoned.getHour();
+            if (startHourOfDay < startHour) {
+                return false;
+            }
+            
+            // Check giờ về <= 11h đêm (23h)
+            int endHourOfDay = endZoned.getHour();
+            if (endHourOfDay > endHour) {
+                return false;
+            }
+            
+            return true;
+        } catch (Exception e) {
+            log.warn("Error checking same day trip: {}", e.getMessage());
+            return false;
+        }
     }
 }
 

@@ -172,7 +172,7 @@ public class DepositServiceImpl implements DepositService {
                 paymentHistoryRepository.findByInvoice_IdOrderByPaymentDateDesc(invoice.getId())
                     .stream()
                     .filter(ph -> ph.getConfirmationStatus() == org.example.ptcmssbackend.enums.PaymentConfirmationStatus.PENDING)
-                    .collect(java.util.stream.Collectors.toList());
+                    .collect(Collectors.toList());
             
             for (org.example.ptcmssbackend.entity.PaymentHistory ph : pendingPayments) {
                 totalPending = totalPending.add(ph.getAmount() != null ? ph.getAmount() : BigDecimal.ZERO);

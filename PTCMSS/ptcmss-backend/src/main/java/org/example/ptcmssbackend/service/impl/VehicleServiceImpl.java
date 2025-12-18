@@ -217,10 +217,9 @@ public class VehicleServiceImpl implements VehicleService {
         
         // Map invoice-based expenses
         List<VehicleExpenseResponse> results = expenses.stream()
-                .filter(inv -> inv.getCostType() == null || !inv.getCostType().equals("maintenance"))
                 .map(inv -> VehicleExpenseResponse.builder()
                         .invoiceId(inv.getId())
-                        .costType(inv.getCostType())
+                        .costType(null) // costType đã được xóa
                         .amount(inv.getAmount())
                         .paymentStatus(inv.getPaymentStatus() != null ? inv.getPaymentStatus().name() : null)
                         .note(inv.getNote())
@@ -269,8 +268,9 @@ public class VehicleServiceImpl implements VehicleService {
         vehicleRepository.findById(vehicleId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy xe ID=" + vehicleId));
         
-        List<Invoices> maintenance = invoiceRepository.findExpensesByVehicleIdAndCostType(
-                vehicleId, InvoiceType.EXPENSE, "maintenance");
+        // costType đã bị xóa - lấy tất cả expenses của vehicle
+        List<Invoices> maintenance = invoiceRepository.findExpensesByVehicleId(
+                vehicleId, InvoiceType.EXPENSE);
         
         return maintenance.stream()
                 .map(inv -> VehicleMaintenanceResponse.builder()
@@ -304,7 +304,7 @@ public class VehicleServiceImpl implements VehicleService {
         invoice.setBranch(vehicle.getBranch());
         invoice.setBooking(latestBooking);
         invoice.setType(InvoiceType.EXPENSE);
-        invoice.setCostType("maintenance");
+        // costType đã được xóa - không còn dùng
         invoice.setAmount(request.getAmount());
         invoice.setPaymentStatus(PaymentStatus.UNPAID);
         invoice.setNote(request.getNote() != null ? request.getNote() : 
@@ -347,17 +347,17 @@ public class VehicleServiceImpl implements VehicleService {
         invoice.setBranch(vehicle.getBranch());
         invoice.setBooking(booking);
         invoice.setType(InvoiceType.EXPENSE);
-        invoice.setCostType(request.getCostType());
+        // costType đã được xóa - không còn dùng
         invoice.setAmount(request.getAmount());
         invoice.setPaymentStatus(PaymentStatus.UNPAID);
         invoice.setNote(request.getNote() != null ? request.getNote() : 
-                "Chi phí " + request.getCostType() + " cho xe " + vehicle.getLicensePlate());
+                "Chi phí cho xe " + vehicle.getLicensePlate());
         
         Invoices saved = invoiceRepository.save(invoice);
         
         return VehicleExpenseResponse.builder()
                 .invoiceId(saved.getId())
-                .costType(saved.getCostType())
+                .costType(null) // costType đã được xóa
                 .amount(saved.getAmount())
                 .paymentStatus(saved.getPaymentStatus() != null ? saved.getPaymentStatus().name() : null)
                 .note(saved.getNote())

@@ -41,8 +41,10 @@ public class NotificationServiceImpl implements NotificationService {
     private final WebSocketNotificationService webSocketNotificationService;
     private final NotificationRepository notificationRepository;
     
-    private static final int EXPIRY_WARNING_DAYS = 30; // Cảnh báo trước 30 ngày
-    private static final int CRITICAL_WARNING_DAYS = 7; // Cảnh báo khẩn cấp trước 7 ngày
+    // Default values - sẽ được override bởi SystemSettings nếu có
+    private static final int DEFAULT_EXPIRY_WARNING_DAYS = 30; // Cảnh báo trước 30 ngày
+    private static final int DEFAULT_CRITICAL_WARNING_DAYS = 7; // Cảnh báo khẩn cấp trước 7 ngày
+    private static final int DEFAULT_HEALTH_CHECK_WARNING_DAYS = 30; // Cảnh báo khám sức khỏe trước 30 ngày
     
     @Override
     public List<AlertResponse> getAllAlerts(Integer branchId) {
@@ -102,8 +104,13 @@ public class NotificationServiceImpl implements NotificationService {
     private void generateVehicleInspectionAlerts() {
         List<Vehicles> vehicles = vehicleRepository.findAll();
         LocalDate today = LocalDate.now();
-        LocalDate warningDate = today.plusDays(EXPIRY_WARNING_DAYS);
-        LocalDate criticalDate = today.plusDays(CRITICAL_WARNING_DAYS);
+        
+        // Lấy cấu hình từ SystemSettings
+        int expiryWarningDays = getSystemSettingInt("EXPIRY_WARNING_DAYS", DEFAULT_EXPIRY_WARNING_DAYS);
+        int criticalWarningDays = getSystemSettingInt("CRITICAL_WARNING_DAYS", DEFAULT_CRITICAL_WARNING_DAYS);
+        
+        LocalDate warningDate = today.plusDays(expiryWarningDays);
+        LocalDate criticalDate = today.plusDays(criticalWarningDays);
         
         for (Vehicles vehicle : vehicles) {
             if (vehicle.getInspectionExpiry() == null) continue;
@@ -154,8 +161,13 @@ public class NotificationServiceImpl implements NotificationService {
     private void generateVehicleInsuranceAlerts() {
         List<Vehicles> vehicles = vehicleRepository.findAll();
         LocalDate today = LocalDate.now();
-        LocalDate warningDate = today.plusDays(EXPIRY_WARNING_DAYS);
-        LocalDate criticalDate = today.plusDays(CRITICAL_WARNING_DAYS);
+        
+        // Lấy cấu hình từ SystemSettings
+        int expiryWarningDays = getSystemSettingInt("EXPIRY_WARNING_DAYS", DEFAULT_EXPIRY_WARNING_DAYS);
+        int criticalWarningDays = getSystemSettingInt("CRITICAL_WARNING_DAYS", DEFAULT_CRITICAL_WARNING_DAYS);
+        
+        LocalDate warningDate = today.plusDays(expiryWarningDays);
+        LocalDate criticalDate = today.plusDays(criticalWarningDays);
         
         for (Vehicles vehicle : vehicles) {
             if (vehicle.getInsuranceExpiry() == null) continue;
@@ -192,8 +204,13 @@ public class NotificationServiceImpl implements NotificationService {
     private void generateDriverLicenseAlerts() {
         List<Drivers> drivers = driverRepository.findAll();
         LocalDate today = LocalDate.now();
-        LocalDate warningDate = today.plusDays(EXPIRY_WARNING_DAYS);
-        LocalDate criticalDate = today.plusDays(CRITICAL_WARNING_DAYS);
+        
+        // Lấy cấu hình từ SystemSettings
+        int expiryWarningDays = getSystemSettingInt("EXPIRY_WARNING_DAYS", DEFAULT_EXPIRY_WARNING_DAYS);
+        int criticalWarningDays = getSystemSettingInt("CRITICAL_WARNING_DAYS", DEFAULT_CRITICAL_WARNING_DAYS);
+        
+        LocalDate warningDate = today.plusDays(expiryWarningDays);
+        LocalDate criticalDate = today.plusDays(criticalWarningDays);
         
         for (Drivers driver : drivers) {
             if (driver.getLicenseExpiry() == null) continue;
@@ -231,7 +248,12 @@ public class NotificationServiceImpl implements NotificationService {
     private void generateDriverHealthCheckAlerts() {
         List<Drivers> drivers = driverRepository.findAll();
         LocalDate today = LocalDate.now();
-        LocalDate warningDate = today.plusDays(EXPIRY_WARNING_DAYS);
+        
+        // Lấy cấu hình từ SystemSettings
+        int healthCheckWarningDays = getSystemSettingInt("HEALTH_CHECK_WARNING_DAYS", DEFAULT_HEALTH_CHECK_WARNING_DAYS);
+        int criticalWarningDays = getSystemSettingInt("CRITICAL_WARNING_DAYS", DEFAULT_CRITICAL_WARNING_DAYS);
+        
+        LocalDate warningDate = today.plusDays(healthCheckWarningDays);
         
         for (Drivers driver : drivers) {
             if (driver.getHealthCheckDate() == null) continue;
@@ -242,7 +264,7 @@ public class NotificationServiceImpl implements NotificationService {
             if (nextCheckDue.isBefore(warningDate)) {
                 long daysLeft = ChronoUnit.DAYS.between(today, nextCheckDue);
                 String driverName = extractDriverName(driver);
-                AlertSeverity severity = daysLeft < CRITICAL_WARNING_DAYS ? AlertSeverity.HIGH : AlertSeverity.MEDIUM;
+                AlertSeverity severity = daysLeft < criticalWarningDays ? AlertSeverity.HIGH : AlertSeverity.MEDIUM;
                 
                 String message = daysLeft < 0 
                         ? String.format("Tài xế %s đã quá hạn khám sức khỏe định kỳ", driverName)

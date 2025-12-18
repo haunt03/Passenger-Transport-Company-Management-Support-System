@@ -12,6 +12,7 @@ import org.example.ptcmssbackend.dto.response.Driver.DriverProfileResponse;
 import org.example.ptcmssbackend.dto.response.Driver.DriverResponse;
 import org.example.ptcmssbackend.dto.response.Driver.DriverScheduleResponse;
 import org.example.ptcmssbackend.dto.response.Driver.TripIncidentResponse;
+import org.example.ptcmssbackend.entity.Bookings;
 import org.example.ptcmssbackend.entity.DriverDayOff;
 import org.example.ptcmssbackend.entity.Drivers;
 import org.example.ptcmssbackend.entity.TripDrivers;
@@ -20,6 +21,7 @@ import org.example.ptcmssbackend.entity.Trips;
 import org.example.ptcmssbackend.entity.TripVehicles;
 import org.example.ptcmssbackend.entity.Vehicles;
 import org.example.ptcmssbackend.enums.ApprovalType;
+import org.example.ptcmssbackend.enums.BookingStatus;
 import org.example.ptcmssbackend.enums.DriverDayOffStatus;
 import org.example.ptcmssbackend.enums.DriverStatus;
 import org.example.ptcmssbackend.enums.TripStatus;
@@ -49,10 +51,11 @@ public class DriverServiceImpl implements DriverService {
     private final TripIncidentRepository tripIncidentRepository;
     private final BranchesRepository branchRepository;
     private final EmployeeRepository employeeRepository;
+    private final BookingRepository bookingRepository;
     private final ApprovalService approvalService;
     private final DriverRatingsRepository driverRatingsRepository;
     private final org.example.ptcmssbackend.service.GraphHopperService graphHopperService;
-    private final InvoiceRepository invoiceRepository;
+    private final org.example.ptcmssbackend.repository.InvoiceRepository invoiceRepository;
     private final WebSocketNotificationService webSocketNotificationService;
 
     @Override
@@ -218,7 +221,7 @@ public class DriverServiceImpl implements DriverService {
     }
 
     @Override
-    public List<DriverScheduleResponse> getSchedule(Integer driverId, Instant startDate, Instant endDate) {
+    public List<DriverScheduleResponse> getSchedule(Integer driverId, java.time.Instant startDate, java.time.Instant endDate) {
         log.info("[DriverSchedule] Loading schedule for driver {} from {} to {}", driverId, startDate, endDate);
         List<TripDrivers> trips;
         if (startDate != null || endDate != null) {
@@ -240,7 +243,12 @@ public class DriverServiceImpl implements DriverService {
                     String hireTypeName = null;
                     if (booking != null && booking.getHireType() != null) {
                         hireType = booking.getHireType().getCode();
-                        hireTypeName = booking.getHireType().getName();
+                        hireTypeName = calculateHireTypeNameWithSuffix(
+                                booking.getHireType().getName(),
+                                booking.getHireType().getCode(),
+                                trip.getStartTime(),
+                                trip.getEndTime()
+                        );
                     }
                     
                     return DriverScheduleResponse.builder()
@@ -312,8 +320,8 @@ public class DriverServiceImpl implements DriverService {
         // Chỉ validate và cập nhật status nếu có giá trị hợp lệ (không null và không rỗng)
         if (request.getStatus() != null && !request.getStatus().trim().isEmpty()) {
             try {
-                DriverStatus newStatus =
-                    DriverStatus.valueOf(request.getStatus().trim());
+                org.example.ptcmssbackend.enums.DriverStatus newStatus = 
+                    org.example.ptcmssbackend.enums.DriverStatus.valueOf(request.getStatus().trim());
                 
                 // VALIDATION: Kiểm tra quyền của user hiện tại
                 org.springframework.security.core.Authentication auth = 
@@ -323,12 +331,12 @@ public class DriverServiceImpl implements DriverService {
                 
                 // Coordinator chỉ được chuyển tài xế sang ACTIVE hoặc INACTIVE
                 if (isCoordinator) {
-                    if (newStatus != DriverStatus.ACTIVE &&
-                        newStatus != DriverStatus.INACTIVE) {
+                    if (newStatus != org.example.ptcmssbackend.enums.DriverStatus.ACTIVE && 
+                        newStatus != org.example.ptcmssbackend.enums.DriverStatus.INACTIVE) {
                         throw new RuntimeException("Điều phối viên chỉ được phép chuyển tài xế sang trạng thái 'Hoạt động' (ACTIVE) hoặc 'Không hoạt động' (INACTIVE).");
                     }
                     // Coordinator không được thay đổi trạng thái nếu tài xế đang ON_TRIP
-                    if (driver.getStatus() == DriverStatus.ON_TRIP) {
+                    if (driver.getStatus() == org.example.ptcmssbackend.enums.DriverStatus.ON_TRIP) {
                         throw new RuntimeException("Không thể thay đổi trạng thái khi tài xế đang trong chuyến đi.");
                     }
                 }
@@ -450,6 +458,20 @@ public class DriverServiceImpl implements DriverService {
             trip.setStartTime(Instant.now());
         }
         tripRepository.save(trip);
+        
+        // Cập nhật booking status thành INPROGRESS khi tài xế bắt đầu chuyến
+        if (trip.getBooking() != null) {
+            Bookings booking = trip.getBooking();
+            if (booking.getStatus() != BookingStatus.INPROGRESS
+                    && booking.getStatus() != BookingStatus.COMPLETED
+                    && booking.getStatus() != BookingStatus.CANCELLED) {
+                booking.setStatus(BookingStatus.INPROGRESS);
+                bookingRepository.save(booking);
+                log.info("[DriverService] Updated booking {} status to INPROGRESS after driver {} started trip {}", 
+                        booking.getId(), driverId, tripId);
+            }
+        }
+        
         return tripId;
     }
 
@@ -594,5 +616,39 @@ public class DriverServiceImpl implements DriverService {
             throw new RuntimeException("Không tìm thấy chi nhánh");
         }
         return driverRepository.findAllByBranchId(branchId);
+    }
+    
+    /**
+     * Helper method: Tính toán hireTypeName với suffix "(trong ngày)" hoặc "(khác ngày)" cho ROUND_TRIP
+     */
+    private String calculateHireTypeNameWithSuffix(String baseName, String hireTypeCode, Instant startTime, Instant endTime) {
+        if (baseName == null || hireTypeCode == null) {
+            return baseName;
+        }
+        
+        // Chỉ thêm suffix cho ROUND_TRIP (Hai chiều)
+        if (!"ROUND_TRIP".equals(hireTypeCode)) {
+            return baseName;
+        }
+        
+        if (startTime == null || endTime == null) {
+            return baseName;
+        }
+        
+        // Kiểm tra xem có phải trong ngày không (chỉ kiểm tra cùng ngày, không kiểm tra giờ)
+        try {
+            java.time.ZonedDateTime startZoned = startTime.atZone(java.time.ZoneId.systemDefault());
+            java.time.ZonedDateTime endZoned = endTime.atZone(java.time.ZoneId.systemDefault());
+            
+            // Check cùng ngày
+            if (startZoned.toLocalDate().equals(endZoned.toLocalDate())) {
+                return baseName + " (trong ngày)";
+            } else {
+                return baseName + " (khác ngày)";
+            }
+        } catch (Exception e) {
+            log.warn("Error checking same day trip: {}", e.getMessage());
+            return baseName;
+        }
     }
 }

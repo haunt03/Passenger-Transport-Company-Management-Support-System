@@ -38,20 +38,7 @@ public class EmailService {
 
         Context context = new Context();
         context.setVariables(variables);
-        
-        String htmlContent;
-        try {
-            htmlContent = templateEngine.process("verify-email", context);
-            log.debug("Email template 'verify-email' processed successfully");
-        } catch (org.thymeleaf.exceptions.TemplateInputException e) {
-            // Template not found - use fallback HTML
-            log.info("Template 'verify-email' not found, using fallback HTML. This is normal if template file is missing.");
-            htmlContent = buildVerificationEmailHtml(fullName, username, verificationUrl);
-        } catch (Exception e) {
-            // Other errors - use fallback HTML
-            log.warn("Error processing email template, using fallback HTML: {}", e.getMessage());
-            htmlContent = buildVerificationEmailHtml(fullName, username, verificationUrl);
-        }
+        String htmlContent = templateEngine.process("verify-email", context);
 
         MimeMessage message = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, "UTF-8");
@@ -266,25 +253,5 @@ public class EmailService {
                 "</div></body></html>";
     }
 
-    private String buildVerificationEmailHtml(String fullName, String username, String verificationUrl) {
-        return "<html><body style='font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;'>" +
-                "<div style='max-width: 600px; margin: 0 auto; background-color: white; border-radius: 10px; padding: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);'>" +
-                "<h2 style='color: #0079BC; margin-bottom: 20px; text-align: center;'>✨ Chào mừng đến TranspoManager</h2>" +
-                "<p>Xin chào <strong>" + fullName + "</strong>,</p>" +
-                "<p>Tài khoản của bạn đã được tạo thành công trong hệ thống quản lý vận tải TranspoManager.</p>" +
-                "<div style='background-color: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #0079BC;'>" +
-                "<p style='margin: 10px 0;'><strong>Tên đăng nhập:</strong> <code style='background: #e9ecef; padding: 3px 8px; border-radius: 4px;'>" + username + "</code></p>" +
-                "</div>" +
-                "<p>Để kích hoạt tài khoản và thiết lập mật khẩu, vui lòng nhấp vào nút bên dưới:</p>" +
-                "<div style='text-align: center; margin: 20px 0;'>" +
-                "<a href='" + verificationUrl + "' style='display: inline-block; padding: 12px 30px; background-color: #0079BC; color: #ffffff; text-decoration: none; border-radius: 5px;'>Xác thực tài khoản</a>" +
-                "</div>" +
-                "<p style='word-break: break-all; color: #0079BC; font-size: 12px;'>Hoặc copy link: " + verificationUrl + "</p>" +
-                "<p style='color: #dc3545; font-size: 14px; margin-top: 20px;'>⚠️ <strong>Lưu ý:</strong> Link xác thực sẽ hết hạn sau 24 giờ. Vui lòng xác thực sớm để kích hoạt tài khoản.</p>" +
-                "<p>Nếu bạn không tạo tài khoản này, vui lòng bỏ qua email này.</p>" +
-                "<hr style='border: none; border-top: 1px solid #eee; margin: 20px 0;'>" +
-                "<p style='color: #666; font-size: 12px; text-align: center;'>Trân trọng,<br><strong>TranspoManager - Hệ thống quản lý vận tải</strong></p>" +
-                "<p style='color: #999; font-size: 11px; text-align: center;'>Email này được gửi tự động, vui lòng không trả lời.</p>" +
-                "</div></body></html>";
-    }
+
 }

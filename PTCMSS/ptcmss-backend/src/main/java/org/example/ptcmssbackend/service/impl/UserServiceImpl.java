@@ -81,7 +81,8 @@ public class UserServiceImpl implements UserService {
         user.setAddress(request.getAddress());
         user.setRole(role);
         user.setPasswordHash("TEAMP123"); // gán mật khẩu tạm thời
-        user.setStatus(UserStatus.INACTIVE); // chưa kích hoạt
+        // Nếu request có status thì dùng, không thì mặc định INACTIVE
+        user.setStatus(request.getStatus() != null ? request.getStatus() : UserStatus.INACTIVE);
         user.setEmailVerified(false);
         user.setVerificationToken(UUID.randomUUID().toString());
 
