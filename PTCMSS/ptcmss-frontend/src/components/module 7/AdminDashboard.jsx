@@ -23,6 +23,7 @@ import {
     PieChart,
     Pie,
     Cell,
+    Rectangle,
 } from "recharts";
 
 import KpiCard from "./shared/KpiCard";
@@ -49,6 +50,20 @@ const PERIOD_OPTIONS = [
 ];
 
 const COLORS = ["#0079BC", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
+
+// Custom shape for expense bar: only render when value > 0,
+// and đảm bảo chiều cao tối thiểu để không bị mất trên chart có trục rất lớn.
+const ExpenseBarShape = (props) => {
+    const { value, y, height, ...rest } = props;
+
+    if (value == null || Number(value) <= 0) return null;
+
+    const minHeight = 6;
+    const safeHeight = Math.max(height, minHeight);
+    const adjustedY = y + (height - safeHeight);
+
+    return <Rectangle {...rest} y={adjustedY} height={safeHeight} />;
+};
 
 // Toast system
 function useToasts() {
@@ -157,12 +172,21 @@ export default function AdminDashboard() {
             // Charts
             setRevenueTrend(trendData || []);
             // Normalize branch comparison data - đảm bảo có field expense
-            const normalizedBranchData = (branchData || []).map(branch => ({
-                ...branch,
-                revenue: branch.revenue || 0,
-                expense: branch.expense !== undefined && branch.expense !== null ? branch.expense : 0,
-                netProfit: branch.netProfit || 0,
-            }));
+            // Đồng thời tạo field expenseForChart: nếu expense <= 0 thì set null để không vẽ cột đỏ
+            const normalizedBranchData = (branchData || []).map(branch => {
+                const revenue = Number(branch.revenue || 0);
+                const rawExpense = branch.expense !== undefined && branch.expense !== null
+                    ? Number(branch.expense)
+                    : 0;
+                const netProfit = branch.netProfit != null ? Number(branch.netProfit) : revenue - rawExpense;
+                return {
+                    ...branch,
+                    revenue,
+                    expense: rawExpense,
+                    expenseForChart: rawExpense > 0 ? rawExpense : null,
+                    netProfit,
+                };
+            });
             setBranchComparison(normalizedBranchData);
             setTopRoutes(routesData || []);
             setTopVehicleCategories(vehicleCategoriesData || []);
@@ -351,7 +375,11 @@ export default function AdminDashboard() {
                                         width={80}
                                     />
                                     <Tooltip
-                                        formatter={(value) => `${fmtVND(value)} đ`}
+                                        formatter={(value, name) => {
+                                            // Nếu không có cột chi phí (null) thì vẫn hiển thị 0 đ trong tooltip
+                                            const displayValue = value == null ? 0 : value;
+                                            return `${fmtVND(displayValue)} đ`;
+                                        }}
                                         contentStyle={{
                                             backgroundColor: "white",
                                             border: "1px solid #e2e8f0",
@@ -361,11 +389,10 @@ export default function AdminDashboard() {
                                     <Legend wrapperStyle={{ fontSize: "12px" }} />
                                     <Bar dataKey="revenue" name="Doanh thu" fill="#10b981" />
                                     <Bar
-                                        dataKey="expense"
+                                        dataKey="expenseForChart"
                                         name="Chi phí"
                                         fill="#ef4444"
-                                        // Hiển thị rõ cột chi phí khi > 0 (dù rất nhỏ), 0 thì không vẽ
-                                        minPointSize={6}
+                                        shape={<ExpenseBarShape />}
                                         isAnimationActive={true}
                                     />
                                 </BarChart>

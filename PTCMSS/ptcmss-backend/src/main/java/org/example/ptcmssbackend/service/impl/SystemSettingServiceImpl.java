@@ -6,8 +6,8 @@ import org.example.ptcmssbackend.dto.response.SystemSetting.SystemSettingRespons
 import org.example.ptcmssbackend.entity.Employees;
 import org.example.ptcmssbackend.entity.SystemSetting;
 import org.example.ptcmssbackend.enums.SettingStatus;
-import org.example.ptcmssbackend.repository.EmployeeRepository;
 import org.example.ptcmssbackend.repository.SystemSettingRepository;
+import org.example.ptcmssbackend.repository.EmployeeRepository;
 import org.example.ptcmssbackend.service.SystemSettingService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,7 +41,7 @@ public class SystemSettingServiceImpl implements SystemSettingService {
     @Override
     public SystemSettingResponse getByKey(String settingKey) {
         SystemSetting setting = systemSettingRepository
-                .findBySettingKeyAndStatus(settingKey, SettingStatus.ACTIVE)
+                .findBySettingKeyAndStatus(settingKey, org.example.ptcmssbackend.enums.SettingStatus.ACTIVE)
                 .orElse(null);
         if (setting == null) {
             return null;
@@ -64,7 +64,7 @@ public class SystemSettingServiceImpl implements SystemSettingService {
         SystemSetting setting = SystemSetting.builder()
                 .settingKey(request.getSettingKey())
                 .settingValue(request.getSettingValue())
-                .effectiveStartDate(request.getEffectiveStartDate() != null ? 
+                .effectiveStartDate(request.getEffectiveStartDate() != null ?
                         request.getEffectiveStartDate() : java.time.LocalDate.now())
                 .effectiveEndDate(request.getEffectiveEndDate())
                 .valueType(request.getValueType())
@@ -98,7 +98,10 @@ public class SystemSettingServiceImpl implements SystemSettingService {
         setting.setValueType(request.getValueType());
         setting.setCategory(request.getCategory());
         setting.setDescription(request.getDescription());
-        setting.setStatus(request.getStatus());
+        // Nếu không truyền status từ frontend thì giữ nguyên status hiện tại (thường là ACTIVE)
+        if (request.getStatus() != null) {
+            setting.setStatus(request.getStatus());
+        }
         setting.setUpdatedBy(updater);
 
         SystemSetting updated = systemSettingRepository.save(setting);
