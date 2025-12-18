@@ -46,34 +46,22 @@ public class DepositServiceImpl implements DepositService {
         // Cần tính cả các payment requests PENDING đã tạo trước đó
         BigDecimal remainingAmount = getRemainingAmount(bookingId);
         BigDecimal totalPendingAmount = getTotalPendingPaymentAmount(bookingId);
-        
-        // Ràng buộc 1: Không được tạo yêu cầu mới nếu đã có yêu cầu PENDING
-        if (totalPendingAmount.compareTo(BigDecimal.ZERO) > 0) {
-            throw new RuntimeException(String.format(
-                "Không thể tạo yêu cầu thanh toán mới. Đã có yêu cầu thanh toán đang chờ duyệt (tổng %s). Vui lòng đợi kế toán xác nhận các yêu cầu trước.", 
-                totalPendingAmount));
-        }
-        
-        // Ràng buộc 2: Tổng pending + amount mới <= remaining amount
+
+        // Ràng buộc: Tổng pending + amount mới <= remaining amount
+        // Cho phép tạo nhiều request miễn tổng không vượt quá số tiền còn lại
         BigDecimal totalWithNewAmount = totalPendingAmount.add(request.getAmount());
         if (totalWithNewAmount.compareTo(remainingAmount) > 0) {
+            BigDecimal availableAmount = remainingAmount.subtract(totalPendingAmount);
             throw new RuntimeException(String.format(
-                "Tổng số tiền yêu cầu (%s) vượt quá số tiền còn lại (%s). Số tiền có thể tạo thêm: %s", 
-                totalWithNewAmount, remainingAmount, remainingAmount.subtract(totalPendingAmount)));
-        }
-        
-        BigDecimal availableAmount = remainingAmount.subtract(totalPendingAmount);
-        if (request.getAmount().compareTo(availableAmount) > 0) {
-            throw new RuntimeException(String.format(
-                "Số tiền vượt quá số tiền còn lại. Số tiền còn lại: %s, đã có %s đang chờ duyệt, còn lại có thể tạo: %s", 
-                remainingAmount, totalPendingAmount, availableAmount));
+                    "Tổng số tiền yêu cầu (%s) vượt quá số tiền còn lại (%s). Hiện đang có %s đang chờ duyệt. Số tiền có thể tạo thêm: %s",
+                    totalWithNewAmount, remainingAmount, totalPendingAmount, availableAmount.compareTo(BigDecimal.ZERO) > 0 ? availableAmount : BigDecimal.ZERO));
         }
 
         // TẤT CẢ ghi nhận tiền (cọc hoặc thanh toán) đều tạo payment_history PENDING chờ kế toán duyệt
         // Flow: Tạo/tìm invoice UNPAID → Tạo payment_history PENDING → Kế toán duyệt → Invoice PAID
-        
+
         List<Invoices> existingInvoices = invoiceRepository.findByBooking_IdOrderByCreatedAtDesc(bookingId);
-        
+
         // Tìm invoice INCOME UNPAID của booking này
         Invoices targetInvoice = existingInvoices.stream()
                 .filter(inv -> inv.getType() == InvoiceType.INCOME && inv.getPaymentStatus() == PaymentStatus.UNPAID)
@@ -86,7 +74,7 @@ public class DepositServiceImpl implements DepositService {
             request.setCustomerId(booking.getCustomer().getId());
             request.setBranchId(booking.getBranch().getId());
             request.setType("INCOME");
-            
+
             // Tạo invoice mới với status UNPAID
             InvoiceResponse newInvoiceResp = invoiceService.createInvoice(request);
             targetInvoice = invoiceRepository.findById(newInvoiceResp.getInvoiceId())
@@ -101,11 +89,11 @@ public class DepositServiceImpl implements DepositService {
         // Mặc định là CASH (chuyển khoản dùng QR riêng)
         paymentHistory.setPaymentMethod("CASH");
         paymentHistory.setConfirmationStatus(org.example.ptcmssbackend.enums.PaymentConfirmationStatus.PENDING);
-        
+
         // Note: thêm prefix để phân biệt cọc vs thanh toán
         String notePrefix = Boolean.TRUE.equals(request.getIsDeposit()) ? "[Đặt cọc] " : "[Thu tiền] ";
         paymentHistory.setNote(notePrefix + (request.getNote() != null ? request.getNote() : ""));
-        
+
         // Generate receipt number
         String receiptNum = null;
         if (receiptNum == null || receiptNum.isEmpty()) {
@@ -118,7 +106,7 @@ public class DepositServiceImpl implements DepositService {
         }
 
         paymentHistoryRepository.save(paymentHistory);
-        log.info("[DepositService] Created payment_history PENDING for invoice: {}, amount: {}, isDeposit: {}", 
+        log.info("[DepositService] Created payment_history PENDING for invoice: {}, amount: {}, isDeposit: {}",
                 targetInvoice.getInvoiceNumber(), request.getAmount(), request.getIsDeposit());
 
         return invoiceService.getInvoiceById(targetInvoice.getId());
@@ -156,7 +144,7 @@ public class DepositServiceImpl implements DepositService {
 
         return totalCost.subtract(totalPaid);
     }
-    
+
     /**
      * Tính tổng số tiền của các payment requests đang PENDING cho booking này
      * (chưa được kế toán duyệt)
@@ -164,21 +152,21 @@ public class DepositServiceImpl implements DepositService {
     private BigDecimal getTotalPendingPaymentAmount(Integer bookingId) {
         // Tìm tất cả invoices của booking
         List<Invoices> invoices = invoiceRepository.findByBooking_IdOrderByCreatedAtDesc(bookingId);
-        
+
         // Tính tổng payment requests PENDING của tất cả invoices
         BigDecimal totalPending = BigDecimal.ZERO;
         for (Invoices invoice : invoices) {
-            List<org.example.ptcmssbackend.entity.PaymentHistory> pendingPayments = 
-                paymentHistoryRepository.findByInvoice_IdOrderByPaymentDateDesc(invoice.getId())
-                    .stream()
-                    .filter(ph -> ph.getConfirmationStatus() == org.example.ptcmssbackend.enums.PaymentConfirmationStatus.PENDING)
-                    .collect(Collectors.toList());
-            
+            List<org.example.ptcmssbackend.entity.PaymentHistory> pendingPayments =
+                    paymentHistoryRepository.findByInvoice_IdOrderByPaymentDateDesc(invoice.getId())
+                            .stream()
+                            .filter(ph -> ph.getConfirmationStatus() == org.example.ptcmssbackend.enums.PaymentConfirmationStatus.PENDING)
+                            .collect(java.util.stream.Collectors.toList());
+
             for (org.example.ptcmssbackend.entity.PaymentHistory ph : pendingPayments) {
                 totalPending = totalPending.add(ph.getAmount() != null ? ph.getAmount() : BigDecimal.ZERO);
             }
         }
-        
+
         return totalPending;
     }
 
@@ -205,12 +193,12 @@ public class DepositServiceImpl implements DepositService {
         String year = String.valueOf(today.getYear());
         String month = String.format("%02d", today.getMonthValue());
         String day = String.format("%02d", today.getDayOfMonth());
-        
+
         // Get max sequence for today
         String pattern = "REC-" + year + month + day + "-%";
         Integer maxSeq = invoiceRepository.findMaxSequenceNumber(branchId, pattern);
         int nextSeq = (maxSeq != null ? maxSeq : 0) + 1;
-        
+
         return String.format("REC-%s%s%s-%04d", year, month, day, nextSeq);
     }
 }
