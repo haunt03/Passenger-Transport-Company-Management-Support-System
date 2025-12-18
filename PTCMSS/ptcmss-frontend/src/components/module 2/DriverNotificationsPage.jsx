@@ -236,7 +236,7 @@ function PaginationBar({ page, totalPages, pageSize, setPage, setPageSize }) {
 // === MAIN PAGE ===
 export default function DriverNotificationsPage() {
     const { toasts, push } = useToasts();
-    
+
     // Get WebSocket notifications for real-time updates
     const { notifications: wsNotifications } = useWebSocket();
 
@@ -259,7 +259,7 @@ export default function DriverNotificationsPage() {
             unread: n.read === false || !n.read,
             created_at: n.timestamp || n.createdAt,
         }));
-        
+
         // Merge and deduplicate
         const allNotifs = [...wsFormatted, ...apiNotifs];
         const seen = new Set();
@@ -330,16 +330,16 @@ export default function DriverNotificationsPage() {
             const { getDriverNotifications } = await import("../../api/notifications");
             const { getStoredUserId } = await import("../../utils/session");
             const userId = getStoredUserId();
-            
+
             console.log("[DriverNotifications] Loading for userId:", userId);
-            
+
             if (!userId) {
                 throw new Error("Bạn cần đăng nhập để xem thông báo");
             }
-            
+
             const response = await getDriverNotifications({ userId, page, limit: pageSize });
             console.log("[DriverNotifications] API response:", response);
-            
+
             // Response structure: { status, message, data: { data: [...], total, page, limit } }
             let rawData = [];
             if (response?.data?.data) {
@@ -349,9 +349,9 @@ export default function DriverNotificationsPage() {
             } else if (Array.isArray(response)) {
                 rawData = response;
             }
-            
+
             console.log("[DriverNotifications] Raw data:", rawData);
-            
+
             // Transform to match component expected format
             const data = (Array.isArray(rawData) ? rawData : []).map(n => ({
                 id: n.id,
@@ -361,7 +361,7 @@ export default function DriverNotificationsPage() {
                 unread: n.isRead === false || n.isRead === 0 || !n.isRead,
                 created_at: n.createdAt || n.created_at,
             }));
-            
+
             console.log("[DriverNotifications] Transformed data:", data);
             setApiNotifs(data);
         } catch (err) {

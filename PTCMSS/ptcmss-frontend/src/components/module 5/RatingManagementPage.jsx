@@ -1,11 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { Star, Search, Filter, Calendar, User, MapPin } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Star, Search, Filter, Calendar, User, MapPin, Phone } from 'lucide-react';
 import RateDriverDialog from './RateDriverDialog';
 import StarRating from '../common/StarRating';
 import Pagination from '../common/Pagination';
+import CustomerTripsModal from '../common/CustomerTripsModal';
 import { getRatingByTrip, getCompletedTripsForRating } from '../../api/ratings';
+import { getCustomer, getCustomerBookings } from '../../api/customers';
+import { getBranchByUserId } from '../../api/branches';
+import { getCurrentRole, getStoredUserId, ROLES } from '../../utils/session';
 
 const RatingManagementPage = () => {
+    const role = useMemo(() => getCurrentRole(), []);
+    const userId = useMemo(() => getStoredUserId(), []);
+    const isBranchScoped = role === ROLES.MANAGER || role === ROLES.COORDINATOR || role === ROLES.CONSULTANT;
+
     const [trips, setTrips] = useState([]);
     const [filteredTrips, setFilteredTrips] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -17,9 +25,58 @@ const RatingManagementPage = () => {
     const [pageSize] = useState(10);
     const [totalPages, setTotalPages] = useState(1);
 
+    // Branch state
+    const [branchId, setBranchId] = useState(null);
+    const [branchLoading, setBranchLoading] = useState(true);
+
+    // Customer detail modal
+    const [selectedCustomer, setSelectedCustomer] = useState(null);
+    const [customerDetail, setCustomerDetail] = useState(null);
+    const [customerTrips, setCustomerTrips] = useState([]);
+    const [loadingCustomerTrips, setLoadingCustomerTrips] = useState(false);
+    const [customerTripsError, setCustomerTripsError] = useState(null);
+
+    // Load branch for scoped users
     useEffect(() => {
+        if (!isBranchScoped) {
+            setBranchLoading(false);
+            return;
+        }
+        if (!userId) {
+            setBranchLoading(false);
+            return;
+        }
+
+        let cancelled = false;
+        async function loadBranch() {
+            setBranchLoading(true);
+            try {
+                const resp = await getBranchByUserId(Number(userId));
+                if (cancelled) return;
+
+                // Try multiple possible response formats
+                const id = resp?.branchId ?? resp?.id ?? resp?.data?.branchId ?? resp?.data?.id ?? null;
+
+                if (id) {
+                    setBranchId(id);
+                }
+            } catch (err) {
+                console.error("[RatingManagementPage] Error loading branch:", err);
+            } finally {
+                if (!cancelled) setBranchLoading(false);
+            }
+        }
+        loadBranch();
+        return () => { cancelled = true; };
+    }, [isBranchScoped, userId]);
+
+    useEffect(() => {
+        if (branchLoading) return;
+        // Nếu là branch scoped nhưng chưa có branchId, đợi thêm
+        if (isBranchScoped && !branchId) return;
+        // Nếu không phải branch scoped hoặc đã có branchId, load trips
         loadTrips();
-    }, []);
+    }, [branchId, branchLoading, isBranchScoped]);
 
     useEffect(() => {
         filterTrips();
@@ -28,10 +85,10 @@ const RatingManagementPage = () => {
     const loadTrips = async () => {
         setLoading(true);
         try {
-            // Call real API to get completed trips
-            const response = await getCompletedTripsForRating();
+            // Call real API to get completed trips with branchId filter if applicable
+            const response = await getCompletedTripsForRating(isBranchScoped ? branchId : null);
             let tripsData = response.data || response || [];
-            
+
             // Double-check: chỉ lấy trips COMPLETED (phòng trường hợp API trả về sai)
             tripsData = tripsData.filter(trip => trip.status === 'COMPLETED');
 
@@ -112,6 +169,85 @@ const RatingManagementPage = () => {
         setTimeout(() => {
             loadTrips(); // Reload to update rating status
         }, 500);
+    };
+
+    // Handle customer click to show detail modal
+    const handleCustomerClick = async (trip) => {
+        const customerId = trip.customerId;
+        if (!customerId) {
+            console.warn('No customerId found in trip:', trip);
+            return;
+        }
+
+        setSelectedCustomer(trip);
+        setLoadingCustomerTrips(true);
+        setCustomerTripsError(null);
+        setCustomerDetail(null);
+        setCustomerTrips([]);
+
+        try {
+            // Fetch customer detail
+            const customerResponse = await getCustomer(customerId);
+            const customerData = customerResponse?.data || customerResponse;
+            setCustomerDetail(customerData);
+
+            // Fetch customer bookings/trips
+            const bookingsResponse = await getCustomerBookings(customerId, { page: 0, size: 100 });
+            const bookingsData = bookingsResponse?.data || bookingsResponse || {};
+            const bookings = bookingsData?.content || bookingsData?.items || (Array.isArray(bookingsData) ? bookingsData : []);
+
+            // Extract all trips from bookings
+            const allTrips = [];
+            for (const booking of bookings) {
+                const trips = Array.isArray(booking.trips) ? booking.trips : [];
+                for (const tripItem of trips) {
+                    allTrips.push({
+                        ...tripItem,
+                        bookingId: booking.id || booking.bookingId,
+                        bookingCode: booking.code || booking.bookingCode,
+                        bookingStatus: booking.status,
+                        bookingCreatedAt: booking.createdAt,
+                    });
+                }
+            }
+
+            // Fetch ratings for each trip
+            const tripsWithRatings = await Promise.all(
+                allTrips.map(async (tripItem) => {
+                    const tripId = tripItem.id || tripItem.tripId;
+                    if (!tripId) return { ...tripItem, rating: null };
+
+                    try {
+                        const ratingResponse = await getRatingByTrip(tripId);
+                        const rating = ratingResponse?.data || ratingResponse || null;
+                        return { ...tripItem, rating };
+                    } catch (err) {
+                        return { ...tripItem, rating: null };
+                    }
+                })
+            );
+
+            // Sort by date (newest first)
+            tripsWithRatings.sort((a, b) => {
+                const dateA = a.pickup_time || a.dropoff_eta || a.bookingCreatedAt || "";
+                const dateB = b.pickup_time || b.dropoff_eta || b.bookingCreatedAt || "";
+                return new Date(dateB) - new Date(dateA);
+            });
+
+            setCustomerTrips(tripsWithRatings);
+        } catch (err) {
+            console.error('Error fetching customer detail:', err);
+            setCustomerTripsError('Không thể tải thông tin khách hàng');
+        } finally {
+            setLoadingCustomerTrips(false);
+        }
+    };
+
+    const handleCloseCustomerModal = () => {
+        setSelectedCustomer(null);
+        setCustomerDetail(null);
+        setCustomerTrips([]);
+        setCustomerTripsError(null);
     };
 
     const getStatusBadge = (hasRating) => {
@@ -210,7 +346,7 @@ const RatingManagementPage = () => {
                             className={`px-4 py-2 rounded-lg font-medium transition-colors ${filterStatus === 'pending'
                                 ? 'bg-primary-600 text-white'
                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                }`}
+                            }`}
                         >
                             Chưa đánh giá
                         </button>
@@ -219,7 +355,7 @@ const RatingManagementPage = () => {
                             className={`px-4 py-2 rounded-lg font-medium transition-colors ${filterStatus === 'rated'
                                 ? 'bg-green-600 text-white'
                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                }`}
+                            }`}
                         >
                             Đã đánh giá
                         </button>
@@ -228,7 +364,7 @@ const RatingManagementPage = () => {
                             className={`px-4 py-2 rounded-lg font-medium transition-colors ${filterStatus === 'all'
                                 ? 'bg-blue-600 text-white'
                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                }`}
+                            }`}
                         >
                             Tất cả
                         </button>
@@ -247,140 +383,161 @@ const RatingManagementPage = () => {
                     <div className="overflow-x-auto">
                         <table className="w-full table-fixed">
                             <thead className="bg-gray-50 border-b">
-                                <tr>
-                                    <th className="w-24 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Chuyến
-                                    </th>
-                                    <th className="w-40 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Tài xế
-                                    </th>
-                                    <th className="w-36 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Khách hàng
-                                    </th>
-                                    <th className="w-56 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Tuyến đường
-                                    </th>
-                                    <th className="w-32 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Thời gian
-                                    </th>
-                                    <th className="w-28 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Trạng thái
-                                    </th>
-                                    <th className="w-32 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Đánh giá
-                                    </th>
-                                    <th className="w-32 px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Thao tác
-                                    </th>
-                                </tr>
+                            <tr>
+                                <th className="w-24 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Chuyến
+                                </th>
+                                <th className="w-40 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Tài xế
+                                </th>
+                                <th className="w-48 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Khách hàng
+                                </th>
+                                <th className="w-56 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Tuyến đường
+                                </th>
+                                <th className="w-32 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Thời gian
+                                </th>
+                                <th className="w-28 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Trạng thái
+                                </th>
+                                <th className="w-32 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Đánh giá
+                                </th>
+                                <th className="w-32 px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Thao tác
+                                </th>
+                            </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                                {filteredTrips.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((trip) => (
-                                    <tr key={trip.tripId} className="hover:bg-gray-50 align-top">
-                                        <td className="px-4 py-4">
-                                            <div className="text-sm font-medium text-gray-900">#{trip.tripId}</div>
-                                            <div className="text-sm text-gray-500">Đơn #{trip.bookingId}</div>
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            <div className="flex items-center">
-                                                <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
-                                                    <User className="text-blue-600" size={20} />
+                            {filteredTrips.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((trip) => (
+                                <tr key={trip.tripId} className="hover:bg-gray-50 align-top">
+                                    <td className="px-4 py-4">
+                                        <div className="text-sm font-medium text-gray-900">#{trip.tripId}</div>
+                                        <div className="text-sm text-gray-500">Đơn #{trip.bookingId}</div>
+                                    </td>
+                                    <td className="px-4 py-4">
+                                        <div className="flex items-center">
+                                            <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                                <User className="text-blue-600" size={20} />
+                                            </div>
+                                            <div className="ml-3">
+                                                <div className="text-sm font-medium text-gray-900 truncate">{trip.driverName}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-4">
+                                        <div
+                                            className="text-sm text-gray-900 cursor-pointer hover:text-blue-600 hover:underline transition-colors"
+                                            onClick={() => handleCustomerClick(trip)}
+                                            title="Click để xem chi tiết khách hàng"
+                                        >
+                                            <div className="font-medium">{trip.customerName}</div>
+                                            {trip.customerPhone && (
+                                                <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
+                                                    <Phone className="h-3 w-3" />
+                                                    <span className="font-mono">{trip.customerPhone}</span>
                                                 </div>
-                                                <div className="ml-3">
-                                                    <div className="text-sm font-medium text-gray-900 truncate">{trip.driverName}</div>
+                                            )}
+                                            {trip.customerAddress && (
+                                                <div className="text-xs text-gray-500 mt-1 line-clamp-2" title={trip.customerAddress}>
+                                                    {trip.customerAddress}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-4">
+                                        <div className="flex items-start gap-2">
+                                            <MapPin className="text-gray-400 flex-shrink-0 mt-0.5" size={16} />
+                                            <div className="text-sm min-w-0">
+                                                <div className="text-gray-900 line-clamp-2" title={trip.startLocation}>
+                                                    {trip.startLocation}
+                                                </div>
+                                                <div className="text-gray-500 line-clamp-2 mt-1" title={trip.endLocation}>
+                                                    → {trip.endLocation}
                                                 </div>
                                             </div>
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            <div className="text-sm text-gray-900 truncate">{trip.customerName}</div>
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            <div className="flex items-start gap-2">
-                                                <MapPin className="text-gray-400 flex-shrink-0 mt-0.5" size={16} />
-                                                <div className="text-sm min-w-0">
-                                                    <div className="text-gray-900 truncate">{trip.startLocation}</div>
-                                                    <div className="text-gray-500 truncate">→ {trip.endLocation}</div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            <div className="text-sm text-gray-900 whitespace-nowrap">
-                                                {new Date(trip.endTime).toLocaleDateString('vi-VN')}
-                                            </div>
-                                            <div className="text-sm text-gray-500 whitespace-nowrap">
-                                                {new Date(trip.endTime).toLocaleTimeString('vi-VN', {
-                                                    hour: '2-digit',
-                                                    minute: '2-digit'
-                                                })}
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            {trip.status === 'COMPLETED' ? (
-                                                <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-4">
+                                        <div className="text-sm text-gray-900 whitespace-nowrap">
+                                            {new Date(trip.endTime).toLocaleDateString('vi-VN')}
+                                        </div>
+                                        <div className="text-sm text-gray-500 whitespace-nowrap">
+                                            {new Date(trip.endTime).toLocaleTimeString('vi-VN', {
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                            })}
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-4">
+                                        {trip.status === 'COMPLETED' ? (
+                                            <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
                                                     Hoàn thành
                                                 </span>
-                                            ) : (
-                                                <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
+                                        ) : (
+                                            <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
                                                     {trip.status || 'N/A'}
                                                 </span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            {trip.hasRating && trip.rating ? (
-                                                (() => {
-                                                    // Lấy overallRating, nếu không có thì tính từ các rating khác
-                                                    let overallRating = trip.rating.overallRating;
-                                                    if (overallRating === null || overallRating === undefined) {
-                                                        // Tính trung bình từ 4 tiêu chí
-                                                        const ratings = [
-                                                            trip.rating.punctualityRating,
-                                                            trip.rating.attitudeRating,
-                                                            trip.rating.safetyRating,
-                                                            trip.rating.complianceRating
-                                                        ].filter(r => r !== null && r !== undefined);
-                                                        if (ratings.length > 0) {
-                                                            overallRating = ratings.reduce((sum, r) => sum + Number(r), 0) / ratings.length;
-                                                        }
+                                        )}
+                                    </td>
+                                    <td className="px-4 py-4">
+                                        {trip.hasRating && trip.rating ? (
+                                            (() => {
+                                                // Lấy overallRating, nếu không có thì tính từ các rating khác
+                                                let overallRating = trip.rating.overallRating;
+                                                if (overallRating === null || overallRating === undefined) {
+                                                    // Tính trung bình từ 4 tiêu chí
+                                                    const ratings = [
+                                                        trip.rating.punctualityRating,
+                                                        trip.rating.attitudeRating,
+                                                        trip.rating.safetyRating,
+                                                        trip.rating.complianceRating
+                                                    ].filter(r => r !== null && r !== undefined);
+                                                    if (ratings.length > 0) {
+                                                        overallRating = ratings.reduce((sum, r) => sum + Number(r), 0) / ratings.length;
                                                     }
-                                                    const ratingValue = overallRating !== null && overallRating !== undefined
-                                                        ? Number(overallRating)
-                                                        : 0;
-                                                    return ratingValue > 0 ? (
-                                                        <StarRating
-                                                            rating={ratingValue}
-                                                            size={16}
-                                                        />
-                                                    ) : (
-                                                        <span className="text-sm text-gray-400">Đang tính...</span>
-                                                    );
-                                                })()
-                                            ) : (
-                                                <span className="text-sm text-gray-400">Chưa có</span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-4 text-right">
-                                            {trip.hasRating ? (
-                                                <button
-                                                    onClick={() => handleRateClick(trip)}
-                                                    className="text-blue-600 hover:text-blue-900 text-sm font-medium whitespace-nowrap"
-                                                >
-                                                    Xem chi tiết
-                                                </button>
-                                            ) : trip.status === 'COMPLETED' ? (
-                                                <button
-                                                    onClick={() => handleRateClick(trip)}
-                                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium whitespace-nowrap"
-                                                >
-                                                    Đánh giá
-                                                </button>
-                                            ) : (
-                                                <span className="text-sm text-gray-400">
+                                                }
+                                                const ratingValue = overallRating !== null && overallRating !== undefined
+                                                    ? Number(overallRating)
+                                                    : 0;
+                                                return ratingValue > 0 ? (
+                                                    <StarRating
+                                                        rating={ratingValue}
+                                                        size={16}
+                                                    />
+                                                ) : (
+                                                    <span className="text-sm text-gray-400">Đang tính...</span>
+                                                );
+                                            })()
+                                        ) : (
+                                            <span className="text-sm text-gray-400">Chưa có</span>
+                                        )}
+                                    </td>
+                                    <td className="px-4 py-4 text-right">
+                                        {trip.hasRating ? (
+                                            <button
+                                                onClick={() => handleRateClick(trip)}
+                                                className="text-blue-600 hover:text-blue-900 text-sm font-medium whitespace-nowrap"
+                                            >
+                                                Xem chi tiết
+                                            </button>
+                                        ) : trip.status === 'COMPLETED' ? (
+                                            <button
+                                                onClick={() => handleRateClick(trip)}
+                                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium whitespace-nowrap"
+                                            >
+                                                Đánh giá
+                                            </button>
+                                        ) : (
+                                            <span className="text-sm text-gray-400">
                                                     Chưa hoàn thành
                                                 </span>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
                             </tbody>
                         </table>
                     </div>
@@ -408,6 +565,24 @@ const RatingManagementPage = () => {
                         setSelectedTrip(null);
                     }}
                     onSuccess={handleRatingSuccess}
+                />
+            )}
+
+            {/* Customer Detail Modal */}
+            {selectedCustomer && (
+                <CustomerTripsModal
+                    customer={customerDetail || {
+                        fullName: selectedCustomer.customerName,
+                        customerName: selectedCustomer.customerName,
+                        phone: selectedCustomer.customerPhone,
+                        email: null,
+                        address: selectedCustomer.customerAddress,
+                        branchName: null
+                    }}
+                    trips={customerTrips}
+                    loading={loadingCustomerTrips}
+                    error={customerTripsError}
+                    onClose={handleCloseCustomerModal}
                 />
             )}
         </div>

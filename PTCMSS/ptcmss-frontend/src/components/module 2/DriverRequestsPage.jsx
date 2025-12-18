@@ -227,27 +227,27 @@ function RequestCard({ request, onCancel, cancellingId }) {
             </div>
 
             {/* Cancel button for PENDING or APPROVED leave requests - chỉ hiển thị nếu chưa trong quá khứ */}
-            {request.type === "LEAVE" && 
-             (request.status === "PENDING" || request.status === "APPROVED") && 
-             !isPastLeaveRequest &&
-             onCancel && (
-                <div className="mt-3 pt-3 border-t border-slate-200">
-                    <button
-                        onClick={() => onCancel(request)}
-                        disabled={cancellingId === request.id}
-                        className="w-full px-3 py-2 text-sm font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-lg hover:bg-rose-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                        {cancellingId === request.id ? (
-                            <>
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                Đang hủy...
-                            </>
-                        ) : (
-                            "Hủy yêu cầu nghỉ phép"
-                        )}
-                    </button>
-                </div>
-            )}
+            {request.type === "LEAVE" &&
+                (request.status === "PENDING" || request.status === "APPROVED") &&
+                !isPastLeaveRequest &&
+                onCancel && (
+                    <div className="mt-3 pt-3 border-t border-slate-200">
+                        <button
+                            onClick={() => onCancel(request)}
+                            disabled={cancellingId === request.id}
+                            className="w-full px-3 py-2 text-sm font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-lg hover:bg-rose-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                            {cancellingId === request.id ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Đang hủy...
+                                </>
+                            ) : (
+                                "Hủy yêu cầu nghỉ phép"
+                            )}
+                        </button>
+                    </div>
+                )}
         </div>
     );
 }
@@ -277,7 +277,7 @@ export default function DriverRequestsPage() {
             try {
                 const { getDayOffHistory } = await import("../../api/drivers");
                 const { getDriverExpenseRequests } = await import("../../api/expenses");
-                
+
                 // Load day-off requests
                 let leaveRequests = [];
                 try {
@@ -304,7 +304,7 @@ export default function DriverRequestsPage() {
                 } catch (leaveErr) {
                     console.warn("Could not load day-off requests:", leaveErr);
                 }
-                
+
                 // Load expense requests (the backend is currently filtering by requesterUserId,
                 // nên ở đây ta truyền userId thay vì driverId)
                 let paymentRequests = [];
@@ -404,7 +404,7 @@ export default function DriverRequestsPage() {
         setCancellingId(request.id);
         try {
             await cancelDayOffRequest(driverId, request.dayOffId);
-            
+
             // Reload lại toàn bộ danh sách từ server để đảm bảo đồng bộ
             try {
                 await loadRequests();
@@ -412,13 +412,13 @@ export default function DriverRequestsPage() {
                 console.error("Failed to reload requests after cancel:", reloadErr);
                 // Vẫn hiển thị thông báo thành công nếu hủy thành công
             }
-            
+
             alert("Đã hủy yêu cầu nghỉ phép thành công.");
         } catch (err) {
             console.error("Failed to cancel leave request:", err);
             alert(
-                err?.data?.message || 
-                err?.message || 
+                err?.data?.message ||
+                err?.message ||
                 "Không thể hủy yêu cầu nghỉ phép. Vui lòng thử lại."
             );
         } finally {
@@ -467,9 +467,9 @@ export default function DriverRequestsPage() {
                                     return null;
                                 }
                                 return (
-                                    <RequestCard 
-                                        key={request.id} 
-                                        request={request} 
+                                    <RequestCard
+                                        key={request.id}
+                                        request={request}
                                         onCancel={handleCancelLeaveRequest}
                                         cancellingId={cancellingId}
                                     />

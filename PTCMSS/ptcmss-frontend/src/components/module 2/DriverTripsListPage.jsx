@@ -38,24 +38,24 @@ function TripCard({ trip, onClick }) {
     const rating = trip.rating || 0;
     const isOngoing = trip.status === "ONGOING";
     const statusMap = {
-        SCHEDULED: { 
-            label: "Chưa bắt đầu", 
+        SCHEDULED: {
+            label: "Chưa bắt đầu",
             bgColor: "bg-slate-50",
             borderColor: "border-slate-200",
             statusBadge: "bg-slate-100 text-slate-700 border-slate-200",
             accentColor: "text-slate-600",
             icon: <Calendar className="h-3.5 w-3.5" />
         },
-        ONGOING: { 
-            label: "Đang chạy", 
+        ONGOING: {
+            label: "Đang chạy",
             bgColor: "bg-gradient-to-br from-sky-50 to-blue-50",
             borderColor: "border-sky-300",
             statusBadge: "bg-sky-600 text-white border-sky-700 shadow-sm",
             accentColor: "text-sky-700",
             icon: <PlayCircle className="h-3.5 w-3.5" />
         },
-        COMPLETED: { 
-            label: "Hoàn thành", 
+        COMPLETED: {
+            label: "Hoàn thành",
             bgColor: "bg-emerald-50",
             borderColor: "border-emerald-200",
             statusBadge: "bg-emerald-100 text-emerald-700 border-emerald-200",
@@ -245,7 +245,7 @@ export default function DriverTripsListPage() {
             const now = new Date();
             result = result.filter((t) => {
                 const tripDate = new Date(t.startTime);
-                
+
                 switch (timeFilter) {
                     case "THIS_WEEK":
                         const startOfWeek = new Date(now);
@@ -255,11 +255,11 @@ export default function DriverTripsListPage() {
                         endOfWeek.setDate(startOfWeek.getDate() + 6);
                         endOfWeek.setHours(23, 59, 59, 999);
                         return tripDate >= startOfWeek && tripDate <= endOfWeek;
-                        
+
                     case "THIS_MONTH":
-                        return tripDate.getMonth() === now.getMonth() && 
-                               tripDate.getFullYear() === now.getFullYear();
-                               
+                        return tripDate.getMonth() === now.getMonth() &&
+                            tripDate.getFullYear() === now.getFullYear();
+
                     case "NEXT_WEEK":
                         const startOfNextWeek = new Date(now);
                         startOfNextWeek.setDate(now.getDate() + (7 - now.getDay()));
@@ -268,12 +268,12 @@ export default function DriverTripsListPage() {
                         endOfNextWeek.setDate(startOfNextWeek.getDate() + 6);
                         endOfNextWeek.setHours(23, 59, 59, 999);
                         return tripDate >= startOfNextWeek && tripDate <= endOfNextWeek;
-                               
+
                     case "LAST_MONTH":
                         const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
                         const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
                         return tripDate >= lastMonth && tripDate <= lastMonthEnd;
-                        
+
                     default:
                         return true;
                 }
@@ -300,11 +300,11 @@ export default function DriverTripsListPage() {
             };
             const aPriority = statusPriority[a.status] || 0;
             const bPriority = statusPriority[b.status] || 0;
-            
+
             if (aPriority !== bPriority) {
                 return bPriority - aPriority; // Higher priority first
             }
-            
+
             // If same priority, sort by time (newest first)
             const aTime = new Date(a.startTime).getTime();
             const bTime = new Date(b.startTime).getTime();
@@ -439,7 +439,7 @@ export default function DriverTripsListPage() {
                                 {filteredTrips.length === 0 ? "Không tìm thấy chuyến nào" : "Không có chuyến nào trong trang này"}
                             </div>
                             <div className="text-sm text-slate-500">
-                                {filteredTrips.length === 0 
+                                {filteredTrips.length === 0
                                     ? "Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm"
                                     : "Chuyển sang trang khác để xem thêm chuyến"}
                             </div>

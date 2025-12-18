@@ -16,16 +16,16 @@ const fmtVND = (n) => new Intl.NumberFormat("vi-VN").format(Math.max(0, Number(n
  * @param {string} props.color - Theme color: 'blue' | 'green' | 'red' | 'info' | 'purple'
  */
 export default function KpiCard({
-    title,
-    value,
-    format = "currency",
-    delta,
-    up,
-    icon: Icon,
-    color = "blue",
-    subtitle,
-    loading = false,
-}) {
+                                    title,
+                                    value,
+                                    format = "currency",
+                                    delta,
+                                    up,
+                                    icon: Icon,
+                                    color = "blue",
+                                    subtitle,
+                                    loading = false,
+                                }) {
     const colorClasses = {
         blue: "bg-sky-50 text-sky-700 border-sky-200",
         green: "bg-info-50 text-info-700 border-info-200",

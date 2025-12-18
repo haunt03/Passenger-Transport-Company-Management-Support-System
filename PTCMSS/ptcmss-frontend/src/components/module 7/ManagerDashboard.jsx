@@ -81,13 +81,13 @@ function Toasts({ toasts }) {
 
 /* -------------------- KPI CARD (light style) -------------------- */
 function KpiBlock({
-    label,
-    value,
-    sub,
-    deltaPct,
-    up,
-    icon,
-}) {
+                      label,
+                      value,
+                      sub,
+                      deltaPct,
+                      up,
+                      icon,
+                  }) {
     return (
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-4 flex flex-col gap-3">
             {/* header row: label + delta chip */}
@@ -214,50 +214,50 @@ function VehiclePerfTable({ rows }) {
             <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                     <thead className="text-[11px] uppercase tracking-wide text-slate-500 bg-slate-50 border-b border-slate-200">
-                        <tr>
-                            <th className="px-3 py-2 font-medium text-slate-600 text-xs text-left">
-                                Biển số xe
-                            </th>
-                            <th className="px-3 py-2 font-medium text-slate-600 text-xs text-left whitespace-nowrap">
-                                Tổng booking
-                            </th>
-                            <th className="px-3 py-2 font-medium text-slate-600 text-xs text-left whitespace-nowrap">
-                                Đã xác nhận
-                            </th>
-                            <th className="px-3 py-2 font-medium text-slate-600 text-xs text-left whitespace-nowrap">
-                                Đã hoàn thành
-                            </th>
-                        </tr>
+                    <tr>
+                        <th className="px-3 py-2 font-medium text-slate-600 text-xs text-left">
+                            Biển số xe
+                        </th>
+                        <th className="px-3 py-2 font-medium text-slate-600 text-xs text-left whitespace-nowrap">
+                            Tổng booking
+                        </th>
+                        <th className="px-3 py-2 font-medium text-slate-600 text-xs text-left whitespace-nowrap">
+                            Đã xác nhận
+                        </th>
+                        <th className="px-3 py-2 font-medium text-slate-600 text-xs text-left whitespace-nowrap">
+                            Đã hoàn thành
+                        </th>
+                    </tr>
                     </thead>
 
                     <tbody>
-                        {(!rows || rows.length === 0) ? (
-                            <tr>
-                                <td colSpan="4" className="px-3 py-8 text-center text-slate-500 text-sm">
-                                    Chưa có dữ liệu xe trong kỳ này
+                    {(!rows || rows.length === 0) ? (
+                        <tr>
+                            <td colSpan="4" className="px-3 py-8 text-center text-slate-500 text-sm">
+                                Chưa có dữ liệu xe trong kỳ này
+                            </td>
+                        </tr>
+                    ) : (
+                        rows.map((v) => (
+                            <tr
+                                key={v.vehicleId}
+                                className="border-b border-slate-200 hover:bg-slate-50/70"
+                            >
+                                <td className="px-3 py-2 text-slate-900 text-sm font-medium">
+                                    {v.vehicleName}
+                                </td>
+                                <td className="px-3 py-2 text-slate-700 text-sm font-medium tabular-nums">
+                                    {fmtInt(v.totalBookings)}
+                                </td>
+                                <td className="px-3 py-2 text-slate-700 text-sm tabular-nums">
+                                    {fmtInt(v.confirmedBookings)}
+                                </td>
+                                <td className="px-3 py-2 text-slate-700 text-sm tabular-nums">
+                                    {fmtInt(v.completedBookings)}
                                 </td>
                             </tr>
-                        ) : (
-                            rows.map((v) => (
-                                <tr
-                                    key={v.vehicleId}
-                                    className="border-b border-slate-200 hover:bg-slate-50/70"
-                                >
-                                    <td className="px-3 py-2 text-slate-900 text-sm font-medium">
-                                        {v.vehicleName}
-                                    </td>
-                                    <td className="px-3 py-2 text-slate-700 text-sm font-medium tabular-nums">
-                                        {fmtInt(v.totalBookings)}
-                                    </td>
-                                    <td className="px-3 py-2 text-slate-700 text-sm tabular-nums">
-                                        {fmtInt(v.confirmedBookings)}
-                                    </td>
-                                    <td className="px-3 py-2 text-slate-700 text-sm tabular-nums">
-                                        {fmtInt(v.completedBookings)}
-                                    </td>
-                                </tr>
-                            ))
-                        )}
+                        ))
+                    )}
                     </tbody>
                 </table>
             </div>
@@ -630,11 +630,11 @@ export default function ManagerDashboardPro() {
                     />
 
                     <KpiBlock
-                        label="Biên lợi nhuận"
-                        value={profitMargin.toFixed(1) + " %"}
-                        sub="(Lợi nhuận / Doanh thu)"
+                        label="Công nợ phải thu"
+                        value={fmtVND(dashboardData?.arBalance || 0) + " đ"}
+                        sub="Tổng công nợ phải thu (A/R)"
                         deltaPct={null}
-                        up={profitMargin >= 0}
+                        up={true}
                         icon={<Gauge className="h-3.5 w-3.5 text-indigo-600" />}
                     />
 

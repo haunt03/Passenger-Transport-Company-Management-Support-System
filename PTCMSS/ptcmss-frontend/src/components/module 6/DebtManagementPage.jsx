@@ -357,83 +357,83 @@ export default function DebtManagementPage() {
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-[13px]">
                             <thead className="bg-slate-50 border-b border-slate-200">
-                                <tr>
-                                    <th className="px-4 py-2 font-medium text-slate-700 text-[11px]">Mã HĐ</th>
-                                    <th className="px-4 py-2 font-medium text-slate-700 text-[11px]">Khách hàng</th>
-                                    <th className="px-4 py-2 font-medium text-slate-700 text-[11px]">Số tiền</th>
-                                    <th className="px-4 py-2 font-medium text-slate-700 text-[11px]">Hạn TT</th>
-                                    <th className="px-4 py-2 font-medium text-slate-700 text-[11px]">Quá hạn</th>
-                                    <th className="px-4 py-2 font-medium text-slate-700 text-[11px]">Nhãn</th>
-                                    <th className="px-4 py-2 font-medium text-slate-700 text-[11px]">Hành động</th>
-                                </tr>
+                            <tr>
+                                <th className="px-4 py-2 font-medium text-slate-700 text-[11px]">Mã HĐ</th>
+                                <th className="px-4 py-2 font-medium text-slate-700 text-[11px]">Khách hàng</th>
+                                <th className="px-4 py-2 font-medium text-slate-700 text-[11px]">Số tiền</th>
+                                <th className="px-4 py-2 font-medium text-slate-700 text-[11px]">Hạn TT</th>
+                                <th className="px-4 py-2 font-medium text-slate-700 text-[11px]">Quá hạn</th>
+                                <th className="px-4 py-2 font-medium text-slate-700 text-[11px]">Nhãn</th>
+                                <th className="px-4 py-2 font-medium text-slate-700 text-[11px]">Hành động</th>
+                            </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-200">
-                                {debts.map((debt) => (
-                                    <tr key={debt.invoiceId} className="hover:bg-slate-50">
-                                        <td className="px-4 py-2 text-slate-900 font-medium">
-                                            {debt.invoiceNumber || `INV-${debt.invoiceId}`}
-                                        </td>
-                                        <td className="px-4 py-2 text-slate-800">{debt.customerName || "—"}</td>
-                                        <td className="px-4 py-2 text-slate-900 font-semibold tabular-nums">
-                                            {fmtVND(debt.balance || 0)} đ
-                                        </td>
-                                        <td className="px-4 py-2 text-slate-600">
-                                            {debt.dueDate || "—"}
-                                        </td>
-                                        <td className="px-4 py-2">
-                                            {debt.daysOverdue > 0 ? (
-                                                <span className="px-2 py-1 rounded text-[11px] bg-rose-100 text-rose-700 border border-rose-300">
+                            {debts.map((debt) => (
+                                <tr key={debt.invoiceId} className="hover:bg-slate-50">
+                                    <td className="px-4 py-2 text-slate-900 font-medium">
+                                        {debt.invoiceNumber || `INV-${debt.invoiceId}`}
+                                    </td>
+                                    <td className="px-4 py-2 text-slate-800">{debt.customerName || "—"}</td>
+                                    <td className="px-4 py-2 text-slate-900 font-semibold tabular-nums">
+                                        {fmtVND(debt.balance || 0)} đ
+                                    </td>
+                                    <td className="px-4 py-2 text-slate-600">
+                                        {debt.dueDate || "—"}
+                                    </td>
+                                    <td className="px-4 py-2">
+                                        {debt.daysOverdue > 0 ? (
+                                            <span className="px-2 py-1 rounded text-[11px] bg-rose-100 text-rose-700 border border-rose-300">
                                                     {debt.daysOverdue} ngày
                                                 </span>
-                                            ) : (
-                                                <span className="text-slate-400">—</span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-2">
-                                            {debt.debtLabel ? (
-                                                <span className="px-2 py-1 rounded text-[11px] bg-slate-100 text-slate-700 border border-slate-300">
+                                        ) : (
+                                            <span className="text-slate-400">—</span>
+                                        )}
+                                    </td>
+                                    <td className="px-4 py-2">
+                                        {debt.debtLabel ? (
+                                            <span className="px-2 py-1 rounded text-[11px] bg-slate-100 text-slate-700 border border-slate-300">
                                                     {DEBT_LABELS[debt.debtLabel] || debt.debtLabel}
                                                 </span>
-                                            ) : (
-                                                <span className="text-slate-400">—</span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-2">
-                                            <div className="flex flex-wrap gap-1">
-                                                <button
-                                                    onClick={() => {
-                                                        setSelectedDebt(debt);
-                                                        setShowReminderModal(true);
-                                                    }}
-                                                    className="px-2 py-1 rounded text-[11px] bg-sky-50 text-sky-700 border border-sky-300 hover:bg-sky-100"
-                                                    title="Gửi nhắc nợ"
-                                                >
-                                                    <Mail className="h-3 w-3 inline" />
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        setSelectedDebt(debt);
-                                                        setShowPromiseModal(true);
-                                                    }}
-                                                    className="px-2 py-1 rounded text-[11px] bg-info-50 text-info-700 border border-info-300 hover:bg-info-100"
-                                                    title="Hẹn thanh toán"
-                                                >
-                                                    <Calendar className="h-3 w-3 inline" />
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        setSelectedDebt(debt);
-                                                        setShowLabelModal(true);
-                                                    }}
-                                                    className="px-2 py-1 rounded text-[11px] bg-purple-50 text-purple-700 border border-purple-300 hover:bg-purple-100"
-                                                    title="Gắn nhãn"
-                                                >
-                                                    <Tag className="h-3 w-3 inline" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
+                                        ) : (
+                                            <span className="text-slate-400">—</span>
+                                        )}
+                                    </td>
+                                    <td className="px-4 py-2">
+                                        <div className="flex flex-wrap gap-1">
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedDebt(debt);
+                                                    setShowReminderModal(true);
+                                                }}
+                                                className="px-2 py-1 rounded text-[11px] bg-sky-50 text-sky-700 border border-sky-300 hover:bg-sky-100"
+                                                title="Gửi nhắc nợ"
+                                            >
+                                                <Mail className="h-3 w-3 inline" />
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedDebt(debt);
+                                                    setShowPromiseModal(true);
+                                                }}
+                                                className="px-2 py-1 rounded text-[11px] bg-info-50 text-info-700 border border-info-300 hover:bg-info-100"
+                                                title="Hẹn thanh toán"
+                                            >
+                                                <Calendar className="h-3 w-3 inline" />
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedDebt(debt);
+                                                    setShowLabelModal(true);
+                                                }}
+                                                className="px-2 py-1 rounded text-[11px] bg-purple-50 text-purple-700 border border-purple-300 hover:bg-purple-100"
+                                                title="Gắn nhãn"
+                                            >
+                                                <Tag className="h-3 w-3 inline" />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
                             </tbody>
                         </table>
                     </div>

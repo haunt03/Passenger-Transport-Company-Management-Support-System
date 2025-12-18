@@ -5,8 +5,12 @@ import {
     Save, X, Loader2, AlertCircle, CheckCircle2, Edit2, CarFront, Eye
 } from "lucide-react";
 import { getDriverProfile, updateDriverProfile } from "../../api/drivers";
+import { getCurrentRole, ROLES } from "../../utils/session";
 
 export default function CoordinatorDriverDetailPage() {
+    const role = getCurrentRole();
+    const isManager = role === ROLES.MANAGER || role === ROLES.ADMIN;
+    const isCoordinator = role === ROLES.COORDINATOR;
     const { driverId } = useParams();
     const navigate = useNavigate();
     const [driver, setDriver] = useState(null);
@@ -97,14 +101,17 @@ export default function CoordinatorDriverDetailPage() {
         setSaving(true);
         try {
             // VALIDATION: Coordinator chỉ được chuyển tài xế sang ACTIVE hoặc INACTIVE
-            const allowedStatuses = ["ACTIVE", "INACTIVE"];
-            if (formData.status && !allowedStatuses.includes(formData.status)) {
-                setToast({
-                    type: "error",
-                    message: "Điều phối viên chỉ được phép chuyển tài xế sang trạng thái 'Hoạt động' hoặc 'Không hoạt động'."
-                });
-                setSaving(false);
-                return;
+            // Manager và Admin có quyền đầy đủ hơn
+            if (isCoordinator) {
+                const allowedStatuses = ["ACTIVE", "INACTIVE"];
+                if (formData.status && !allowedStatuses.includes(formData.status)) {
+                    setToast({
+                        type: "error",
+                        message: "Điều phối viên chỉ được phép chuyển tài xế sang trạng thái 'Hoạt động' hoặc 'Không hoạt động'."
+                    });
+                    setSaving(false);
+                    return;
+                }
             }
 
             console.log("[CoordinatorDriverDetail] Updating driver:", driverId, formData);
@@ -178,7 +185,7 @@ export default function CoordinatorDriverDetailPage() {
                 {/* Toast */}
                 {toast && (
                     <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg ${toast.type === "success" ? "bg-emerald-500 text-white" : "bg-rose-500 text-white"
-                        }`}>
+                    }`}>
                         {toast.type === "success" ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
                         <span>{toast.message}</span>
                         <button onClick={() => setToast(null)} className="ml-2">
@@ -190,7 +197,11 @@ export default function CoordinatorDriverDetailPage() {
                 {/* Header */}
                 <div className="flex items-center gap-4 mb-6">
                     <button
-                        onClick={() => navigate(-1)}
+                        onClick={() => {
+                            // Navigate về danh sách theo role
+                            const listPath = isManager ? "/manager/drivers" : "/coordinator/drivers";
+                            navigate(listPath);
+                        }}
                         className="p-2 rounded-lg hover:bg-slate-200 transition-colors"
                     >
                         <ArrowLeft className="h-5 w-5 text-slate-600" />
@@ -208,7 +219,13 @@ export default function CoordinatorDriverDetailPage() {
                         {!editing ? (
                             <>
                                 <button
-                                    onClick={() => navigate(`/coordinator/drivers/${driverId}/trips`)}
+                                    onClick={() => {
+                                        // Navigate theo role
+                                        const tripsPath = isManager
+                                            ? `/manager/drivers/${driverId}/trips`
+                                            : `/coordinator/drivers/${driverId}/trips`;
+                                        navigate(tripsPath);
+                                    }}
                                     className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-500 transition-colors"
                                 >
                                     <CarFront className="h-4 w-4" />
@@ -399,7 +416,7 @@ export default function CoordinatorDriverDetailPage() {
                                             : driver?.status === "OFF_DUTY"
                                                 ? "bg-info-50 text-info-700"
                                                 : "bg-slate-100 text-slate-600"
-                                        }`}>
+                                    }`}>
                                         {ALL_STATUS_LABELS[driver?.status] || driver?.status || "—"}
                                     </span>
                                 )}

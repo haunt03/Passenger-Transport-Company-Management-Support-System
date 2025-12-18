@@ -16,6 +16,7 @@ import {
     XCircle,
     StickyNote,
     PlusCircle,
+    Upload,
 } from "lucide-react";
 import { createExpenseRequest, getDriverExpenseRequests } from "../../api/expenses";
 import { listVehiclesByBranch } from "../../api/vehicles";
@@ -213,8 +214,8 @@ function RequestCard({ request }) {
 }
 
 export default function CoordinatorExpenseManagementPage() {
-    const [activeTab, setActiveTab] = React.useState("create"); // "create" or "list"
-    
+    const [activeTab, setActiveTab] = React.useState("list"); // "create" or "list", mặc định xem danh sách
+
     const role = React.useMemo(() => getCurrentRole(), []);
     const userId = React.useMemo(() => getStoredUserId(), []);
     const branchScoped = React.useMemo(() => BRANCH_SCOPED_ROLES.has(role), [role]);
@@ -239,6 +240,9 @@ export default function CoordinatorExpenseManagementPage() {
     const [loading, setLoading] = React.useState(false);
     const [requests, setRequests] = React.useState([]);
     const [listError, setListError] = React.useState("");
+
+    // File attachments state
+    const [files, setFiles] = React.useState([]); // [{ file, name, size, type }]
 
     const parseAmount = (raw) => {
         const digits = (raw || "").replace(/[^0-9]/g, "");
@@ -291,8 +295,8 @@ export default function CoordinatorExpenseManagementPage() {
                 setBranchName("");
                 setBranchError(
                     err?.data?.message ||
-                        err?.message ||
-                        "Không tải được chi nhánh."
+                    err?.message ||
+                    "Không tải được chi nhánh."
                 );
             } finally {
                 if (!cancelled) setBranchLoading(false);
@@ -328,8 +332,8 @@ export default function CoordinatorExpenseManagementPage() {
                 setVehicleOptions([]);
                 setVehicleError(
                     err?.data?.message ||
-                        err?.message ||
-                        "Không tải được danh sách xe."
+                    err?.message ||
+                    "Không tải được danh sách xe."
                 );
             } finally {
                 if (!cancelled) setVehicleLoading(false);
@@ -412,8 +416,24 @@ export default function CoordinatorExpenseManagementPage() {
         setVehicleId("");
         setAmountInput("");
         setNotes("");
+        setFiles([]);
         setError("");
         setSuccess("");
+    };
+
+    const onFilesChange = (e) => {
+        const incoming = Array.from(e.target.files || []).map((file) => ({
+            file,
+            name: file.name,
+            size: file.size,
+            type: file.type,
+        }));
+        if (!incoming.length) return;
+        setFiles((prev) => [...prev, ...incoming]);
+    };
+
+    const removeFile = (index) => {
+        setFiles((prev) => prev.filter((_, i) => i !== index));
     };
 
     const handleSubmit = async (e) => {
@@ -441,16 +461,28 @@ export default function CoordinatorExpenseManagementPage() {
         setSubmitting(true);
         try {
             const noteClean = notes.trim();
-            const payload = {
-                type,
-                amount,
-                branchId: Number(branchId),
-                vehicleId: vehicleId ? Number(vehicleId) : undefined,
-                note: noteClean || undefined,
-                requesterUserId: userId ? Number(userId) : undefined,
-            };
 
-            await createExpenseRequest(payload);
+            // Build multipart FormData to gửi cho backend (kèm ảnh chứng từ)
+            const formData = new FormData();
+            formData.append("type", type);
+            formData.append("amount", String(amount));
+            formData.append("branchId", String(branchId));
+            if (vehicleId) {
+                formData.append("vehicleId", String(vehicleId));
+            }
+            if (noteClean) {
+                formData.append("note", noteClean);
+            }
+            if (userId) {
+                formData.append("requesterUserId", String(userId));
+            }
+            files.forEach((f) => {
+                if (f && f.file) {
+                    formData.append("files", f.file);
+                }
+            });
+
+            await createExpenseRequest(formData);
             setSuccess(
                 `Đã gửi yêu cầu chi phí lúc ${new Date().toLocaleString("vi-VN")}. Kế toán sẽ duyệt sớm.`
             );
@@ -463,8 +495,8 @@ export default function CoordinatorExpenseManagementPage() {
         } catch (err) {
             setError(
                 err?.data?.message ||
-                    err?.message ||
-                    "Không gửi được yêu cầu. Vui lòng thử lại."
+                err?.message ||
+                "Không gửi được yêu cầu. Vui lòng thử lại."
             );
         } finally {
             setSubmitting(false);
@@ -497,7 +529,7 @@ export default function CoordinatorExpenseManagementPage() {
             {/* Header */}
             <div className="mb-6">
                 <div className="flex items-center gap-3 mb-2">
-                    <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
+                    <div className="h-12 w-12 rounded-xl bg-[#0079BC] flex items-center justify-center shadow-lg">
                         <ReceiptText className="h-6 w-6 text-white" />
                     </div>
                     <div>
@@ -514,18 +546,6 @@ export default function CoordinatorExpenseManagementPage() {
             {/* Tabs */}
             <div className="mb-6 bg-white rounded-lg border border-slate-200 p-1 inline-flex">
                 <button
-                    onClick={() => setActiveTab("create")}
-                    className={cls(
-                        "px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 flex items-center gap-2",
-                        activeTab === "create"
-                            ? "bg-emerald-50 text-emerald-700 shadow-sm"
-                            : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                    )}
-                >
-                    <PlusCircle className="h-4 w-4" />
-                    Tạo yêu cầu
-                </button>
-                <button
                     onClick={() => {
                         setActiveTab("list");
                         if (requests.length === 0) loadRequests();
@@ -533,7 +553,7 @@ export default function CoordinatorExpenseManagementPage() {
                     className={cls(
                         "px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 flex items-center gap-2",
                         activeTab === "list"
-                            ? "bg-emerald-50 text-emerald-700 shadow-sm"
+                            ? "bg-sky-50 text-sky-700 shadow-sm"
                             : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                     )}
                 >
@@ -544,6 +564,18 @@ export default function CoordinatorExpenseManagementPage() {
                             {stats.pending}
                         </span>
                     )}
+                </button>
+                <button
+                    onClick={() => setActiveTab("create")}
+                    className={cls(
+                        "px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 flex items-center gap-2",
+                        activeTab === "create"
+                            ? "bg-sky-50 text-sky-700 shadow-sm"
+                            : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                    )}
+                >
+                    <PlusCircle className="h-4 w-4" />
+                    Tạo yêu cầu
                 </button>
             </div>
 
@@ -584,8 +616,8 @@ export default function CoordinatorExpenseManagementPage() {
                     <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
                         <div className="border-b border-slate-200 px-6 py-4 bg-gradient-to-r from-slate-50 to-slate-100">
                             <div className="flex items-center gap-2">
-                                <div className="h-8 w-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-                                    <FileText className="h-4 w-4 text-emerald-600" />
+                                <div className="h-8 w-8 rounded-lg bg-sky-100 flex items-center justify-center">
+                                    <FileText className="h-4 w-4 text-sky-600" />
                                 </div>
                                 <h2 className="text-lg font-semibold text-slate-900">Thông tin yêu cầu</h2>
                             </div>
@@ -696,6 +728,58 @@ export default function CoordinatorExpenseManagementPage() {
                                     placeholder="Nội dung chi tiết, ví dụ: bảo dưỡng 5 vạn km"
                                     className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm text-slate-900 resize-none transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                                 />
+                            </div>
+
+                            {/* File attachments */}
+                            <div className="flex flex-col gap-2">
+                                <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                    <ClipboardList className="h-4 w-4 text-slate-500" />
+                                    Ảnh chứng từ gửi kế toán
+                                    <span className="text-xs text-slate-500 font-normal">(tùy chọn)</span>
+                                </label>
+                                <div className="flex flex-wrap items-center gap-3">
+                                    <label className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm cursor-pointer hover:bg-slate-50">
+                                        <Upload className="h-4 w-4 text-sky-600" />
+                                        <span>Thêm ảnh</span>
+                                        <input
+                                            type="file"
+                                            className="hidden"
+                                            accept="image/*"
+                                            multiple
+                                            onChange={onFilesChange}
+                                        />
+                                    </label>
+                                    {files.length > 0 && (
+                                        <span className="text-xs text-slate-500">
+                                            Đã chọn {files.length} file
+                                        </span>
+                                    )}
+                                </div>
+                                {files.length > 0 && (
+                                    <div className="mt-2 max-h-40 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 text-sm divide-y divide-slate-200">
+                                        {files.map((f, idx) => (
+                                            <div key={idx} className="flex items-center gap-3 px-3 py-2">
+                                                <div className="h-8 w-8 rounded-md bg-white border border-slate-200 flex items-center justify-center">
+                                                    <FileText className="h-4 w-4 text-slate-500" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-slate-800 truncate">{f.name}</div>
+                                                    <div className="text-[11px] text-slate-500">
+                                                        {(f.size / 1024).toFixed(0)} KB
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeFile(idx)}
+                                                    className="inline-flex items-center justify-center h-7 w-7 rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200"
+                                                    title="Xóa file"
+                                                >
+                                                    <X className="h-3.5 w-3.5" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Error Message */}

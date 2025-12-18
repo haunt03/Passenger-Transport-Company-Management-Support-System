@@ -18,11 +18,11 @@ const cls = (...a) => a.filter(Boolean).join(" ");
  * Alerts Panel - System warnings and notifications
  */
 export default function AlertsPanel({
-    alerts = [],
-    onAcknowledge,
-    loading = false,
-    maxHeight = 400,
-}) {
+                                        alerts = [],
+                                        onAcknowledge,
+                                        loading = false,
+                                        maxHeight = 400,
+                                    }) {
     const getAlertIcon = (type, severity) => {
         if (severity === "CRITICAL") return AlertCircle;
         if (severity === "HIGH") return AlertTriangle;

@@ -143,8 +143,8 @@ export default function ExpenseRequestForm() {
                 setBranchName("");
                 setBranchError(
                     err?.data?.message ||
-                        err?.message ||
-                        "Không tải được chi nhánh."
+                    err?.message ||
+                    "Không tải được chi nhánh."
                 );
             } finally {
                 if (!cancelled) setBranchLoading(false);
@@ -184,8 +184,8 @@ export default function ExpenseRequestForm() {
                 setVehicleOptions([]);
                 setVehicleError(
                     err?.data?.message ||
-                        err?.message ||
-                        "Không tải được danh sách xe."
+                    err?.message ||
+                    "Không tải được danh sách xe."
                 );
             } finally {
                 if (!cancelled) setVehicleLoading(false);
@@ -255,8 +255,8 @@ export default function ExpenseRequestForm() {
         } catch (err) {
             setError(
                 err?.data?.message ||
-                    err?.message ||
-                    "Không gửi được yêu cầu. Vui lòng thử lại."
+                err?.message ||
+                "Không gửi được yêu cầu. Vui lòng thử lại."
             );
         } finally {
             setSubmitting(false);

@@ -156,7 +156,14 @@ export default function AdminDashboard() {
 
             // Charts
             setRevenueTrend(trendData || []);
-            setBranchComparison(branchData || []);
+            // Normalize branch comparison data - đảm bảo có field expense
+            const normalizedBranchData = (branchData || []).map(branch => ({
+                ...branch,
+                revenue: branch.revenue || 0,
+                expense: branch.expense !== undefined && branch.expense !== null ? branch.expense : 0,
+                netProfit: branch.netProfit || 0,
+            }));
+            setBranchComparison(normalizedBranchData);
             setTopRoutes(routesData || []);
             setTopVehicleCategories(vehicleCategoriesData || []);
 
@@ -327,35 +334,41 @@ export default function AdminDashboard() {
                             {branchComparison && branchComparison.length > 0 ? (
                                 <ResponsiveContainer width="100%" height={300}>
                                     <BarChart data={branchComparison} margin={{ left: 20, right: 10, top: 10, bottom: 60 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                                    <XAxis
-                                        dataKey="branchName"
-                                        stroke="#64748b"
-                                        style={{ fontSize: "12px" }}
-                                        angle={-45}
-                                        textAnchor="end"
-                                        height={60}
-                                        interval={0}
-                                    />
-                                    <YAxis
-                                        stroke="#64748b"
-                                        style={{ fontSize: "12px" }}
-                                        tickFormatter={(v) => fmtVND(v)}
-                                        width={80}
-                                    />
-                                    <Tooltip
-                                        formatter={(value) => `${fmtVND(value)} đ`}
-                                        contentStyle={{
-                                            backgroundColor: "white",
-                                            border: "1px solid #e2e8f0",
-                                            borderRadius: "8px",
-                                        }}
-                                    />
-                                    <Legend wrapperStyle={{ fontSize: "12px" }} />
-                                    <Bar dataKey="revenue" name="Doanh thu" fill="#10b981" />
-                                    <Bar dataKey="expense" name="Chi phí" fill="#ef4444" />
-                                </BarChart>
-                            </ResponsiveContainer>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                                        <XAxis
+                                            dataKey="branchName"
+                                            stroke="#64748b"
+                                            style={{ fontSize: "12px" }}
+                                            angle={-45}
+                                            textAnchor="end"
+                                            height={60}
+                                            interval={0}
+                                        />
+                                        <YAxis
+                                            stroke="#64748b"
+                                            style={{ fontSize: "12px" }}
+                                            tickFormatter={(v) => fmtVND(v)}
+                                            width={80}
+                                        />
+                                        <Tooltip
+                                            formatter={(value) => `${fmtVND(value)} đ`}
+                                            contentStyle={{
+                                                backgroundColor: "white",
+                                                border: "1px solid #e2e8f0",
+                                                borderRadius: "8px",
+                                            }}
+                                        />
+                                        <Legend wrapperStyle={{ fontSize: "12px" }} />
+                                        <Bar dataKey="revenue" name="Doanh thu" fill="#10b981" />
+                                        <Bar
+                                            dataKey="expense"
+                                            name="Chi phí"
+                                            fill="#ef4444"
+                                            // Đảm bảo hiển thị ngay cả khi giá trị = 0 hoặc null
+                                            isAnimationActive={true}
+                                        />
+                                    </BarChart>
+                                </ResponsiveContainer>
                             ) : (
                                 <div className="text-center py-8 text-slate-500 text-sm">
                                     Không có dữ liệu chi nhánh
@@ -450,52 +463,52 @@ export default function AdminDashboard() {
 
                     {/* PENDING APPROVALS */}
                     <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                            <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 text-sm text-slate-600 flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <Calendar className="h-4 w-4 text-primary-600" />
-                                    <span className="font-medium text-slate-700">
+                        <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 text-sm text-slate-600 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-primary-600" />
+                                <span className="font-medium text-slate-700">
                                         Yêu Cầu Chờ Duyệt
                                     </span>
-                                </div>
-                                <span className="text-xs text-slate-500">
+                            </div>
+                            <span className="text-xs text-slate-500">
                                     {pendingApprovals.length} mục
                                 </span>
-                            </div>
-                            <div className="p-4 max-h-[400px] overflow-y-auto">
-                                {pendingApprovals && pendingApprovals.length > 0 ? (
-                                    <div className="space-y-2">
-                                        {pendingApprovals.map((approval, index) => (
-                                            <div
-                                                key={approval.historyId || index}
-                                                className="p-3 rounded-lg bg-info-50 border border-info-200"
-                                            >
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="text-sm font-medium text-slate-900">
-                                                            {approval.approvalType}
-                                                        </div>
-                                                        <div className="text-xs text-slate-600 mt-1">
-                                                            Người yêu cầu: {approval.requesterName}
-                                                        </div>
-                                                        {approval.branchName && (
-                                                            <div className="text-xs text-slate-500 mt-0.5">
-                                                                Chi nhánh: {approval.branchName}
-                                                            </div>
-                                                        )}
+                        </div>
+                        <div className="p-4 max-h-[400px] overflow-y-auto">
+                            {pendingApprovals && pendingApprovals.length > 0 ? (
+                                <div className="space-y-2">
+                                    {pendingApprovals.map((approval, index) => (
+                                        <div
+                                            key={approval.historyId || index}
+                                            className="p-3 rounded-lg bg-info-50 border border-info-200"
+                                        >
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-sm font-medium text-slate-900">
+                                                        {approval.approvalType}
                                                     </div>
-                                                    <div className="text-xs text-slate-500 whitespace-nowrap">
-                                                        {new Date(approval.requestedAt).toLocaleDateString("vi-VN")}
+                                                    <div className="text-xs text-slate-600 mt-1">
+                                                        Người yêu cầu: {approval.requesterName}
                                                     </div>
+                                                    {approval.branchName && (
+                                                        <div className="text-xs text-slate-500 mt-0.5">
+                                                            Chi nhánh: {approval.branchName}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="text-xs text-slate-500 whitespace-nowrap">
+                                                    {new Date(approval.requestedAt).toLocaleDateString("vi-VN")}
                                                 </div>
                                             </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="text-center py-8 text-slate-500 text-sm">
-                                        Không có yêu cầu chờ duyệt
-                                    </div>
-                                )}
-                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-8 text-slate-500 text-sm">
+                                    Không có yêu cầu chờ duyệt
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </>
             )}

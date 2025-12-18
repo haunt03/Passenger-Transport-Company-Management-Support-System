@@ -12,6 +12,7 @@ import {
     AlertCircle,
     FileText,
     Loader2,
+    Image as ImageIcon,
 } from "lucide-react";
 import {
     getPendingExpenseRequests,
@@ -47,6 +48,21 @@ const STATUS_LABELS = {
     PENDING: "Chờ duyệt",
     APPROVED: "Đã duyệt",
     REJECTED: "Đã từ chối",
+};
+
+// Chuẩn hoá URL ảnh chứng từ để luôn truy cập đúng backend (kể cả khi chỉ lưu relative path)
+const buildImageUrl = (path) => {
+    if (!path) return "";
+    const raw = String(path).trim();
+    if (!raw) return "";
+
+    // Nếu đã là absolute URL (http/https) thì dùng luôn
+    if (/^https?:\/\//i.test(raw)) return raw;
+
+    // Ngược lại: ghép với API_BASE (backend) để tránh trỏ nhầm sang origin của frontend (5173)
+    const apiBase = (import.meta?.env?.VITE_API_BASE || "http://localhost:8080").replace(/\/$/, "");
+    const normalizedPath = raw.startsWith("/") ? raw : `/${raw}`;
+    return `${apiBase}${normalizedPath}`;
 };
 
 function StatusBadge({ status }) {
@@ -86,11 +102,11 @@ function Toasts({ toasts }) {
                     className={cls(
                         "rounded-lg px-3 py-2 text-sm shadow border min-w-[220px] bg-white text-gray-800 border-gray-200",
                         t.kind === "success" &&
-                            "bg-emerald-50 border-emerald-400 text-emerald-700",
+                        "bg-emerald-50 border-emerald-400 text-emerald-700",
                         t.kind === "error" &&
-                            "bg-rose-50 border-rose-400 text-rose-700",
+                        "bg-rose-50 border-rose-400 text-rose-700",
                         t.kind === "info" &&
-                            "bg-white border-gray-200 text-gray-800"
+                        "bg-white border-gray-200 text-gray-800"
                     )}
                 >
                     {t.msg}
@@ -248,7 +264,7 @@ export default function ExpenseRequestManagementPage() {
             setModalOpen(false);
             setSelectedRequest(null);
             setModalNote("");
-            
+
             // Reload list sau khi đóng modal
             setTimeout(() => {
                 loadExpenseRequests();
@@ -350,21 +366,36 @@ export default function ExpenseRequestManagementPage() {
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm">
                             <thead className="text-xs text-gray-500 border-b border-gray-200 bg-gray-50">
-                                <tr>
-                                    <th className="px-3 py-2 font-medium text-gray-600 text-xs">ID</th>
-                                    <th className="px-3 py-2 font-medium text-gray-600 text-xs">Loại chi phí</th>
-                                    <th className="px-3 py-2 font-medium text-gray-600 text-xs">Số tiền</th>
-                                    <th className="px-3 py-2 font-medium text-gray-600 text-xs">Chi nhánh</th>
-                                    <th className="px-3 py-2 font-medium text-gray-600 text-xs">Xe</th>
-                                    <th className="px-3 py-2 font-medium text-gray-600 text-xs">Người yêu cầu</th>
-                                    <th className="px-3 py-2 font-medium text-gray-600 text-xs">Ngày tạo</th>
-                                    <th className="px-3 py-2 font-medium text-gray-600 text-xs">Trạng thái</th>
-                                    <th className="px-3 py-2 font-medium text-gray-600 text-xs">Hành động</th>
-                                </tr>
+                            <tr>
+                                <th className="px-3 py-2 font-medium text-gray-600 text-xs">ID</th>
+                                <th className="px-3 py-2 font-medium text-gray-600 text-xs">Loại chi phí</th>
+                                <th className="px-3 py-2 font-medium text-gray-600 text-xs">Số tiền</th>
+                                <th className="px-3 py-2 font-medium text-gray-600 text-xs">Chi nhánh</th>
+                                <th className="px-3 py-2 font-medium text-gray-600 text-xs">Xe</th>
+                                <th className="px-3 py-2 font-medium text-gray-600 text-xs">Người yêu cầu</th>
+                                <th className="px-3 py-2 font-medium text-gray-600 text-xs">Chứng từ</th>
+                                <th className="px-3 py-2 font-medium text-gray-600 text-xs">Ngày tạo</th>
+                                <th className="px-3 py-2 font-medium text-gray-600 text-xs">Trạng thái</th>
+                                <th className="px-3 py-2 font-medium text-gray-600 text-xs">Hành động</th>
+                            </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200">
-                                {expenseRequests.map((req) => (
-                                    <tr key={req.id} className="hover:bg-gray-50">
+                            {expenseRequests.map((req) => {
+                                const rawImages = req && req.receiptImages;
+                                const images = Array.isArray(rawImages)
+                                    ? rawImages
+                                    : typeof rawImages === "string"
+                                        ? rawImages
+                                            .split(/[;,]/)
+                                            .map((s) => s.trim())
+                                            .filter(Boolean)
+                                        : [];
+                                const imageUrls = images
+                                    .map((u) => buildImageUrl(u))
+                                    .filter(Boolean);
+
+                                return (
+                                    <tr key={req.id} className="hover:bg-gray-50 align-top">
                                         <td className="px-3 py-2 text-sm text-gray-900 font-medium">
                                             #{req.id}
                                         </td>
@@ -382,6 +413,38 @@ export default function ExpenseRequestManagementPage() {
                                         </td>
                                         <td className="px-3 py-2 text-sm text-gray-800">
                                             {req.requesterName || "—"}
+                                        </td>
+                                        <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+                                            {imageUrls.length === 0 ? (
+                                                <span className="inline-flex items-center gap-1 text-gray-400">
+                                                        <ImageIcon className="h-3.5 w-3.5" />
+                                                        <span>Không có</span>
+                                                    </span>
+                                            ) : (
+                                                <div className="flex flex-wrap gap-1 max-w-[160px]">
+                                                    {imageUrls.slice(0, 3).map((url, idx) => (
+                                                        <button
+                                                            key={idx}
+                                                            type="button"
+                                                            onClick={() => window.open(url, "_blank")}
+                                                            className="group relative h-10 w-10 rounded-md overflow-hidden border border-gray-200 bg-gray-50 hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                                                            title="Xem ảnh chứng từ"
+                                                        >
+                                                            <img
+                                                                src={url}
+                                                                alt={`Chứng từ ${idx + 1}`}
+                                                                className="h-full w-full object-cover"
+                                                            />
+                                                            <div className="pointer-events-none absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                                                        </button>
+                                                    ))}
+                                                    {imageUrls.length > 3 && (
+                                                        <div className="flex items-center justify-center h-10 px-2 rounded-md border border-dashed border-gray-300 text-[11px] text-gray-500 bg-gray-50">
+                                                            +{imageUrls.length - 3} ảnh
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
                                         </td>
                                         <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
                                             {req.createdAt
@@ -412,12 +475,13 @@ export default function ExpenseRequestManagementPage() {
                                             )}
                                             {req.status !== "PENDING" && (
                                                 <span className="text-xs text-gray-400 italic">
-                                                    Đã xử lý
-                                                </span>
+                                                        Đã xử lý
+                                                    </span>
                                             )}
                                         </td>
                                     </tr>
-                                ))}
+                                );
+                            })}
                             </tbody>
                         </table>
                     </div>
@@ -486,6 +550,51 @@ export default function ExpenseRequestManagementPage() {
                                         <div className="text-gray-600 mt-1">{selectedRequest.note}</div>
                                     </div>
                                 )}
+
+                                {/* Hình ảnh chứng từ */}
+                                {(() => {
+                                    const rawImages = selectedRequest && selectedRequest.receiptImages;
+                                    const images = Array.isArray(rawImages)
+                                        ? rawImages
+                                        : typeof rawImages === "string"
+                                            ? rawImages
+                                                .split(/[;,]/)
+                                                .map((s) => s.trim())
+                                                .filter(Boolean)
+                                            : [];
+                                    const imageUrls = images
+                                        .map((u) => buildImageUrl(u))
+                                        .filter(Boolean);
+
+                                    if (!imageUrls.length) return null;
+
+                                    return (
+                                        <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
+                                            <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                                                <ImageIcon className="h-4 w-4 text-gray-500" />
+                                                <span>Ảnh chứng từ</span>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                {imageUrls.map((url, idx) => (
+                                                    <button
+                                                        key={idx}
+                                                        type="button"
+                                                        onClick={() => window.open(url, "_blank")}
+                                                        className="group relative w-full aspect-square rounded-md overflow-hidden border border-gray-200 bg-gray-50 hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                                                        title="Xem ảnh chứng từ"
+                                                    >
+                                                        <img
+                                                            src={url}
+                                                            alt={`Chứng từ ${idx + 1}`}
+                                                            className="h-full w-full object-cover"
+                                                        />
+                                                        <div className="pointer-events-none absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </div>
 
                             <div>

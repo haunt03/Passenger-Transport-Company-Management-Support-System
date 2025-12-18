@@ -50,9 +50,9 @@ const TripDetailWithRating = () => {
                         Chi tiết chuyến #{trip.tripId}
                     </h1>
                     <span className={`px-3 py-1 rounded-full text-sm font-medium ${trip.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
-                            trip.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' :
-                                'bg-gray-100 text-gray-800'
-                        }`}>
+                        trip.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' :
+                            'bg-gray-100 text-gray-800'
+                    }`}>
                         {trip.status}
                     </span>
                 </div>

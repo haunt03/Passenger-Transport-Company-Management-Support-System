@@ -31,6 +31,7 @@ import {
     rejectApprovalRequest,
 } from "../../api/notifications";
 import { getPendingPayments, confirmPayment } from "../../api/invoices";
+import { getPendingExpenseRequests, approveExpenseRequest, rejectExpenseRequest } from "../../api/expenses";
 import { getEmployeeByUserId } from "../../api/employees";
 import { getCurrentRole, getStoredUserId, ROLES } from "../../utils/session";
 
@@ -265,8 +266,8 @@ function ConfirmModal({
                 {/* body */}
                 <div className="px-5 py-4 text-sm text-slate-700 space-y-3">
                     <div className="flex items-start gap-2">
-                        <Info className="h-4 w-4 mt-0.5 text-slate-400" />
-                        <div>{message}</div>
+                        <Info className="h-4 w-4 mt-0.5 text-slate-400 flex-shrink-0" />
+                        <div className="flex-1">{message}</div>
                     </div>
 
                     {requireReason ? (
@@ -326,7 +327,7 @@ function RevExpChart({ data = [] }) {
     const innerH = H - padding.t - padding.b;
 
     // Fix: Handle empty data or all zeros
-    const values = data.length > 0 
+    const values = data.length > 0
         ? data.map((d) => Math.max(Number(d.revenue || 0), Number(d.expense || 0)))
         : [0];
     const maxValue = Math.max(...values);
@@ -403,7 +404,7 @@ function RevExpChart({ data = [] }) {
                 const hExp = Math.max(0, innerH - (yExp - padding.t));
 
                 // Validate to prevent NaN or invalid values
-                if (isNaN(yRev) || isNaN(yExp) || isNaN(hRev) || isNaN(hExp) || 
+                if (isNaN(yRev) || isNaN(yExp) || isNaN(hRev) || isNaN(hExp) ||
                     !isFinite(yRev) || !isFinite(yExp) || !isFinite(hRev) || !isFinite(hExp)) {
                     return null;
                 }
@@ -1296,6 +1297,14 @@ export default function AccountantDashboard() {
     const [pendingPaymentsLoading, setPendingPaymentsLoading] = React.useState(false);
     const [pendingPaymentsError, setPendingPaymentsError] = React.useState("");
 
+    // Payment confirmation modal state
+    const [paymentConfirm, setPaymentConfirm] = React.useState({
+        open: false,
+        paymentId: null,
+        status: null, // "CONFIRMED" | "REJECTED"
+        paymentInfo: null, // Thông tin payment để hiển thị trong popup
+    });
+
     const [branchId, setBranchId] = React.useState(null);
     const [branches, setBranches] = React.useState([]);
     const [period, setPeriod] = React.useState("THIS_MONTH");
@@ -1359,7 +1368,7 @@ export default function AccountantDashboard() {
     const loadDashboard = React.useCallback(async () => {
         setLoading(true);
         setError(null);
-        
+
         const defaultData = {
             totalRevenue: 0,
             totalExpense: 0,
@@ -1376,14 +1385,14 @@ export default function AccountantDashboard() {
             pendingApprovals: [],
             topCustomers: [],
         };
-        
+
         try {
             // Try main dashboard endpoint first
             const data = await getAccountingDashboard({
                 branchId: branchId || undefined,
                 period,
             });
-            
+
             if (data && typeof data === 'object') {
                 setDashboardData({
                     ...defaultData,
@@ -1402,22 +1411,22 @@ export default function AccountantDashboard() {
             }
         } catch (err) {
             console.error("Error loading dashboard:", err);
-            
+
             // Try fallback: load individual stats
             try {
                 const { getTotalRevenue, getTotalExpense, getARBalance } = await import("../../api/accounting");
                 const params = { branchId: branchId || undefined, period };
-                
+
                 const [revenueRes, expenseRes, arRes] = await Promise.allSettled([
                     getTotalRevenue(params),
                     getTotalExpense(params),
                     getARBalance(params),
                 ]);
-                
+
                 const revenue = revenueRes.status === 'fulfilled' ? Number(revenueRes.value?.total || revenueRes.value || 0) : 0;
                 const expense = expenseRes.status === 'fulfilled' ? Number(expenseRes.value?.total || expenseRes.value || 0) : 0;
                 const ar = arRes.status === 'fulfilled' ? Number(arRes.value?.total || arRes.value || 0) : 0;
-                
+
                 setDashboardData({
                     ...defaultData,
                     totalRevenue: revenue,
@@ -1425,7 +1434,7 @@ export default function AccountantDashboard() {
                     netProfit: revenue - expense,
                     arBalance: ar,
                 });
-                
+
                 push("Dữ liệu dashboard được tải từ nguồn phụ", "info");
             } catch (fallbackErr) {
                 console.error("Fallback also failed:", fallbackErr);
@@ -1444,17 +1453,33 @@ export default function AccountantDashboard() {
         setQueueLoading(true);
         setQueueError("");
         try {
-            const approvals = await getPendingApprovals(branchId || undefined);
-            const list = Array.isArray(approvals)
-                ? approvals
-                : approvals?.items || approvals?.data || [];
-            const expenseOnly = list.filter(
-                (item) => item.approvalType === "EXPENSE_REQUEST"
-            );
-            setApprovalQueue(expenseOnly);
+            // Sử dụng API riêng cho expense requests
+            const response = await getPendingExpenseRequests(branchId || undefined);
+            const list = Array.isArray(response)
+                ? response
+                : response?.data || response?.items || [];
+
+            // Map expense requests sang format tương thích với QueueTable
+            const mappedQueue = list.map((expense) => ({
+                id: expense.id || expense.expenseRequestId,
+                approvalType: "EXPENSE_REQUEST",
+                requestedByName: expense.requesterName || expense.driverName || expense.creatorName || "—",
+                requestedAt: expense.createdAt || expense.requestedAt || expense.created_at,
+                details: {
+                    type: expense.type || expense.expenseType || "EXPENSE",
+                    amount: expense.amount || 0,
+                    note: expense.note || expense.description || "",
+                    requesterName: expense.requesterName || expense.driverName || expense.creatorName || "—",
+                    tripId: expense.tripId || null,
+                    bookingCode: expense.bookingCode || null,
+                },
+                branchName: expense.branchName || null,
+            }));
+
+            setApprovalQueue(mappedQueue);
         } catch (err) {
-            console.error("Error loading approvals:", err);
-            setQueueError(err.message || "Không tải được hàng đợi duyệt chi.");
+            console.error("Error loading expense requests:", err);
+            setQueueError(err.message || "Không tải được hàng đợi duyệt chi phí.");
             setApprovalQueue([]);
         } finally {
             setQueueLoading(false);
@@ -1514,16 +1539,16 @@ export default function AccountantDashboard() {
     }, [approvalQueue, query, typeFilter]);
 
     const approveOne = React.useCallback(
-        async (historyId) => {
+        async (expenseRequestId) => {
             try {
-                console.log("[AccountantDashboard] Approving request:", historyId);
-                await approveApprovalRequest(historyId, {});
-                push(`Đã duyệt yêu cầu #${historyId}`, "success");
+                console.log("[AccountantDashboard] Approving expense request:", expenseRequestId);
+                await approveExpenseRequest(expenseRequestId);
+                push(`Đã duyệt yêu cầu chi phí #${expenseRequestId}`, "success");
                 // Reload both dashboard and queue
                 loadApprovalQueue();
                 loadDashboard();
             } catch (err) {
-                console.error("Approve request failed:", err);
+                console.error("Approve expense request failed:", err);
                 const errorMsg = err?.response?.data?.message || err.message || "Không thể duyệt yêu cầu";
                 push(errorMsg, "error");
             }
@@ -1532,16 +1557,16 @@ export default function AccountantDashboard() {
     );
 
     const rejectOne = React.useCallback(
-        async (historyId, reason) => {
+        async (expenseRequestId, reason) => {
             try {
-                console.log("[AccountantDashboard] Rejecting request:", historyId, reason);
-                await rejectApprovalRequest(historyId, { note: reason });
-                push(`Đã từ chối yêu cầu #${historyId}${reason ? " · " + reason : ""}`, "info");
+                console.log("[AccountantDashboard] Rejecting expense request:", expenseRequestId, reason);
+                await rejectExpenseRequest(expenseRequestId, reason || "");
+                push(`Đã từ chối yêu cầu chi phí #${expenseRequestId}${reason ? " · " + reason : ""}`, "info");
                 // Reload both dashboard and queue
                 loadApprovalQueue();
                 loadDashboard();
             } catch (err) {
-                console.error("Reject request failed:", err);
+                console.error("Reject expense request failed:", err);
                 const errorMsg = err?.response?.data?.message || err.message || "Không thể từ chối yêu cầu";
                 push(errorMsg, "error");
             }
@@ -1549,7 +1574,20 @@ export default function AccountantDashboard() {
         [loadApprovalQueue, loadDashboard, push]
     );
 
-    // Confirm/Reject payment request from driver/consultant
+    // Handle payment confirmation request (show popup first)
+    const handlePaymentConfirmClick = React.useCallback(
+        (paymentId, status, paymentInfo) => {
+            setPaymentConfirm({
+                open: true,
+                paymentId,
+                status,
+                paymentInfo,
+            });
+        },
+        []
+    );
+
+    // Confirm/Reject payment request from driver/consultant (after popup confirmation)
     const confirmPaymentRequest = React.useCallback(
         async (paymentId, status) => {
             try {
@@ -1559,6 +1597,13 @@ export default function AccountantDashboard() {
                 // Reload pending payments and dashboard
                 loadPendingPayments();
                 loadDashboard();
+                // Close modal
+                setPaymentConfirm({
+                    open: false,
+                    paymentId: null,
+                    status: null,
+                    paymentInfo: null,
+                });
             } catch (err) {
                 console.error("Confirm payment failed:", err);
                 const errorMsg = err?.response?.data?.message || err.message || "Không thể xử lý yêu cầu thanh toán";
@@ -1572,10 +1617,10 @@ export default function AccountantDashboard() {
     const chartData = React.useMemo(() => {
         const revenueChart = dashboardData.revenueChart || [];
         const expenseChart = dashboardData.expenseChart || [];
-        
+
         // Combine revenue and expense by month (group daily data by month)
         const dateMap = {};
-        
+
         // Process revenue data - accumulate by month
         revenueChart.forEach((item) => {
             if (!item || !item.date) return;
@@ -1592,7 +1637,7 @@ export default function AccountantDashboard() {
                 console.warn("Error parsing revenue date:", item.date, e);
             }
         });
-        
+
         // Process expense data - accumulate by month
         expenseChart.forEach((item) => {
             if (!item || !item.date) return;
@@ -1609,18 +1654,18 @@ export default function AccountantDashboard() {
                 console.warn("Error parsing expense date:", item.date, e);
             }
         });
-        
+
         // Generate months array - only show months that have data or current month
         const currentMonth = new Date().getMonth() + 1;
         const currentMonthStr = String(currentMonth).padStart(2, '0');
         const months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
-        
+
         // If we have data, use all months, otherwise show last 6 months
         const hasData = Object.keys(dateMap).length > 0;
-        const monthsToShow = hasData 
-            ? months 
+        const monthsToShow = hasData
+            ? months
             : months.slice(Math.max(0, currentMonth - 6), currentMonth);
-        
+
         const result = monthsToShow.map((m) => {
             if (dateMap[m]) {
                 return {
@@ -1631,7 +1676,7 @@ export default function AccountantDashboard() {
             }
             return { month: m, revenue: 0, expense: 0 };
         });
-        
+
         return result.length > 0 ? result : [{ month: currentMonthStr, revenue: 0, expense: 0 }];
     }, [dashboardData.revenueChart, dashboardData.expenseChart]);
 
@@ -1773,16 +1818,16 @@ export default function AccountantDashboard() {
                         up={true}
                     />
                     <KpiCard
-                        title="Công nợ phải trả (A/P)"
-                        value={Number(dashboardData.apBalance || 0)}
+                        title="Tổng chi phí"
+                        value={Number(dashboardData.totalExpense || 0)}
                         delta={0}
                         up={false}
                     />
                     <KpiCard
-                        title="Lợi nhuận ròng"
-                        value={Number(dashboardData.netProfit || 0)}
-                        delta={dashboardData.expenseToRevenueRatio ? Number(dashboardData.expenseToRevenueRatio) : 0}
-                        up={Number(dashboardData.netProfit || 0) >= 0}
+                        title="Tổng doanh thu"
+                        value={Number(dashboardData.totalRevenue || 0)}
+                        delta={dashboardData.collectionRate ? Number(dashboardData.collectionRate) : 0}
+                        up={true}
                     />
                 </div>
             </div>
@@ -1913,8 +1958,8 @@ export default function AccountantDashboard() {
 
                 {/* footer note */}
                 <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 text-[11px] text-slate-500 leading-relaxed">
-                   Yêu cầu chi phí chờ duyệt: {approvalQueue.length} mục.
-                    HĐ đến hạn 7 ngày: {dashboardData.invoicesDueIn7Days || 0}. 
+                    Yêu cầu chi phí chờ duyệt: {approvalQueue.length} mục.
+                    HĐ đến hạn 7 ngày: {dashboardData.invoicesDueIn7Days || 0}.
                     HĐ quá hạn: {dashboardData.overdueInvoices || 0}.
                 </div>
             </div>
@@ -2016,14 +2061,14 @@ export default function AccountantDashboard() {
                                     {/* Action buttons */}
                                     <div className="flex flex-col gap-2">
                                         <button
-                                            onClick={() => confirmPaymentRequest(payment.paymentId, "CONFIRMED")}
+                                            onClick={() => handlePaymentConfirmClick(payment.paymentId, "CONFIRMED", payment)}
                                             className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm"
                                         >
                                             <CheckCircle className="h-3.5 w-3.5" />
                                             Đã nhận
                                         </button>
                                         <button
-                                            onClick={() => confirmPaymentRequest(payment.paymentId, "REJECTED")}
+                                            onClick={() => handlePaymentConfirmClick(payment.paymentId, "REJECTED", payment)}
                                             className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm"
                                         >
                                             <XCircle className="h-3.5 w-3.5" />
@@ -2041,6 +2086,87 @@ export default function AccountantDashboard() {
                     Xác thực tiền đã nhận từ tài xế/tư vấn viên. Chọn "Đã nhận" để ghi nhận số tiền vào hóa đơn.
                 </div>
             </div>
+
+            {/* Payment Confirmation Modal */}
+            <ConfirmModal
+                open={paymentConfirm.open}
+                title={
+                    paymentConfirm.status === "CONFIRMED"
+                        ? "Xác nhận đã nhận tiền"
+                        : "Xác nhận chưa nhận được tiền"
+                }
+                message={
+                    paymentConfirm.paymentInfo ? (
+                        <div className="space-y-2">
+                            <div className="font-semibold text-slate-900">
+                                {paymentConfirm.status === "CONFIRMED"
+                                    ? "Bạn có chắc chắn đã nhận đủ số tiền này?"
+                                    : "Bạn có chắc chắn muốn đánh dấu 'CHƯA NHẬN ĐƯỢC' cho khoản thanh toán này?"}
+                            </div>
+                            <div className="mt-3 pt-3 border-t border-slate-200 space-y-1.5 text-sm">
+                                <div className="flex justify-between">
+                                    <span className="text-slate-600">Số tiền:</span>
+                                    <span className="font-semibold text-slate-900">
+                                        {fmtVND(paymentConfirm.paymentInfo.amount || 0)} đ
+                                    </span>
+                                </div>
+                                {paymentConfirm.paymentInfo.invoiceNumber && (
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-600">Hóa đơn:</span>
+                                        <span className="text-slate-900">
+                                            {paymentConfirm.paymentInfo.invoiceNumber || `INV-${paymentConfirm.paymentInfo.invoiceId}`}
+                                        </span>
+                                    </div>
+                                )}
+                                {paymentConfirm.paymentInfo.bookingCode && (
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-600">Mã đơn:</span>
+                                        <span className="text-slate-900">{paymentConfirm.paymentInfo.bookingCode}</span>
+                                    </div>
+                                )}
+                                {paymentConfirm.paymentInfo.paymentMethod && (
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-600">Phương thức:</span>
+                                        <span className="text-slate-900">
+                                            {paymentConfirm.paymentInfo.paymentMethod === "CASH"
+                                                ? "Tiền mặt"
+                                                : paymentConfirm.paymentInfo.paymentMethod === "TRANSFER"
+                                                    ? "Chuyển khoản"
+                                                    : paymentConfirm.paymentInfo.paymentMethod === "QR"
+                                                        ? "QR Code"
+                                                        : paymentConfirm.paymentInfo.paymentMethod}
+                                        </span>
+                                    </div>
+                                )}
+                                {paymentConfirm.paymentInfo.note && (
+                                    <div className="pt-1">
+                                        <span className="text-slate-600">Ghi chú: </span>
+                                        <span className="text-slate-700 italic">"{paymentConfirm.paymentInfo.note}"</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ) : (
+                        paymentConfirm.status === "CONFIRMED"
+                            ? "Bạn có chắc chắn đã nhận đủ số tiền này và muốn xác nhận 'ĐÃ NHẬN'?"
+                            : "Bạn có chắc chắn muốn đánh dấu 'CHƯA NHẬN ĐƯỢC' cho khoản thanh toán này?"
+                    )
+                }
+                requireReason={false}
+                onCancel={() =>
+                    setPaymentConfirm({
+                        open: false,
+                        paymentId: null,
+                        status: null,
+                        paymentInfo: null,
+                    })
+                }
+                onConfirm={() => {
+                    if (paymentConfirm.paymentId && paymentConfirm.status) {
+                        confirmPaymentRequest(paymentConfirm.paymentId, paymentConfirm.status);
+                    }
+                }}
+            />
         </div>
     );
 }

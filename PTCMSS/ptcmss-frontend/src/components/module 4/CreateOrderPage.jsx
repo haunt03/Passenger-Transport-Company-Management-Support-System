@@ -32,6 +32,7 @@ import {
     Sparkles,
     ArrowRight,
     X,
+    RefreshCw,
 } from "lucide-react";
 import AnimatedDialog from "../common/AnimatedDialog";
 
@@ -73,6 +74,29 @@ import AnimatedDialog from "../common/AnimatedDialog";
 const cls = (...a) => a.filter(Boolean).join(" ");
 const fmtVND = (n) =>
     new Intl.NumberFormat("vi-VN").format(Math.max(0, Number(n || 0)));
+
+// Đọc số tiền bằng tiếng Việt đơn giản (triệu / tỷ) cho UI
+function readAmountVi(n) {
+    const value = Math.max(0, Number(n || 0));
+    if (!Number.isFinite(value) || value <= 0) return "Chưa có giá hệ thống";
+
+    const billion = 1_000_000_000;
+    const million = 1_000_000;
+
+    if (value >= billion) {
+        const main = value / billion;
+        const rounded = Math.round(main * 10) / 10; // làm tròn 1 chữ số thập phân
+        return `${rounded.toString().replace(".", ",")} tỷ đồng`;
+    }
+
+    if (value >= million) {
+        const main = value / million;
+        const rounded = Math.round(main * 10) / 10;
+        return `${rounded.toString().replace(".", ",")} triệu đồng`;
+    }
+
+    return `${fmtVND(value)} đồng`;
+}
 
 function stripAccents(str = "") {
     try {
@@ -152,6 +176,30 @@ function formatReadableDateTime(isoString) {
         hour: "2-digit",
         minute: "2-digit",
     });
+}
+
+function parseLocalInputDate(value, isDateOnly) {
+    if (!value) return null;
+    if (isDateOnly) {
+        const parts = String(value).split("-");
+        if (parts.length !== 3) return null;
+        const y = Number(parts[0]);
+        const m = Number(parts[1]);
+        const d = Number(parts[2]);
+        if (!y || !m || !d) return null;
+        return new Date(y, m - 1, d, 0, 0, 0, 0); // local midnight
+    }
+    const dt = new Date(value);
+    return Number.isNaN(dt.getTime()) ? null : dt;
+}
+
+function formatDurationFromMinutes(totalMinutes) {
+    const mins = Math.max(0, Math.round(totalMinutes || 0));
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h <= 0) return `${m} phút`;
+    if (m === 0) return `${h} giờ`;
+    return `${h} giờ ${m} phút`;
 }
 
 function extractPageItems(payload) {
@@ -256,52 +304,52 @@ export default function CreateOrderPage() {
     const [timeError, setTimeError] = React.useState(""); // Error message cho validation thời gian
     const [categories, setCategories] = React.useState([]);
     const [paxCount, setPaxCount] = React.useState(1);
-    
+
     // Multiple vehicle selections: [{ categoryId, quantity }]
     const [vehicleSelections, setVehicleSelections] = React.useState([
         { categoryId: "", quantity: 1 }
     ]);
-    
+
     // Helper: thêm loại xe
     const addVehicleSelection = () => {
         if (vehicleSelections.length >= 5) return; // Max 5 loại
-        const unusedCategory = categories.find(c => 
+        const unusedCategory = categories.find(c =>
             !vehicleSelections.some(v => v.categoryId === c.id)
         );
-        setVehicleSelections([...vehicleSelections, { 
-            categoryId: unusedCategory?.id || "", 
-            quantity: 1 
+        setVehicleSelections([...vehicleSelections, {
+            categoryId: unusedCategory?.id || "",
+            quantity: 1
         }]);
     };
-    
+
     // Helper: xóa loại xe
     const removeVehicleSelection = (index) => {
         if (vehicleSelections.length <= 1) return; // Ít nhất 1 loại
         setVehicleSelections(vehicleSelections.filter((_, i) => i !== index));
     };
-    
+
     // Helper: cập nhật loại xe
     const updateVehicleSelection = (index, field, value) => {
         const updated = [...vehicleSelections];
-        
+
         // Nếu đang thay đổi categoryId, kiểm tra trùng lặp
         if (field === 'categoryId') {
             // Kiểm tra xem loại xe này đã được chọn ở selection khác chưa
-            const isDuplicate = vehicleSelections.some((v, i) => 
+            const isDuplicate = vehicleSelections.some((v, i) =>
                 i !== index && v.categoryId === value && value !== ""
             );
-            
+
             if (isDuplicate) {
                 // Không cho phép chọn loại xe đã được chọn
                 alert("Loại xe này đã được chọn. Vui lòng chọn loại xe khác hoặc tăng số lượng của loại xe đã chọn.");
                 return;
             }
         }
-        
+
         updated[index] = { ...updated[index], [field]: value };
         setVehicleSelections(updated);
     };
-    
+
     // Tính tổng số chỗ
     const totalSeats = React.useMemo(() => {
         return vehicleSelections.reduce((sum, v) => {
@@ -309,7 +357,7 @@ export default function CreateOrderPage() {
             return sum + (cat?.seats || 0) * (v.quantity || 0);
         }, 0);
     }, [vehicleSelections, categories]);
-    
+
     // Lấy categoryId đầu tiên để tương thích với code cũ
     const categoryId = vehicleSelections[0]?.categoryId || "";
     const vehicleCount = vehicleSelections[0]?.quantity || 1;
@@ -345,7 +393,7 @@ export default function CreateOrderPage() {
             setAvailabilityInfo(null);
             return;
         }
-        
+
         const checkAvail = async () => {
             setCheckingAvail(true);
             try {
@@ -354,7 +402,7 @@ export default function CreateOrderPage() {
                 const sEnd = hireType === "ONE_WAY" && !endTime
                     ? new Date(new Date(startTime).getTime() + 2 * 60 * 60 * 1000).toISOString()
                     : new Date(endTime).toISOString();
-                
+
                 // Check availability cho TẤT CẢ các loại xe đã chọn
                 const results = await Promise.all(
                     vehicleSelections
@@ -370,13 +418,13 @@ export default function CreateOrderPage() {
                             return { ...data, categoryId: selection.categoryId, quantity: selection.quantity };
                         })
                 );
-                
+
                 console.log("🔵 [FRONTEND] Real-time Check Availability Results:", results);
-                
+
                 // Tổng hợp kết quả: nếu có bất kỳ loại xe nào hết thì báo hết
                 const allOk = results.every(r => r.ok);
                 const failedChecks = results.filter(r => !r.ok);
-                
+
                 if (allOk) {
                     // Tất cả đều có đủ xe
                     const totalAvailable = results.reduce((sum, r) => sum + (r.availableCount || 0), 0);
@@ -397,7 +445,7 @@ export default function CreateOrderPage() {
                         needed: firstFailed.needed,
                         totalCandidates: firstFailed.totalCandidates || 0,
                         busyCount: firstFailed.busyCount || 0,
-                        text: `${cat?.name || 'Xe'}: Hết xe (${firstFailed.busyCount || 0}/${firstFailed.totalCandidates || 0} đang bận)`,
+                        text: `${cat?.name || 'Xe'}: Hết xe (hiện chỉ còn ${firstFailed.availableCount || 0} xe trong khoảng thời gian này)`,
                         branch: branchId,
                         // Suggestions từ kết quả đầu tiên bị fail
                         alternativeCategories: firstFailed.alternativeCategories,
@@ -422,7 +470,7 @@ export default function CreateOrderPage() {
                 setCheckingAvail(false);
             }
         };
-        
+
         // Debounce 500ms để tránh check quá nhiều khi user đang nhập
         const timer = setTimeout(checkAvail, 500);
         return () => clearTimeout(timer);
@@ -445,11 +493,84 @@ export default function CreateOrderPage() {
     const [calculatingDistance, setCalculatingDistance] = React.useState(false);
     const [distanceError, setDistanceError] = React.useState("");
 
+    // System settings cho vận tốc trung bình (load từ admin settings)
+    const [avgVehicleSpeedKmph, setAvgVehicleSpeedKmph] = React.useState(60); // Mặc định 60 km/h
+
+    const etaInfo = React.useMemo(() => {
+        const dist = Number(distanceKm);
+        if (!dist || Number.isNaN(dist) || dist <= 0) return null;
+        if (!startTime) return null;
+
+        const isDateOnly = hireType === "DAILY" || hireType === "MULTI_DAY";
+        const startDate = parseLocalInputDate(startTime, isDateOnly);
+        if (!startDate) return null;
+
+        const speed = Math.max(1, Number(avgVehicleSpeedKmph || 60));
+        const travelMinutes = Math.max(0, Math.ceil((dist / speed) * 60));
+        const bufferMinutes = 10;
+        const travelText = formatDurationFromMinutes(travelMinutes);
+
+        const addMinutes = (d, mins) => new Date(d.getTime() + mins * 60 * 1000);
+        const fmt = (d) =>
+            d.toLocaleString("vi-VN", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+            });
+
+        // ONE_WAY / FIXED_ROUTE
+        if (hireType === "ONE_WAY" || hireType === "FIXED_ROUTE") {
+            const busyUntil = addMinutes(startDate, travelMinutes + bufferMinutes);
+            return {
+                mode: "ONE_WAY",
+                speed,
+                travelMinutes,
+                travelText,
+                bufferMinutes,
+                busyUntilText: fmt(busyUntil),
+            };
+        }
+
+        // ROUND_TRIP: endTime là "thời gian bắt đầu về"
+        if (hireType === "ROUND_TRIP") {
+            const returnStart = endTime ? parseLocalInputDate(endTime, false) : null;
+            const goArrive = addMinutes(startDate, travelMinutes);
+            const busyUntil = returnStart
+                ? addMinutes(returnStart, travelMinutes + bufferMinutes)
+                : addMinutes(startDate, travelMinutes * 2 + bufferMinutes);
+            return {
+                mode: "ROUND_TRIP",
+                speed,
+                travelMinutes,
+                travelText,
+                bufferMinutes,
+                goArriveText: fmt(goArrive),
+                busyUntilText: fmt(busyUntil),
+            };
+        }
+
+        // DAILY / MULTI_DAY: bận tới đầu ngày kế tiếp (sau ngày kết thúc) + buffer
+        const endDate = endTime ? parseLocalInputDate(endTime, true) : startDate;
+        const endDay = endDate ? endDate : startDate;
+        const nextDay = new Date(endDay.getFullYear(), endDay.getMonth(), endDay.getDate() + 1, 0, 0, 0, 0);
+        const busyUntil = addMinutes(nextDay, bufferMinutes);
+        return {
+            mode: "BY_DAY",
+            speed,
+            travelMinutes,
+            travelText,
+            bufferMinutes,
+            busyUntilText: fmt(busyUntil),
+        };
+    }, [distanceKm, startTime, endTime, hireType, avgVehicleSpeedKmph]);
+
     // Tự động tính discount và quotedPrice khi discountPercent hoặc estPriceSys thay đổi
     React.useEffect(() => {
         const discountAmount = Math.round((estPriceSys * discountPercent) / 100);
         setDiscount(discountAmount);
-        
+
         // Tự động cập nhật giá báo khách nếu chưa được chỉnh sửa thủ công
         if (!quotedPriceTouched) {
             const newQuotedPrice = Math.max(0, estPriceSys - discountAmount);
@@ -460,11 +581,11 @@ export default function CreateOrderPage() {
     // Các field mới cho logic tính giá
     const [isHoliday, setIsHoliday] = React.useState(false);
     const [isWeekend, setIsWeekend] = React.useState(false);
-    
+
     // System settings cho phụ phí (load từ admin settings)
     const [holidaySurchargeRate, setHolidaySurchargeRate] = React.useState(0.25); // Mặc định 25%
     const [weekendSurchargeRate, setWeekendSurchargeRate] = React.useState(0.20); // Mặc định 20%
-    
+
     // Note cho tài xế (ghi chú điểm đón/trả, hướng dẫn...)
     const [bookingNote, setBookingNote] = React.useState("");
     const loadRecentBookingSuggestion = React.useCallback(async (phoneNumber) => {
@@ -716,18 +837,26 @@ export default function CreateOrderPage() {
                 if (Array.isArray(settings)) {
                     const holidaySetting = settings.find(s => s.settingKey === "HOLIDAY_SURCHARGE_RATE");
                     const weekendSetting = settings.find(s => s.settingKey === "WEEKEND_SURCHARGE_RATE");
-                    
+                    const avgSpeedSetting = settings.find(s => s.settingKey === "AVG_VEHICLE_SPEED_KMPH");
+
                     if (holidaySetting && holidaySetting.settingValue) {
                         const rate = parseFloat(holidaySetting.settingValue);
                         if (!isNaN(rate)) {
                             setHolidaySurchargeRate(rate);
                         }
                     }
-                    
+
                     if (weekendSetting && weekendSetting.settingValue) {
                         const rate = parseFloat(weekendSetting.settingValue);
                         if (!isNaN(rate)) {
                             setWeekendSurchargeRate(rate);
+                        }
+                    }
+
+                    if (avgSpeedSetting && avgSpeedSetting.settingValue != null) {
+                        const parsed = Number(avgSpeedSetting.settingValue);
+                        if (!Number.isNaN(parsed) && parsed > 0) {
+                            setAvgVehicleSpeedKmph(Math.round(parsed));
                         }
                     }
                 }
@@ -800,27 +929,41 @@ export default function CreateOrderPage() {
             setIsWeekend(false);
         }
     }, [startTime]);
-    
+
     // Validate thời gian real-time khi startTime hoặc endTime thay đổi
     React.useEffect(() => {
         if (hireType === "ONE_WAY") {
             setTimeError(""); // ONE_WAY không cần validate
             return;
         }
-        
+
         if (startTime && endTime) {
             const startDate = new Date(startTime);
             const endDate = new Date(endTime);
-            
+
             if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
                 setTimeError(""); // Chưa parse được thì chưa validate
                 return;
             }
-            
-            if (endDate <= startDate) {
-                setTimeError("Thời gian về phải sau thời gian đi");
+
+            // Đối với thuê theo ngày (DAILY / MULTI_DAY): chỉ cần ngày kết thúc >= ngày bắt đầu
+            if (hireType === "DAILY" || hireType === "MULTI_DAY") {
+                // So sánh chỉ ngày (bỏ qua giờ)
+                const startDay = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+                const endDay = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+
+                if (endDay < startDay) {
+                    setTimeError("Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu");
+                } else {
+                    setTimeError(""); // Clear error nếu hợp lệ
+                }
             } else {
-                setTimeError(""); // Clear error nếu hợp lệ
+                // ROUND_TRIP: cần thời gian về > thời gian đi (cả giờ)
+                if (endDate <= startDate) {
+                    setTimeError("Thời gian về phải sau thời gian đi");
+                } else {
+                    setTimeError(""); // Clear error nếu hợp lệ
+                }
             }
         } else {
             setTimeError(""); // Chưa đủ thông tin thì chưa validate
@@ -828,7 +971,7 @@ export default function CreateOrderPage() {
     }, [startTime, endTime, hireType]);
 
     // calculate via backend when possible
-    React.useEffect(() => {
+    const recalcPrice = React.useCallback(async () => {
         const run = async () => {
             // Cần đủ thông tin cơ bản để tính giá
             const validSelections = vehicleSelections.filter(v => v.categoryId && v.quantity > 0);
@@ -868,13 +1011,13 @@ export default function CreateOrderPage() {
                     startTime: startISO,
                     endTime: endISO,
                 };
-                
+
                 // Lấy thông tin hireType từ hireTypesList
-                const currentHireTypeObj = hireTypesList.find(h => 
-                    (hireTypeId && h.id === Number(hireTypeId)) || 
+                const currentHireTypeObj = hireTypesList.find(h =>
+                    (hireTypeId && h.id === Number(hireTypeId)) ||
                     (hireType && h.code === hireType)
                 );
-                
+
                 // 🔍 LOG FRONTEND: Dữ liệu gửi đi
                 console.log("🔵 [FRONTEND] Calculate Price Request:", {
                     ...priceRequest,
@@ -889,10 +1032,10 @@ export default function CreateOrderPage() {
                     })),
                     hireTypesList: hireTypesList.map(h => ({ id: h.id, code: h.code, name: h.name }))
                 });
-                
+
                 const price = await calculatePrice(priceRequest);
                 const base = Number(price || 0);
-                
+
                 // 🔍 LOG FRONTEND: Kết quả nhận về
                 console.log("🟢 [FRONTEND] Calculate Price Response:", {
                     price: base,
@@ -901,7 +1044,7 @@ export default function CreateOrderPage() {
                     hireTypeId: hireTypeId,
                     hireTypeName: hireType?.name || "N/A"
                 });
-                
+
                 setEstPriceSys(base);
                 setQuotedPrice((old) => (quotedPriceTouched ? old : base));
             } catch (err) {
@@ -911,8 +1054,12 @@ export default function CreateOrderPage() {
                 setCalculatingPrice(false);
             }
         };
-        run();
-    }, [hireTypeId, isHoliday, isWeekend, startTime, endTime, quotedPriceTouched, distanceKm, vehicleSelections, hireType]);
+        await run();
+    }, [hireTypeId, isHoliday, isWeekend, startTime, endTime, quotedPriceTouched, distanceKm, vehicleSelections, hireType, calculatePrice]);
+
+    React.useEffect(() => {
+        recalcPrice();
+    }, [recalcPrice]);
 
     /* --- submit states --- */
     const [loadingDraft, setLoadingDraft] =
@@ -1002,17 +1149,17 @@ export default function CreateOrderPage() {
 
     // Validation: ONE_WAY không cần endTime
     const needsEndTime = hireType !== "ONE_WAY";
-    
+
     // Validate thời gian: endTime phải > startTime
     const isTimeValid = React.useMemo(() => {
         if (!startTime) return true; // Chưa nhập startTime thì chưa cần validate
         if (!needsEndTime || !endTime) return true; // ONE_WAY hoặc chưa nhập endTime
-        
+
         const startDate = new Date(startTime);
         const endDate = new Date(endTime);
         return endDate > startDate;
     }, [startTime, endTime, needsEndTime]);
-    
+
     const isValidCore =
         phone &&
         customerName &&
@@ -1070,28 +1217,34 @@ export default function CreateOrderPage() {
             // Validate endTime nếu không phải ONE_WAY
             if (hireType !== "ONE_WAY" && endTime) {
                 const endDate = new Date(endTime);
-                
-                // Check if end time is after start time
-                if (endDate <= startDate) {
-                    setTimeError("Thời gian về phải sau thời gian đi");
-                    push("Thời gian về phải sau thời gian đi", "error");
-                    return;
-                } else {
-                    setTimeError(""); // Clear error nếu hợp lệ
-                }
 
-                // Check minimum duration based on hire type
-                const durationHours = (endDate - startDate) / (1000 * 60 * 60);
-                let minDuration = 2; // Minimum 2 hours for round trip
-                
+                // Đối với thuê theo ngày (DAILY / MULTI_DAY): chỉ cần ngày kết thúc >= ngày bắt đầu
                 if (hireType === "DAILY" || hireType === "MULTI_DAY") {
-                    minDuration = 8; // Minimum 8 hours for daily hire
-                }
-                
-                if (durationHours < minDuration) {
-                    const hireTypeLabel = hireType === "ROUND_TRIP" ? "hai chiều" : "theo ngày";
-                    push(`Thời gian thuê ${hireTypeLabel} tối thiểu ${minDuration} giờ`, "error");
-                    return;
+                    if (endDate < startDate) {
+                        setTimeError("Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu");
+                        push("Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu", "error");
+                        return;
+                    } else {
+                        setTimeError(""); // Clear error nếu hợp lệ
+                    }
+                    // Không check tối thiểu X giờ cho thuê theo ngày vì có case thuê trong ngày
+                } else {
+                    // ROUND_TRIP: cần thời gian về > thời gian đi và tối thiểu một số giờ
+                    if (endDate <= startDate) {
+                        setTimeError("Thời gian về phải sau thời gian đi");
+                        push("Thời gian về phải sau thời gian đi", "error");
+                        return;
+                    } else {
+                        setTimeError(""); // Clear error nếu hợp lệ
+                    }
+
+                    const durationHours = (endDate - startDate) / (1000 * 60 * 60);
+                    const minDuration = 2; // Minimum 2 hours for round trip
+
+                    if (durationHours < minDuration) {
+                        push(`Thời gian thuê hai chiều tối thiểu ${minDuration} giờ`, "error");
+                        return;
+                    }
                 }
             }
         }
@@ -1168,10 +1321,10 @@ export default function CreateOrderPage() {
             console.log("📤 Full request payload:", req);
             const created = await createBooking(req);
             console.log("✅ Draft created response:", created);
-            
+
             // Handle different response formats
             const bookingId = created?.id || created?.data?.id || created?.bookingId;
-            
+
             if (bookingId) {
                 push(`✓ Đã lưu nháp đơn hàng #${bookingId} - Đang chuyển đến trang chi tiết...`, "success", 3000);
                 setTimeout(() => {
@@ -1232,28 +1385,40 @@ export default function CreateOrderPage() {
             // Validate endTime nếu không phải ONE_WAY
             if (hireType !== "ONE_WAY" && endTime) {
                 const endDate = new Date(endTime);
-                
-                // Check if end time is after start time
-                if (endDate <= startDate) {
-                    setTimeError("Thời gian về phải sau thời gian đi");
-                    push("Thời gian về phải sau thời gian đi", "error");
-                    return;
-                } else {
-                    setTimeError(""); // Clear error nếu hợp lệ
-                }
 
-                // Check minimum duration based on hire type
-                const durationHours = (endDate - startDate) / (1000 * 60 * 60);
-                let minDuration = 2; // Minimum 2 hours for round trip
-                
+                // Đối với thuê theo ngày (DAILY / MULTI_DAY): chỉ cần ngày kết thúc >= ngày bắt đầu
                 if (hireType === "DAILY" || hireType === "MULTI_DAY") {
-                    minDuration = 8; // Minimum 8 hours for daily hire
-                }
-                
-                if (durationHours < minDuration) {
-                    const hireTypeLabel = hireType === "ROUND_TRIP" ? "hai chiều" : "theo ngày";
-                    push(`Thời gian thuê ${hireTypeLabel} tối thiểu ${minDuration} giờ`, "error");
-                    return;
+                    // So sánh chỉ ngày (bỏ qua giờ)
+                    const startDay = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+                    const endDay = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+
+                    if (endDay < startDay) {
+                        setTimeError("Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu");
+                        push("Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu", "error");
+                        return;
+                    } else {
+                        setTimeError(""); // Clear error nếu hợp lệ
+                    }
+
+                    // Không check tối thiểu X giờ cho thuê theo ngày vì có case thuê trong ngày
+                } else {
+                    // ROUND_TRIP: cần thời gian về > thời gian đi (cả giờ)
+                    if (endDate <= startDate) {
+                        setTimeError("Thời gian về phải sau thời gian đi");
+                        push("Thời gian về phải sau thời gian đi", "error");
+                        return;
+                    } else {
+                        setTimeError(""); // Clear error nếu hợp lệ
+                    }
+
+                    // Check minimum duration for round trip
+                    const durationHours = (endDate - startDate) / (1000 * 60 * 60);
+                    const minDuration = 2; // Minimum 2 hours for round trip
+
+                    if (durationHours < minDuration) {
+                        push(`Thời gian thuê hai chiều tối thiểu ${minDuration} giờ`, "error");
+                        return;
+                    }
                 }
             }
         }
@@ -1287,7 +1452,7 @@ export default function CreateOrderPage() {
                                 endTime: sEnd,
                                 quantity: selection.quantity || 1,
                             });
-                            
+
                             // 🔍 LOG FRONTEND: Check availability response
                             console.log("🔵 [FRONTEND] Check Availability Response:", {
                                 categoryId: selection.categoryId,
@@ -1300,16 +1465,16 @@ export default function CreateOrderPage() {
                                 alternativeCategories: data.alternativeCategories || [],
                                 nextAvailableSlots: data.nextAvailableSlots || [],
                             });
-                            
+
                             return { ...data, categoryId: selection.categoryId, quantity: selection.quantity };
                         })
                     );
-                    
+
                     const allOk = checkResults.every(r => r.ok);
                     if (!allOk) {
                         const firstFailed = checkResults.find(r => !r.ok);
                         const cat = categories.find(c => c.id === firstFailed.categoryId);
-                        
+
                         // Set availabilityInfo để hiển thị suggest dialog
                         setAvailabilityInfo({
                             ok: false,
@@ -1324,17 +1489,17 @@ export default function CreateOrderPage() {
                             failedCategoryId: firstFailed.categoryId,
                             results: checkResults,
                         });
-                        
+
                         push(
                             `${cat?.name || 'Xe'}: Không đủ xe trong khung giờ này (${firstFailed.busyCount || 0}/${firstFailed.totalCandidates || 0} đang bận). Vui lòng chọn thời gian khác.`,
                             "error"
                         );
-                        
+
                         // Tự động mở popup gợi ý khi không đủ xe và có suggestions
                         if (firstFailed.alternativeCategories?.length > 0 || firstFailed.nextAvailableSlots?.length > 0) {
                             setShowSuggestionDialog(true);
                         }
-                        
+
                         setLoadingSubmit(false);
                         return;
                     }
@@ -1351,9 +1516,9 @@ export default function CreateOrderPage() {
             console.log("🔵 [FRONTEND] vehicleSelections before creating booking:", vehicleSelections);
             const validVehicleSelections = vehicleSelections.filter(v => v.categoryId);
             console.log("🔵 [FRONTEND] Valid vehicle selections:", validVehicleSelections);
-            const vehiclesToSend = validVehicleSelections.map(v => ({ 
-                vehicleCategoryId: Number(v.categoryId), 
-                quantity: Number(v.quantity || 1) 
+            const vehiclesToSend = validVehicleSelections.map(v => ({
+                vehicleCategoryId: Number(v.categoryId),
+                quantity: Number(v.quantity || 1)
             }));
             console.log("🔵 [FRONTEND] Vehicles to send to backend:", vehiclesToSend);
 
@@ -1414,10 +1579,10 @@ export default function CreateOrderPage() {
             const created = await createBooking(req);
             console.log("✅ Booking created response:", created);
             console.log("🔍 [FRONTEND] Vehicles in response:", created?.vehicles || created?.data?.vehicles);
-            
+
             // Handle different response formats
             const bookingId = created?.id || created?.data?.id || created?.bookingId;
-            
+
             if (bookingId) {
                 push(`✓ Đã tạo đơn hàng #${bookingId} - Đang chuyển đến trang chi tiết...`, "success", 3000);
                 // Chuyển đến trang chi tiết để tạo request đặt cọc
@@ -1650,7 +1815,7 @@ export default function CreateOrderPage() {
                                     className={cls(
                                         "px-3 py-2 rounded-md border text-[13px] flex items-center gap-2 shadow-sm",
                                         hireType ===
-                                            opt.key
+                                        opt.key
                                             ? "ring-1 ring-emerald-200 bg-emerald-50 border-emerald-200 text-emerald-700"
                                             : "border-slate-300 bg-white hover:bg-slate-50 text-slate-700"
                                     )}
@@ -1729,6 +1894,17 @@ export default function CreateOrderPage() {
                                     Đang tính...
                                 </span>
                             ) : null}
+                            {!calculatingPrice && (
+                                <button
+                                    type="button"
+                                    onClick={recalcPrice}
+                                    className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-[11px] font-medium text-sky-700 hover:bg-sky-100 hover:border-sky-300 transition-colors"
+                                    title="Tính lại giá hệ thống dựa trên tuyến, thời gian và số xe hiện tại"
+                                >
+                                    <RefreshCw className="h-3 w-3" />
+                                    <span>Tính lại giá</span>
+                                </button>
+                            )}
                         </div>
 
                         <div className="grid md:grid-cols-3 gap-4 text-[13px]">
@@ -1740,9 +1916,8 @@ export default function CreateOrderPage() {
                                 <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 tabular-nums font-semibold text-slate-900">
                                     {fmtVND(estPriceSys)} đ
                                 </div>
-                                <div className="text-[11px] text-slate-400 mt-1">
-                                    Tự động tính theo tuyến /
-                                    loại xe.
+                                <div className="text-[11px] text-slate-500 mt-1">
+                                    {readAmountVi(estPriceSys)}
                                 </div>
                             </div>
 
@@ -1933,12 +2108,12 @@ export default function CreateOrderPage() {
                             </div>
 
                             {/* Thời gian đón / Ngày bắt đầu */}
-                            <div>
+                            <div className="relative" style={{ zIndex: 10 }}>
                                 <div className={labelCls}>
                                     <Clock className="h-3.5 w-3.5 text-slate-400" />
                                     <span>
-                                        {hireType === "DAILY" || hireType === "MULTI_DAY" 
-                                            ? "Ngày bắt đầu *" 
+                                        {hireType === "DAILY" || hireType === "MULTI_DAY"
+                                            ? "Ngày bắt đầu *"
                                             : "Thời gian đi *"}
                                     </span>
                                 </div>
@@ -1948,24 +2123,48 @@ export default function CreateOrderPage() {
                                     onChange={(e) => {
                                         const newStartTime = e.target.value;
                                         setStartTime(newStartTime);
-                                        
+
                                         // Validate real-time: nếu đã có endTime, kiểm tra endTime > startTime
                                         if (newStartTime && endTime && hireType !== "ONE_WAY") {
                                             const startDate = new Date(newStartTime);
                                             const endDate = new Date(endTime);
-                                            if (endDate <= startDate) {
-                                                setTimeError("Thời gian về phải sau thời gian đi");
+
+                                            // Đối với thuê theo ngày (DAILY / MULTI_DAY): chỉ cần ngày kết thúc >= ngày bắt đầu
+                                            if (hireType === "DAILY" || hireType === "MULTI_DAY") {
+                                                // So sánh chỉ ngày (bỏ qua giờ)
+                                                const startDay = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+                                                const endDay = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+
+                                                if (endDay < startDay) {
+                                                    setTimeError("Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu");
+                                                } else {
+                                                    setTimeError("");
+                                                }
                                             } else {
-                                                setTimeError("");
+                                                // ROUND_TRIP: cần thời gian về > thời gian đi (cả giờ)
+                                                if (endDate <= startDate) {
+                                                    setTimeError("Thời gian về phải sau thời gian đi");
+                                                } else {
+                                                    setTimeError("");
+                                                }
                                             }
                                         } else {
                                             setTimeError("");
                                         }
                                     }}
+                                    onClick={(e) => {
+                                        // Đảm bảo click event không bị chặn
+                                        e.stopPropagation();
+                                    }}
+                                    min={hireType === "DAILY" || hireType === "MULTI_DAY"
+                                        ? new Date().toISOString().split('T')[0]
+                                        : new Date().toISOString().slice(0, 16)}
+                                    step={hireType === "DAILY" || hireType === "MULTI_DAY" ? undefined : "60"}
                                     className={cls(
                                         inputCls,
                                         timeError && "border-red-300 focus:border-red-500 focus:ring-red-500/20"
                                     )}
+                                    style={{ position: 'relative', zIndex: 100 }}
                                 />
                                 {timeError && (
                                     <div className="text-[12px] text-red-600 mt-1 flex items-center gap-1">
@@ -1977,7 +2176,7 @@ export default function CreateOrderPage() {
 
                             {/* Kết thúc dự kiến / Ngày kết thúc - Ẩn với ONE_WAY */}
                             {hireType !== "ONE_WAY" && (
-                                <div>
+                                <div className="relative" style={{ zIndex: 10 }}>
                                     <div className={labelCls}>
                                         <Calendar className="h-3.5 w-3.5 text-slate-400" />
                                         <span>
@@ -1992,24 +2191,48 @@ export default function CreateOrderPage() {
                                         onChange={(e) => {
                                             const newEndTime = e.target.value;
                                             setEndTime(newEndTime);
-                                            
+
                                             // Validate real-time: endTime phải > startTime
                                             if (newEndTime && startTime) {
                                                 const startDate = new Date(startTime);
                                                 const endDate = new Date(newEndTime);
-                                                if (endDate <= startDate) {
-                                                    setTimeError("Thời gian về phải sau thời gian đi");
+
+                                                // Đối với thuê theo ngày (DAILY / MULTI_DAY): chỉ cần ngày kết thúc >= ngày bắt đầu
+                                                if (hireType === "DAILY" || hireType === "MULTI_DAY") {
+                                                    // So sánh chỉ ngày (bỏ qua giờ)
+                                                    const startDay = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+                                                    const endDay = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+
+                                                    if (endDay < startDay) {
+                                                        setTimeError("Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu");
+                                                    } else {
+                                                        setTimeError("");
+                                                    }
                                                 } else {
-                                                    setTimeError("");
+                                                    // ROUND_TRIP: cần thời gian về > thời gian đi (cả giờ)
+                                                    if (endDate <= startDate) {
+                                                        setTimeError("Thời gian về phải sau thời gian đi");
+                                                    } else {
+                                                        setTimeError("");
+                                                    }
                                                 }
                                             } else {
                                                 setTimeError("");
                                             }
                                         }}
+                                        onClick={(e) => {
+                                            // Đảm bảo click event không bị chặn
+                                            e.stopPropagation();
+                                        }}
+                                        min={hireType === "DAILY" || hireType === "MULTI_DAY"
+                                            ? new Date().toISOString().split('T')[0]
+                                            : new Date().toISOString().slice(0, 16)}
+                                        step={hireType === "DAILY" || hireType === "MULTI_DAY" ? undefined : "60"}
                                         className={cls(
                                             inputCls,
                                             timeError && "border-red-300 focus:border-red-500 focus:ring-red-500/20"
                                         )}
+                                        style={{ position: 'relative', zIndex: 100 }}
                                     />
                                     {timeError && (
                                         <div className="text-[12px] text-red-600 mt-1 flex items-center gap-1">
@@ -2020,25 +2243,79 @@ export default function CreateOrderPage() {
                                 </div>
                             )}
 
+                            {/* ETA / Xe bận tới (ước lượng theo km + vận tốc trung bình) */}
+                            {etaInfo && (
+                                <div className="col-span-full">
+                                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="flex items-center gap-2">
+                                                <Clock className="h-4 w-4 text-sky-600" />
+                                                <div className="text-[13px] font-semibold text-slate-900">
+                                                    Ước lượng thời gian (tham khảo)
+                                                </div>
+                                            </div>
+                                            <div className="text-[11px] text-slate-500">
+                                                Vận tốc: {etaInfo.speed} km/h • Dự phòng: {etaInfo.bufferMinutes} phút
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-[12px]">
+                                            <div className="rounded-lg bg-white border border-slate-200 p-2">
+                                                <div className="text-[11px] uppercase font-semibold text-slate-500">
+                                                    Thời lượng ước tính
+                                                </div>
+                                                <div className="text-[13px] font-semibold text-slate-900 tabular-nums">
+                                                    {etaInfo.mode === "BY_DAY" ? "Theo ngày" : etaInfo.travelText}
+                                                </div>
+                                                {etaInfo.mode !== "BY_DAY" && (
+                                                    <div className="text-[11px] text-slate-500 mt-0.5">
+                                                        Dựa trên quãng đường & vận tốc trung bình cấu hình.
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="rounded-lg bg-white border border-slate-200 p-2">
+                                                <div className="text-[11px] uppercase font-semibold text-slate-500">
+                                                    Xe rảnh dự kiến
+                                                </div>
+                                                <div className="text-[13px] font-semibold text-slate-900 tabular-nums">
+                                                    {etaInfo.busyUntilText}
+                                                </div>
+                                                {etaInfo.mode === "ROUND_TRIP" && etaInfo.goArriveText && (
+                                                    <div className="text-[11px] text-slate-500 mt-0.5">
+                                                        Dự kiến đến lượt đi: <span className="font-medium">{etaInfo.goArriveText}</span>
+                                                    </div>
+                                                )}
+                                                {etaInfo.mode === "BY_DAY" && (
+                                                    <div className="text-[11px] text-slate-500 mt-0.5">
+                                                        Đặt theo ngày: xe chỉ nhận chuyến mới từ ngày kế tiếp.
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Loại xe - Hỗ trợ nhiều loại */}
                             <div className="col-span-full">
                                 <div className={labelCls}>
                                     <CarFront className="h-3.5 w-3.5 text-emerald-600" />
                                     <span>Loại xe yêu cầu *</span>
                                 </div>
-                                
+
                                 <div className="space-y-2 mt-1">
                                     {vehicleSelections.map((selection, index) => {
                                         const cat = categories.find(c => c.id === selection.categoryId);
                                         // Kiểm tra loại xe này có hết không (từ availabilityInfo.results)
                                         const thisVehicleResult = availabilityInfo?.results?.find(r => r.categoryId === selection.categoryId);
                                         const isOutOfStock = thisVehicleResult && !thisVehicleResult.ok;
-                                        
+
                                         return (
                                             <div key={index} className={cls(
                                                 "p-2 rounded-lg border",
-                                                isOutOfStock 
-                                                    ? "bg-red-50 border-red-300" 
+                                                isOutOfStock
+                                                    ? "bg-red-50 border-red-300"
                                                     : "bg-slate-50 border-slate-200"
                                             )}>
                                                 {/* Row 1: Select + Số lượng + Số chỗ + Nút xóa */}
@@ -2057,16 +2334,16 @@ export default function CreateOrderPage() {
                                                         <option value="">-- Chọn loại xe --</option>
                                                         {categories.map((c) => {
                                                             // Disable nếu loại xe này đã được chọn ở selection khác
-                                                            const isAlreadySelected = vehicleSelections.some((v, i) => 
+                                                            const isAlreadySelected = vehicleSelections.some((v, i) =>
                                                                 i !== index && v.categoryId === c.id
                                                             );
                                                             // Kiểm tra loại xe này có hết không
                                                             const catResult = availabilityInfo?.results?.find(r => r.categoryId === c.id);
                                                             const catOutOfStock = catResult && !catResult.ok;
-                                                            
+
                                                             return (
-                                                                <option 
-                                                                    key={c.id} 
+                                                                <option
+                                                                    key={c.id}
                                                                     value={c.id}
                                                                     disabled={isAlreadySelected}
                                                                     className={catOutOfStock ? "text-red-600" : ""}
@@ -2076,7 +2353,7 @@ export default function CreateOrderPage() {
                                                             );
                                                         })}
                                                     </select>
-                                                    
+
                                                     {/* Số lượng */}
                                                     <div className="flex items-center gap-1">
                                                         <span className="text-[12px] text-slate-500 whitespace-nowrap">SL:</span>
@@ -2097,7 +2374,7 @@ export default function CreateOrderPage() {
                                                             <Plus className="h-3 w-3" />
                                                         </button>
                                                     </div>
-                                                    
+
                                                     {/* Hiện số chỗ */}
                                                     {cat && (
                                                         <span className={cls(
@@ -2107,7 +2384,7 @@ export default function CreateOrderPage() {
                                                             = {cat.seats * selection.quantity} chỗ
                                                         </span>
                                                     )}
-                                                    
+
                                                     {/* Nút xóa */}
                                                     {vehicleSelections.length > 1 && (
                                                         <button
@@ -2120,20 +2397,20 @@ export default function CreateOrderPage() {
                                                         </button>
                                                     )}
                                                 </div>
-                                                
+
                                                 {/* Row 2: Badge hết xe (nếu có) */}
                                                 {isOutOfStock && (
                                                     <div className="mt-2 flex items-center">
                                                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium bg-red-100 text-red-700 border border-red-200">
                                                             <CarFront className="h-3.5 w-3.5" />
-                                                            {cat?.name}: Hết xe ({thisVehicleResult?.busyCount || 0}/{thisVehicleResult?.totalCandidates || 0} đang bận) ({thisVehicleResult?.availableCount || 0} xe)
+                                                            {cat?.name}: Hết xe (hiện chỉ còn {thisVehicleResult?.availableCount || 0} xe trong khoảng thời gian này)
                                                         </span>
                                                     </div>
                                                 )}
                                             </div>
                                         );
                                     })}
-                                    
+
                                     {/* Nút thêm loại xe */}
                                     {vehicleSelections.length < 5 && categories.length > vehicleSelections.length && (
                                         <button
@@ -2146,7 +2423,7 @@ export default function CreateOrderPage() {
                                         </button>
                                     )}
                                 </div>
-                                
+
                                 {/* Tổng số chỗ */}
                                 <div className="mt-2 flex items-center justify-between text-[12px]">
                                     <span className="text-slate-500">
@@ -2154,13 +2431,13 @@ export default function CreateOrderPage() {
                                         {vehicleSelections.length > 1 && (
                                             <span className="ml-1">
                                                 ({vehicleSelections.filter(v => v.categoryId).map(v => {
-                                                    const c = categories.find(cat => cat.id === v.categoryId);
-                                                    return c ? `${v.quantity}×${c.seats}` : '';
-                                                }).filter(Boolean).join(' + ')})
+                                                const c = categories.find(cat => cat.id === v.categoryId);
+                                                return c ? `${v.quantity}×${c.seats}` : '';
+                                            }).filter(Boolean).join(' + ')})
                                             </span>
                                         )}
                                     </span>
-                                    
+
                                     {checkingAvail ? (
                                         <span className="inline-flex items-center gap-1 text-slate-500">
                                             <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />
@@ -2204,7 +2481,7 @@ export default function CreateOrderPage() {
                     ) : null}
 
                     {availabilityInfo &&
-                        !availabilityInfo.ok ? (
+                    !availabilityInfo.ok ? (
                         <div className="rounded-lg border border-info-200 bg-info-50 text-info-700 text-[12px] p-3 flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <AlertTriangle className="h-4 w-4 text-primary-600 shrink-0" />
@@ -2330,7 +2607,7 @@ export default function CreateOrderPage() {
                                     Không đủ xe khả dụng
                                 </h3>
                                 <p className="text-sm text-slate-500 mt-1">
-                                    Cần <span className="font-medium text-slate-700">{availabilityInfo.needed}</span> xe {selectedCategory?.name || ""}, 
+                                    Cần <span className="font-medium text-slate-700">{availabilityInfo.needed}</span> xe {selectedCategory?.name || ""},
                                     hiện chỉ còn <span className="font-medium text-primary-600">{availabilityInfo.count}</span> xe rảnh.
                                     Vui lòng chọn một trong các gợi ý bên dưới.
                                 </p>
@@ -2350,53 +2627,55 @@ export default function CreateOrderPage() {
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                {availabilityInfo.alternativeCategories
-                                    // Ẩn các loại xe đã được chọn trong form (tránh gợi ý trùng)
-                                    .filter(
-                                        (alt) =>
-                                            !vehicleSelections.some(
-                                                (v) =>
-                                                    String(v.categoryId) ===
-                                                    String(alt.categoryId)
-                                            )
-                                    )
-                                    .map((alt) => (
-                                        <button
-                                            key={alt.categoryId}
-                                            type="button"
-                                            onClick={() => {
-                                                // Tìm index của loại xe bị hết để thay thế
-                                                const failedIndex = vehicleSelections.findIndex(
-                                                    v => v.categoryId === availabilityInfo.failedCategoryId
-                                                );
-                                                if (failedIndex >= 0) {
-                                                    updateVehicleSelection(failedIndex, 'categoryId', String(alt.categoryId));
-                                                } else {
-                                                    // Nếu không tìm thấy, cập nhật xe đầu tiên
-                                                    updateVehicleSelection(0, 'categoryId', String(alt.categoryId));
-                                                }
-                                                setShowSuggestionDialog(false);
-                                                push(`Đã chọn ${alt.categoryName}`, "success");
-                                            }}
-                                            className="w-full text-left px-4 py-3 rounded-lg bg-white hover:bg-emerald-50 border border-emerald-200 hover:border-emerald-400 text-slate-700 transition-all flex items-center justify-between group shadow-sm hover:shadow"
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-10 w-10 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
-                                                    <CarFront className="h-5 w-5" />
+                                    {availabilityInfo.alternativeCategories
+                                        // Chỉ hiển thị các loại xe có xe rảnh (availableCount > 0)
+                                        .filter((alt) => (alt.availableCount || 0) > 0)
+                                        // Ẩn các loại xe đã được chọn trong form (tránh gợi ý trùng)
+                                        .filter(
+                                            (alt) =>
+                                                !vehicleSelections.some(
+                                                    (v) =>
+                                                        String(v.categoryId) ===
+                                                        String(alt.categoryId)
+                                                )
+                                        )
+                                        .map((alt) => (
+                                            <button
+                                                key={alt.categoryId}
+                                                type="button"
+                                                onClick={() => {
+                                                    // Tìm index của loại xe bị hết để thay thế
+                                                    const failedIndex = vehicleSelections.findIndex(
+                                                        v => v.categoryId === availabilityInfo.failedCategoryId
+                                                    );
+                                                    if (failedIndex >= 0) {
+                                                        updateVehicleSelection(failedIndex, 'categoryId', String(alt.categoryId));
+                                                    } else {
+                                                        // Nếu không tìm thấy, cập nhật xe đầu tiên
+                                                        updateVehicleSelection(0, 'categoryId', String(alt.categoryId));
+                                                    }
+                                                    setShowSuggestionDialog(false);
+                                                    push(`Đã chọn ${alt.categoryName}`, "success");
+                                                }}
+                                                className="w-full text-left px-4 py-3 rounded-lg bg-white hover:bg-emerald-50 border border-emerald-200 hover:border-emerald-400 text-slate-700 transition-all flex items-center justify-between group shadow-sm hover:shadow"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-10 w-10 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
+                                                        <CarFront className="h-5 w-5" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-medium text-slate-800">{alt.categoryName}</div>
+                                                        <div className="text-[11px] text-slate-500">{alt.seats} chỗ ngồi • {alt.pricePerKm?.toLocaleString("vi-VN")}đ/km</div>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <div className="font-medium text-slate-800">{alt.categoryName}</div>
-                                                    <div className="text-[11px] text-slate-500">{alt.seats} chỗ ngồi • {alt.pricePerKm?.toLocaleString("vi-VN")}đ/km</div>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-2">
                                                 <span className="text-xs bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full font-medium">
                                                     {alt.availableCount} xe rảnh
                                                 </span>
-                                                <ArrowRight className="h-4 w-4 text-emerald-500 group-hover:translate-x-1 transition-transform" />
-                                            </div>
-                                        </button>
-                                    ))}
+                                                    <ArrowRight className="h-4 w-4 text-emerald-500 group-hover:translate-x-1 transition-transform" />
+                                                </div>
+                                            </button>
+                                        ))}
                                 </div>
                             </div>
                         )}

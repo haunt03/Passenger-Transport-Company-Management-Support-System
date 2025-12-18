@@ -17,6 +17,7 @@ import {
     X,
 } from "lucide-react";
 import { getDriverSchedule, getDriverProfile } from "../../api/drivers";
+import { getCurrentRole, ROLES } from "../../utils/session";
 
 /* ===========================================
    Helper Functions
@@ -109,16 +110,17 @@ function TripStatusBadge({ status }) {
 export default function CoordinatorDriverTripsPage() {
     const { driverId } = useParams();
     const navigate = useNavigate();
+    const role = getCurrentRole();
+    const isManager = role === ROLES.MANAGER || role === ROLES.ADMIN;
 
     const [driver, setDriver] = React.useState(null);
     const [trips, setTrips] = React.useState([]);
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState("");
 
-    // Filter states
+    // Filter states - mặc định không filter (hiển thị tất cả)
     const [startDate, setStartDate] = React.useState("");
     const [endDate, setEndDate] = React.useState("");
-    const [statusFilter, setStatusFilter] = React.useState("ALL");
 
     // Pagination
     const [currentPage, setCurrentPage] = React.useState(1);
@@ -140,18 +142,16 @@ export default function CoordinatorDriverTripsPage() {
             const driverResp = await getDriverProfile(driverId);
             setDriver(driverResp);
 
-            // Load trips with date filter
-            let start = null;
-            let end = null;
-
+            // Load trips - chỉ truyền filter thời gian khi user đã chọn
+            const params = {};
             if (startDate) {
-                start = new Date(startDate + "T00:00:00").toISOString();
+                params.startDate = new Date(startDate + "T00:00:00").toISOString();
             }
             if (endDate) {
-                end = new Date(endDate + "T23:59:59").toISOString();
+                params.endDate = new Date(endDate + "T23:59:59").toISOString();
             }
 
-            const tripsResp = await getDriverSchedule(driverId, start, end);
+            const tripsResp = await getDriverSchedule(driverId, params);
             const tripsList = Array.isArray(tripsResp?.data) ? tripsResp.data : (Array.isArray(tripsResp) ? tripsResp : []);
 
             // Sort by startTime descending (newest first)
@@ -170,11 +170,8 @@ export default function CoordinatorDriverTripsPage() {
         }
     };
 
-    // Filter trips by status
-    const filteredTrips = React.useMemo(() => {
-        if (statusFilter === "ALL") return trips;
-        return trips.filter((t) => t.status === statusFilter);
-    }, [trips, statusFilter]);
+    // Không filter theo status nữa - hiển thị tất cả
+    const filteredTrips = trips;
 
     // Pagination
     const totalPages = Math.max(1, Math.ceil(filteredTrips.length / pageSize));
@@ -184,15 +181,14 @@ export default function CoordinatorDriverTripsPage() {
     // Reset page when filter changes
     React.useEffect(() => {
         setCurrentPage(1);
-    }, [statusFilter, startDate, endDate]);
+    }, [startDate, endDate]);
 
     const clearFilters = () => {
         setStartDate("");
         setEndDate("");
-        setStatusFilter("ALL");
     };
 
-    const hasActiveFilters = startDate || endDate || statusFilter !== "ALL";
+    const hasActiveFilters = startDate || endDate;
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 p-6">
@@ -201,7 +197,13 @@ export default function CoordinatorDriverTripsPage() {
                 <div className="mb-6">
                     <div className="flex items-center gap-4 mb-4">
                         <button
-                            onClick={() => navigate(-1)}
+                            onClick={() => {
+                                // Navigate về driver detail theo role
+                                const detailPath = isManager
+                                    ? `/manager/drivers/${driverId}`
+                                    : `/coordinator/drivers/${driverId}`;
+                                navigate(detailPath);
+                            }}
                             className="p-2 rounded-lg hover:bg-slate-200 transition-colors"
                         >
                             <ArrowLeft className="h-5 w-5 text-slate-600" />
@@ -277,21 +279,6 @@ export default function CoordinatorDriverTripsPage() {
                                 />
                             </div>
 
-                            {/* Status Filter */}
-                            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
-                                <Clock className="h-4 w-4 text-slate-400 shrink-0" />
-                                <select
-                                    value={statusFilter}
-                                    onChange={(e) => setStatusFilter(e.target.value)}
-                                    className="flex-1 bg-transparent outline-none text-sm text-slate-700 cursor-pointer"
-                                >
-                                    <option value="ALL">Tất cả trạng thái</option>
-                                    <option value="SCHEDULED">Đã lên lịch</option>
-                                    <option value="ONGOING">Đang thực hiện</option>
-                                    <option value="COMPLETED">Hoàn thành</option>
-                                    <option value="CANCELLED">Đã hủy</option>
-                                </select>
-                            </div>
                         </div>
 
                         {/* Clear Filters */}
@@ -359,57 +346,57 @@ export default function CoordinatorDriverTripsPage() {
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left text-[13px]">
                                     <thead className="text-[11px] uppercase tracking-wide bg-slate-100/60 border-b border-slate-200 text-slate-500">
-                                        <tr>
-                                            <th className="px-4 py-3 font-medium">Mã chuyến</th>
-                                            <th className="px-4 py-3 font-medium">Khách hàng</th>
-                                            <th className="px-4 py-3 font-medium">Địa điểm đón</th>
-                                            <th className="px-4 py-3 font-medium">Địa điểm đến</th>
-                                            <th className="px-4 py-3 font-medium">Thời gian đón</th>
-                                            <th className="px-4 py-3 font-medium">Thời gian đến</th>
-                                            <th className="px-4 py-3 font-medium text-right">Trạng thái</th>
-                                        </tr>
+                                    <tr>
+                                        <th className="px-4 py-3 font-medium">Mã chuyến</th>
+                                        <th className="px-4 py-3 font-medium">Khách hàng</th>
+                                        <th className="px-4 py-3 font-medium">Địa điểm đón</th>
+                                        <th className="px-4 py-3 font-medium">Địa điểm đến</th>
+                                        <th className="px-4 py-3 font-medium">Thời gian đón</th>
+                                        <th className="px-4 py-3 font-medium">Thời gian đến</th>
+                                        <th className="px-4 py-3 font-medium text-right">Trạng thái</th>
+                                    </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-200">
-                                        {paginatedTrips.map((trip) => (
-                                            <tr key={trip.tripId || trip.id} className="hover:bg-slate-50 transition-colors">
-                                                <td className="px-4 py-3 font-medium text-slate-900 whitespace-nowrap">
-                                                    {trip.tripCode || trip.code || `#${trip.tripId || trip.id}`}
-                                                </td>
-                                                <td className="px-4 py-3 text-slate-700">
-                                                    <div className="font-medium">{trip.customerName || trip.customer_name || "—"}</div>
-                                                    {trip.customerPhone && (
-                                                        <div className="text-[11px] text-slate-500">{trip.customerPhone || trip.customer_phone}</div>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3 text-slate-700">
-                                                    <div className="flex items-start gap-1 text-[12px] leading-relaxed max-w-[200px]">
-                                                        <MapPin className="h-3.5 w-3.5 text-primary-600 shrink-0 mt-0.5" />
-                                                        <span className="truncate">{trip.pickupLocation || trip.pickup_location || trip.pickup || "—"}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-slate-700">
-                                                    <div className="flex items-start gap-1 text-[12px] leading-relaxed max-w-[200px]">
-                                                        <MapPin className="h-3.5 w-3.5 text-green-600 shrink-0 mt-0.5" />
-                                                        <span className="truncate">{trip.dropoffLocation || trip.dropoff_location || trip.dropoff || "—"}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
-                                                    <div className="flex items-start gap-1 text-[12px] leading-relaxed">
-                                                        <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                                                        <span>{fmtDateTimeShort(trip.startTime || trip.start_time || trip.pickupTime || trip.pickup_time)}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
-                                                    <div className="flex items-start gap-1 text-[12px] leading-relaxed">
-                                                        <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                                                        <span>{fmtDateTimeShort(trip.endTime || trip.end_time || trip.dropoffTime || trip.dropoff_time)}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-right">
-                                                    <TripStatusBadge status={trip.status} />
-                                                </td>
-                                            </tr>
-                                        ))}
+                                    {paginatedTrips.map((trip) => (
+                                        <tr key={trip.tripId || trip.id} className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-4 py-3 font-medium text-slate-900 whitespace-nowrap">
+                                                {trip.tripCode || trip.code || `#${trip.tripId || trip.id}`}
+                                            </td>
+                                            <td className="px-4 py-3 text-slate-700">
+                                                <div className="font-medium">{trip.customerName || trip.customer_name || "—"}</div>
+                                                {trip.customerPhone && (
+                                                    <div className="text-[11px] text-slate-500">{trip.customerPhone || trip.customer_phone}</div>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 text-slate-700">
+                                                <div className="flex items-start gap-1 text-[12px] leading-relaxed max-w-[200px]">
+                                                    <MapPin className="h-3.5 w-3.5 text-primary-600 shrink-0 mt-0.5" />
+                                                    <span className="truncate">{trip.pickupLocation || trip.pickup_location || trip.pickup || "—"}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-slate-700">
+                                                <div className="flex items-start gap-1 text-[12px] leading-relaxed max-w-[200px]">
+                                                    <MapPin className="h-3.5 w-3.5 text-green-600 shrink-0 mt-0.5" />
+                                                    <span className="truncate">{trip.dropoffLocation || trip.dropoff_location || trip.dropoff || "—"}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
+                                                <div className="flex items-start gap-1 text-[12px] leading-relaxed">
+                                                    <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                                                    <span>{fmtDateTimeShort(trip.startTime || trip.start_time || trip.pickupTime || trip.pickup_time)}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
+                                                <div className="flex items-start gap-1 text-[12px] leading-relaxed">
+                                                    <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                                                    <span>{fmtDateTimeShort(trip.endTime || trip.end_time || trip.dropoffTime || trip.dropoff_time)}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 whitespace-nowrap text-right">
+                                                <TripStatusBadge status={trip.status} />
+                                            </td>
+                                        </tr>
+                                    ))}
                                     </tbody>
                                 </table>
                             </div>
@@ -453,6 +440,19 @@ export default function CoordinatorDriverTripsPage() {
         </div>
     );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

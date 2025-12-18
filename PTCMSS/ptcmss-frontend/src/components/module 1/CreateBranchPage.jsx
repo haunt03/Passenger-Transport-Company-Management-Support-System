@@ -120,7 +120,7 @@ function CreateBranchModal({
         try {
             const { createBranch } = await import("../../api/branches");
             const result = await createBranch(payload);
-            
+
             const newBranch = {
                 id: result?.id || result?.data?.id,
                 name: result?.branchName || result?.data?.branchName,

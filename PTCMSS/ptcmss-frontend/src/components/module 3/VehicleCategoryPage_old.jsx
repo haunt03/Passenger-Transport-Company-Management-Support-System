@@ -90,10 +90,10 @@ function StatusPill({ status }) {
    POST /api/admin/vehicle-categories
 ------------------------------------------------- */
 function VehicleCategoryCreateModal({
-    open,
-    onClose,
-    onCreated,
-}) {
+                                        open,
+                                        onClose,
+                                        onCreated,
+                                    }) {
     const [name, setName] = React.useState("");
     const [seats, setSeats] = React.useState("");
     const [loading, setLoading] = React.useState(false);
@@ -527,65 +527,65 @@ export default function VehicleCategoryPage() {
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-[13px] text-slate-700">
                             <thead className="bg-slate-50 border-b border-slate-200 text-[11px] uppercase tracking-wide text-slate-600">
-                                <tr>
-                                    <th className="px-5 py-3 font-semibold text-left">
-                                        Tên danh mục
-                                    </th>
-                                    <th className="px-5 py-3 font-semibold text-center whitespace-nowrap">
-                                        Số ghế
-                                    </th>
-                                    <th className="px-5 py-3 font-semibold text-center">
-                                        Trạng thái
-                                    </th>
-                                    <th className="px-5 py-3 font-semibold text-center whitespace-nowrap">
-                                        Số xe
-                                    </th>
-                                </tr>
+                            <tr>
+                                <th className="px-5 py-3 font-semibold text-left">
+                                    Tên danh mục
+                                </th>
+                                <th className="px-5 py-3 font-semibold text-center whitespace-nowrap">
+                                    Số ghế
+                                </th>
+                                <th className="px-5 py-3 font-semibold text-center">
+                                    Trạng thái
+                                </th>
+                                <th className="px-5 py-3 font-semibold text-center whitespace-nowrap">
+                                    Số xe
+                                </th>
+                            </tr>
                             </thead>
 
                             <tbody className="divide-y divide-slate-100">
-                                {categories.map((cat) => (
-                                    <tr
-                                        key={cat.id}
-                                        className="hover:bg-slate-50/70 transition-colors"
-                                    >
-                                        {/* name + id */}
-                                        <td className="px-5 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-sky-50 to-sky-100 border border-sky-200 flex items-center justify-center text-sky-600 font-semibold text-[13px] shadow-sm">
-                                                    {cat.seats || "?"}
+                            {categories.map((cat) => (
+                                <tr
+                                    key={cat.id}
+                                    className="hover:bg-slate-50/70 transition-colors"
+                                >
+                                    {/* name + id */}
+                                    <td className="px-5 py-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-sky-50 to-sky-100 border border-sky-200 flex items-center justify-center text-sky-600 font-semibold text-[13px] shadow-sm">
+                                                {cat.seats || "?"}
+                                            </div>
+                                            <div className="flex flex-col leading-tight">
+                                                <div className="text-slate-900 font-medium text-[14px]">
+                                                    {cat.name}
                                                 </div>
-                                                <div className="flex flex-col leading-tight">
-                                                    <div className="text-slate-900 font-medium text-[14px]">
-                                                        {cat.name}
-                                                    </div>
-                                                    <div className="text-[11px] text-slate-500">
-                                                        ID: {cat.id}
-                                                    </div>
+                                                <div className="text-[11px] text-slate-500">
+                                                    ID: {cat.id}
                                                 </div>
                                             </div>
-                                        </td>
+                                        </div>
+                                    </td>
 
-                                        {/* seats */}
-                                        <td className="px-5 py-4 text-center">
+                                    {/* seats */}
+                                    <td className="px-5 py-4 text-center">
                                             <span className="inline-flex items-center gap-1 text-[13px] text-slate-700 tabular-nums font-medium">
                                                 {cat.seats ?? "—"} ghế
                                             </span>
-                                        </td>
+                                    </td>
 
-                                        {/* status */}
-                                        <td className="px-5 py-4 text-center">
-                                            <StatusPill status={cat.status} />
-                                        </td>
+                                    {/* status */}
+                                    <td className="px-5 py-4 text-center">
+                                        <StatusPill status={cat.status} />
+                                    </td>
 
-                                        {/* vehicles_count */}
-                                        <td className="px-5 py-4 text-center">
+                                    {/* vehicles_count */}
+                                    <td className="px-5 py-4 text-center">
                                             <span className="text-[14px] font-semibold text-slate-900 tabular-nums">
                                                 {cat.vehicles_count} xe
                                             </span>
-                                        </td>
-                                    </tr>
-                                ))}
+                                    </td>
+                                </tr>
+                            ))}
                             </tbody>
                         </table>
                     </div>

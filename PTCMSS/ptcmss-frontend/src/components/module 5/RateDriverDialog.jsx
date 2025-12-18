@@ -4,7 +4,7 @@ import { createRating } from '../../api/ratings';
 
 const RateDriverDialog = ({ trip, onClose, onSuccess, existingRating = null }) => {
     const isReadOnly = existingRating !== null && existingRating !== undefined;
-    
+
     const [ratings, setRatings] = useState({
         punctualityRating: 5,
         attitudeRating: 5,
@@ -98,7 +98,7 @@ const RateDriverDialog = ({ trip, onClose, onSuccess, existingRating = null }) =
                     >
                         <Star
                             size={28}
-                            className={star <= value ? 'fill-primary-500 text-primary-500' : 'text-gray-300'}
+                            className={star <= value ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
                         />
                     </button>
                 ))}
@@ -203,8 +203,8 @@ const RateDriverDialog = ({ trip, onClose, onSuccess, existingRating = null }) =
                             disabled={isReadOnly}
                             rows={4}
                             className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
-                                isReadOnly 
-                                    ? 'bg-gray-50 text-gray-600 cursor-not-allowed' 
+                                isReadOnly
+                                    ? 'bg-gray-50 text-gray-600 cursor-not-allowed'
                                     : 'focus:ring-2 focus:ring-blue-500 focus:border-transparent'
                             }`}
                             placeholder={isReadOnly ? 'Không có nhận xét' : "Chia sẻ trải nghiệm của bạn về chuyến đi..."}

@@ -114,13 +114,13 @@ export default function TripExpenseModal({
             const { createExpenseRequest } = await import("../../api/expenses");
             const { getStoredUserId } = await import("../../utils/session");
             const { getBranchByUserId } = await import("../../api/branches");
-            
+
             // Get user context
             const userId = getStoredUserId();
             if (!userId) {
                 throw new Error("Bạn cần đăng nhập để gửi yêu cầu chi phí");
             }
-            
+
             // Get branch from user
             let branchId = null;
             try {
@@ -129,11 +129,11 @@ export default function TripExpenseModal({
             } catch (err) {
                 console.warn("Could not get branch:", err);
             }
-            
+
             if (!branchId) {
                 throw new Error("Không thể xác định chi nhánh. Vui lòng thử lại.");
             }
-            
+
             // Build FormData for ExpenseRequestController
             // Expected fields: type, amount, note, branchId, vehicleId (optional), requesterUserId
             const expenseFormData = new FormData();
@@ -148,7 +148,7 @@ export default function TripExpenseModal({
             if (vehicleId != null) {
                 expenseFormData.append("vehicleId", String(vehicleId));
             }
-            
+
             // Add files (ExpenseRequestController expects "files" parameter)
             files.forEach((fObj) => {
                 expenseFormData.append("files", fObj.file);

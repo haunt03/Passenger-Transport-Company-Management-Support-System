@@ -23,7 +23,7 @@ export default function CoordinatorDriverListPage({ readOnly = false }) {
     const [totalPages, setTotalPages] = useState(1);
     const [totalItems, setTotalItems] = useState(0);
     const pageSize = 10;
-    
+
     // Time filter để kiểm tra tài xế rảnh (cho Tư vấn viên & Điều phối viên)
     const [timeFilterStart, setTimeFilterStart] = useState("");
     const [timeFilterEnd, setTimeFilterEnd] = useState("");
@@ -78,25 +78,35 @@ export default function CoordinatorDriverListPage({ readOnly = false }) {
         if (isBranchScoped && !branchId) return;
         fetchDrivers();
     }, [currentPage, searchQuery, branchId, branchLoading]);
-    
+
     // Check driver availability when time filter is set
     useEffect(() => {
         if (!canUseAvailabilityFilter || !timeFilterStart || !timeFilterEnd || !drivers.length) {
             setDriverAvailability({});
             return;
         }
-        
+
         const checkAvailability = async () => {
             const availabilityMap = {};
             const startTime = new Date(timeFilterStart + "T00:00:00");
             const endTime = new Date(timeFilterEnd + "T23:59:59");
-            
+            const startISO = startTime.toISOString();
+            const endISO = endTime.toISOString();
+
             // Check availability for each driver
             for (const driver of drivers) {
                 try {
-                    const schedule = await getDriverSchedule(driver.id);
-                    const trips = schedule?.trips || schedule || [];
-                    
+                    // Gọi API lịch làm việc trong khoảng thời gian đang filter
+                    const schedule = await getDriverSchedule(driver.id, {
+                        startDate: startISO,
+                        endDate: endISO,
+                    });
+                    const trips = Array.isArray(schedule?.data)
+                        ? schedule.data
+                        : Array.isArray(schedule)
+                            ? schedule
+                            : [];
+
                     // Check if driver has any trip overlapping with the time range
                     const hasConflict = trips.some(trip => {
                         if (!trip.startTime || trip.status === 'COMPLETED' || trip.status === 'CANCELLED') {
@@ -104,11 +114,11 @@ export default function CoordinatorDriverListPage({ readOnly = false }) {
                         }
                         const tripStart = new Date(trip.startTime);
                         const tripEnd = trip.endTime ? new Date(trip.endTime) : new Date(tripStart.getTime() + 8 * 60 * 60 * 1000); // Default 8 hours if no endTime
-                        
+
                         // Check overlap
                         return (tripStart <= endTime && tripEnd >= startTime);
                     });
-                    
+
                     availabilityMap[driver.id] = {
                         available: !hasConflict,
                         reason: hasConflict ? "Có chuyến trong khoảng thời gian này" : "Rảnh",
@@ -121,10 +131,10 @@ export default function CoordinatorDriverListPage({ readOnly = false }) {
                     };
                 }
             }
-            
+
             setDriverAvailability(availabilityMap);
         };
-        
+
         checkAvailability();
     }, [canUseAvailabilityFilter, timeFilterStart, timeFilterEnd, drivers]);
 
@@ -169,7 +179,12 @@ export default function CoordinatorDriverListPage({ readOnly = false }) {
     };
 
     const handleViewDetail = (driverId) => {
-        navigate(`/coordinator/drivers/${driverId}`);
+        // Navigate theo role: Manager dùng /manager/drivers, Coordinator dùng /coordinator/drivers
+        if (role === ROLES.MANAGER) {
+            navigate(`/manager/drivers/${driverId}`);
+        } else {
+            navigate(`/coordinator/drivers/${driverId}`);
+        }
     };
 
     const getLicenseStatus = (expiryDate) => {
@@ -258,7 +273,7 @@ export default function CoordinatorDriverListPage({ readOnly = false }) {
                                 </div>
                             )}
                         </div>
-                        
+
                         {/* Row 2: Time filter for checking availability */}
                         {canUseAvailabilityFilter && (
                             <div className="flex flex-col sm:flex-row items-center gap-3 pt-3 border-t border-slate-200">
@@ -337,103 +352,103 @@ export default function CoordinatorDriverListPage({ readOnly = false }) {
                         <div className="overflow-x-auto">
                             <table className="w-full">
                                 <thead className="bg-slate-50 border-b border-slate-200">
-                                    <tr>
+                                <tr>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                        Tài xế
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                        Số điện thoại
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                        Hạng GPLX
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                        Hạn GPLX
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                        Khám sức khỏe
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                        Trạng thái
+                                    </th>
+                                    {canUseAvailabilityFilter && timeFilterStart && timeFilterEnd && (
                                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                            Tài xế
+                                            Rảnh/Bận
                                         </th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                            Số điện thoại
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                            Hạng GPLX
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                            Hạn GPLX
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                            Khám sức khỏe
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                            Trạng thái
-                                        </th>
-                                        {canUseAvailabilityFilter && timeFilterStart && timeFilterEnd && (
-                                            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                                Rảnh/Bận
-                                            </th>
-                                        )}
-                                        <th className="px-4 py-3 text-center text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                            Thao tác
-                                        </th>
-                                    </tr>
+                                    )}
+                                    <th className="px-4 py-3 text-center text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                        Thao tác
+                                    </th>
+                                </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-200">
-                                    {drivers.map((driver) => {
-                                        const licenseStatus = getLicenseStatus(driver.licenseExpiry);
-                                        return (
-                                            <tr key={driver.id} className="hover:bg-slate-50 transition-colors">
-                                                <td className="px-4 py-3">
-                                                    <div className="flex items-center gap-3">
-                                                        <UserAvatar
-                                                            name={driver.fullName}
-                                                            avatar={driver.avatar}
-                                                            size={40}
-                                                        />
-                                                        <div>
-                                                            <div className="font-medium text-slate-900">{driver.fullName}</div>
-                                                            <div className="text-xs text-slate-500">ID: {driver.id}</div>
-                                                        </div>
+                                {drivers.map((driver) => {
+                                    const licenseStatus = getLicenseStatus(driver.licenseExpiry);
+                                    return (
+                                        <tr key={driver.id} className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center gap-3">
+                                                    <UserAvatar
+                                                        name={driver.fullName}
+                                                        avatar={driver.avatar}
+                                                        size={40}
+                                                    />
+                                                    <div>
+                                                        <div className="font-medium text-slate-900">{driver.fullName}</div>
+                                                        <div className="text-xs text-slate-500">ID: {driver.id}</div>
                                                     </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-sm text-slate-700">{driver.phone || "—"}</td>
-                                                <td className="px-4 py-3">
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-slate-700">{driver.phone || "—"}</td>
+                                            <td className="px-4 py-3">
                                                     <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-medium">
                                                         <Award className="h-3 w-3" />
                                                         {driver.licenseClass || "—"}
                                                     </span>
-                                                </td>
-                                                <td className="px-4 py-3">
+                                            </td>
+                                            <td className="px-4 py-3">
                                                     <span className={`text-sm font-medium ${licenseStatus.color}`}>
                                                         {licenseStatus.text}
                                                     </span>
-                                                </td>
-                                                <td className="px-4 py-3 text-sm text-slate-700">
-                                                    {driver.healthCheckDate ? (
-                                                        <span className="flex items-center gap-1">
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-slate-700">
+                                                {driver.healthCheckDate ? (
+                                                    <span className="flex items-center gap-1">
                                                             <Calendar className="h-3 w-3 text-slate-400" />
-                                                            {formatDate(driver.healthCheckDate)}
+                                                        {formatDate(driver.healthCheckDate)}
                                                         </span>
-                                                    ) : (
-                                                        <span className="text-slate-400">Chưa cập nhật</span>
-                                                    )}
-                                                </td>
-                                                {/* Cột Trạng thái: Hiển thị trạng thái hiện tại của tài xế */}
-                                                <td className="px-4 py-3">
-                                                    {(() => {
-                                                        const statusMap = {
-                                                            "AVAILABLE": { label: "Sẵn sàng", color: "bg-green-50 text-green-700" },
-                                                            "BUSY": { label: "Đang bận", color: "bg-info-50 text-info-700" },
-                                                            "ON_LEAVE": { label: "Nghỉ phép", color: "bg-slate-50 text-slate-700" },
-                                                            "INACTIVE": { label: "Không hoạt động", color: "bg-rose-50 text-rose-700" },
-                                                            "ACTIVE": { label: "Hoạt động", color: "bg-green-50 text-green-700" },
-                                                        };
-                                                        const config = statusMap[driver.status] || { label: driver.status || "—", color: "bg-slate-50 text-slate-700" };
-                                                        return (
-                                                            <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
+                                                ) : (
+                                                    <span className="text-slate-400">Chưa cập nhật</span>
+                                                )}
+                                            </td>
+                                            {/* Cột Trạng thái: Hiển thị trạng thái hiện tại của tài xế */}
+                                            <td className="px-4 py-3">
+                                                {(() => {
+                                                    const statusMap = {
+                                                        "AVAILABLE": { label: "Sẵn sàng", color: "bg-green-50 text-green-700" },
+                                                        "BUSY": { label: "Đang bận", color: "bg-info-50 text-info-700" },
+                                                        "ON_LEAVE": { label: "Nghỉ phép", color: "bg-slate-50 text-slate-700" },
+                                                        "INACTIVE": { label: "Không hoạt động", color: "bg-rose-50 text-rose-700" },
+                                                        "ACTIVE": { label: "Hoạt động", color: "bg-green-50 text-green-700" },
+                                                    };
+                                                    const config = statusMap[driver.status] || { label: driver.status || "—", color: "bg-slate-50 text-slate-700" };
+                                                    return (
+                                                        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
                                                                 {config.label}
                                                             </span>
-                                                        );
-                                                    })()}
-                                                </td>
-                                                {/* Cột Rảnh/Bận: Hiển thị trạng thái rảnh/bận theo khoảng thời gian đã chọn trong filter
-                                                    Chỉ hiển thị khi tài xế ở trạng thái sẵn sàng (AVAILABLE/ACTIVE) và đã chọn filter ngày */}
-                                                {canUseAvailabilityFilter && timeFilterStart && timeFilterEnd && (driver.status === "AVAILABLE" || driver.status === "ACTIVE") && (
-                                                    <td className="px-4 py-3">
-                                                        {driverAvailability[driver.id] ? (
-                                                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium ${
-                                                                driverAvailability[driver.id].available
-                                                                    ? "bg-green-50 text-green-700 border border-green-200"
-                                                                    : "bg-orange-50 text-orange-700 border border-orange-200"
-                                                            }`}>
+                                                    );
+                                                })()}
+                                            </td>
+                                            {/* Cột Rảnh/Bận: Hiển thị trạng thái rảnh/bận theo khoảng thời gian đã chọn trong filter
+                                                    Chỉ bỏ qua kiểm tra khi tài xế ở trạng thái 'Không hoạt động' (INACTIVE) */}
+                                            {canUseAvailabilityFilter && timeFilterStart && timeFilterEnd && driver.status !== "INACTIVE" && (
+                                                <td className="px-4 py-3">
+                                                    {driverAvailability[driver.id] ? (
+                                                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium ${
+                                                            driverAvailability[driver.id].available
+                                                                ? "bg-green-50 text-green-700 border border-green-200"
+                                                                : "bg-orange-50 text-orange-700 border border-orange-200"
+                                                        }`}>
                                                                 {driverAvailability[driver.id].available ? (
                                                                     <>
                                                                         <CheckCircle2 className="h-3 w-3" />
@@ -446,31 +461,31 @@ export default function CoordinatorDriverListPage({ readOnly = false }) {
                                                                     </>
                                                                 )}
                                                             </span>
-                                                        ) : (
-                                                            <span className="text-xs text-slate-400">Đang kiểm tra...</span>
-                                                        )}
-                                                    </td>
-                                                )}
-                                                <td className="px-4 py-3">
-                                                    <div className="flex items-center justify-center">
-                                                        {/* Consultant: Ẩn button Xem chi tiết */}
-                                                        {!isConsultant && (
-                                                            <button
-                                                                onClick={() => handleViewDetail(driver.id)}
-                                                                className="p-2 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors"
-                                                                title="Xem chi tiết"
-                                                            >
-                                                                <Eye className="h-4 w-4" />
-                                                            </button>
-                                                        )}
-                                                        {isConsultant && (
-                                                            <span className="text-[11px] text-slate-400 italic">Chỉ xem</span>
-                                                        )}
-                                                    </div>
+                                                    ) : (
+                                                        <span className="text-xs text-slate-400">Đang kiểm tra...</span>
+                                                    )}
                                                 </td>
-                                            </tr>
-                                        );
-                                    })}
+                                            )}
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center justify-center">
+                                                    {/* Consultant: Ẩn button Xem chi tiết */}
+                                                    {!isConsultant && (
+                                                        <button
+                                                            onClick={() => handleViewDetail(driver.id)}
+                                                            className="p-2 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors"
+                                                            title="Xem chi tiết"
+                                                        >
+                                                            <Eye className="h-4 w-4" />
+                                                        </button>
+                                                    )}
+                                                    {isConsultant && (
+                                                        <span className="text-[11px] text-slate-400 italic">Chỉ xem</span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                                 </tbody>
                             </table>
                         </div>
@@ -489,10 +504,11 @@ export default function CoordinatorDriverListPage({ readOnly = false }) {
                                         <span className="font-medium text-slate-800">• Cột "Trạng thái":</span> Trạng thái hiện tại của tài xế trong hệ thống (Sẵn sàng/Đang bận/Nghỉ phép/Không hoạt động)
                                     </li>
                                     <li>
-                                        <span className="font-medium text-slate-800">• Cột "Rảnh/Bận":</span> Chỉ hiển thị khi tài xế ở trạng thái "Sẵn sàng" hoặc "Hoạt động" và cho biết tài xế có rảnh trong khoảng thời gian đã chọn hay không
+                                        <span className="font-medium text-slate-800">• Cột "Rảnh/Bận":</span> Kiểm tra tài xế có rảnh trong khoảng thời gian đã chọn (bao gồm cả khi tài xế đang bận hoặc nghỉ phép). Chỉ không kiểm tra khi tài xế ở trạng thái "Không hoạt động".
+                                        <span className="font-medium text-slate-800">• Cột "Rảnh/Bận":</span> Kiểm tra tài xế có rảnh trong khoảng thời gian đã chọn (kể cả khi đang trong chuyến hoặc nghỉ phép). Chỉ không kiểm tra khi tài xế ở trạng thái "Không hoạt động".
                                     </li>
                                     <li className="text-xs text-slate-500 mt-2">
-                                        💡 Lưu ý: Tài xế đang "Đang bận", "Nghỉ phép" hoặc "Không hoạt động" sẽ không hiển thị cột "Rảnh/Bận" vì đã rõ là không thể sử dụng
+                                        💡 Lưu ý: Tài xế "Không hoạt động" sẽ không được kiểm tra vì không thể sử dụng cho các chuyến mới.
                                     </li>
                                 </ul>
                             </div>

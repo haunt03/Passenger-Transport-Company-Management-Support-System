@@ -5,29 +5,27 @@ import { listVehicleCategories } from "../../api/vehicleCategories";
 import { listBookings, createBooking, cancelBooking } from "../../api/bookings";
 import { listBranches } from "../../api/branches";
 import { getEmployeeByUserId } from "../../api/employees";
+import { getCustomerBookings } from "../../api/customers";
 import { getCurrentRole, getStoredUserId, ROLES } from "../../utils/session";
 import {
+    AlertCircle,
+    AlertTriangle,
     ClipboardList,
     PlusCircle,
-    Search,
     Filter,
     Calendar,
+    Search,
     User,
     MapPin,
     DollarSign,
+    Loader2,
+    Eye,
+    Pencil,
+    Trash2,
     ChevronLeft,
     ChevronRight,
     ChevronUp,
     ChevronDown,
-    Eye,
-    Pencil,
-    Loader2,
-    AlertTriangle,
-    X,
-    Clock,
-    CarFront,
-    Trash2,
-    AlertCircle,
 } from "lucide-react";
 
 /**
@@ -166,7 +164,7 @@ const ORDER_STATUS_STYLE = {
 function OrderStatusPill({ status, order }) {
     // Normalize status regardless of format (IN_PROGRESS, Đang thực hiện, ...)
     let normalizedStatus = normalizeStatusValue(status) || 'DRAFT';
-    
+
     // Override: Nếu trạng thái là COMPLETED nhưng chưa thanh toán đủ → hiển thị INPROGRESS
     if (normalizedStatus === 'COMPLETED' && order) {
         const paidAmount = Number(order.paid_amount || 0);
@@ -175,7 +173,7 @@ function OrderStatusPill({ status, order }) {
             normalizedStatus = 'INPROGRESS';
         }
     }
-    
+
     const label = ORDER_STATUS_LABEL[normalizedStatus] || ORDER_STATUS_LABEL[status] || status || ORDER_STATUS_LABEL.DRAFT;
     const style = ORDER_STATUS_STYLE[normalizedStatus] || ORDER_STATUS_STYLE[status] || ORDER_STATUS_STYLE.DRAFT;
     return (
@@ -302,17 +300,17 @@ const MOCK_ORDERS = [
 /* FILTER BAR                                                */
 /* --------------------------------------------------------- */
 function FilterBar({
-    statusFilter,
-    setStatusFilter,
-    dateFilter,
-    setDateFilter,
-    searchText,
-    setSearchText,
-    onClickCreate,
-    onRefresh,
-    loadingRefresh,
-    showCreateButton = true, // Add prop to control button visibility
-}) {
+                       statusFilter,
+                       setStatusFilter,
+                       dateFilter,
+                       setDateFilter,
+                       searchText,
+                       setSearchText,
+                       onClickCreate,
+                       onRefresh,
+                       loadingRefresh,
+                       showCreateButton = true, // Add prop to control button visibility
+                   }) {
     return (
         <div className="flex flex-col lg:flex-row lg:flex-wrap gap-3">
             {/* CTA tạo đơn hàng mới - Hidden for Manager */}
@@ -344,7 +342,6 @@ function FilterBar({
                     >
                         <option value="">Tất cả trạng thái</option>
                         <option value="DRAFT">Nháp</option>
-                        <option value="PENDING">Chờ xử lý</option>
                         <option value="QUOTATION_SENT">Đã gửi báo giá</option>
                         <option value="CONFIRMED">Khách đã xác nhận</option>
                         <option value="ASSIGNED">Đã phân xe</option>
@@ -399,21 +396,22 @@ function FilterBar({
 /* --------------------------------------------------------- */
 
 function OrdersTable({
-    items,
-    page,
-    setPage,
-    pageSize,
-    setPageSize,
-    totalPages,
-    sortKey,
-    setSortKey,
-    sortDir,
-    setSortDir,
-    onViewDetail,
-    onEdit,
-    onCancel,
-    showActions = true, // Add prop to control actions column visibility
-}) {
+                         items,
+                         page,
+                         setPage,
+                         pageSize,
+                         setPageSize,
+                         totalPages,
+                         sortKey,
+                         setSortKey,
+                         sortDir,
+                         setSortDir,
+                         onViewDetail,
+                         onEdit,
+                         onCancel,
+                         showActions = true, // Add prop to control actions column visibility
+                         onViewCustomerTrips, // Handler để mở popup danh sách chuyến đi của khách hàng
+                     }) {
     const headerCell = (key, label) => (
         <th
             className="px-3 py-2 font-medium cursor-pointer select-none text-slate-500 text-[12px]"
@@ -445,13 +443,13 @@ function OrdersTable({
     // Kiểm tra xem đơn hàng đã quá thời gian bắt đầu chưa
     const isStartTimePassed = (pickupTime = null) => {
         if (!pickupTime) return false; // Không có thời gian thì coi như chưa quá
-        
+
         try {
             // Parse ngày giống như fmtDateTime: replace space thành T để parse đúng ISO format
             const safe = String(pickupTime).replace(" ", "T");
             const pickupDate = new Date(safe);
             const now = new Date();
-            
+
             // Kiểm tra xem parse có thành công không
             if (!isNaN(pickupDate.getTime())) {
                 // Nếu thời gian bắt đầu đã qua (nhỏ hơn hoặc bằng thời gian hiện tại)
@@ -460,225 +458,232 @@ function OrdersTable({
         } catch (e) {
             console.error("Error parsing pickup time:", e);
         }
-        
+
         return false; // Nếu parse lỗi thì coi như chưa quá
     };
 
     // Cho phép sửa khi:
-    // 1. Status cho phép (DRAFT, PENDING, CONFIRMED, ASSIGNED, QUOTATION_SENT)
-    // 2. Chưa quá thời gian bắt đầu
+    // 1. Status KHÔNG phải COMPLETED hoặc CANCELLED
+    // 2. Chưa quá thời gian bắt đầu (chưa bắt đầu chuyến)
     const canEdit = (status, pickupTime = null) => {
-        // Nếu đã quá thời gian bắt đầu thì không cho sửa
-        if (isStartTimePassed(pickupTime)) {
-            return false;
-        }
-        
         const normalized = status ? status.replace(/_/g, '').toUpperCase() : '';
-        return normalized === 'DRAFT' ||
-            normalized === 'PENDING' ||
-            normalized === 'CONFIRMED' ||
-            normalized === 'ASSIGNED' ||
-            normalized === 'QUOTATIONSENT';
-    };
-    
-    // Cho phép hủy khi:
-    // 1. Chưa hoàn thành, chưa hủy
-    // 2. Chưa quá thời gian bắt đầu
-    const canCancel = (status, pickupTime = null) => {
-        const normalized = status ? status.replace(/_/g, '').toUpperCase() : '';
-        
-        // Không cho hủy khi: đã hoàn thành, đã hủy
+
+        // Không cho sửa khi đã hoàn thành hoặc đã hủy
         if (normalized === 'COMPLETED' || normalized === 'CANCELLED') {
             return false;
         }
-        
+
+        // Nếu đã quá thời gian bắt đầu thì không cho sửa (đã bắt đầu chuyến)
+        if (isStartTimePassed(pickupTime)) {
+            return false;
+        }
+
+        // Tất cả các trạng thái khác đều được phép sửa (nếu chưa bắt đầu chuyến)
+        return true;
+    };
+
+    // Cho phép hủy khi:
+    // 1. Chưa hoàn thành, chưa hủy
+    // 2. Chưa quá thời gian bắt đầu
+    // 3. Không phải trạng thái "Đang thực hiện"
+    const canCancel = (status, pickupTime = null) => {
+        const normalized = status ? status.replace(/_/g, '').toUpperCase() : '';
+
+        // Không cho hủy khi: đã hoàn thành, đã hủy, đang thực hiện
+        if (normalized === 'COMPLETED' || normalized === 'CANCELLED' || normalized === 'INPROGRESS') {
+            return false;
+        }
+
         // Nếu đã quá thời gian bắt đầu thì không cho hủy
         if (isStartTimePassed(pickupTime)) {
             return false;
         }
-        
-        // Nếu chưa quá thời gian bắt đầu và chưa đang thực hiện thì cho phép hủy
-        return normalized !== 'INPROGRESS';
+
+        return true;
     };
 
     return (
         <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
                 <thead className="text-xs border-b border-slate-200 bg-slate-100/70">
-                    <tr>
-                        {headerCell("code", "Mã đơn")}
-                        {headerCell("customer_name", "Khách hàng")}
-                        {headerCell("pickup", "Lịch trình")}
-                        {headerCell("pickup_time", "Ngày đi")}
-                        {headerCell("estimated_cost", "Chi phí tạm tính")}
-                        {headerCell("deposit_amount", "Đã thu")}
-                        {headerCell("quoted_price", "Tổng tiền")}
-                        {headerCell("status", "Trạng thái")}
-                        <th className="px-3 py-2 font-medium text-slate-500 text-[12px]">
-                            Hành động
-                        </th>
-                    </tr>
+                <tr>
+                    {headerCell("code", "Mã đơn")}
+                    {headerCell("customer_name", "Khách hàng")}
+                    {headerCell("pickup", "Lịch trình")}
+                    {headerCell("pickup_time", "Ngày đi")}
+                    {headerCell("estimated_cost", "Chi phí tạm tính")}
+                    {headerCell("deposit_amount", "Đã thu")}
+                    {headerCell("quoted_price", "Tổng tiền")}
+                    {headerCell("status", "Trạng thái")}
+                    <th className="px-3 py-2 font-medium text-slate-500 text-[12px]">
+                        Hành động
+                    </th>
+                </tr>
                 </thead>
 
                 <tbody>
-                    {current.map((o) => (
-                        <tr
-                            key={o.id}
-                            className="border-b border-slate-200 hover:bg-slate-50"
-                        >
-                            {/* Mã đơn */}
-                            <td className="px-3 py-2 text-[13px] font-semibold text-slate-900 whitespace-nowrap">
-                                {o.code}
-                            </td>
+                {current.map((o) => (
+                    <tr
+                        key={o.id}
+                        className="border-b border-slate-200 hover:bg-slate-50"
+                    >
+                        {/* Mã đơn */}
+                        <td className="px-3 py-2 text-[13px] font-semibold text-slate-900 whitespace-nowrap">
+                            {o.code}
+                        </td>
 
-                            {/* Khách hàng */}
-                            <td className="px-3 py-2 text-[13px] text-slate-700 whitespace-nowrap">
-                                <div className="flex items-start gap-2">
-                                    <User className="h-3.5 w-3.5 text-sky-600 shrink-0 mt-0.5" />
-                                    <div>
-                                        <div className="font-medium text-slate-900 leading-tight">
-                                            {o.customer_name}
-                                        </div>
-                                        <div className="text-[11px] text-slate-500 leading-tight break-all">
-                                            {o.customer_phone}
-                                        </div>
-                                    </div>
-                                </div>
-                            </td>
-
-                            {/* Lịch trình */}
-                            <td className="px-3 py-2 text-[13px] text-slate-700 min-w-[180px]">
-                                <div className="flex items-start gap-2 leading-snug">
-                                    <MapPin className="h-3.5 w-3.5 text-primary-600 shrink-0 mt-0.5" />
-                                    <div className="space-y-1">
-                                        <div className="text-slate-900 font-medium">
-                                            {o.pickup} → {o.dropoff}
-                                        </div>
-                                        <div className="text-[11px] text-slate-500">
-                                            {o.vehicle_category} ·{" "}
-                                            {o.vehicle_count} xe
-                                        </div>
-                                    </div>
-                                </div>
-                            </td>
-
-                            {/* Ngày đi */}
-                            <td className="px-3 py-2 text-[13px] text-slate-700 whitespace-nowrap">
-                                <div className="leading-tight">
-                                    <div className="text-slate-900 font-medium tabular-nums">
-                                        {fmtDateOnly(o.pickup_time)}
-                                    </div>
-                                    <div className="text-[11px] text-slate-500 tabular-nums">
-                                        {fmtDateTime(o.pickup_time).slice(-5)}{" "}
-                                        ~{" "}
-                                        {fmtDateTime(
-                                            o.dropoff_eta
-                                        ).slice(-5)}
-                                    </div>
-                                </div>
-                            </td>
-
-                            {/* Chi phí tạm tính (estimatedCost) */}
-                            <td className="px-3 py-2 text-[13px] whitespace-nowrap tabular-nums text-slate-700">
-                                {fmtVND((o.estimated_cost || o.quoted_price || 0) + (o.discount_amount || 0))}
-                            </td>
-
-                            {/* Đã thu (paid amount) */}
-                            <td className="px-3 py-2 text-[13px] whitespace-nowrap tabular-nums">
-                                <div className="text-emerald-700 font-semibold">
-                                    {fmtVND(o.paid_amount || 0)}
-                                </div>
-                                {o.deposit_amount > 0 && (
-                                    <div className="text-[11px] text-slate-500">
-                                        Cọc: {fmtVND(o.deposit_amount)}
-                                    </div>
-                                )}
-                            </td>
-
-                            {/* Tổng tiền (renamed from Giá trị) */}
-                            <td className="px-3 py-2 text-[13px] whitespace-nowrap tabular-nums">
-                                <div className="flex items-start gap-1 text-primary-600 font-semibold">
-                                    <DollarSign className="h-3.5 w-3.5 text-primary-600 mt-0.5" />
-                                    <span>{fmtVND(o.quoted_price)}</span>
-                                </div>
-                                {o.discount_amount > 0 ? (
-                                    <div className="text-[11px] text-slate-500 leading-tight">
-                                        Giảm: {fmtVND(o.discount_amount)}
-                                    </div>
-                                ) : null}
-                            </td>
-
-                            {/* Trạng thái - Vietnamese labels */}
-                            <td className="px-3 py-2 text-[13px] whitespace-nowrap">
-                                <OrderStatusPill status={o.status} order={o} />
-                            </td>
-
-                            {/* Actions - Always show "Chi tiết", hide "Sửa" for Manager/Accountant */}
-                            <td className="px-3 py-2 text-[13px] whitespace-nowrap">
-                                <div className="flex items-center gap-2 flex-wrap">
+                        {/* Khách hàng */}
+                        <td className="px-3 py-2 text-[13px] text-slate-700 whitespace-nowrap">
+                            <div className="flex items-start gap-2">
+                                <User className="h-3.5 w-3.5 text-sky-600 shrink-0 mt-0.5" />
+                                <div>
                                     <button
                                         type="button"
-                                        onClick={() => onViewDetail(o)}
-                                        className="rounded-md border border-sky-300 text-sky-700 bg-white hover:bg-sky-50 px-2.5 py-1.5 text-[12px] flex items-center gap-1 shadow-sm"
+                                        onClick={() => onViewCustomerTrips && onViewCustomerTrips(o.customerId, o.customer_name)}
+                                        className="font-medium text-slate-900 leading-tight hover:text-sky-600 hover:underline cursor-pointer text-left"
                                     >
-                                        <Eye className="h-3.5 w-3.5" />
-                                        <span>Chi tiết</span>
+                                        {o.customer_name}
                                     </button>
-
-                                    {showActions && (
-                                        <>
-                                            <button
-                                                type="button"
-                                                disabled={!canEdit(o.status, o.pickup_time)}
-                                                onClick={() => {
-                                                    if (canEdit(o.status, o.pickup_time)) onEdit(o);
-                                                }}
-                                                className={cls(
-                                                    "rounded-md border px-2.5 py-1.5 text-[12px] flex items-center gap-1 shadow-sm",
-                                                    canEdit(o.status, o.pickup_time)
-                                                        ? "border-primary-300 text-primary-700 bg-white hover:bg-primary-50"
-                                                        : "border-slate-200 text-slate-400 bg-white cursor-not-allowed opacity-50"
-                                                )}
-                                                title={isStartTimePassed(o.pickup_time) ? "Không thể sửa đơn đã quá thời gian bắt đầu" : ""}
-                                            >
-                                                <Pencil className="h-3.5 w-3.5" />
-                                                <span>Sửa</span>
-                                            </button>
-                                            
-                                            <button
-                                                type="button"
-                                                disabled={!canCancel(o.status, o.pickup_time)}
-                                                onClick={() => {
-                                                    if (canCancel(o.status, o.pickup_time)) onCancel(o);
-                                                }}
-                                                className={cls(
-                                                    "rounded-md border px-2.5 py-1.5 text-[12px] flex items-center gap-1 shadow-sm",
-                                                    canCancel(o.status, o.pickup_time)
-                                                        ? "border-rose-300 text-rose-700 bg-white hover:bg-rose-50"
-                                                        : "border-slate-200 text-slate-400 bg-white cursor-not-allowed opacity-50"
-                                                )}
-                                                title={isStartTimePassed(o.pickup_time) ? "Không thể hủy đơn đã quá thời gian bắt đầu" : ""}
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                                <span>Hủy</span>
-                                            </button>
-                                        </>
-                                    )}
+                                    <div className="text-[11px] text-slate-500 leading-tight break-all">
+                                        {o.customer_phone}
+                                    </div>
                                 </div>
-                            </td>
-                        </tr>
-                    ))}
+                            </div>
+                        </td>
 
-                    {current.length === 0 && (
-                        <tr>
-                            <td
-                                colSpan={9}
-                                className="px-3 py-6 text-center text-slate-500 text-[13px]"
-                            >
-                                Không có đơn hàng phù hợp.
-                            </td>
-                        </tr>
-                    )}
+                        {/* Lịch trình */}
+                        <td className="px-3 py-2 text-[13px] text-slate-700 min-w-[180px]">
+                            <div className="flex items-start gap-2 leading-snug">
+                                <MapPin className="h-3.5 w-3.5 text-primary-600 shrink-0 mt-0.5" />
+                                <div className="space-y-1">
+                                    <div className="text-slate-900 font-medium">
+                                        {o.pickup} → {o.dropoff}
+                                    </div>
+                                    <div className="text-[11px] text-slate-500">
+                                        {o.vehicle_category} ·{" "}
+                                        {o.vehicle_count} xe
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+
+                        {/* Ngày đi */}
+                        <td className="px-3 py-2 text-[13px] text-slate-700 whitespace-nowrap">
+                            <div className="leading-tight">
+                                <div className="text-slate-900 font-medium tabular-nums">
+                                    {fmtDateOnly(o.pickup_time)}
+                                </div>
+                                <div className="text-[11px] text-slate-500 tabular-nums">
+                                    {fmtDateTime(o.pickup_time).slice(-5)}{" "}
+                                    ~{" "}
+                                    {fmtDateTime(
+                                        o.dropoff_eta
+                                    ).slice(-5)}
+                                </div>
+                            </div>
+                        </td>
+
+                        {/* Chi phí tạm tính (estimatedCost) */}
+                        <td className="px-3 py-2 text-[13px] whitespace-nowrap tabular-nums text-slate-700">
+                            {fmtVND((o.estimated_cost || o.quoted_price || 0) + (o.discount_amount || 0))}
+                        </td>
+
+                        {/* Đã thu (paid amount) */}
+                        <td className="px-3 py-2 text-[13px] whitespace-nowrap tabular-nums">
+                            <div className="text-emerald-700 font-semibold">
+                                {fmtVND(o.paid_amount || 0)}
+                            </div>
+                            {o.deposit_amount > 0 && (
+                                <div className="text-[11px] text-slate-500">
+                                    Cọc: {fmtVND(o.deposit_amount)}
+                                </div>
+                            )}
+                        </td>
+
+                        {/* Tổng tiền (renamed from Giá trị) */}
+                        <td className="px-3 py-2 text-[13px] whitespace-nowrap tabular-nums">
+                            <div className="flex items-start gap-1 text-primary-600 font-semibold">
+                                <DollarSign className="h-3.5 w-3.5 text-primary-600 mt-0.5" />
+                                <span>{fmtVND(o.quoted_price)}</span>
+                            </div>
+                            {o.discount_amount > 0 ? (
+                                <div className="text-[11px] text-slate-500 leading-tight">
+                                    Giảm: {fmtVND(o.discount_amount)}
+                                </div>
+                            ) : null}
+                        </td>
+
+                        {/* Trạng thái - Vietnamese labels */}
+                        <td className="px-3 py-2 text-[13px] whitespace-nowrap">
+                            <OrderStatusPill status={o.status} order={o} />
+                        </td>
+
+                        {/* Actions - Always show "Chi tiết", hide "Sửa" for Manager/Accountant */}
+                        <td className="px-3 py-2 text-[13px] whitespace-nowrap">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <button
+                                    type="button"
+                                    onClick={() => onViewDetail(o)}
+                                    className="rounded-md border border-sky-300 text-sky-700 bg-white hover:bg-sky-50 px-2.5 py-1.5 text-[12px] flex items-center gap-1 shadow-sm"
+                                >
+                                    <Eye className="h-3.5 w-3.5" />
+                                    <span>Chi tiết</span>
+                                </button>
+
+                                {showActions && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            disabled={!canEdit(o.status, o.pickup_time)}
+                                            onClick={() => {
+                                                if (canEdit(o.status, o.pickup_time)) onEdit(o);
+                                            }}
+                                            className={cls(
+                                                "rounded-md border px-2.5 py-1.5 text-[12px] flex items-center gap-1 shadow-sm",
+                                                canEdit(o.status, o.pickup_time)
+                                                    ? "border-primary-300 text-primary-700 bg-white hover:bg-primary-50"
+                                                    : "border-slate-200 text-slate-400 bg-white cursor-not-allowed opacity-50"
+                                            )}
+                                            title={isStartTimePassed(o.pickup_time) ? "Không thể sửa đơn đã quá thời gian bắt đầu" : ""}
+                                        >
+                                            <Pencil className="h-3.5 w-3.5" />
+                                            <span>Sửa</span>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            disabled={!canCancel(o.status, o.pickup_time)}
+                                            onClick={() => {
+                                                if (canCancel(o.status, o.pickup_time)) onCancel(o);
+                                            }}
+                                            className={cls(
+                                                "rounded-md border px-2.5 py-1.5 text-[12px] flex items-center gap-1 shadow-sm",
+                                                canCancel(o.status, o.pickup_time)
+                                                    ? "border-rose-300 text-rose-700 bg-white hover:bg-rose-50"
+                                                    : "border-slate-200 text-slate-400 bg-white cursor-not-allowed opacity-50"
+                                            )}
+                                            title={isStartTimePassed(o.pickup_time) ? "Không thể hủy đơn đã quá thời gian bắt đầu" : ""}
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                            <span>Hủy</span>
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        </td>
+                    </tr>
+                ))}
+
+                {current.length === 0 && (
+                    <tr>
+                        <td
+                            colSpan={9}
+                            className="px-3 py-6 text-center text-slate-500 text-[13px]"
+                        >
+                            Không có đơn hàng phù hợp.
+                        </td>
+                    </tr>
+                )}
                 </tbody>
             </table>
 
@@ -863,7 +868,7 @@ function OrderDetailModal({ open, order, onClose }) {
                         </div>
 
                         {order.status === ORDER_STATUS.CANCELLED ||
-                            order.status === ORDER_STATUS.DRAFT ? (
+                        order.status === ORDER_STATUS.DRAFT ? (
                             <div className="text-[11px] text-info-700 bg-info-50 border border-info-200 rounded-md px-2 py-1 max-w-fit flex items-start gap-2">
                                 <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-info-600" />
                                 <span>
@@ -908,12 +913,12 @@ function OrderDetailModal({ open, order, onClose }) {
  *   - mode: "create" | "edit"
  */
 function OrderFormModal({
-    open,
-    mode,
-    initialOrder,
-    onClose,
-    onSave,
-}) {
+                            open,
+                            mode,
+                            initialOrder,
+                            onClose,
+                            onSave,
+                        }) {
     const isEdit = mode === "edit";
 
     // ------- form state
@@ -1125,8 +1130,8 @@ function OrderFormModal({
     // build object chuẩn shape table
     const buildOrderPayload = (statusOverride) => {
         const catObj = (categories && categories.length
-            ? categories.map(c => ({ id: String(c.categoryId), label: c.categoryName }))
-            : VEHICLE_CATEGORIES
+                ? categories.map(c => ({ id: String(c.categoryId), label: c.categoryName }))
+                : VEHICLE_CATEGORIES
         ).find((c) => String(c.id) === String(categoryId));
         return {
             branch_id: branchId ? String(branchId) : "",
@@ -1794,6 +1799,13 @@ export default function ConsultantOrdersPage() {
     const [orders, setOrders] = React.useState([]);
     const [loadError, setLoadError] = React.useState(null);
 
+    // Customer trips popup
+    const [customerTripsOpen, setCustomerTripsOpen] = React.useState(false);
+    const [selectedCustomerId, setSelectedCustomerId] = React.useState(null);
+    const [selectedCustomerName, setSelectedCustomerName] = React.useState("");
+    const [customerTrips, setCustomerTrips] = React.useState([]);
+    const [customerTripsLoading, setCustomerTripsLoading] = React.useState(false);
+
     // default branch to use when creating from quick modal
     const [defaultBranchId, setDefaultBranchId] = React.useState(null);
     React.useEffect(() => {
@@ -1820,7 +1832,7 @@ export default function ConsultantOrdersPage() {
                 const data = resp?.data || resp;
                 if (!cancelled) {
                     setEmployeeInfo(data || null);
-                    
+
                     // Nếu không có branchId trong employee, thử lấy từ profile hoặc branch API
                     if (!data?.branchId && (isConsultant || isAccountant)) {
                         try {
@@ -1828,12 +1840,12 @@ export default function ConsultantOrdersPage() {
                             const { getBranchByUserId } = await import("../../api/branches");
                             const profile = await getMyProfile();
                             let branchId = profile?.branchId || profile?.branch?.id || profile?.branch?.branchId;
-                            
+
                             if (!branchId) {
                                 const branch = await getBranchByUserId(currentUserId);
                                 branchId = branch?.id || branch?.branchId;
                             }
-                            
+
                             if (branchId && !cancelled) {
                                 setEmployeeInfo(prev => ({
                                     ...prev,
@@ -1872,18 +1884,18 @@ export default function ConsultantOrdersPage() {
     }, [scopedBranchId]);
 
     const mapApiBookings = React.useCallback((response) => {
-                let list = [];
-                if (Array.isArray(response)) {
-                    list = response;
-                } else if (Array.isArray(response?.content)) {
-                    list = response.content;
-                } else if (Array.isArray(response?.data)) {
-                    list = response.data;
-                } else if (Array.isArray(response?.data?.content)) {
-                    list = response.data.content;
-                } else if (Array.isArray(response?.items)) {
-                    list = response.items;
-                }
+        let list = [];
+        if (Array.isArray(response)) {
+            list = response;
+        } else if (Array.isArray(response?.content)) {
+            list = response.content;
+        } else if (Array.isArray(response?.data)) {
+            list = response.data;
+        } else if (Array.isArray(response?.data?.content)) {
+            list = response.data.content;
+        } else if (Array.isArray(response?.items)) {
+            list = response.items;
+        }
 
         return (list || []).map((b) => {
             const bookingBranchId =
@@ -1901,41 +1913,53 @@ export default function ConsultantOrdersPage() {
             const quotedPrice =
                 b.totalCost || b.totalPrice || b.total || 0;
 
-            // Chuẩn hoá status giống như hiển thị ở pill:
-            // 1. Backend có thể trả IN_PROGRESS (có dấu gạch dưới) → chuẩn hóa thành INPROGRESS
-            // 2. Nếu backend trả COMPLETED nhưng chưa thu đủ tiền → coi là INPROGRESS để filter cho nhất quán.
-            let rawStatus = b.status || "PENDING";
+            // Chuẩn hoá status theo logic mới:
+            // - Đơn chưa đặt cọc: "Đã gửi báo giá" (QUOTATION_SENT)
+            // - Đơn đã đặt cọc: "Khách đã xác nhận" (CONFIRMED)
+            // - Đơn đã được phân công tài xế/xe: "Đã phân xe" (ASSIGNED)
+            // - Đơn được tài xế xác nhận bắt đầu: "Đang thực hiện" (INPROGRESS)
+            // - Đơn được tài xế đánh dấu hoàn thành + Thu đủ tiền: "Hoàn thành" (COMPLETED)
+            let rawStatus = b.status || "QUOTATION_SENT";
             const normalizedRawStatus = normalizeStatusValue(rawStatus);
-            
+            const hasDeposit = Number(paidAmount || 0) > 0 || Number(b.depositAmount || b.deposit_amount || 0) > 0;
+            const isFullyPaid = Number(paidAmount || 0) >= Number(quotedPrice || 0);
+
             // Map các status về format chuẩn của frontend
-            if (normalizedRawStatus === "INPROGRESS") {
-                rawStatus = ORDER_STATUS.INPROGRESS;
-            } else if (normalizedRawStatus === "COMPLETED") {
-                // Nếu COMPLETED nhưng chưa thu đủ tiền → coi là INPROGRESS
-                if (Number(paidAmount || 0) < Number(quotedPrice || 0)) {
-                    rawStatus = ORDER_STATUS.INPROGRESS;
-                } else {
+            // Workflow: QUOTATION_SENT → CONFIRMED (đặt cọc) → ASSIGNED (phân xe) → INPROGRESS (bắt đầu) → COMPLETED
+            if (normalizedRawStatus === "COMPLETED") {
+                // COMPLETED: chỉ khi đã hoàn thành và thu đủ tiền
+                if (isFullyPaid) {
                     rawStatus = ORDER_STATUS.COMPLETED;
+                } else {
+                    // COMPLETED nhưng chưa thu đủ tiền → vẫn đang thực hiện
+                    rawStatus = ORDER_STATUS.INPROGRESS;
                 }
-            } else if (normalizedRawStatus === "PENDING") {
-                rawStatus = ORDER_STATUS.PENDING;
+            } else if (normalizedRawStatus === "INPROGRESS" || normalizedRawStatus === "ONGOING" || normalizedRawStatus === "IN_PROGRESS") {
+                // INPROGRESS: tài xế đã bắt đầu chuyến
+                rawStatus = ORDER_STATUS.INPROGRESS;
+            } else if (normalizedRawStatus === "ASSIGNED") {
+                // ASSIGNED: đã phân xe/tài xế
+                rawStatus = ORDER_STATUS.ASSIGNED;
             } else if (normalizedRawStatus === "CONFIRMED") {
+                // CONFIRMED: khách đã xác nhận (đã đặt cọc)
                 rawStatus = ORDER_STATUS.CONFIRMED;
             } else if (normalizedRawStatus === "CANCELLED") {
                 rawStatus = ORDER_STATUS.CANCELLED;
-            } else if (normalizedRawStatus === "ASSIGNED") {
-                rawStatus = ORDER_STATUS.ASSIGNED;
             } else if (normalizedRawStatus === "QUOTATIONSENT") {
                 rawStatus = ORDER_STATUS.QUOTATION_SENT;
             } else if (normalizedRawStatus === "DRAFT") {
                 rawStatus = ORDER_STATUS.DRAFT;
+            } else if (normalizedRawStatus === "PENDING") {
+                // PENDING → QUOTATION_SENT (đã gửi báo giá)
+                rawStatus = ORDER_STATUS.QUOTATION_SENT;
             } else {
-                // Fallback: giữ nguyên status nếu không match
-                rawStatus = rawStatus.toUpperCase();
+                // Fallback: Nếu không có status hoặc không match, dựa vào deposit
+                // Nếu đã có deposit → CONFIRMED (khách đã xác nhận), chưa có → QUOTATION_SENT
+                rawStatus = hasDeposit ? ORDER_STATUS.CONFIRMED : ORDER_STATUS.QUOTATION_SENT;
             }
 
-                    return {
-                        id: b.id || b.bookingId,
+            return {
+                id: b.id || b.bookingId,
                 code:
                     b.bookingCode ||
                     b.code ||
@@ -1962,24 +1986,24 @@ export default function ConsultantOrdersPage() {
                     (b.routeSummary || b.dropoffLocation || "").split(" → ")[1] ||
                     b.endLocation ||
                     "",
-                        pickup_time: b.startDate || b.pickupTime || b.startTime,
+                pickup_time: b.startDate || b.pickupTime || b.startTime,
                 dropoff_eta:
                     b.endDate || b.dropoffTime || b.endTime || b.startDate,
-                        vehicle_category: b.vehicleCategory || "",
-                        vehicle_category_id: b.vehicleCategoryId || "",
-                        vehicle_count: b.vehicleCount || b.quantity || 1,
-                        pax_count: b.passengerCount || b.paxCount || 0,
-                        estimated_cost: b.estimatedCost || b.estimated_cost || 0,
+                vehicle_category: b.vehicleCategory || "",
+                vehicle_category_id: b.vehicleCategoryId || "",
+                vehicle_count: b.vehicleCount || b.quantity || 1,
+                pax_count: b.passengerCount || b.paxCount || 0,
+                estimated_cost: b.estimatedCost || b.estimated_cost || 0,
                 deposit_amount:
                     b.depositAmount || b.deposit_amount || b.deposit || 0,
                 paid_amount: paidAmount,
                 quoted_price: quotedPrice,
-                        discount_amount: b.discountAmount || b.discount || 0,
-                        notes: b.notes || b.note || "",
+                discount_amount: b.discountAmount || b.discount || 0,
+                notes: b.notes || b.note || "",
                 branchId: bookingBranchId,
-                        customerId: customerId,
-                    };
-                });
+                customerId: customerId,
+            };
+        });
     }, []);
 
     const fetchBookings = React.useCallback(async () => {
@@ -1988,14 +2012,14 @@ export default function ConsultantOrdersPage() {
             // Chưa load xong, đợi thêm
             return null;
         }
-        
+
         if ((isConsultant || isAccountant) && scopedBranchId == null) {
             if (employeeFetchDone && !employeeInfo?.branchId) {
                 throw new Error("Không xác định được chi nhánh của bạn. Vui lòng liên hệ quản trị viên để được gán vào chi nhánh.");
             }
             return null;
         }
-        
+
         // Debug: Log thông tin branch để kiểm tra
         const branchIdToFilter = (isConsultant || isAccountant) ? scopedBranchId : undefined;
         console.log("[ConsultantOrderListPage] Fetching bookings:", {
@@ -2005,13 +2029,13 @@ export default function ConsultantOrdersPage() {
             scopedBranchId: scopedBranchId,
             branchIdToFilter: branchIdToFilter,
         });
-        
+
         const response = await listBookings({
             branchId: branchIdToFilter,
         });
-        
+
         const mapped = mapApiBookings(response);
-        
+
         // Debug: Log số lượng đơn và branchId của từng đơn
         console.log("[ConsultantOrderListPage] Fetched bookings:", {
             total: mapped.length,
@@ -2021,7 +2045,7 @@ export default function ConsultantOrdersPage() {
                 status: b.status,
             })),
         });
-        
+
         return mapped;
     }, [isConsultant, isAccountant, scopedBranchId, mapApiBookings, employeeFetchDone, employeeInfo, currentUserId]);
 
@@ -2052,29 +2076,30 @@ export default function ConsultantOrdersPage() {
         const st = location.state;
         if (!(st && st.refresh)) return;
         let cancelled = false;
-            (async () => {
-                try {
+        (async () => {
+            try {
                 const mapped = await fetchBookings();
                 if (!cancelled && mapped) {
                     setOrders(mapped);
                     if (st.toast) push(st.toast, "success");
                 }
-                } catch (err) {
+            } catch (err) {
                 if (!cancelled) {
                     console.error("Failed to refresh orders:", err);
                 }
             } finally {
                 if (!cancelled) {
-                navigate(location.pathname, { replace: true, state: {} });
-        }
+                    navigate(location.pathname, { replace: true, state: {} });
+                }
             }
         })();
         return () => { cancelled = true; };
     }, [location, navigate, push, fetchBookings]);
 
     // paging / sort
-    const [sortKey, setSortKey] =
-        React.useState("created_at");
+    // Mặc định sắp xếp theo mã đơn (mã lớn hơn = đơn mới hơn) giảm dần
+    // để đảm bảo danh sách đơn của tư vấn viên hiển thị đúng thứ tự như mong muốn.
+    const [sortKey, setSortKey] = React.useState("code");
     const [sortDir, setSortDir] = React.useState("desc");
     const [page, setPage] = React.useState(1);
     const [pageSize, setPageSize] = React.useState(10);
@@ -2091,7 +2116,7 @@ export default function ConsultantOrdersPage() {
     const [formOpen, setFormOpen] = React.useState(false);
     const [formMode, setFormMode] = React.useState("create"); // "create" | "edit"
     const [formOrder, setFormOrder] = React.useState(null);
-    
+
     // Cancel dialog states
     const [cancelDialogOpen, setCancelDialogOpen] = React.useState(false);
     const [cancelOrder, setCancelOrder] = React.useState(null);
@@ -2131,12 +2156,20 @@ export default function ConsultantOrdersPage() {
         });
 
         const arr = [...afterFilter];
-        // Mặc định: đơn mới nhất lên đầu (pickup_time desc) nếu chưa chọn sort khác
+        // Helper để extract số từ mã đơn (ORD-1 -> 1, ORD-2025-001 -> 2025001)
+        const extractOrderNumber = (code) => {
+            if (!code) return 0;
+            const match = String(code).match(/(\d+)/);
+            return match ? parseInt(match[1], 10) : 0;
+        };
+
+        // Mặc định: đơn mới nhất lên đầu (theo mã đơn desc) nếu chưa chọn sort khác
         arr.sort((a, b) => {
             let A, B;
             if (sortKey === "code") {
-                A = a.code;
-                B = b.code;
+                // Sort theo số trong mã đơn (ORD-1, ORD-2, ...)
+                A = extractOrderNumber(a.code);
+                B = extractOrderNumber(b.code);
             } else if (sortKey === "customer_name") {
                 A = a.customer_name;
                 B = b.customer_name;
@@ -2150,9 +2183,9 @@ export default function ConsultantOrdersPage() {
                 A = a.status;
                 B = b.status;
             } else {
-                // default sort theo pickup_time (ngày đi)
-                A = a.pickup_time;
-                B = b.pickup_time;
+                // default sort theo mã đơn (mới nhất lên đầu)
+                A = extractOrderNumber(a.code);
+                B = extractOrderNumber(b.code);
             }
             if (A < B)
                 return sortDir === "asc" ? -1 : 1;
@@ -2206,30 +2239,30 @@ export default function ConsultantOrdersPage() {
         }
         // fallback: open modal cũ nếu thiếu id
     };
-    
+
     // Mở dialog xác nhận hủy đơn
     const handleCancelClick = (order) => {
         setCancelOrder(order);
         setCancelDialogOpen(true);
     };
-    
+
     // Xác nhận hủy đơn
     const handleConfirmCancel = async () => {
         if (!cancelOrder || !cancelOrder.id) return;
-        
+
         setCancelLoading(true);
         try {
             await cancelBooking(cancelOrder.id);
-            
+
             // Thông báo chi tiết
             const orderCode = cancelOrder.code || `#${cancelOrder.id}`;
             const customerName = cancelOrder.customer_name || "";
-            const depositInfo = cancelOrder.deposit_amount > 0 
-                ? ` (Tiền cọc sẽ được xử lý theo chính sách)` 
+            const depositInfo = cancelOrder.deposit_amount > 0
+                ? ` (Tiền cọc sẽ được xử lý theo chính sách)`
                 : "";
-            
+
             push(`✓ Đã hủy đơn hàng ${orderCode}${customerName ? ` - ${customerName}` : ""}${depositInfo}`, "success", 4000);
-            
+
             setCancelDialogOpen(false);
             setCancelOrder(null);
             // Refresh danh sách
@@ -2252,8 +2285,8 @@ export default function ConsultantOrdersPage() {
         try {
             const mapped = await fetchBookings();
             if (mapped) {
-            setOrders(mapped);
-            push("Đã làm mới danh sách đơn hàng", "success");
+                setOrders(mapped);
+                push("Đã làm mới danh sách đơn hàng", "success");
             }
         } catch (e) {
             push("Không tải được danh sách đơn hàng", "error");
@@ -2261,6 +2294,27 @@ export default function ConsultantOrdersPage() {
             setLoadingRefresh(false);
         }
     }, [fetchBookings, isConsultant, scopedBranchId, push]);
+
+    // Handler để mở popup danh sách chuyến đi của khách hàng
+    const handleViewCustomerTrips = React.useCallback(async (customerId, customerName) => {
+        if (!customerId) return;
+        setSelectedCustomerId(customerId);
+        setSelectedCustomerName(customerName || "");
+        setCustomerTripsOpen(true);
+        setCustomerTripsLoading(true);
+        setCustomerTrips([]);
+
+        try {
+            const response = await getCustomerBookings(customerId, { page: 0, size: 100 });
+            const bookings = response?.data?.content || response?.data?.items || response?.data || [];
+            setCustomerTrips(Array.isArray(bookings) ? bookings : []);
+        } catch (e) {
+            console.error("Failed to load customer trips:", e);
+            push("Không tải được danh sách chuyến đi của khách hàng", "error");
+        } finally {
+            setCustomerTripsLoading(false);
+        }
+    }, [push]);
 
     /**
      * khi form create / edit bấm lưu,
@@ -2426,6 +2480,7 @@ export default function ConsultantOrdersPage() {
                     onEdit={handleEdit}
                     onCancel={handleCancelClick}
                     showActions={!isManager && !isAccountant}
+                    onViewCustomerTrips={handleViewCustomerTrips}
                 />
 
 
@@ -2446,7 +2501,7 @@ export default function ConsultantOrdersPage() {
                 onClose={() => setFormOpen(false)}
                 onSave={handleSaveFromForm}
             />
-            
+
             {/* DIALOG XÁC NHẬN HỦY ĐƠN */}
             {cancelDialogOpen && cancelOrder && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -2466,12 +2521,12 @@ export default function ConsultantOrdersPage() {
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div className="px-5 py-4 space-y-3">
                             <p className="text-[13px] text-slate-700">
                                 Bạn có chắc chắn muốn hủy đơn hàng này không?
                             </p>
-                            
+
                             {/* Cảnh báo nếu đã đặt cọc */}
                             {cancelOrder.deposit_amount > 0 && (
                                 <div className="p-3 rounded-lg bg-info-50 border border-info-200">
@@ -2494,12 +2549,12 @@ export default function ConsultantOrdersPage() {
                                     </div>
                                 </div>
                             )}
-                            
+
                             <p className="text-[12px] text-slate-500 italic">
                                 Hành động này không thể hoàn tác.
                             </p>
                         </div>
-                        
+
                         <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-2">
                             <button
                                 type="button"
@@ -2521,6 +2576,109 @@ export default function ConsultantOrdersPage() {
                                 {cancelLoading && <Loader2 className="h-4 w-4 animate-spin" />}
                                 {cancelLoading ? "Đang hủy..." : "Xác nhận hủy"}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* POPUP DANH SÁCH CHUYẾN ĐI CỦA KHÁCH HÀNG */}
+            {customerTripsOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+                        {/* Header */}
+                        <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-semibold text-slate-900">
+                                    Danh sách chuyến đi
+                                </h3>
+                                <p className="text-sm text-slate-600 mt-1">
+                                    Khách hàng: <span className="font-medium">{selectedCustomerName}</span>
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setCustomerTripsOpen(false);
+                                    setSelectedCustomerId(null);
+                                    setSelectedCustomerName("");
+                                    setCustomerTrips([]);
+                                }}
+                                className="text-slate-400 hover:text-slate-600 p-2 rounded-lg hover:bg-slate-100 transition-colors"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 overflow-y-auto p-6">
+                            {customerTripsLoading ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <Loader2 className="h-6 w-6 animate-spin text-sky-600" />
+                                    <span className="ml-2 text-slate-600">Đang tải...</span>
+                                </div>
+                            ) : customerTrips.length === 0 ? (
+                                <div className="text-center py-12 text-slate-500">
+                                    <ClipboardList className="h-12 w-12 mx-auto mb-3 text-slate-300" />
+                                    <p className="text-sm">Khách hàng chưa có chuyến đi nào</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {customerTrips.map((booking) => {
+                                        const bookingCode = booking.bookingCode || booking.code || (booking.id ? `ORD-${booking.id}` : `ORD-${booking.bookingId || "?"}`);
+                                        const status = booking.status || "QUOTATION_SENT";
+                                        const statusLabel = ORDER_STATUS_LABEL[status] || status;
+                                        const statusStyle = ORDER_STATUS_STYLE[status] || ORDER_STATUS_STYLE.DRAFT;
+                                        const totalCost = booking.totalCost || booking.totalPrice || booking.total || 0;
+                                        const paidAmount = booking.paidAmount || booking.paid_amount || 0;
+
+                                        return (
+                                            <div
+                                                key={booking.id || booking.bookingId}
+                                                className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors cursor-pointer"
+                                                onClick={() => {
+                                                    if (booking.id || booking.bookingId) {
+                                                        handleViewDetail({ id: booking.id || booking.bookingId });
+                                                        setCustomerTripsOpen(false);
+                                                    }
+                                                }}
+                                            >
+                                                <div className="flex items-start justify-between gap-4">
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <span className="font-semibold text-slate-900">{bookingCode}</span>
+                                                            <span className={cls("px-2 py-0.5 rounded-md text-[11px] font-medium", statusStyle)}>
+                                                                {statusLabel}
+                                                            </span>
+                                                        </div>
+                                                        {booking.startLocation && booking.endLocation && (
+                                                            <div className="text-sm text-slate-600 mb-1">
+                                                                <MapPin className="h-3.5 w-3.5 inline text-primary-600 mr-1" />
+                                                                {booking.startLocation} → {booking.endLocation}
+                                                            </div>
+                                                        )}
+                                                        {booking.startDate && (
+                                                            <div className="text-xs text-slate-500 mb-2">
+                                                                <Clock className="h-3.5 w-3.5 inline mr-1" />
+                                                                {fmtDateTime(booking.startDate)}
+                                                            </div>
+                                                        )}
+                                                        <div className="flex items-center gap-4 text-xs text-slate-600">
+                                                            <span>
+                                                                <DollarSign className="h-3.5 w-3.5 inline mr-1" />
+                                                                Tổng: {fmtVND(totalCost)}
+                                                            </span>
+                                                            <span className={paidAmount >= totalCost ? "text-emerald-600" : "text-rose-600"}>
+                                                                Đã thu: {fmtVND(paidAmount)}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <ChevronRight className="h-5 w-5 text-slate-400 shrink-0" />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

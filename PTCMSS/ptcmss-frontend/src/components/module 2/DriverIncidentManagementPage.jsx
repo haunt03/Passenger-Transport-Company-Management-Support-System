@@ -30,21 +30,36 @@ const SEVERITIES = [
   {
     value: "MINOR",
     label: "Nhẹ",
-    color: "text-blue-700 bg-blue-50 border-blue-200",
+    color: "text-emerald-700",
+    bgColor: "bg-gradient-to-br from-emerald-50 to-green-50",
+    borderColor: "border-emerald-300",
+    borderColorSelected: "border-emerald-500",
+    iconColor: "text-emerald-600",
+    shadowColor: "shadow-emerald-100",
     icon: Info,
     description: "Sự cố nhỏ, không ảnh hưởng đến an toàn"
   },
   {
     value: "MAJOR",
     label: "Trung bình",
-    color: "text-info-700 bg-info-50 border-info-200",
+    color: "text-amber-700",
+    bgColor: "bg-gradient-to-br from-amber-50 to-orange-50",
+    borderColor: "border-amber-300",
+    borderColorSelected: "border-amber-500",
+    iconColor: "text-amber-600",
+    shadowColor: "shadow-amber-100",
     icon: AlertCircle,
     description: "Sự cố cần xử lý, có thể ảnh hưởng đến lịch trình"
   },
   {
     value: "CRITICAL",
     label: "Nghiêm trọng",
-    color: "text-rose-700 bg-rose-50 border-rose-200",
+    color: "text-red-700",
+    bgColor: "bg-gradient-to-br from-red-50 to-rose-50",
+    borderColor: "border-red-300",
+    borderColorSelected: "border-red-500",
+    iconColor: "text-red-600",
+    shadowColor: "shadow-red-100",
     icon: AlertTriangle,
     description: "Sự cố nghiêm trọng, cần xử lý khẩn cấp"
   },
@@ -123,20 +138,20 @@ const getSeverityLabel = (severity) => {
 };
 
 const SEVERITY_COLORS = {
-  MINOR: { color: "text-blue-700", bg: "bg-blue-50", border: "border-blue-200" },
+  MINOR: { color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200" },
   NORMAL: { color: "text-slate-700", bg: "bg-slate-50", border: "border-slate-200" },
-  MAJOR: { color: "text-info-700", bg: "bg-info-50", border: "border-info-200" },
-  CRITICAL: { color: "text-rose-700", bg: "bg-rose-50", border: "border-rose-200" },
+  MAJOR: { color: "text-amber-700", bg: "bg-amber-50", border: "border-amber-200" },
+  CRITICAL: { color: "text-red-700", bg: "bg-red-50", border: "border-red-200" },
 };
 
 export default function DriverIncidentManagementPage() {
   const userId = useMemo(() => getStoredUserId(), []);
   const [activeTab, setActiveTab] = useState("report"); // "report" or "list"
-  
+
   // Driver state
   const [driver, setDriver] = useState(null);
   const [driverLoading, setDriverLoading] = useState(true);
-  
+
   // Report form state
   const [tripId, setTripId] = useState("");
   const [tripIdInput, setTripIdInput] = useState("");
@@ -152,12 +167,13 @@ export default function DriverIncidentManagementPage() {
   const [toast, setToast] = useState(null);
   const [locationSuggestions, setLocationSuggestions] = useState([]);
   const [fetchingSuggestions, setFetchingSuggestions] = useState(false);
-  
+
   // List state
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("all");
+  const [tripsLoaded, setTripsLoaded] = useState(false);
 
   // Format time helper
   const fmtHM = (iso) => {
@@ -187,11 +203,7 @@ export default function DriverIncidentManagementPage() {
         const data = await getDriverProfileByUser(Number(userId));
         if (cancelled) return;
         setDriver(data);
-        
-        // Load current trip and available trips
-        if (data?.driverId) {
-          await loadTrips(data.driverId);
-        }
+        // Không load trips ngay, chỉ load khi user vào tab "report"
       } catch (err) {
         if (cancelled) return;
         console.error("Không tải được thông tin tài xế:", err);
@@ -204,7 +216,7 @@ export default function DriverIncidentManagementPage() {
     };
   }, [userId]);
 
-  // Load trips for reporting
+  // Load trips for reporting - chỉ load khi vào tab "report"
   const loadTrips = async (driverId) => {
     try {
       const dash = await getDriverDashboard(driverId);
@@ -212,9 +224,9 @@ export default function DriverIncidentManagementPage() {
         const tripDate = new Date(dash.startTime);
         const today = new Date();
         const isToday =
-          tripDate.getDate() === today.getDate() &&
-          tripDate.getMonth() === today.getMonth() &&
-          tripDate.getFullYear() === today.getFullYear();
+            tripDate.getDate() === today.getDate() &&
+            tripDate.getMonth() === today.getMonth() &&
+            tripDate.getFullYear() === today.getFullYear();
 
         if (isToday) {
           const trip = {
@@ -237,58 +249,76 @@ export default function DriverIncidentManagementPage() {
         setTripSelectionMode("dropdown");
       }
 
-      const schedule = await getDriverSchedule(driverId);
+      // Tối ưu: chỉ load schedule trong khoảng thời gian cần thiết (hôm qua đến 2 giờ sau)
       const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const yesterday = new Date(today);
+      const yesterday = new Date(now);
       yesterday.setDate(yesterday.getDate() - 1);
-      
+      const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+
+      const toLocalDateInput = (date) => {
+        const d = new Date(date);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+      };
+
+      const schedule = await getDriverSchedule(driverId, {
+        startDate: toLocalDateInput(yesterday),
+        endDate: toLocalDateInput(twoHoursLater),
+      });
+
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const yesterdayDate = new Date(today);
+      yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+
       const reportableTrips = Array.isArray(schedule)
-        ? schedule
-            .filter((t) => {
-              const tripDate = new Date(t.startTime || t.start_time);
-              const tripStatus = t.status || "SCHEDULED";
-              const validStatus = ["SCHEDULED", "ASSIGNED", "ONGOING"].includes(tripStatus);
-              if (!validStatus) return false;
-              
-              const isToday =
-                tripDate.getDate() === today.getDate() &&
-                tripDate.getMonth() === today.getMonth() &&
-                tripDate.getFullYear() === today.getFullYear();
-              
-              const isYesterdayOngoing =
-                tripStatus === "ONGOING" &&
-                tripDate.getDate() === yesterday.getDate() &&
-                tripDate.getMonth() === yesterday.getMonth() &&
-                tripDate.getFullYear() === yesterday.getFullYear();
-              
-              const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-              const isUpcoming = tripDate <= twoHoursFromNow && tripDate >= now;
-              
-              return isToday || isYesterdayOngoing || isUpcoming;
-            })
-            .sort((a, b) => {
-              const statusOrder = { ONGOING: 1, ASSIGNED: 2, SCHEDULED: 3 };
-              const aOrder = statusOrder[a.status] || 99;
-              const bOrder = statusOrder[b.status] || 99;
-              if (aOrder !== bOrder) return aOrder - bOrder;
-              
-              const aTime = new Date(a.startTime || a.start_time).getTime();
-              const bTime = new Date(b.startTime || b.start_time).getTime();
-              return bTime - aTime;
-            })
-            .map((t) => ({
-              tripId: t.tripId || t.trip_id,
-              pickupAddress: t.startLocation || t.start_location || "—",
-              dropoffAddress: t.endLocation || t.end_location || "—",
-              pickupTime: t.startTime || t.start_time,
-              customerName: t.customerName || t.customer_name,
-              status: t.status || "SCHEDULED",
-            }))
-        : [];
+          ? schedule
+              .filter((t) => {
+                const tripDate = new Date(t.startTime || t.start_time);
+                const tripStatus = t.status || "SCHEDULED";
+                const validStatus = ["SCHEDULED", "ASSIGNED", "ONGOING"].includes(tripStatus);
+                if (!validStatus) return false;
+
+                const isToday =
+                    tripDate.getDate() === today.getDate() &&
+                    tripDate.getMonth() === today.getMonth() &&
+                    tripDate.getFullYear() === today.getFullYear();
+
+                const isYesterdayOngoing =
+                    tripStatus === "ONGOING" &&
+                    tripDate.getDate() === yesterdayDate.getDate() &&
+                    tripDate.getMonth() === yesterdayDate.getMonth() &&
+                    tripDate.getFullYear() === yesterdayDate.getFullYear();
+
+                const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+                const isUpcoming = tripDate <= twoHoursFromNow && tripDate >= now;
+
+                return isToday || isYesterdayOngoing || isUpcoming;
+              })
+              .sort((a, b) => {
+                const statusOrder = { ONGOING: 1, ASSIGNED: 2, SCHEDULED: 3 };
+                const aOrder = statusOrder[a.status] || 99;
+                const bOrder = statusOrder[b.status] || 99;
+                if (aOrder !== bOrder) return aOrder - bOrder;
+
+                const aTime = new Date(a.startTime || a.start_time).getTime();
+                const bTime = new Date(b.startTime || b.start_time).getTime();
+                return bTime - aTime;
+              })
+              .map((t) => ({
+                tripId: t.tripId || t.trip_id,
+                pickupAddress: t.startLocation || t.start_location || "—",
+                dropoffAddress: t.endLocation || t.end_location || "—",
+                pickupTime: t.startTime || t.start_time,
+                customerName: t.customerName || t.customer_name,
+                status: t.status || "SCHEDULED",
+              }))
+          : [];
       setAvailableTrips(reportableTrips);
     } catch (err) {
       console.error("Lỗi khi tải danh sách chuyến đi:", err);
+      throw err;
     }
   };
 
@@ -305,18 +335,18 @@ export default function DriverIncidentManagementPage() {
       try {
         setFetchingSuggestions(true);
         const resp = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&limit=5`,
-          { signal: controller.signal }
+            `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&limit=5`,
+            { signal: controller.signal }
         );
         if (!resp.ok) throw new Error(`Lỗi kết nối: HTTP ${resp.status}`);
         const data = await resp.json();
         const mapped = Array.isArray(data)
-          ? data.map((item) => ({
+            ? data.map((item) => ({
               label: item.display_name,
               lat: item.lat,
               lon: item.lon,
             }))
-          : [];
+            : [];
         setLocationSuggestions(mapped);
       } catch (err) {
         if (err.name !== "AbortError") {
@@ -345,11 +375,23 @@ export default function DriverIncidentManagementPage() {
     setLocationSuggestions([]);
   };
 
+  // Load trips khi chuyển sang tab "report" (lazy load)
+  useEffect(() => {
+    if (activeTab === "report" && driver?.driverId && !driverLoading && !tripsLoaded) {
+      loadTrips(driver.driverId).then(() => {
+        setTripsLoaded(true);
+      }).catch(() => {
+        setTripsLoaded(false);
+      });
+    }
+  }, [activeTab, driver?.driverId, driverLoading, tripsLoaded]);
+
   // Load incidents list
   useEffect(() => {
     if (driverLoading || !driver?.driverId || activeTab !== "list") return;
     fetchIncidents();
-  }, [driver, driverLoading, filter, activeTab]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [driver?.driverId, driverLoading, filter, activeTab]);
 
   const fetchIncidents = async () => {
     if (!driver?.driverId) return;
@@ -453,7 +495,7 @@ export default function DriverIncidentManagementPage() {
       setSeverity("MAJOR");
       setLocation("");
       setDescription("");
-      
+
       // Switch to list tab and refresh
       setActiveTab("list");
       setTimeout(() => fetchIncidents(), 500);
@@ -471,7 +513,7 @@ export default function DriverIncidentManagementPage() {
   const getSeverityBadge = (severity) => {
     const config = SEVERITY_COLORS[severity] || SEVERITY_COLORS.NORMAL;
     return (
-      <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md ${config.bg} ${config.color} border ${config.border}`}>
+        <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md ${config.bg} ${config.color} border ${config.border}`}>
         {getSeverityLabel(severity) || "Bình thường"}
       </span>
     );
@@ -480,13 +522,13 @@ export default function DriverIncidentManagementPage() {
   const getResolutionBadge = (incident) => {
     if (!incident.resolved) {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-info-100 text-info-700 border border-info-200">
+          <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-info-100 text-info-700 border border-info-200">
           <Clock className="h-3.5 w-3.5" /> Chờ xử lý
         </span>
       );
     }
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-emerald-100 text-emerald-700 border border-emerald-200">
+        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-emerald-100 text-emerald-700 border border-emerald-200">
         <CheckCircle2 className="h-3.5 w-3.5" /> Đã xử lý
       </span>
     );
@@ -497,526 +539,543 @@ export default function DriverIncidentManagementPage() {
 
   if (driverLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-      </div>
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 text-slate-900">
-      {/* Toast Notification */}
-      {toast && (
-        <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg animate-fade-in ${
-          toast.type === "success" ? "bg-emerald-500 text-white" : "bg-rose-500 text-white"
-        }`}>
-          {toast.type === "success" ? <CheckCircle2 className="h-5 w-5" /> : <XCircle className="h-5 w-5" />}
-          <span className="text-sm">{toast.message}</span>
-          <button onClick={() => setToast(null)} className="ml-2">
-            <XCircle className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
-            <Shield className="h-6 w-6 text-white" />
-          </div>
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold text-slate-900">Quản lý sự cố</h1>
-            <p className="text-sm text-slate-600">Báo cáo và theo dõi các sự cố trong chuyến đi</p>
-          </div>
-        </div>
-        {driver && (
-          <div className="flex items-center gap-2 mt-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg inline-flex">
-            <Shield className="h-4 w-4 text-blue-600" />
-            <span className="text-sm text-blue-700">
-              <strong>{driver.fullName}</strong>
-              {driver.branchName && ` - ${driver.branchName}`}
-            </span>
-          </div>
+      <div className="min-h-screen bg-slate-50 p-6 text-slate-900">
+        {/* Toast Notification */}
+        {toast && (
+            <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg animate-fade-in ${
+                toast.type === "success" ? "bg-emerald-500 text-white" : "bg-rose-500 text-white"
+            }`}>
+              {toast.type === "success" ? <CheckCircle2 className="h-5 w-5" /> : <XCircle className="h-5 w-5" />}
+              <span className="text-sm">{toast.message}</span>
+              <button onClick={() => setToast(null)} className="ml-2">
+                <XCircle className="h-4 w-4" />
+              </button>
+            </div>
         )}
-      </div>
 
-      {/* Tabs */}
-      <div className="mb-6 bg-white rounded-lg border border-slate-200 p-1 inline-flex">
-        <button
-          onClick={() => setActiveTab("report")}
-          className={`px-6 py-2.5 text-sm font-medium rounded-md transition-all duration-200 ${
-            activeTab === "report"
-              ? "bg-blue-600 text-white shadow-sm"
-              : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4" />
-            Báo cáo sự cố
+        {/* Header */}
+        <div className="mb-6">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
+              <Shield className="h-6 w-6 text-white" />
+            </div>
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold text-slate-900">Quản lý sự cố</h1>
+              <p className="text-sm text-slate-600">Báo cáo và theo dõi các sự cố trong chuyến đi</p>
+            </div>
           </div>
-        </button>
-        <button
-          onClick={() => {
-            setActiveTab("list");
-            if (driver?.driverId) fetchIncidents();
-          }}
-          className={`px-6 py-2.5 text-sm font-medium rounded-md transition-all duration-200 ${
-            activeTab === "list"
-              ? "bg-blue-600 text-white shadow-sm"
-              : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Danh sách sự cố
-            {pendingCount > 0 && (
-              <span className="px-1.5 py-0.5 text-xs bg-info-500 text-white rounded-full">
+          {driver && (
+              <div className="flex items-center gap-2 mt-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg inline-flex">
+                <Shield className="h-4 w-4 text-blue-600" />
+                <span className="text-sm text-blue-700">
+              <strong>{driver.fullName}</strong>
+                  {driver.branchName && ` - ${driver.branchName}`}
+            </span>
+              </div>
+          )}
+        </div>
+
+        {/* Tabs */}
+        <div className="mb-6 bg-white rounded-lg border border-slate-200 p-1 inline-flex">
+          <button
+              onClick={() => setActiveTab("report")}
+              className={`px-6 py-2.5 text-sm font-medium rounded-md transition-all duration-200 ${
+                  activeTab === "report"
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+              }`}
+          >
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              Báo cáo sự cố
+            </div>
+          </button>
+          <button
+              onClick={() => {
+                setActiveTab("list");
+              }}
+              className={`px-6 py-2.5 text-sm font-medium rounded-md transition-all duration-200 ${
+                  activeTab === "list"
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+              }`}
+          >
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Danh sách sự cố
+              {pendingCount > 0 && (
+                  <span className="px-1.5 py-0.5 text-xs bg-info-500 text-white rounded-full">
                 {pendingCount}
               </span>
-            )}
-          </div>
-        </button>
-      </div>
+              )}
+            </div>
+          </button>
+        </div>
 
-      {/* Tab Content */}
-      {activeTab === "report" ? (
-        <div className="max-w-4xl mx-auto">
-          <form onSubmit={onSubmit} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <div className="space-y-6">
-              {/* Trip Selection */}
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
-                  <MapPin className="h-4 w-4 text-slate-400" />
-                  Chọn chuyến đi <span className="text-rose-500">*</span>
-                </label>
+        {/* Tab Content */}
+        {activeTab === "report" ? (
+            <div className="max-w-4xl mx-auto">
+              <form onSubmit={onSubmit} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                <div className="space-y-6">
+                  {/* Trip Selection */}
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
+                      <MapPin className="h-4 w-4 text-slate-400" />
+                      Chọn chuyến đi <span className="text-rose-500">*</span>
+                    </label>
 
-                {currentTrip && tripSelectionMode === "auto" && (
-                  <div className="mb-3 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="h-6 w-6 rounded-full bg-blue-500 flex items-center justify-center">
-                            <CheckCircle2 className="h-4 w-4 text-white" />
-                          </div>
-                          <span className="text-sm font-semibold text-blue-900">Chuyến đi hiện tại</span>
-                          <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-md">
+                    {currentTrip && tripSelectionMode === "auto" && (
+                        <div className="mb-3 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="h-6 w-6 rounded-full bg-blue-500 flex items-center justify-center">
+                                  <CheckCircle2 className="h-4 w-4 text-white" />
+                                </div>
+                                <span className="text-sm font-semibold text-blue-900">Chuyến đi hiện tại</span>
+                                <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-md">
                             ID: {currentTrip.tripId}
                           </span>
-                          {currentTrip.status === "ONGOING" && (
-                            <span className="text-xs px-2 py-0.5 bg-info-100 text-info-700 rounded-md font-medium">
+                                {currentTrip.status === "ONGOING" && (
+                                    <span className="text-xs px-2 py-0.5 bg-info-100 text-info-700 rounded-md font-medium">
                               Đang diễn ra
                             </span>
-                          )}
-                          {currentTrip.status === "ASSIGNED" && (
-                            <span className="text-xs px-2 py-0.5 bg-sky-100 text-sky-700 rounded-md font-medium">
+                                )}
+                                {currentTrip.status === "ASSIGNED" && (
+                                    <span className="text-xs px-2 py-0.5 bg-sky-100 text-sky-700 rounded-md font-medium">
                               Đã phân xe
                             </span>
-                          )}
-                        </div>
-                        <div className="text-sm text-blue-800 space-y-1">
-                          <div className="flex items-center gap-2">
-                            <MapPin className="h-3.5 w-3.5" />
-                            <span className="font-medium">{currentTrip.pickupAddress} → {currentTrip.dropoffAddress}</span>
-                          </div>
-                          {currentTrip.customerName && (
-                            <div className="flex items-center gap-2">
-                              <User className="h-3.5 w-3.5" />
-                              <span>{currentTrip.customerName}</span>
-                              {currentTrip.customerPhone && (
-                                <>
-                                  <Phone className="h-3.5 w-3.5 ml-2" />
-                                  <span>{currentTrip.customerPhone}</span>
-                                </>
-                              )}
-                            </div>
-                          )}
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-3.5 w-3.5" />
-                            <span>{fmtHM(currentTrip.pickupTime)}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setTripSelectionMode("dropdown")}
-                        className="text-xs text-blue-600 hover:text-blue-800 underline"
-                      >
-                        Chọn chuyến khác
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {tripSelectionMode === "dropdown" && (
-                  <select
-                    value={tripId}
-                    onChange={(e) => handleTripSelect(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">-- Chọn chuyến đi --</option>
-                    {availableTrips.map((trip) => (
-                      <option key={trip.tripId} value={trip.tripId}>
-                        Chuyến {trip.tripId} - {trip.pickupAddress} → {trip.dropoffAddress} ({getTripStatusLabel(trip.status)})
-                      </option>
-                    ))}
-                  </select>
-                )}
-
-                {tripSelectionMode === "manual" && (
-                  <input
-                    type="text"
-                    value={tripIdInput}
-                    onChange={(e) => handleManualInput(e.target.value)}
-                    placeholder="Nhập mã chuyến đi"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                )}
-
-                {tripSelectionMode !== "manual" && availableTrips.length === 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setTripSelectionMode("manual")}
-                    className="mt-2 text-xs text-blue-600 hover:text-blue-800 underline"
-                  >
-                    Nhập mã chuyến đi thủ công
-                  </button>
-                )}
-              </div>
-
-              {/* Incident Type */}
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
-                  <AlertTriangle className="h-4 w-4 text-slate-400" />
-                  Loại sự cố <span className="text-rose-500">*</span>
-                </label>
-                <select
-                  value={incidentType}
-                  onChange={(e) => setIncidentType(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">-- Chọn loại sự cố --</option>
-                  {INCIDENT_TYPES.map((type) => (
-                    <option key={type.value} value={type.value}>
-                      {type.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Severity */}
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-3">
-                  <Info className="h-4 w-4 text-slate-400" />
-                  Mức độ nghiêm trọng <span className="text-rose-500">*</span>
-                </label>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {SEVERITIES.map((sev) => {
-                    const Icon = sev.icon;
-                    return (
-                      <button
-                        key={sev.value}
-                        type="button"
-                        onClick={() => setSeverity(sev.value)}
-                        className={`p-4 border-2 rounded-lg text-left transition-all ${
-                          severity === sev.value
-                            ? `${sev.color} border-current shadow-md`
-                            : "border-slate-200 hover:border-slate-300 bg-white"
-                        }`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <Icon className={`h-5 w-5 ${severity === sev.value ? sev.color.split(' ')[0] : 'text-slate-400'}`} />
-                          <div className="flex-1">
-                            <div className="font-medium">{sev.label}</div>
-                            <div className="text-xs mt-1">{sev.description}</div>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Location */}
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
-                  <MapPin className="h-4 w-4 text-slate-400" />
-                  Địa điểm (tùy chọn)
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    placeholder="Nhập địa điểm hoặc tọa độ GPS"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  {locationSuggestions.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-slate-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      {locationSuggestions.map((sugg, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => handleSelectSuggestion(sugg)}
-                          className="w-full px-3 py-2 text-left hover:bg-slate-50 text-sm"
-                        >
-                          {sugg.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
-                  <FileText className="h-4 w-4 text-slate-400" />
-                  Mô tả chi tiết <span className="text-rose-500">*</span>
-                </label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Mô tả chi tiết về sự cố đã xảy ra..."
-                  rows={5}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                />
-                <p className="text-xs text-slate-500 mt-1">Tối thiểu 10 ký tự</p>
-              </div>
-
-              {/* Submit Button */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTripId("");
-                    setTripIdInput("");
-                    setIncidentType("");
-                    setSeverity("MAJOR");
-                    setLocation("");
-                    setDescription("");
-                    if (currentTrip) {
-                      setTripId(String(currentTrip.tripId));
-                      setSelectedTrip(currentTrip);
-                      setTripSelectionMode("auto");
-                    }
-                  }}
-                  className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
-                >
-                  Đặt lại
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-6 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-2"
-                >
-                  {submitting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Đang gửi...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4" />
-                      Gửi báo cáo
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </form>
-        </div>
-      ) : (
-        <div>
-          {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="bg-white rounded-lg border border-slate-200 p-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-slate-100 flex items-center justify-center">
-                  <AlertTriangle className="h-5 w-5 text-slate-600" />
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-slate-900">{incidents.length}</div>
-                  <div className="text-sm text-slate-600">Tổng sự cố</div>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-lg border border-slate-200 p-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-info-100 flex items-center justify-center">
-                  <Clock className="h-5 w-5 text-primary-600" />
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-primary-600">{pendingCount}</div>
-                  <div className="text-sm text-slate-600">Chờ xử lý</div>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-lg border border-slate-200 p-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-emerald-100 flex items-center justify-center">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-emerald-600">{resolvedCount}</div>
-                  <div className="text-sm text-slate-600">Đã xử lý</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Filter */}
-          <div className="mb-4 flex items-center gap-2">
-            <Filter className="h-4 w-4 text-slate-600" />
-            <span className="text-sm font-medium text-slate-700">Lọc theo:</span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setFilter("all")}
-                className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                  filter === "all"
-                    ? "bg-blue-600 text-white"
-                    : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
-                }`}
-              >
-                Tất cả
-              </button>
-              <button
-                onClick={() => setFilter("pending")}
-                className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                  filter === "pending"
-                    ? "bg-primary-600 text-white"
-                    : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
-                }`}
-              >
-                Chờ xử lý
-              </button>
-              <button
-                onClick={() => setFilter("resolved")}
-                className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                  filter === "resolved"
-                    ? "bg-emerald-600 text-white"
-                    : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
-                }`}
-              >
-                Đã xử lý
-              </button>
-            </div>
-            <button
-              onClick={fetchIncidents}
-              className="ml-auto inline-flex items-center gap-2 px-3 py-2 text-sm border rounded-lg text-slate-700 hover:bg-slate-100 transition-colors"
-              disabled={loading}
-            >
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              Làm mới
-            </button>
-          </div>
-
-          {/* Incident List */}
-          {loading ? (
-            <div className="flex items-center gap-2 text-slate-600">
-              <Loader2 className="h-4 w-4 animate-spin" /> Đang tải danh sách...
-            </div>
-          ) : error ? (
-            <div className="flex items-center gap-2 text-rose-600">
-              <XCircle className="h-4 w-4" /> {error}
-            </div>
-          ) : incidents.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-slate-200 bg-white p-12 text-center">
-              <Shield className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-slate-900 mb-2">Chưa có sự cố nào</h3>
-              <p className="text-sm text-slate-600">
-                {filter === "all"
-                  ? "Bạn chưa báo cáo sự cố nào. Hãy báo cáo khi có sự cố xảy ra."
-                  : filter === "resolved"
-                  ? "Chưa có sự cố nào đã được xử lý."
-                  : "Tất cả sự cố đã được xử lý."}
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4">
-              {incidents.map((inc) => {
-                const resolution = inc.resolutionAction
-                  ? RESOLUTION_ACTIONS[inc.resolutionAction]
-                  : null;
-                const ResolutionIcon = resolution?.icon;
-
-                return (
-                  <div
-                    key={inc.id}
-                    className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center flex-shrink-0">
-                        <AlertTriangle className="h-6 w-6 text-blue-600" />
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-3 mb-3">
-                          <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-semibold text-slate-900">Chuyến {inc.tripId}</span>
-                              {getSeverityBadge(inc.severity)}
-                              {getResolutionBadge(inc)}
-                            </div>
-                            <div className="text-xs text-slate-500 flex items-center gap-2 mt-1">
-                              <span>ID: {inc.id}</span>
-                              <span>•</span>
-                              <Calendar className="h-3.5 w-3.5" />
-                              <span>
-                                {inc.createdAt
-                                  ? new Date(inc.createdAt).toLocaleString("vi-VN")
-                                  : "--"}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="mb-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                          <div className="text-sm text-slate-700 leading-relaxed">{inc.description}</div>
-                        </div>
-
-                        {inc.resolved && (
-                          <div className="mt-4 p-4 bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg border border-emerald-200">
-                            <div className="flex items-start gap-3">
-                              {ResolutionIcon && (
-                                <div className="p-2 rounded-lg bg-emerald-100 flex-shrink-0">
-                                  <ResolutionIcon className={`h-5 w-5 ${resolution.color}`} />
-                                </div>
-                              )}
-                              <div className="flex-1">
-                                <div className="font-semibold text-emerald-900 mb-1">
-                                  Giải pháp đã áp dụng: {resolution?.label || "Đã xử lý"}
-                                </div>
-                                {inc.resolutionNote && (
-                                  <div className="text-sm text-emerald-800 mt-2 mb-2">
-                                    {inc.resolutionNote}
-                                  </div>
                                 )}
-                                <div className="text-xs text-emerald-700 flex items-center gap-2 mt-2">
-                                  <User className="h-3.5 w-3.5" />
-                                  <span>
-                                    Xử lý bởi: {inc.resolvedByName || "Điều phối viên"}
-                                    {inc.resolvedAt && (
-                                      <>
-                                        {" • "}
-                                        {new Date(inc.resolvedAt).toLocaleString("vi-VN")}
-                                      </>
-                                    )}
-                                  </span>
+                              </div>
+                              <div className="text-sm text-blue-800 space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <MapPin className="h-3.5 w-3.5" />
+                                  <span className="font-medium">{currentTrip.pickupAddress} → {currentTrip.dropoffAddress}</span>
+                                </div>
+                                {currentTrip.customerName && (
+                                    <div className="flex items-center gap-2">
+                                      <User className="h-3.5 w-3.5" />
+                                      <span>{currentTrip.customerName}</span>
+                                      {currentTrip.customerPhone && (
+                                          <>
+                                            <Phone className="h-3.5 w-3.5 ml-2" />
+                                            <span>{currentTrip.customerPhone}</span>
+                                          </>
+                                      )}
+                                    </div>
+                                )}
+                                <div className="flex items-center gap-2">
+                                  <Clock className="h-3.5 w-3.5" />
+                                  <span>{fmtHM(currentTrip.pickupTime)}</span>
                                 </div>
                               </div>
                             </div>
+                            <button
+                                type="button"
+                                onClick={() => setTripSelectionMode("dropdown")}
+                                className="text-xs text-blue-600 hover:text-blue-800 underline"
+                            >
+                              Chọn chuyến khác
+                            </button>
                           </div>
-                        )}
-                      </div>
+                        </div>
+                    )}
+
+                    {tripSelectionMode === "dropdown" && (
+                        <select
+                            value={tripId}
+                            onChange={(e) => handleTripSelect(e.target.value)}
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">-- Chọn chuyến đi --</option>
+                          {availableTrips.map((trip) => (
+                              <option key={trip.tripId} value={trip.tripId}>
+                                Chuyến {trip.tripId} - {trip.pickupAddress} → {trip.dropoffAddress} ({getTripStatusLabel(trip.status)})
+                              </option>
+                          ))}
+                        </select>
+                    )}
+
+                    {tripSelectionMode === "manual" && (
+                        <input
+                            type="text"
+                            value={tripIdInput}
+                            onChange={(e) => handleManualInput(e.target.value)}
+                            placeholder="Nhập mã chuyến đi"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    )}
+
+                    {tripSelectionMode !== "manual" && availableTrips.length === 0 && (
+                        <button
+                            type="button"
+                            onClick={() => setTripSelectionMode("manual")}
+                            className="mt-2 text-xs text-blue-600 hover:text-blue-800 underline"
+                        >
+                          Nhập mã chuyến đi thủ công
+                        </button>
+                    )}
+                  </div>
+
+                  {/* Incident Type */}
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
+                      <AlertTriangle className="h-4 w-4 text-slate-400" />
+                      Loại sự cố <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                        value={incidentType}
+                        onChange={(e) => setIncidentType(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">-- Chọn loại sự cố --</option>
+                      {INCIDENT_TYPES.map((type) => (
+                          <option key={type.value} value={type.value}>
+                            {type.label}
+                          </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Severity */}
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-3">
+                      <Info className="h-4 w-4 text-slate-400" />
+                      Mức độ nghiêm trọng <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {SEVERITIES.map((sev) => {
+                        const Icon = sev.icon;
+                        const isSelected = severity === sev.value;
+                        return (
+                            <button
+                                key={sev.value}
+                                type="button"
+                                onClick={() => setSeverity(sev.value)}
+                                className={`relative p-5 border-2 rounded-xl text-left transition-all duration-200 ${
+                                    isSelected
+                                        ? `${sev.bgColor} ${sev.borderColorSelected} ${sev.shadowColor} shadow-lg scale-[1.02]`
+                                        : `${sev.bgColor} ${sev.borderColor} hover:${sev.borderColorSelected} hover:shadow-md bg-white`
+                                }`}
+                            >
+                              <div className="flex items-start gap-4">
+                                <div className={`flex-shrink-0 p-2.5 rounded-lg transition-colors ${
+                                    isSelected
+                                        ? `bg-white/60 ${sev.iconColor}`
+                                        : "bg-slate-100 text-slate-400"
+                                }`}>
+                                  <Icon className={`h-5 w-5 ${isSelected ? sev.iconColor : 'text-slate-400'}`} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className={`font-semibold text-base mb-1.5 ${isSelected ? sev.color : 'text-slate-700'}`}>
+                                    {sev.label}
+                                  </div>
+                                  <div className={`text-xs leading-relaxed ${isSelected ? 'text-slate-600' : 'text-slate-500'}`}>
+                                    {sev.description}
+                                  </div>
+                                </div>
+                              </div>
+                              {isSelected && (
+                                  <div className={`absolute top-3 right-3 w-2.5 h-2.5 rounded-full ${
+                                      sev.value === "MINOR" ? "bg-emerald-500" :
+                                          sev.value === "MAJOR" ? "bg-amber-500" :
+                                              "bg-red-500"
+                                  } shadow-sm ring-2 ring-white`} />
+                              )}
+                            </button>
+                        );
+                      })}
                     </div>
                   </div>
-                );
-              })}
+
+                  {/* Location */}
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
+                      <MapPin className="h-4 w-4 text-slate-400" />
+                      Địa điểm (tùy chọn)
+                    </label>
+                    <div className="relative">
+                      <input
+                          type="text"
+                          value={location}
+                          onChange={(e) => setLocation(e.target.value)}
+                          placeholder="Nhập địa điểm hoặc tọa độ GPS"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      {locationSuggestions.length > 0 && (
+                          <div className="absolute z-10 w-full mt-1 bg-white border border-slate-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                            {locationSuggestions.map((sugg, idx) => (
+                                <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => handleSelectSuggestion(sugg)}
+                                    className="w-full px-3 py-2 text-left hover:bg-slate-50 text-sm"
+                                >
+                                  {sugg.label}
+                                </button>
+                            ))}
+                          </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
+                      <FileText className="h-4 w-4 text-slate-400" />
+                      Mô tả chi tiết <span className="text-rose-500">*</span>
+                    </label>
+                    <textarea
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="Mô tả chi tiết về sự cố đã xảy ra..."
+                        rows={5}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    />
+                    <p className="text-xs text-slate-500 mt-1">Tối thiểu 10 ký tự</p>
+                  </div>
+
+                  {/* Submit Button */}
+                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
+                    <button
+                        type="button"
+                        onClick={() => {
+                          setTripId("");
+                          setTripIdInput("");
+                          setIncidentType("");
+                          setSeverity("MAJOR");
+                          setLocation("");
+                          setDescription("");
+                          if (currentTrip) {
+                            setTripId(String(currentTrip.tripId));
+                            setSelectedTrip(currentTrip);
+                            setTripSelectionMode("auto");
+                          }
+                        }}
+                        className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+                    >
+                      Đặt lại
+                    </button>
+                    <button
+                        type="submit"
+                        disabled={submitting}
+                        className="px-6 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-2"
+                    >
+                      {submitting ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Đang gửi...
+                          </>
+                      ) : (
+                          <>
+                            <Send className="h-4 w-4" />
+                            Gửi báo cáo
+                          </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </form>
             </div>
-          )}
-        </div>
-      )}
-    </div>
+        ) : (
+            <div>
+              {/* Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div className="bg-white rounded-lg border border-slate-200 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-slate-100 flex items-center justify-center">
+                      <AlertTriangle className="h-5 w-5 text-slate-600" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-slate-900">{incidents.length}</div>
+                      <div className="text-sm text-slate-600">Tổng sự cố</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg border border-slate-200 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-info-100 flex items-center justify-center">
+                      <Clock className="h-5 w-5 text-primary-600" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-primary-600">{pendingCount}</div>
+                      <div className="text-sm text-slate-600">Chờ xử lý</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg border border-slate-200 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+                      <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-emerald-600">{resolvedCount}</div>
+                      <div className="text-sm text-slate-600">Đã xử lý</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filter */}
+              <div className="mb-4 flex items-center gap-2">
+                <Filter className="h-4 w-4 text-slate-600" />
+                <span className="text-sm font-medium text-slate-700">Lọc theo:</span>
+                <div className="flex gap-2">
+                  <button
+                      onClick={() => setFilter("all")}
+                      className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                          filter === "all"
+                              ? "bg-blue-600 text-white"
+                              : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
+                      }`}
+                  >
+                    Tất cả
+                  </button>
+                  <button
+                      onClick={() => setFilter("pending")}
+                      className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                          filter === "pending"
+                              ? "bg-primary-600 text-white"
+                              : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
+                      }`}
+                  >
+                    Chờ xử lý
+                  </button>
+                  <button
+                      onClick={() => setFilter("resolved")}
+                      className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                          filter === "resolved"
+                              ? "bg-emerald-600 text-white"
+                              : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
+                      }`}
+                  >
+                    Đã xử lý
+                  </button>
+                </div>
+                <button
+                    onClick={fetchIncidents}
+                    className="ml-auto inline-flex items-center gap-2 px-3 py-2 text-sm border rounded-lg text-slate-700 hover:bg-slate-100 transition-colors"
+                    disabled={loading}
+                >
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  Làm mới
+                </button>
+              </div>
+
+              {/* Incident List */}
+              {loading ? (
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Đang tải danh sách...
+                  </div>
+              ) : error ? (
+                  <div className="flex items-center gap-2 text-rose-600">
+                    <XCircle className="h-4 w-4" /> {error}
+                  </div>
+              ) : incidents.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-slate-200 bg-white p-12 text-center">
+                    <Shield className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-slate-900 mb-2">Chưa có sự cố nào</h3>
+                    <p className="text-sm text-slate-600">
+                      {filter === "all"
+                          ? "Bạn chưa báo cáo sự cố nào. Hãy báo cáo khi có sự cố xảy ra."
+                          : filter === "resolved"
+                              ? "Chưa có sự cố nào đã được xử lý."
+                              : "Tất cả sự cố đã được xử lý."}
+                    </p>
+                  </div>
+              ) : (
+                  <div className="grid grid-cols-1 gap-4">
+                    {incidents.map((inc) => {
+                      const resolution = inc.resolutionAction
+                          ? RESOLUTION_ACTIONS[inc.resolutionAction]
+                          : null;
+                      const ResolutionIcon = resolution?.icon;
+
+                      return (
+                          <div
+                              key={inc.id}
+                              className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow"
+                          >
+                            <div className="flex items-start gap-4">
+                              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center flex-shrink-0">
+                                <AlertTriangle className="h-6 w-6 text-blue-600" />
+                              </div>
+
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between gap-3 mb-3">
+                                  <div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="font-semibold text-slate-900">Chuyến {inc.tripId}</span>
+                                      {getSeverityBadge(inc.severity)}
+                                      {getResolutionBadge(inc)}
+                                    </div>
+                                    <div className="text-xs text-slate-500 flex items-center gap-2 mt-1">
+                                      <span>ID: {inc.id}</span>
+                                      <span>•</span>
+                                      <Calendar className="h-3.5 w-3.5" />
+                                      <span>
+                                {inc.createdAt
+                                    ? new Date(inc.createdAt).toLocaleString("vi-VN")
+                                    : "--"}
+                              </span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="mb-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                  <div className="text-sm text-slate-700 leading-relaxed">{inc.description}</div>
+                                </div>
+
+                                {inc.resolved && (
+                                    <div className="mt-4 p-4 bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg border border-emerald-200">
+                                      <div className="flex items-start gap-3">
+                                        {ResolutionIcon && (
+                                            <div className="p-2 rounded-lg bg-emerald-100 flex-shrink-0">
+                                              <ResolutionIcon className={`h-5 w-5 ${resolution.color}`} />
+                                            </div>
+                                        )}
+                                        <div className="flex-1">
+                                          <div className="font-semibold text-emerald-900 mb-1">
+                                            Giải pháp đã áp dụng: {resolution?.label || "Đã xử lý"}
+                                          </div>
+                                          {inc.resolutionNote && (
+                                              <div className="text-sm text-emerald-800 mt-2 mb-2">
+                                                {inc.resolutionNote}
+                                              </div>
+                                          )}
+                                          <div className="text-xs text-emerald-700 flex items-center gap-2 mt-2">
+                                            <User className="h-3.5 w-3.5" />
+                                            <span>
+                                    Xử lý bởi: {inc.resolvedByName || "Điều phối viên"}
+                                              {inc.resolvedAt && (
+                                                  <>
+                                                    {" • "}
+                                                    {new Date(inc.resolvedAt).toLocaleString("vi-VN")}
+                                                  </>
+                                              )}
+                                  </span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                      );
+                    })}
+                  </div>
+              )}
+            </div>
+        )}
+      </div>
   );
 }
 

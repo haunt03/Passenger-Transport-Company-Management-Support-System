@@ -1,6 +1,6 @@
 ﻿// VehicleDetailPage.jsx (LIGHT THEME VERSION)
 import React from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
     getVehicle,
     updateVehicle,
@@ -24,6 +24,7 @@ import {
     Save,
     X,
     Gauge,
+    ArrowLeft,
 } from "lucide-react";
 
 /**
@@ -551,59 +552,59 @@ function TripHistoryTab({ trips }) {
                 <div className="overflow-x-auto rounded-lg border border-slate-200">
                     <table className="w-full text-left text-[13px]">
                         <thead className="text-[11px] uppercase tracking-wide bg-slate-100/60 border-b border-slate-200 text-slate-500">
-                            <tr>
-                                <th className="px-3 py-2 font-medium">Mã chuyến</th>
-                                <th className="px-3 py-2 font-medium">Khách</th>
-                                <th className="px-3 py-2 font-medium">Địa điểm đón</th>
-                                <th className="px-3 py-2 font-medium">Thời gian đón</th>
-                                <th className="px-3 py-2 font-medium text-right">Tình trạng</th>
-                            </tr>
+                        <tr>
+                            <th className="px-3 py-2 font-medium">Mã chuyến</th>
+                            <th className="px-3 py-2 font-medium">Khách</th>
+                            <th className="px-3 py-2 font-medium">Địa điểm đón</th>
+                            <th className="px-3 py-2 font-medium">Thời gian đón</th>
+                            <th className="px-3 py-2 font-medium text-right">Tình trạng</th>
+                        </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200">
-                            {slice.map((t) => (
-                                <tr
-                                    key={t.id}
-                                    className="hover:bg-slate-50"
-                                >
-                                    <td className="px-3 py-2 font-medium text-slate-900 whitespace-nowrap">
-                                        {t.code}
-                                    </td>
-                                    <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
-                                        {t.customer_name}
-                                        <div className="text-[11px] text-slate-500">
-                                            {t.customer_phone}
-                                        </div>
-                                    </td>
-                                    <td className="px-3 py-2 text-slate-700">
-                                        <div className="flex items-start gap-1 text-[12px] leading-relaxed">
-                                            <MapPin className="h-3.5 w-3.5 text-primary-600 shrink-0" />
-                                            <span>{t.pickup}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
-                                        <div className="flex items-start gap-1 text-[12px] leading-relaxed">
-                                            <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                                            <span>
+                        {slice.map((t) => (
+                            <tr
+                                key={t.id}
+                                className="hover:bg-slate-50"
+                            >
+                                <td className="px-3 py-2 font-medium text-slate-900 whitespace-nowrap">
+                                    {t.code}
+                                </td>
+                                <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
+                                    {t.customer_name}
+                                    <div className="text-[11px] text-slate-500">
+                                        {t.customer_phone}
+                                    </div>
+                                </td>
+                                <td className="px-3 py-2 text-slate-700">
+                                    <div className="flex items-start gap-1 text-[12px] leading-relaxed">
+                                        <MapPin className="h-3.5 w-3.5 text-primary-600 shrink-0" />
+                                        <span>{t.pickup}</span>
+                                    </div>
+                                </td>
+                                <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
+                                    <div className="flex items-start gap-1 text-[12px] leading-relaxed">
+                                        <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                                        <span>
                                                 {fmtDateTimeShort(t.pickup_time)}
                                             </span>
-                                        </div>
-                                    </td>
-                                    <td className="px-3 py-2 whitespace-nowrap text-right">
-                                        <VehicleStatusBadge status={t.status} />
-                                    </td>
-                                </tr>
-                            ))}
+                                    </div>
+                                </td>
+                                <td className="px-3 py-2 whitespace-nowrap text-right">
+                                    <VehicleStatusBadge status={t.status} />
+                                </td>
+                            </tr>
+                        ))}
 
-                            {slice.length === 0 && (
-                                <tr>
-                                    <td
-                                        colSpan={5}
-                                        className="px-3 py-6 text-center text-slate-400 text-[13px]"
-                                    >
-                                        Chưa có chuyến nào.
-                                    </td>
-                                </tr>
-                            )}
+                        {slice.length === 0 && (
+                            <tr>
+                                <td
+                                    colSpan={5}
+                                    className="px-3 py-6 text-center text-slate-400 text-[13px]"
+                                >
+                                    Chưa có chuyến nào.
+                                </td>
+                            </tr>
+                        )}
                         </tbody>
                     </table>
                 </div>
@@ -682,64 +683,64 @@ function ExpenseHistoryTab({ expenses }) {
                 <div className="overflow-x-auto rounded-lg border border-slate-200">
                     <table className="w-full text-left text-[13px]">
                         <thead className="text-[11px] uppercase tracking-wide bg-slate-100/60 border-b border-slate-200 text-slate-500">
-                            <tr>
-                                <th className="px-3 py-2 font-medium">Ngày</th>
-                                <th className="px-3 py-2 font-medium">Loại chi phí</th>
-                                <th className="px-3 py-2 font-medium">Mô tả</th>
-                                <th className="px-3 py-2 font-medium text-right">
-                                    Số tiền
-                                </th>
-                            </tr>
+                        <tr>
+                            <th className="px-3 py-2 font-medium">Ngày</th>
+                            <th className="px-3 py-2 font-medium">Loại chi phí</th>
+                            <th className="px-3 py-2 font-medium">Mô tả</th>
+                            <th className="px-3 py-2 font-medium text-right">
+                                Số tiền
+                            </th>
+                        </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200">
-                            {slice.map((e) => (
-                                <tr
-                                    key={e.id}
-                                    className="hover:bg-slate-50"
-                                >
-                                    <td className="px-3 py-2 text-[12px] text-slate-700 whitespace-nowrap">
-                                        <div className="flex items-start gap-1 leading-relaxed">
-                                            <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                                            <span>{fmtDate(e.date)}</span>
-                                        </div>
-                                    </td>
+                        {slice.map((e) => (
+                            <tr
+                                key={e.id}
+                                className="hover:bg-slate-50"
+                            >
+                                <td className="px-3 py-2 text-[12px] text-slate-700 whitespace-nowrap">
+                                    <div className="flex items-start gap-1 leading-relaxed">
+                                        <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                                        <span>{fmtDate(e.date)}</span>
+                                    </div>
+                                </td>
 
-                                    <td className="px-3 py-2 text-[12px] text-slate-700 whitespace-nowrap">
-                                        <div className="flex items-center gap-1">
-                                            {e.type === "FUEL" ? (
-                                                <Fuel className="h-3.5 w-3.5 text-sky-600" />
-                                            ) : (
-                                                <Wrench className="h-3.5 w-3.5 text-primary-600" />
-                                            )}
-                                            <span className="font-medium text-slate-900">
+                                <td className="px-3 py-2 text-[12px] text-slate-700 whitespace-nowrap">
+                                    <div className="flex items-center gap-1">
+                                        {e.type === "FUEL" ? (
+                                            <Fuel className="h-3.5 w-3.5 text-sky-600" />
+                                        ) : (
+                                            <Wrench className="h-3.5 w-3.5 text-primary-600" />
+                                        )}
+                                        <span className="font-medium text-slate-900">
                                                 {e.type_label}
                                             </span>
-                                        </div>
-                                    </td>
+                                    </div>
+                                </td>
 
-                                    <td className="px-3 py-2 text-[12px] text-slate-600">
-                                        {e.note || "—"}
-                                    </td>
+                                <td className="px-3 py-2 text-[12px] text-slate-600">
+                                    {e.note || "—"}
+                                </td>
 
-                                    <td className="px-3 py-2 text-[12px] text-right whitespace-nowrap tabular-nums text-slate-900">
-                                        {Number(e.amount || 0).toLocaleString(
-                                            "vi-VN"
-                                        )}
-                                        đ
-                                    </td>
-                                </tr>
-                            ))}
+                                <td className="px-3 py-2 text-[12px] text-right whitespace-nowrap tabular-nums text-slate-900">
+                                    {Number(e.amount || 0).toLocaleString(
+                                        "vi-VN"
+                                    )}
+                                    đ
+                                </td>
+                            </tr>
+                        ))}
 
-                            {slice.length === 0 && (
-                                <tr>
-                                    <td
-                                        colSpan={4}
-                                        className="px-3 py-6 text-center text-slate-400 text-[13px]"
-                                    >
-                                        Chưa có chi phí nào.
-                                    </td>
-                                </tr>
-                            )}
+                        {slice.length === 0 && (
+                            <tr>
+                                <td
+                                    colSpan={4}
+                                    className="px-3 py-6 text-center text-slate-400 text-[13px]"
+                                >
+                                    Chưa có chi phí nào.
+                                </td>
+                            </tr>
+                        )}
                         </tbody>
                     </table>
                 </div>
@@ -797,12 +798,25 @@ function ExpenseHistoryTab({ expenses }) {
 export default function VehicleDetailPage() {
     const { toasts, push } = useToasts();
     const { vehicleId } = useParams();
+    const navigate = useNavigate();
 
     const currentRole = React.useMemo(() => getCurrentRole(), []);
     const isAccountant = currentRole === ROLES.ACCOUNTANT;
     const isConsultant = currentRole === ROLES.CONSULTANT;
     const isCoordinator = currentRole === ROLES.COORDINATOR;
     const isReadOnly = isAccountant || isConsultant;
+
+    // Xác định route quay về dựa trên role
+    const getBackRoute = () => {
+        if (isAccountant) return "/accountant/vehicles";
+        if (isConsultant) return "/consultant/vehicles";
+        if (isCoordinator) return "/coordinator/vehicles";
+        return "/vehicles"; // Manager hoặc default
+    };
+
+    const handleBack = () => {
+        navigate(getBackRoute());
+    };
 
     const [initialVehicle, setInitialVehicle] = React.useState({
         id: vehicleId ? Number(vehicleId) : undefined,
@@ -837,18 +851,18 @@ export default function VehicleDetailPage() {
                 console.log("🔍 [VehicleDetailPage] Vehicle data from API:", v);
                 console.log("🔍 [VehicleDetailPage] Vehicle capacity:", v.capacity);
                 console.log("🔍 [VehicleDetailPage] Category data:", catData);
-                
+
                 // Tìm category tương ứng để lấy seats nếu vehicle không có capacity
                 const vehicleCategory = (catData || []).find(c => c.id === v.categoryId);
                 const categorySeats = vehicleCategory?.seats || null;
-                
+
                 // Ưu tiên capacity từ vehicle, nếu không có thì lấy từ category
                 const finalCapacity = v.capacity != null ? Number(v.capacity) : (categorySeats != null ? Number(categorySeats) : null);
-                
+
                 console.log("🔍 [VehicleDetailPage] Vehicle category:", vehicleCategory);
                 console.log("🔍 [VehicleDetailPage] Category seats:", categorySeats);
                 console.log("🔍 [VehicleDetailPage] Final capacity:", finalCapacity);
-                
+
                 const mapped = {
                     id: v.id,
                     license_plate: v.licensePlate,
@@ -926,7 +940,7 @@ export default function VehicleDetailPage() {
             console.log("🔍 [VehicleDetailPage] Loading expenses for vehicle:", vehicleId);
             const data = await getVehicleExpenses(vehicleId);
             console.log("🔍 [VehicleDetailPage] Expenses API response:", data);
-            
+
             // Handle different response formats
             let expenses = [];
             if (Array.isArray(data)) {
@@ -940,9 +954,9 @@ export default function VehicleDetailPage() {
             } else if (data?.expenses && Array.isArray(data.expenses)) {
                 expenses = data.expenses;
             }
-            
+
             console.log("🔍 [VehicleDetailPage] Parsed expenses:", expenses);
-            
+
             // Map backend data to frontend format
             // costType đã bị xóa - có thể null cho Invoices, chỉ ExpenseRequests có expenseType
             const mappedExpenses = expenses.map((e) => ({
@@ -983,7 +997,7 @@ export default function VehicleDetailPage() {
             console.log("🔍 [VehicleDetailPage] Loading maintenance for vehicle:", vehicleId);
             const data = await getVehicleMaintenance(vehicleId);
             console.log("🔍 [VehicleDetailPage] Maintenance API response:", data);
-            
+
             // Handle different response formats
             let maintenance = [];
             if (Array.isArray(data)) {
@@ -997,9 +1011,9 @@ export default function VehicleDetailPage() {
             } else if (data?.maintenance && Array.isArray(data.maintenance)) {
                 maintenance = data.maintenance;
             }
-            
+
             console.log("🔍 [VehicleDetailPage] Parsed maintenance:", maintenance);
-            
+
             // Map backend data to frontend format
             const mappedMaintenance = maintenance.map((m) => ({
                 id: m.maintenanceId || m.id,
@@ -1037,9 +1051,9 @@ export default function VehicleDetailPage() {
         } else if (activeTab === "COSTS" && vehicleId) {
             // Always reload when switching to COSTS tab to ensure fresh data
             console.log("🔍 [VehicleDetailPage] Switching to COSTS tab, loading expenses and maintenance");
-                loadExpenses();
-                loadMaintenance();
-            }
+            loadExpenses();
+            loadMaintenance();
+        }
     }, [activeTab, vehicleId, tripsData.length, loadTrips, loadExpenses, loadMaintenance]);
 
     // Combine expenses and maintenance for COSTS tab
@@ -1112,6 +1126,19 @@ export default function VehicleDetailPage() {
             {/* Header */}
             <div className="flex flex-col lg:flex-row lg:items-start gap-4 mb-6">
                 <div className="flex-1 flex flex-col gap-3 min-w-0">
+                    {/* Back button */}
+                    <div className="mb-2">
+                        <button
+                            type="button"
+                            onClick={handleBack}
+                            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+                            title="Quay về danh sách xe"
+                        >
+                            <ArrowLeft className="h-4 w-4" />
+                            <span>Quay về</span>
+                        </button>
+                    </div>
+
                     <div className="flex flex-wrap items-start gap-3">
                         {/* icon + title */}
                         <div className="flex items-start gap-3">

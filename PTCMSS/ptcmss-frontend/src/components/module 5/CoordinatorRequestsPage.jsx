@@ -368,8 +368,8 @@ export default function CoordinatorRequestsPage() {
                                     return null;
                                 }
                                 return (
-                                    <RequestCard 
-                                        key={request.id} 
+                                    <RequestCard
+                                        key={request.id}
                                         request={request}
                                     />
                                 );

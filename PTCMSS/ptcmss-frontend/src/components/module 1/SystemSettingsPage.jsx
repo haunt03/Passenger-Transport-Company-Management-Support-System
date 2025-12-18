@@ -8,11 +8,13 @@ import {
     Search,
     Info,
     X,
+    Trash2,
 } from "lucide-react";
 import {
     listSystemSettings,
     createSystemSetting,
     updateSystemSetting,
+    deleteSystemSetting,
 } from "../../api/systemSettings";
 import QrPaymentSettings from "../common/QrPaymentSettings.jsx";
 
@@ -74,7 +76,7 @@ function Toasts({ toasts }) {
 /* ---------------------------------- */
 /* 1 dòng setting đang có             */
 /* ---------------------------------- */
-function SettingRow({ row, edited, onChangeField, isDirty }) {
+function SettingRow({ row, edited, onChangeField, isDirty, onDelete, index }) {
     const isBoolean =
         normalize(row.valueType) === "boolean" ||
         ["true", "false"].includes(normalize(edited.value));
@@ -114,10 +116,17 @@ function SettingRow({ row, edited, onChangeField, isDirty }) {
                 isDirty ? "bg-sky-50" : ""
             )}
         >
+            {/* STT */}
+            <td className="px-3 py-3 text-center align-top w-[60px]">
+                <div className="text-sm font-medium text-slate-600">
+                    {index != null ? index + 1 : "—"}
+                </div>
+            </td>
+
             {/* KEY + label */}
             <td className="px-3 py-3 text-xs text-slate-500 font-mono whitespace-nowrap align-top">
                 <div className="flex items-start gap-2">
-                    <div>
+                    <div className="flex-1">
                         <div className="text-[11px] text-slate-800 font-semibold leading-none mb-1">
                             {edited.label || "—"}
                         </div>
@@ -139,16 +148,27 @@ function SettingRow({ row, edited, onChangeField, isDirty }) {
                 {renderValueInput()}
             </td>
 
-            {/* DESCRIPTION editable */}
+            {/* DESCRIPTION editable + DELETE button */}
             <td className="px-3 py-3 align-top">
-                <textarea
-                    value={edited.description}
-                    onChange={(e) =>
-                        onChangeField(row.key, "description", e.target.value)
-                    }
-                    rows={2}
-                    className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500"
-                />
+                <div className="flex items-start gap-2">
+                    <textarea
+                        value={edited.description}
+                        onChange={(e) =>
+                            onChangeField(row.key, "description", e.target.value)
+                        }
+                        rows={2}
+                        className="flex-1 bg-white border border-slate-300 rounded-md px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500"
+                    />
+                    {onDelete && (
+                        <button
+                            onClick={() => onDelete(row)}
+                            className="mt-1 p-2 rounded-md border border-red-300 bg-red-50 text-red-600 hover:bg-red-100 hover:border-red-400 transition-colors flex-shrink-0"
+                            title="Xóa cấu hình này"
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </button>
+                    )}
+                </div>
             </td>
         </tr>
     );
@@ -165,6 +185,13 @@ function NewSettingRow({ draft, onChangeDraft, onConfirm, onCancel }) {
 
     return (
         <tr className="bg-slate-50 border-b border-slate-200 align-top">
+            {/* STT */}
+            <td className="px-3 py-3 text-center align-top w-[60px]">
+                <div className="text-sm font-medium text-sky-600 italic">
+                    Mới
+                </div>
+            </td>
+
             {/* KEY + LABEL */}
             <td className="px-3 py-3 align-top">
                 <div className="flex flex-col gap-2">
@@ -281,6 +308,10 @@ export default function SystemSettingsPage() {
         description: "",
     });
 
+    // state cho xóa cấu hình
+    const [deletingSetting, setDeletingSetting] = React.useState(null);
+    const [loadingDelete, setLoadingDelete] = React.useState(false);
+
     // filter search
     const filteredSettings = React.useMemo(() => {
         const q = normalize(query);
@@ -387,7 +418,7 @@ export default function SystemSettingsPage() {
             // Add to local state
             setSettings((list) => [...list, mappedCreated]);
             setOriginalSettings((list) => [...list, mappedCreated]);
-            
+
             setAdding(false);
             setDraftNew({
                 key: "",
@@ -395,7 +426,7 @@ export default function SystemSettingsPage() {
                 value: "",
                 description: "",
             });
-            
+
             push("Đã thêm cấu hình mới.", "success");
         } catch (err) {
             console.error("Failed to create system setting:", err);
@@ -413,6 +444,41 @@ export default function SystemSettingsPage() {
         });
     };
 
+    // Handler xóa cấu hình
+    const handleDeleteClick = (setting) => {
+        setDeletingSetting(setting);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!deletingSetting || loadingDelete) return;
+
+        setLoadingDelete(true);
+        try {
+            // Cần settingId để xóa
+            if (!deletingSetting.id) {
+                throw new Error("Không tìm thấy ID của cấu hình");
+            }
+
+            await deleteSystemSetting(deletingSetting.id);
+
+            // Xóa khỏi local state
+            setSettings((list) => list.filter((s) => s.key !== deletingSetting.key));
+            setOriginalSettings((list) => list.filter((s) => s.key !== deletingSetting.key));
+
+            setDeletingSetting(null);
+            push(`Đã xóa cấu hình "${deletingSetting.label || deletingSetting.key}"`, "success");
+        } catch (err) {
+            console.error("Failed to delete system setting:", err);
+            push("Không thể xóa cấu hình: " + (err.message || "Lỗi không xác định"), "error");
+        } finally {
+            setLoadingDelete(false);
+        }
+    };
+
+    const handleDeleteCancel = () => {
+        setDeletingSetting(null);
+    };
+
     // Load settings from API
     const loadSettings = React.useCallback(async () => {
         setLoadingRefresh(true);
@@ -420,12 +486,24 @@ export default function SystemSettingsPage() {
             const data = await listSystemSettings();
             const settingsList = Array.isArray(data) ? data : [];
 
-            // Map backend response to frontend format
+            // Map backend response to frontend format với label tự động
+            const settingLabels = {
+                "EXPIRY_WARNING_DAYS": "Số ngày cảnh báo hết hạn",
+                "CRITICAL_WARNING_DAYS": "Số ngày cảnh báo khẩn cấp",
+                "HEALTH_CHECK_WARNING_DAYS": "Số ngày cảnh báo khám sức khỏe",
+                "MAX_CONTINUOUS_DRIVING_HOURS": "Giờ lái liên tục tối đa",
+                "MAX_DRIVING_HOURS_PER_DAY": "Giờ lái tối đa/ngày",
+                "MAX_DRIVING_HOURS_PER_WEEK": "Giờ lái tối đa/tuần",
+                "MAX_DRIVER_LEAVE_DAYS": "Số ngày nghỉ tối đa/tháng",
+                "AVG_VEHICLE_SPEED_KMPH": "Vận tốc trung bình (km/h)",
+                "DUE_DATE_DEBT_DAYS": "Số ngày cộng thêm để tính hạn công nợ sau khi kết thúc chuyến",
+            };
+
             const mappedSettings = settingsList.map(item => ({
                 ...item,
                 key: item.settingKey,
                 value: item.settingValue,
-                label: item.settingKey // Use settingKey as label since backend doesn't have separate label
+                label: settingLabels[item.settingKey] || item.settingKey // Use friendly label if available
             }));
 
             setSettings(mappedSettings);
@@ -599,6 +677,9 @@ export default function SystemSettingsPage() {
                         <table className="w-full text-left text-sm">
                             <thead className="text-xs uppercase tracking-wide text-slate-600 bg-slate-50/80 border-b border-slate-200">
                             <tr>
+                                <th className="px-3 py-3.5 font-semibold w-[60px] text-center">
+                                    STT
+                                </th>
                                 <th className="px-6 py-3.5 font-semibold w-[280px] text-left">
                                     Key &amp; Tên hiển thị
                                 </th>
@@ -623,13 +704,15 @@ export default function SystemSettingsPage() {
                             ) : null}
 
                             {/* các hàng hiện có */}
-                            {filteredSettings.map((row) => (
+                            {filteredSettings.map((row, index) => (
                                 <SettingRow
                                     key={row.key}
                                     row={row}
                                     edited={row}
                                     onChangeField={handleChangeField}
                                     isDirty={isRowDirty(row)}
+                                    onDelete={handleDeleteClick}
+                                    index={index}
                                 />
                             ))}
 
@@ -637,7 +720,7 @@ export default function SystemSettingsPage() {
                             {filteredSettings.length === 0 && !adding ? (
                                 <tr>
                                     <td
-                                        colSpan={3}
+                                        colSpan={4}
                                         className="px-6 py-12 text-center"
                                     >
                                         <div className="flex flex-col items-center gap-3">
@@ -685,6 +768,63 @@ export default function SystemSettingsPage() {
             {initialLoading && (
                 <div className="text-center py-8 text-slate-500 text-sm">
                     Đang tải cấu hình hệ thống...
+                </div>
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {deletingSetting && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+                        <div className="px-6 py-4 border-b border-slate-200">
+                            <h3 className="text-lg font-semibold text-slate-900">
+                                Xác nhận xóa cấu hình
+                            </h3>
+                        </div>
+                        <div className="px-6 py-4">
+                            <p className="text-sm text-slate-700 mb-2">
+                                Bạn có chắc chắn muốn xóa cấu hình này?
+                            </p>
+                            <div className="bg-slate-50 rounded-md p-3 mb-4">
+                                <div className="text-xs text-slate-500 mb-1">Tên hiển thị:</div>
+                                <div className="text-sm font-medium text-slate-900">
+                                    {deletingSetting.label || "—"}
+                                </div>
+                                <div className="text-xs text-slate-500 mt-2 mb-1">Key:</div>
+                                <div className="text-xs font-mono text-slate-700">
+                                    {deletingSetting.key}
+                                </div>
+                            </div>
+                            <p className="text-xs text-rose-600">
+                                ⚠️ Hành động này không thể hoàn tác!
+                            </p>
+                        </div>
+                        <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-end gap-3">
+                            <button
+                                onClick={handleDeleteCancel}
+                                disabled={loadingDelete}
+                                className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                onClick={handleDeleteConfirm}
+                                disabled={loadingDelete}
+                                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            >
+                                {loadingDelete ? (
+                                    <>
+                                        <RefreshCw className="h-4 w-4 animate-spin" />
+                                        <span>Đang xóa...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Trash2 className="h-4 w-4" />
+                                        <span>Xóa</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

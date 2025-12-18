@@ -377,71 +377,71 @@ export default function CoordinatorVehicleListPage() {
                         <div className="overflow-x-auto">
                             <table className="w-full">
                                 <thead className="bg-slate-50 border-b border-slate-200">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                            Biển số
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                            Loại xe
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                            Số ghế
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                            Hãng xe
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                            Hạn đăng kiểm
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                            Hạn bảo hiểm
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                            Trạng thái
-                                        </th>
-                                        <th className="px-4 py-3 text-center text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                                            Thao tác
-                                        </th>
-                                    </tr>
+                                <tr>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                        Biển số
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                        Loại xe
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                        Số ghế
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                        Hãng xe
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                        Hạn đăng kiểm
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                        Hạn bảo hiểm
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                        Trạng thái
+                                    </th>
+                                    <th className="px-4 py-3 text-center text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                                        Thao tác
+                                    </th>
+                                </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-200">
-                                    {vehicles.map((vehicle) => {
-                const inspectionStatus = getInspectionStatus(vehicle.inspectionExpiry || vehicle.inspectionExpiryDate);
-                const insuranceStatus = getInsuranceStatus(vehicle.insuranceExpiry || vehicle.insuranceExpiryDate);
-                                        return (
-                                            <tr key={vehicle.id} className="hover:bg-slate-50 transition-colors">
-                                                <td className="px-4 py-3">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-[#0079BC] to-sky-600 flex items-center justify-center text-white">
-                                                            <CarFront className="h-5 w-5" />
-                                                        </div>
-                                                        <div>
-                                                            <div className="font-semibold text-slate-900">{vehicle.licensePlate}</div>
-                                                            <div className="text-xs text-slate-500">ID: {vehicle.id}</div>
-                                                        </div>
+                                {vehicles.map((vehicle) => {
+                                    const inspectionStatus = getInspectionStatus(vehicle.inspectionExpiry || vehicle.inspectionExpiryDate);
+                                    const insuranceStatus = getInsuranceStatus(vehicle.insuranceExpiry || vehicle.insuranceExpiryDate);
+                                    return (
+                                        <tr key={vehicle.id} className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-[#0079BC] to-sky-600 flex items-center justify-center text-white">
+                                                        <CarFront className="h-5 w-5" />
                                                     </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-sm text-slate-700">
-                                                    {vehicle.categoryName || vehicle.vehicleCategory?.name || "—"}
-                                                </td>
-                                                <td className="px-4 py-3 text-sm text-slate-700">
-                                                    {vehicle.capacity != null ? vehicle.capacity : "—"}
-                                                </td>
-                                                <td className="px-4 py-3 text-sm text-slate-700">
-                                                    {vehicle.brand || vehicle.model || "—"}
-                                                </td>
-                                                <td className="px-4 py-3">
+                                                    <div>
+                                                        <div className="font-semibold text-slate-900">{vehicle.licensePlate}</div>
+                                                        <div className="text-xs text-slate-500">ID: {vehicle.id}</div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-slate-700">
+                                                {vehicle.categoryName || vehicle.vehicleCategory?.name || "—"}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-slate-700">
+                                                {vehicle.capacity != null ? vehicle.capacity : "—"}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-slate-700">
+                                                {vehicle.brand || vehicle.model || "—"}
+                                            </td>
+                                            <td className="px-4 py-3">
                                                     <span className={`text-sm font-medium ${inspectionStatus.color}`}>
                                                         {inspectionStatus.text}
                                                     </span>
-                                                </td>
-                                                <td className="px-4 py-3">
+                                            </td>
+                                            <td className="px-4 py-3">
                                                     <span className={`text-sm font-medium ${insuranceStatus.color}`}>
                                                         {insuranceStatus.text}
                                                     </span>
-                                                </td>
-                                                <td className="px-4 py-3 text-sm">
-                                                    <div className="flex flex-col gap-1">
+                                            </td>
+                                            <td className="px-4 py-3 text-sm">
+                                                <div className="flex flex-col gap-1">
                                                     {/* Badge trên: Trạng thái hiện tại của xe (Sẵn sàng/Đang sử dụng/Bảo trì) */}
                                                     <span
                                                         className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${vehicle.status === "AVAILABLE"
@@ -451,7 +451,7 @@ export default function CoordinatorVehicleListPage() {
                                                                 : vehicle.status === "MAINTENANCE"
                                                                     ? "bg-orange-50 text-orange-700"
                                                                     : "bg-gray-50 text-gray-700"
-                                                            }`}
+                                                        }`}
                                                     >
                                                         {vehicle.status === "AVAILABLE"
                                                             ? "Sẵn sàng"
@@ -461,34 +461,34 @@ export default function CoordinatorVehicleListPage() {
                                                                     ? "Bảo trì"
                                                                     : "Không hoạt động"}
                                                     </span>
-                                                        {/* Badge dưới: Rảnh/Bận theo khoảng thời gian đã chọn trong filter
+                                                    {/* Badge dưới: Rảnh/Bận theo khoảng thời gian đã chọn trong filter
                                                             Chỉ hiển thị khi xe ở trạng thái "Sẵn sàng" và đã chọn filter ngày */}
-                                                        {vehicle.status === "AVAILABLE" && timeFilterStart && timeFilterEnd && vehicleAvailability[vehicle.id] && (
-                                                            <span
-                                                                className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${vehicleAvailability[vehicle.id].available
-                                                                    ? "bg-emerald-50 text-emerald-700"
-                                                                    : "bg-info-50 text-info-700"
-                                                                    }`}
-                                                            >
+                                                    {vehicle.status === "AVAILABLE" && timeFilterStart && timeFilterEnd && vehicleAvailability[vehicle.id] && (
+                                                        <span
+                                                            className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${vehicleAvailability[vehicle.id].available
+                                                                ? "bg-emerald-50 text-emerald-700"
+                                                                : "bg-info-50 text-info-700"
+                                                            }`}
+                                                        >
                                                                 {vehicleAvailability[vehicle.id].available ? "Rảnh" : "Bận"}
                                                             </span>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <div className="flex items-center justify-center">
-                                                        <button
-                                                            onClick={() => handleViewDetail(vehicle.id)}
-                                                            className="p-2 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors"
-                                                            title="Xem chi tiết"
-                                                        >
-                                                            <Eye className="h-4 w-4" />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center justify-center">
+                                                    <button
+                                                        onClick={() => handleViewDetail(vehicle.id)}
+                                                        className="p-2 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors"
+                                                        title="Xem chi tiết"
+                                                    >
+                                                        <Eye className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                                 </tbody>
                             </table>
                         </div>

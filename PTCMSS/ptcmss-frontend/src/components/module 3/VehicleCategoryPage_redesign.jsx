@@ -77,10 +77,10 @@ function StatusPill({ status }) {
 
 /* Modal tạo danh mục xe */
 function VehicleCategoryCreateModal({
-    open,
-    onClose,
-    onCreated,
-}) {
+                                        open,
+                                        onClose,
+                                        onCreated,
+                                    }) {
     const [name, setName] = React.useState("");
     const [seats, setSeats] = React.useState("");
     const [loading, setLoading] = React.useState(false);
@@ -380,94 +380,94 @@ export default function VehicleCategoryPage() {
                         <div className="overflow-x-auto text-[13px] text-slate-700">
                             <table className="w-full text-left">
                                 <thead className="bg-slate-100/60 border-b border-slate-200 text-[11px] uppercase tracking-wide text-slate-500">
-                                    <tr>
-                                        <th className="px-5 py-3 font-medium text-left">
-                                            Tên danh mục
-                                        </th>
-                                        <th className="px-5 py-3 font-medium text-center whitespace-nowrap">
-                                            Số ghế
-                                        </th>
-                                        <th className="px-5 py-3 font-medium text-center whitespace-nowrap">
-                                            Phí mở cửa
-                                        </th>
-                                        <th className="px-5 py-3 font-medium text-center whitespace-nowrap">
-                                            Giá cố định/ngày
-                                        </th>
-                                        <th className="px-5 py-3 font-medium text-center whitespace-nowrap">
-                                            Giá theo km
-                                        </th>
-                                        <th className="px-5 py-3 font-medium text-center">
-                                            Trạng thái
-                                        </th>
-                                        <th className="px-5 py-3 font-medium text-center whitespace-nowrap">
-                                            Số xe
-                                        </th>
-                                        <th className="px-5 py-3 font-medium text-center">
-                                            Hành động
-                                        </th>
-                                    </tr>
+                                <tr>
+                                    <th className="px-5 py-3 font-medium text-left">
+                                        Tên danh mục
+                                    </th>
+                                    <th className="px-5 py-3 font-medium text-center whitespace-nowrap">
+                                        Số ghế
+                                    </th>
+                                    <th className="px-5 py-3 font-medium text-center whitespace-nowrap">
+                                        Phí mở cửa
+                                    </th>
+                                    <th className="px-5 py-3 font-medium text-center whitespace-nowrap">
+                                        Giá cố định/ngày
+                                    </th>
+                                    <th className="px-5 py-3 font-medium text-center whitespace-nowrap">
+                                        Giá theo km
+                                    </th>
+                                    <th className="px-5 py-3 font-medium text-center">
+                                        Trạng thái
+                                    </th>
+                                    <th className="px-5 py-3 font-medium text-center whitespace-nowrap">
+                                        Số xe
+                                    </th>
+                                    <th className="px-5 py-3 font-medium text-center">
+                                        Hành động
+                                    </th>
+                                </tr>
                                 </thead>
 
                                 <tbody className="divide-y divide-slate-200">
-                                    {categories.map((cat) => (
-                                        <tr
-                                            key={cat.id}
-                                            className="hover:bg-slate-50 transition-colors"
-                                        >
-                                            {/* name */}
-                                            <td className="px-5 py-3">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="text-slate-900 font-medium text-[13px]">
-                                                        {cat.name}
-                                                    </div>
+                                {categories.map((cat) => (
+                                    <tr
+                                        key={cat.id}
+                                        className="hover:bg-slate-50 transition-colors"
+                                    >
+                                        {/* name */}
+                                        <td className="px-5 py-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className="text-slate-900 font-medium text-[13px]">
+                                                    {cat.name}
                                                 </div>
-                                            </td>
+                                            </div>
+                                        </td>
 
-                                            {/* seats */}
-                                            <td className="px-5 py-3 text-center">
+                                        {/* seats */}
+                                        <td className="px-5 py-3 text-center">
                                                 <span className="text-[13px] text-slate-700 tabular-nums">
                                                     {cat.seats ?? "—"} ghế
                                                 </span>
-                                            </td>
+                                        </td>
 
-                                            {/* pricing placeholders */}
-                                            <td className="px-5 py-3 text-center text-slate-500 text-[12px]">
-                                                —
-                                            </td>
-                                            <td className="px-5 py-3 text-center text-slate-500 text-[12px]">
-                                                —
-                                            </td>
-                                            <td className="px-5 py-3 text-center text-slate-500 text-[12px]">
-                                                —
-                                            </td>
+                                        {/* pricing placeholders */}
+                                        <td className="px-5 py-3 text-center text-slate-500 text-[12px]">
+                                            —
+                                        </td>
+                                        <td className="px-5 py-3 text-center text-slate-500 text-[12px]">
+                                            —
+                                        </td>
+                                        <td className="px-5 py-3 text-center text-slate-500 text-[12px]">
+                                            —
+                                        </td>
 
-                                            {/* status */}
-                                            <td className="px-5 py-3 text-center">
-                                                <StatusPill status={cat.status} />
-                                            </td>
+                                        {/* status */}
+                                        <td className="px-5 py-3 text-center">
+                                            <StatusPill status={cat.status} />
+                                        </td>
 
-                                            {/* vehicles_count */}
-                                            <td className="px-5 py-3 text-center">
-                                                <div className="inline-flex items-center gap-1 text-sky-600 text-[13px]">
-                                                    <CarFront className="h-3.5 w-3.5" />
-                                                    <span className="font-medium">{cat.vehicles_count}</span>
-                                                </div>
-                                            </td>
+                                        {/* vehicles_count */}
+                                        <td className="px-5 py-3 text-center">
+                                            <div className="inline-flex items-center gap-1 text-sky-600 text-[13px]">
+                                                <CarFront className="h-3.5 w-3.5" />
+                                                <span className="font-medium">{cat.vehicles_count}</span>
+                                            </div>
+                                        </td>
 
-                                            {/* action */}
-                                            <td className="px-5 py-3 text-center">
-                                                <button
-                                                    className={cls(
-                                                        "inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-[12px] font-medium shadow-sm",
-                                                        "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100"
-                                                    )}
-                                                >
-                                                    <Wrench className="h-3.5 w-3.5 text-sky-600" />
-                                                    <span>Sửa</span>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                        {/* action */}
+                                        <td className="px-5 py-3 text-center">
+                                            <button
+                                                className={cls(
+                                                    "inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-[12px] font-medium shadow-sm",
+                                                    "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100"
+                                                )}
+                                            >
+                                                <Wrench className="h-3.5 w-3.5 text-sky-600" />
+                                                <span>Sửa</span>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
                                 </tbody>
                             </table>
                         </div>

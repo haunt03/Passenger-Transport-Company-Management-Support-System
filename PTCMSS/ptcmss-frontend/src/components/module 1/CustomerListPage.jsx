@@ -6,6 +6,7 @@ import { getEmployeeByUserId } from "../../api/employees";
 import { getCurrentRole, getStoredUserId, ROLES } from "../../utils/session";
 import { getRatingByTrip } from "../../api/ratings";
 import Pagination from "../common/Pagination";
+import CustomerTripsModal from "../common/CustomerTripsModal";
 
 function cls(...classes) {
     return classes.filter(Boolean).join(" ");
@@ -33,8 +34,9 @@ export default function CustomerListPage() {
     const currentRole = getCurrentRole();
     const currentUserId = getStoredUserId();
     const isManager = currentRole === ROLES.MANAGER;
+    const isConsultant = currentRole === ROLES.CONSULTANT;
 
-    // Manager's branch info
+    // Manager/Consultant's branch info
     const [managerBranchId, setManagerBranchId] = useState(null);
     const [managerBranchName, setManagerBranchName] = useState("");
 
@@ -60,9 +62,9 @@ export default function CustomerListPage() {
     const [loadingTrips, setLoadingTrips] = useState(false);
     const [tripsError, setTripsError] = useState(null);
 
-    // Load Manager's branch info
+    // Load Manager/Consultant's branch info
     useEffect(() => {
-        if (!isManager || !currentUserId) return;
+        if ((!isManager && !isConsultant) || !currentUserId) return;
 
         (async () => {
             try {
@@ -71,18 +73,19 @@ export default function CustomerListPage() {
                 if (emp?.branchId) {
                     setManagerBranchId(emp.branchId);
                     setManagerBranchName(emp.branchName || "");
-                    // Tự động set branchId filter cho manager
+                    // Tự động set branchId filter cho manager/consultant
                     setBranchId(String(emp.branchId));
-                    console.log("[CustomerListPage] Manager branch loaded:", {
+                    console.log("[CustomerListPage] Branch loaded:", {
+                        role: currentRole,
                         branchId: emp.branchId,
                         branchName: emp.branchName
                     });
                 }
             } catch (err) {
-                console.error("Error loading manager branch:", err);
+                console.error("Error loading branch:", err);
             }
         })();
-    }, [isManager, currentUserId]);
+    }, [isManager, isConsultant, currentUserId, currentRole]);
 
     // Load branches for filter
     useEffect(() => {
@@ -219,6 +222,14 @@ export default function CustomerListPage() {
             const allTrips = [];
             for (const booking of bookings) {
                 const trips = Array.isArray(booking.trips) ? booking.trips : [];
+                if (trips.length > 0 && allTrips.length === 0) {
+                    console.log('[CustomerListPage] First booking trips sample:', {
+                        bookingId: booking.id,
+                        tripsCount: trips.length,
+                        firstTrip: trips[0],
+                        firstTripKeys: trips[0] ? Object.keys(trips[0]) : []
+                    });
+                }
                 for (const trip of trips) {
                     // Add booking info to trip
                     allTrips.push({
@@ -229,6 +240,17 @@ export default function CustomerListPage() {
                         bookingCreatedAt: booking.createdAt,
                     });
                 }
+            }
+
+            if (allTrips.length > 0) {
+                console.log('[CustomerListPage] Sample trip after mapping:', {
+                    tripId: allTrips[0].id || allTrips[0].tripId,
+                    startLocation: allTrips[0].startLocation,
+                    endLocation: allTrips[0].endLocation,
+                    startTime: allTrips[0].startTime,
+                    endTime: allTrips[0].endTime,
+                    allKeys: Object.keys(allTrips[0])
+                });
             }
 
             // Fetch ratings for each trip
@@ -282,7 +304,7 @@ export default function CustomerListPage() {
                         <div>
                             <h1 className="text-2xl font-bold text-slate-900">Danh sách khách hàng</h1>
                             <p className="text-sm text-slate-600">
-                                {isManager && managerBranchName ? (
+                                {(isManager || isConsultant) && managerBranchName ? (
                                     <>Chi nhánh: <span className="font-medium text-slate-700">{managerBranchName}</span> • Tổng: {totalElements} khách hàng</>
                                 ) : (
                                     <>Quản lý thông tin khách hàng • Tổng: {totalElements} khách hàng</>
@@ -309,8 +331,8 @@ export default function CustomerListPage() {
                                 />
                             </div>
 
-                            {/* Branch - Hidden for Manager */}
-                            {!isManager && (
+                            {/* Branch - Hidden for Manager/Consultant */}
+                            {!isManager && !isConsultant && (
                                 <div className="relative">
                                     <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                                     <select
@@ -421,125 +443,125 @@ export default function CustomerListPage() {
                     <div className="overflow-x-auto">
                         <table className="w-full">
                             <thead>
-                                <tr className="bg-slate-50 border-b border-slate-200">
-                                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                        Tên khách hàng
-                                    </th>
-                                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                        Email
-                                    </th>
-                                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                        Số điện thoại
-                                    </th>
-                                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                        Chi nhánh
-                                    </th>
-                                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                        Ghi chú
-                                    </th>
-                                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                        Ngày tạo
-                                    </th>
-                                </tr>
+                            <tr className="bg-slate-50 border-b border-slate-200">
+                                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                                    Tên khách hàng
+                                </th>
+                                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                                    Email
+                                </th>
+                                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                                    Số điện thoại
+                                </th>
+                                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                                    Chi nhánh
+                                </th>
+                                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                                    Ghi chú
+                                </th>
+                                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                                    Ngày tạo
+                                </th>
+                            </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {loading ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-4 py-12 text-center">
-                                            <div className="flex flex-col items-center gap-2">
-                                                <RefreshCw className="h-6 w-6 text-slate-400 animate-spin" />
-                                                <span className="text-sm text-slate-500">Đang tải...</span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ) : customers.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-4 py-12 text-center">
-                                            <div className="flex flex-col items-center gap-2">
-                                                <Users className="h-8 w-8 text-slate-300" />
-                                                <span className="text-sm text-slate-500">Không có khách hàng nào</span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    customers.map((customer) => (
-                                        <tr
-                                            key={customer.id}
-                                            className="hover:bg-slate-50 transition-colors cursor-pointer"
-                                            onClick={() => handleCustomerClick(customer)}
-                                        >
-                                            {/* Name */}
-                                            <td className="px-4 py-3">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="h-9 w-9 rounded-full bg-gradient-to-br from-[#0079BC] to-sky-500 flex items-center justify-center text-white text-sm font-semibold shadow-sm">
-                                                        {(customer.fullName || "?").charAt(0).toUpperCase()}
-                                                    </div>
-                                                    <div>
-                                                        <div className="font-medium text-slate-900 text-sm">
-                                                            {customer.fullName || "—"}
-                                                        </div>
-                                                        {customer.address && (
-                                                            <div className="text-xs text-slate-500 truncate max-w-[200px]">
-                                                                {customer.address}
-                                                            </div>
-                                                        )}
-                                                    </div>
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={6} className="px-4 py-12 text-center">
+                                        <div className="flex flex-col items-center gap-2">
+                                            <RefreshCw className="h-6 w-6 text-slate-400 animate-spin" />
+                                            <span className="text-sm text-slate-500">Đang tải...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : customers.length === 0 ? (
+                                <tr>
+                                    <td colSpan={6} className="px-4 py-12 text-center">
+                                        <div className="flex flex-col items-center gap-2">
+                                            <Users className="h-8 w-8 text-slate-300" />
+                                            <span className="text-sm text-slate-500">Không có khách hàng nào</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : (
+                                customers.map((customer) => (
+                                    <tr
+                                        key={customer.id}
+                                        className="hover:bg-slate-50 transition-colors cursor-pointer"
+                                        onClick={() => handleCustomerClick(customer)}
+                                    >
+                                        {/* Name */}
+                                        <td className="px-4 py-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-9 w-9 rounded-full bg-gradient-to-br from-[#0079BC] to-sky-500 flex items-center justify-center text-white text-sm font-semibold shadow-sm">
+                                                    {(customer.fullName || "?").charAt(0).toUpperCase()}
                                                 </div>
-                                            </td>
-
-                                            {/* Email */}
-                                            <td className="px-4 py-3">
-                                                {customer.email ? (
-                                                    <div className="flex items-center gap-2 text-sm text-slate-700">
-                                                        <Mail className="h-4 w-4 text-slate-400" />
-                                                        <span>{customer.email}</span>
+                                                <div>
+                                                    <div className="font-medium text-slate-900 text-sm">
+                                                        {customer.fullName || "—"}
                                                     </div>
-                                                ) : (
-                                                    <span className="text-sm text-slate-400">—</span>
-                                                )}
-                                            </td>
+                                                    {customer.address && (
+                                                        <div className="text-xs text-slate-500 truncate max-w-[200px]">
+                                                            {customer.address}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </td>
 
-                                            {/* Phone */}
-                                            <td className="px-4 py-3">
-                                                {customer.phone ? (
-                                                    <div className="flex items-center gap-2 text-sm text-slate-700">
-                                                        <Phone className="h-4 w-4 text-slate-400" />
-                                                        <span className="font-mono">{customer.phone}</span>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-sm text-slate-400">—</span>
-                                                )}
-                                            </td>
+                                        {/* Email */}
+                                        <td className="px-4 py-3">
+                                            {customer.email ? (
+                                                <div className="flex items-center gap-2 text-sm text-slate-700">
+                                                    <Mail className="h-4 w-4 text-slate-400" />
+                                                    <span>{customer.email}</span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-sm text-slate-400">—</span>
+                                            )}
+                                        </td>
 
-                                            {/* Branch */}
-                                            <td className="px-4 py-3">
+                                        {/* Phone */}
+                                        <td className="px-4 py-3">
+                                            {customer.phone ? (
+                                                <div className="flex items-center gap-2 text-sm text-slate-700">
+                                                    <Phone className="h-4 w-4 text-slate-400" />
+                                                    <span className="font-mono">{customer.phone}</span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-sm text-slate-400">—</span>
+                                            )}
+                                        </td>
+
+                                        {/* Branch */}
+                                        <td className="px-4 py-3">
                                                 <span className="text-sm text-slate-700">
                                                     {customer.branchName || "—"}
                                                 </span>
-                                            </td>
+                                        </td>
 
-                                            {/* Note */}
-                                            <td className="px-4 py-3">
-                                                {customer.note ? (
-                                                    <div className="flex items-start gap-2 text-sm text-slate-600 max-w-[200px]">
-                                                        <StickyNote className="h-4 w-4 text-slate-400 shrink-0 mt-0.5" />
-                                                        <span className="line-clamp-2">{customer.note}</span>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-sm text-slate-400">—</span>
-                                                )}
-                                            </td>
-
-                                            {/* Created At */}
-                                            <td className="px-4 py-3">
-                                                <div className="flex items-center gap-2 text-sm text-slate-600">
-                                                    <Calendar className="h-4 w-4 text-slate-400" />
-                                                    <span>{formatDate(customer.createdAt)}</span>
+                                        {/* Note */}
+                                        <td className="px-4 py-3">
+                                            {customer.note ? (
+                                                <div className="flex items-start gap-2 text-sm text-slate-600 max-w-[200px]">
+                                                    <StickyNote className="h-4 w-4 text-slate-400 shrink-0 mt-0.5" />
+                                                    <span className="line-clamp-2">{customer.note}</span>
                                                 </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
+                                            ) : (
+                                                <span className="text-sm text-slate-400">—</span>
+                                            )}
+                                        </td>
+
+                                        {/* Created At */}
+                                        <td className="px-4 py-3">
+                                            <div className="flex items-center gap-2 text-sm text-slate-600">
+                                                <Calendar className="h-4 w-4 text-slate-400" />
+                                                <span>{formatDate(customer.createdAt)}</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
                             </tbody>
                         </table>
                     </div>
@@ -570,308 +592,6 @@ export default function CustomerListPage() {
                     onClose={handleCloseModal}
                 />
             )}
-        </div>
-    );
-}
-
-// Modal component to display customer trips and ratings
-function CustomerTripsModal({ customer, trips, loading, error, onClose }) {
-    const formatDateTime = (dateStr) => {
-        if (!dateStr) return "—";
-        try {
-            const date = new Date(dateStr);
-            return date.toLocaleString("vi-VN", {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-            });
-        } catch {
-            return "—";
-        }
-    };
-
-    const formatDate = (dateStr) => {
-        if (!dateStr) return "—";
-        try {
-            return new Date(dateStr).toLocaleDateString("vi-VN", {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-            });
-        } catch {
-            return "—";
-        }
-    };
-
-    const getTripStatusLabel = (status) => {
-        const statusMap = {
-            PENDING: "Chờ xử lý",
-            ASSIGNED: "Đã phân xe",
-            IN_PROGRESS: "Đang thực hiện",
-            COMPLETED: "Hoàn thành",
-            CANCELLED: "Đã hủy",
-        };
-        return statusMap[status] || status || "—";
-    };
-
-    const getTripStatusColor = (status) => {
-        const colorMap = {
-            PENDING: "bg-info-50 text-info-700 border-info-200",
-            ASSIGNED: "bg-sky-50 text-sky-700 border-sky-200",
-            IN_PROGRESS: "bg-blue-50 text-blue-700 border-blue-200",
-            COMPLETED: "bg-emerald-50 text-emerald-700 border-emerald-200",
-            CANCELLED: "bg-rose-50 text-rose-700 border-rose-200",
-        };
-        return colorMap[status] || "bg-slate-50 text-slate-700 border-slate-200";
-    };
-
-    return (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
-            <div
-                className="bg-white rounded-xl shadow-xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col"
-                onClick={(e) => e.stopPropagation()}
-            >
-                {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-slate-200 bg-gradient-to-r from-[#0079BC] to-sky-600 text-white">
-                    <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center text-white text-xl font-bold">
-                            {(customer.fullName || "?").charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                            <h2 className="text-2xl font-bold">Danh sách chuyến đi</h2>
-                            <p className="text-sm text-white/90 mt-1">
-                                {customer.fullName || "—"} • {trips.length} chuyến
-                            </p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="text-white/80 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-lg"
-                    >
-                        <X className="h-6 w-6" />
-                    </button>
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 overflow-y-auto p-6">
-                    {loading ? (
-                        <div className="flex flex-col items-center justify-center py-12">
-                            <RefreshCw className="h-8 w-8 text-slate-400 animate-spin mb-3" />
-                            <span className="text-sm text-slate-500">Đang tải danh sách chuyến đi...</span>
-                        </div>
-                    ) : error ? (
-                        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">
-                            {error}
-                        </div>
-                    ) : trips.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-12">
-                            <CarFront className="h-12 w-12 text-slate-300 mb-3" />
-                            <span className="text-sm text-slate-500">Khách hàng chưa có chuyến đi nào</span>
-                        </div>
-                    ) : (
-                        <div className="space-y-4">
-                            {trips.map((trip, index) => {
-                                const tripId = trip.id || trip.tripId;
-                                const rating = trip.rating;
-                                const hasRating = rating && rating.overallRating;
-
-                                return (
-                                    <div
-                                        key={tripId || index}
-                                        className="border border-slate-200 rounded-lg p-5 hover:shadow-md transition-shadow bg-white"
-                                    >
-                                        {/* Trip Header */}
-                                        <div className="flex items-start justify-between mb-4">
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-3 mb-2">
-                                                    <span className="text-lg font-bold text-slate-900">
-                                                        Chuyến #{tripId || `#${index + 1}`}
-                                                    </span>
-                                                    {trip.status && (
-                                                        <span
-                                                            className={`px-2.5 py-1 rounded-md text-xs font-medium border ${getTripStatusColor(
-                                                                trip.status
-                                                            )}`}
-                                                        >
-                                                            {getTripStatusLabel(trip.status)}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                {trip.bookingCode && (
-                                                    <p className="text-xs text-slate-500">
-                                                        Đơn hàng: {trip.bookingCode}
-                                                    </p>
-                                                )}
-                                            </div>
-                                            {hasRating && (
-                                                <div className="flex items-center gap-1 bg-info-50 px-3 py-1.5 rounded-lg border border-info-200">
-                                                    <Star className="h-4 w-4 text-primary-500 fill-primary-500" />
-                                                    <span className="text-sm font-semibold text-info-700">
-                                                        {rating.overallRating?.toFixed(1) || "—"}
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Trip Details */}
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                            {/* Pickup */}
-                                            <div className="space-y-1">
-                                                <div className="flex items-center gap-2 text-xs font-medium text-slate-500 uppercase">
-                                                    <MapPin className="h-3.5 w-3.5" />
-                                                    Điểm đón
-                                                </div>
-                                                <p className="text-sm text-slate-900 font-medium">
-                                                    {trip.pickup || "—"}
-                                                </p>
-                                                {trip.pickup_time && (
-                                                    <p className="text-xs text-slate-500 flex items-center gap-1">
-                                                        <Clock className="h-3 w-3" />
-                                                        {formatDateTime(trip.pickup_time)}
-                                                    </p>
-                                                )}
-                                            </div>
-
-                                            {/* Dropoff */}
-                                            <div className="space-y-1">
-                                                <div className="flex items-center gap-2 text-xs font-medium text-slate-500 uppercase">
-                                                    <MapPin className="h-3.5 w-3.5" />
-                                                    Điểm đến
-                                                </div>
-                                                <p className="text-sm text-slate-900 font-medium">
-                                                    {trip.dropoff || "—"}
-                                                </p>
-                                                {trip.dropoff_eta && (
-                                                    <p className="text-xs text-slate-500 flex items-center gap-1">
-                                                        <Clock className="h-3 w-3" />
-                                                        {formatDateTime(trip.dropoff_eta)}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {/* Driver Info */}
-                                        {(trip.driver_name || trip.driverName) && (
-                                            <div className="flex items-center gap-2 mb-4 p-2 bg-slate-50 rounded-lg">
-                                                <User className="h-4 w-4 text-slate-400" />
-                                                <span className="text-sm text-slate-700">
-                                                    <span className="font-medium">Tài xế:</span>{" "}
-                                                    {trip.driver_name || trip.driverName || "—"}
-                                                </span>
-                                                {trip.vehicle_plate && (
-                                                    <span className="text-xs text-slate-500">
-                                                        • {trip.vehicle_plate}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        )}
-
-                                        {/* Rating Section */}
-                                        {hasRating ? (
-                                            <div className="mt-4 pt-4 border-t border-slate-200">
-                                                <div className="flex items-center gap-2 mb-3">
-                                                    <Star className="h-4 w-4 text-primary-500 fill-primary-500" />
-                                                    <span className="text-sm font-semibold text-slate-900">
-                                                        Đánh giá tài xế
-                                                    </span>
-                                                    <span className="text-xs text-slate-500">
-                                                        ({formatDate(rating.ratedAt)})
-                                                    </span>
-                                                </div>
-
-                                                <div className="grid grid-cols-2 gap-3 mb-3">
-                                                    {rating.punctualityRating && (
-                                                        <div className="flex items-center justify-between text-xs">
-                                                            <span className="text-slate-600">⏰ Đúng giờ:</span>
-                                                            <div className="flex gap-0.5">
-                                                                {[1, 2, 3, 4, 5].map((star) => (
-                                                                    <Star
-                                                                        key={star}
-                                                                        className={`h-3 w-3 ${
-                                                                            star <= rating.punctualityRating
-                                                                                ? "text-primary-500 fill-primary-500"
-                                                                                : "text-slate-300"
-                                                                        }`}
-                                                                    />
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {rating.attitudeRating && (
-                                                        <div className="flex items-center justify-between text-xs">
-                                                            <span className="text-slate-600">😊 Thái độ:</span>
-                                                            <div className="flex gap-0.5">
-                                                                {[1, 2, 3, 4, 5].map((star) => (
-                                                                    <Star
-                                                                        key={star}
-                                                                        className={`h-3 w-3 ${
-                                                                            star <= rating.attitudeRating
-                                                                                ? "text-primary-500 fill-primary-500"
-                                                                                : "text-slate-300"
-                                                                        }`}
-                                                                    />
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {rating.safetyRating && (
-                                                        <div className="flex items-center justify-between text-xs">
-                                                            <span className="text-slate-600">🛡️ An toàn:</span>
-                                                            <div className="flex gap-0.5">
-                                                                {[1, 2, 3, 4, 5].map((star) => (
-                                                                    <Star
-                                                                        key={star}
-                                                                        className={`h-3 w-3 ${
-                                                                            star <= rating.safetyRating
-                                                                                ? "text-primary-500 fill-primary-500"
-                                                                                : "text-slate-300"
-                                                                        }`}
-                                                                    />
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {rating.complianceRating && (
-                                                        <div className="flex items-center justify-between text-xs">
-                                                            <span className="text-slate-600">✅ Tuân thủ:</span>
-                                                            <div className="flex gap-0.5">
-                                                                {[1, 2, 3, 4, 5].map((star) => (
-                                                                    <Star
-                                                                        key={star}
-                                                                        className={`h-3 w-3 ${
-                                                                            star <= rating.complianceRating
-                                                                                ? "text-primary-500 fill-primary-500"
-                                                                                : "text-slate-300"
-                                                                        }`}
-                                                                    />
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {rating.comment && (
-                                                    <div className="mt-2 p-2 bg-slate-50 rounded text-xs text-slate-700">
-                                                        <span className="font-medium">Nhận xét:</span> {rating.comment}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ) : (
-                                            <div className="mt-4 pt-4 border-t border-slate-200">
-                                                <p className="text-xs text-slate-400 italic">
-                                                    Chưa có đánh giá cho chuyến đi này
-                                                </p>
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-            </div>
         </div>
     );
 }

@@ -38,15 +38,15 @@ async function listCustomers({ branchId, startDate, endDate, page = 1, size = 10
     if (page != null) params.append("page", String(page));
     if (size != null) params.append("size", String(size));
     const qs = params.toString();
-    
+
     // Sử dụng trực tiếp API bookings để lấy thông tin khách hàng
     console.log("📞 Fetching customers from bookings...");
     const bookings = await apiFetch(`/api/bookings?${qs}`);
     console.log("📦 Bookings response:", bookings);
-    
+
     const items = bookings?.data?.items || bookings?.items || bookings?.content || [];
     console.log("📋 Booking items:", items);
-    
+
     // Extract unique customers from bookings
     const customerMap = new Map();
     items.forEach(b => {
@@ -57,10 +57,10 @@ async function listCustomers({ branchId, startDate, endDate, page = 1, size = 10
         const customerEmail = customer.email || b.customerEmail || b.customer_email || "";
         const customerPhone = customer.phone || customer.phoneNumber || b.customerPhone || b.customer_phone || "";
         const customerNote = customer.note || b.note || "";
-        
+
         // Dùng phone hoặc email làm key để loại trùng
         const key = customerPhone || customerEmail || `${customerName}-${Math.random()}`;
-        
+
         if (key && !customerMap.has(key)) {
             customerMap.set(key, {
                 id: customer.id || b.customerId || b.id,
@@ -71,7 +71,7 @@ async function listCustomers({ branchId, startDate, endDate, page = 1, size = 10
             });
         }
     });
-    
+
     const result = {
         items: Array.from(customerMap.values()),
         totalElements: customerMap.size,
@@ -103,9 +103,9 @@ function Toasts({ toasts }) {
                     className={cls(
                         "flex items-start gap-2 rounded-md border px-3 py-2 shadow-sm bg-white text-slate-700",
                         t.kind === "success" &&
-                            "border-green-200 text-green-700 bg-green-50",
+                        "border-green-200 text-green-700 bg-green-50",
                         t.kind === "error" &&
-                            "border-red-200 text-red-700 bg-red-50"
+                        "border-red-200 text-red-700 bg-red-50"
                     )}
                 >
                     {t.kind === "success" ? (
@@ -486,11 +486,11 @@ function VehicleCategoryCreateModal({ open, onClose, onCreated, existingCategori
 
 /* ---------------------- Modal Edit Category ------------------------ */
 function VehicleCategoryEditModal({
-    open,
-    data,
-    onClose,
-    onSaved,
-}) {
+                                      open,
+                                      data,
+                                      onClose,
+                                      onSaved,
+                                  }) {
     const [baseFee, setBaseFee] = React.useState("");
     const [sameDayFixedPrice, setSameDayFixedPrice] = React.useState("");
     const [pricePerKm, setPricePerKm] = React.useState("");
@@ -720,12 +720,12 @@ function CustomerListModal({ open, onClose }) {
                 page,
                 size: pageSize,
             });
-            
+
             // Handle different response structures
             const items = result?.data?.items || result?.items || result?.content || result?.data?.content || [];
             const total = result?.data?.totalElements || result?.totalElements || result?.data?.total || items.length;
             const pages = result?.data?.totalPages || result?.totalPages || Math.ceil(total / pageSize) || 1;
-            
+
             setCustomers(items);
             setTotalItems(total);
             setTotalPages(pages);
@@ -848,49 +848,49 @@ function CustomerListModal({ open, onClose }) {
                     ) : (
                         <table className="w-full text-[13px]">
                             <thead className="bg-slate-100 border-b text-[11px] uppercase text-slate-500 sticky top-0">
-                                <tr>
-                                    <th className="px-4 py-2 text-left">Tên</th>
-                                    <th className="px-4 py-2 text-left">Email</th>
-                                    <th className="px-4 py-2 text-left">SĐT</th>
-                                    <th className="px-4 py-2 text-left">Ghi chú</th>
-                                </tr>
+                            <tr>
+                                <th className="px-4 py-2 text-left">Tên</th>
+                                <th className="px-4 py-2 text-left">Email</th>
+                                <th className="px-4 py-2 text-left">SĐT</th>
+                                <th className="px-4 py-2 text-left">Ghi chú</th>
+                            </tr>
                             </thead>
                             <tbody>
-                                {customers.map((c, idx) => (
-                                    <tr
-                                        key={c.id || idx}
-                                        className="hover:bg-slate-50 transition border-b border-slate-200 last:border-none"
-                                    >
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center gap-2">
-                                                <div className="h-8 w-8 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[11px] font-semibold">
-                                                    {(c.fullName || c.name || "?").charAt(0).toUpperCase()}
-                                                </div>
-                                                <span className="font-medium text-slate-900">
+                            {customers.map((c, idx) => (
+                                <tr
+                                    key={c.id || idx}
+                                    className="hover:bg-slate-50 transition border-b border-slate-200 last:border-none"
+                                >
+                                    <td className="px-4 py-3">
+                                        <div className="flex items-center gap-2">
+                                            <div className="h-8 w-8 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[11px] font-semibold">
+                                                {(c.fullName || c.name || "?").charAt(0).toUpperCase()}
+                                            </div>
+                                            <span className="font-medium text-slate-900">
                                                     {c.fullName || c.name || "—"}
                                                 </span>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center gap-1 text-slate-600">
-                                                <Mail className="h-3.5 w-3.5 text-slate-400" />
-                                                {c.email || "—"}
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center gap-1 text-slate-600">
-                                                <Phone className="h-3.5 w-3.5 text-slate-400" />
-                                                {c.phone || c.phoneNumber || "—"}
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center gap-1 text-slate-500 text-[12px]">
-                                                <FileText className="h-3.5 w-3.5 text-slate-400" />
-                                                {c.note || c.notes || "—"}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <div className="flex items-center gap-1 text-slate-600">
+                                            <Mail className="h-3.5 w-3.5 text-slate-400" />
+                                            {c.email || "—"}
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <div className="flex items-center gap-1 text-slate-600">
+                                            <Phone className="h-3.5 w-3.5 text-slate-400" />
+                                            {c.phone || c.phoneNumber || "—"}
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <div className="flex items-center gap-1 text-slate-500 text-[12px]">
+                                            <FileText className="h-3.5 w-3.5 text-slate-400" />
+                                            {c.note || c.notes || "—"}
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
                             </tbody>
                         </table>
                     )}
@@ -1037,7 +1037,7 @@ export default function VehicleCategoryManagePage() {
 
                     <div>
                         <div className="text-lg font-semibold text-slate-900">
-Quản lý danh mục xe
+                            Quản lý danh mục xe
                         </div>
                         <div className="text-[12px] text-slate-500 max-w-xl">
                             Chuẩn hoá loại xe để điều phối và quản lý hiệu quả.
@@ -1063,82 +1063,82 @@ Quản lý danh mục xe
                 <div className="overflow-x-auto">
                     <table className="w-full text-[13px]">
                         <thead className="bg-slate-100 border-b text-[11px] uppercase text-slate-500">
-                            <tr>
-                                <th className="px-4 py-2 text-left">Tên danh mục</th>
-                                <th className="px-4 py-2 text-left">Số ghế</th>
-                                <th className="px-4 py-2 text-center">Số xe</th>
-                                <th className="px-4 py-2 text-right">Phí mở cửa</th>
-                                <th className="px-4 py-2 text-right">Giá cố định/ngày</th>
-                                <th className="px-4 py-2 text-right">Giá theo km</th>
-                                <th className="px-4 py-2 text-left">Trạng thái</th>
-                                <th className="px-4 py-2 text-left">Hành động</th>
-                            </tr>
+                        <tr>
+                            <th className="px-4 py-2 text-left">Tên danh mục</th>
+                            <th className="px-4 py-2 text-left">Số ghế</th>
+                            <th className="px-4 py-2 text-center">Số xe</th>
+                            <th className="px-4 py-2 text-right">Phí mở cửa</th>
+                            <th className="px-4 py-2 text-right">Giá cố định/ngày</th>
+                            <th className="px-4 py-2 text-right">Giá theo km</th>
+                            <th className="px-4 py-2 text-left">Trạng thái</th>
+                            <th className="px-4 py-2 text-left">Hành động</th>
+                        </tr>
                         </thead>
 
                         <tbody>
-                            {pagedCategories.map((cat) => (
-                                <tr
-                                    key={cat.id}
-                                    className="hover:bg-slate-50 transition border-b border-slate-200 last:border-none"
-                                >
-                                    <td className="px-4 py-3 align-top">
-                                        <div className="font-medium text-slate-900">
-                                            {cat.name}
-                                        </div>
-                                    </td>
+                        {pagedCategories.map((cat) => (
+                            <tr
+                                key={cat.id}
+                                className="hover:bg-slate-50 transition border-b border-slate-200 last:border-none"
+                            >
+                                <td className="px-4 py-3 align-top">
+                                    <div className="font-medium text-slate-900">
+                                        {cat.name}
+                                    </div>
+                                </td>
 
-                                    <td className="px-4 py-3 align-top">
-                                        {cat.seats} ghế
-                                    </td>
+                                <td className="px-4 py-3 align-top">
+                                    {cat.seats} ghế
+                                </td>
 
-                                    <td className="px-4 py-3 align-top text-center">
+                                <td className="px-4 py-3 align-top text-center">
                                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[11px] font-medium">
                                             <CarFront className="h-3 w-3" />
                                             {cat.vehicles_count ?? 0}
                                         </span>
-                                    </td>
+                                </td>
 
-                                    <td className="px-4 py-3 align-top text-right tabular-nums">
-                                        {cat.baseFee ? fmtVND(cat.baseFee) + " đ" : "—"}
-                                    </td>
+                                <td className="px-4 py-3 align-top text-right tabular-nums">
+                                    {cat.baseFee ? fmtVND(cat.baseFee) + " đ" : "—"}
+                                </td>
 
-                                    <td className="px-4 py-3 align-top text-right tabular-nums">
-                                        {cat.sameDayFixedPrice ? fmtVND(cat.sameDayFixedPrice) + " đ" : "—"}
-                                    </td>
+                                <td className="px-4 py-3 align-top text-right tabular-nums">
+                                    {cat.sameDayFixedPrice ? fmtVND(cat.sameDayFixedPrice) + " đ" : "—"}
+                                </td>
 
-                                    <td className="px-4 py-3 align-top text-right tabular-nums">
-                                        {cat.pricePerKm ? fmtVND(cat.pricePerKm) + " đ" : "—"}
-                                    </td>
+                                <td className="px-4 py-3 align-top text-right tabular-nums">
+                                    {cat.pricePerKm ? fmtVND(cat.pricePerKm) + " đ" : "—"}
+                                </td>
 
-                                    <td className="px-4 py-3 align-top">
-                                        <StatusPill status={cat.status} />
-                                    </td>
+                                <td className="px-4 py-3 align-top">
+                                    <StatusPill status={cat.status} />
+                                </td>
 
-                                    <td className="px-4 py-3 align-top">
-                                        <button
-                                            onClick={() => {
-                                                setEditData(cat);
-                                                setEditOpen(true);
-                                            }}
-                                            className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] hover:bg-slate-100 text-slate-700 shadow-sm flex items-center gap-1"
-                                        >
-                                            <Pencil className="h-3.5 w-3.5" />
-                                            Sửa
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-
-                            {pagedCategories.length === 0 && (
-                                <tr>
-                                    <td
-                                        colSpan={8}
-                                        className="px-4 py-10 text-center text-slate-400"
+                                <td className="px-4 py-3 align-top">
+                                    <button
+                                        onClick={() => {
+                                            setEditData(cat);
+                                            setEditOpen(true);
+                                        }}
+                                        className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] hover:bg-slate-100 text-slate-700 shadow-sm flex items-center gap-1"
                                     >
-                                        Chưa có danh mục nào.
-                                    </td>
-                                </tr>
-                            )}
+                                        <Pencil className="h-3.5 w-3.5" />
+                                        Sửa
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+
+                        {pagedCategories.length === 0 && (
+                            <tr>
+                                <td
+                                    colSpan={8}
+                                    className="px-4 py-10 text-center text-slate-400"
+                                >
+                                    Chưa có danh mục nào.
+                                </td>
+                            </tr>
+                        )}
                         </tbody>
                     </table>
                 </div>

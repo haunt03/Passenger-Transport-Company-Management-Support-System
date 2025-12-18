@@ -247,15 +247,22 @@ export default function ConsultantDashboardPage() {
                     confirmed_orders: d.totalConfirmedCount ?? 0,
                     revenue_this_month: d.monthlyRevenue ?? 0,
                 });
-                const mapped = (d.pendingBookings || []).map(o => ({
-                    id: o.id,
-                    code: `RQ-${o.id}`,
-                    customer_name: o.customerName,
-                    pickup: (o.routeSummary || "?").split(" → ")[0] || "",
-                    dropoff: (o.routeSummary || "?").split(" → ")[1] || "",
-                    pickup_time: o.startDate,
-                    status: "WAITING_QUOTE",
-                }));
+                // Filter: loại bỏ các đơn đã có thanh toán (đã đặt cọc)
+                // => các đơn này sẽ được coi là "khách đã xác nhận", không hiển thị trong "Đơn hàng đang chờ xử lý"
+                const mapped = (d.pendingBookings || [])
+                    .filter(o => {
+                        const paid = Number(o.paidAmount || o.paid_amount || 0);
+                        return !(paid > 0);
+                    })
+                    .map(o => ({
+                        id: o.id,
+                        code: `RQ-${o.id}`,
+                        customer_name: o.customerName,
+                        pickup: (o.routeSummary || "?").split(" → ")[0] || "",
+                        dropoff: (o.routeSummary || "?").split(" → ")[1] || "",
+                        pickup_time: o.startDate,
+                        status: "WAITING_QUOTE",
+                    }));
                 setPendingOrders(mapped);
             } catch (e) {
                 // keep mock if fails

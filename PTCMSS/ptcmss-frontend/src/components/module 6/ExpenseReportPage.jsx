@@ -467,8 +467,8 @@ function FiltersBar({
                 {/* Branch */}
                 <div className="flex flex-col gap-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-[13px] text-slate-700 shadow-sm">
                     <div className="flex items-center gap-2">
-                    <Building2 className="h-4 w-4 text-slate-500" />
-                    <select
+                        <Building2 className="h-4 w-4 text-slate-500" />
+                        <select
                             value={branchId ?? ""}
                             onChange={(e) => {
                                 if (branchDisabled) return;
@@ -482,7 +482,7 @@ function FiltersBar({
                             }}
                             disabled={branchDisabled || branchLoading}
                             className="bg-transparent outline-none text-[13px] text-slate-900 disabled:text-slate-500"
-                    >
+                        >
                             {branchDisabled ? (
                                 <option value={branchId ?? ""}>
                                     {branchLoading
@@ -499,7 +499,7 @@ function FiltersBar({
                                     ))}
                                 </>
                             )}
-                    </select>
+                        </select>
                     </div>
                     {branchDisabled && (
                         <div className={`text-[11px] ${branchError ? "text-rose-600" : "text-primary-600"}`}>
@@ -1254,7 +1254,7 @@ export default function ExpenseReportPage() {
             try {
                 const branchesData = await listBranches({ size: 100 });
                 setBranches(normalizeBranchOptions(branchesData));
-                
+
                 // For Accountant/Manager/Consultant: only load vehicles from their branch
                 // For Admin: load all vehicles
                 if (isBranchLocked && branchId != null) {
@@ -1333,12 +1333,11 @@ export default function ExpenseReportPage() {
         setLoading(true);
         setError(null);
         try {
-            // costType đã bị xóa khỏi database - không gửi filter này lên backend
-            // Backend sẽ trả về tất cả expenses, không phân loại theo costType nữa
+            // expenseType filter chỉ áp dụng cho ExpenseRequests (không áp dụng cho Invoices vì costType đã bị xóa)
             const data = await getExpenseReport({
                 branchId: branchId || undefined,
                 vehicleId: vehicleId || undefined,
-                // costType: catFilter || undefined, // Đã bị xóa - không filter nữa
+                expenseType: catFilter || undefined, // Filter theo loại chi phí
                 startDate: fromDate || undefined,
                 endDate: toDate || undefined,
                 period: period || undefined,
@@ -1445,11 +1444,11 @@ export default function ExpenseReportPage() {
             return;
         }
         try {
-            // costType đã bị xóa - không gửi filter này lên backend
+            // expenseType filter chỉ áp dụng cho ExpenseRequests
             await exportExpenseReportToExcel({
                 branchId: branchId || undefined,
                 vehicleId: vehicleId || undefined,
-                // costType: catFilter || undefined, // Đã bị xóa - không filter nữa
+                expenseType: catFilter || undefined, // Filter theo loại chi phí
                 startDate: fromDate || undefined,
                 endDate: toDate || undefined,
                 period: period || undefined,
@@ -1547,7 +1546,7 @@ export default function ExpenseReportPage() {
                 />
 
                 <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 text-[11px] text-slate-500 leading-relaxed">
-                 Tổng chi phí: {fmtVND(totalExpense)} đ.
+                    Tổng chi phí: {fmtVND(totalExpense)} đ.
                     {error && <span className="text-rose-600 ml-2">Lỗi: {error}</span>}
                 </div>
             </div>

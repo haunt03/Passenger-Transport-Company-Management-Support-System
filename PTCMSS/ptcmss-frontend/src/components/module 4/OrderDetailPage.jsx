@@ -1,6 +1,6 @@
 ﻿// OrderDetailPage.jsx (LIGHT THEME, hooked with light DepositModal)
 import React from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
     getBooking,
     addBookingPayment,
@@ -27,6 +27,7 @@ import {
     X,
     QrCode,
     Copy,
+    ArrowLeft,
 } from "lucide-react";
 
 //  dùng modal light theme thay vì bản dark
@@ -76,6 +77,29 @@ const fmtVND = (n) =>
     new Intl.NumberFormat("vi-VN").format(
         Math.max(0, Number(n || 0))
     ) + " đ";
+
+// Đọc số tiền bằng tiếng Việt đơn giản (triệu / tỷ) cho UI
+function readAmountVi(n) {
+    const value = Math.max(0, Number(n || 0));
+    if (!Number.isFinite(value) || value <= 0) return "Chưa có gợi ý số tiền";
+
+    const billion = 1_000_000_000;
+    const million = 1_000_000;
+
+    if (value >= billion) {
+        const main = value / billion;
+        const rounded = Math.round(main * 10) / 10;
+        return `${rounded.toString().replace(".", ",")} tỷ đồng`;
+    }
+
+    if (value >= million) {
+        const main = value / million;
+        const rounded = Math.round(main * 10) / 10;
+        return `${rounded.toString().replace(".", ",")} triệu đồng`;
+    }
+
+    return `${new Intl.NumberFormat("vi-VN").format(value)} đồng`;
+}
 
 /* ---------- status pill ---------- */
 const ORDER_STATUS_LABEL = {
@@ -209,7 +233,7 @@ function TripInfoCard({ trip, hireTypeName, useHighway }) {
     const vehicleDetailsText = trip.vehicle_details && trip.vehicle_details.length > 0
         ? trip.vehicle_details.map(v => `${v.quantity}×${v.name}`).join(", ")
         : (trip.vehicle_category ? `${trip.vehicle_count || 1}×${trip.vehicle_category}` : "—");
-    
+
     return (
         <div className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-4 shadow-sm">
             <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
@@ -284,15 +308,18 @@ function TripInfoCard({ trip, hireTypeName, useHighway }) {
                                     {trip.dropoff || "—"}
                                 </div>
 
-                                <div className="mt-1 flex items-center gap-1 text-[12px] text-slate-500">
-                                    <Clock className="h-3.5 w-3.5 text-slate-400" />
-                                    <span>
-                                        Thời gian về:{" "}
-                                        <span className="font-medium text-slate-900 tabular-nums">
-                                            {fmtDateTime(trip.dropoff_eta)}
+                                {/* Với thuê 1 chiều có thể không có thời gian về rõ ràng -> chỉ hiển thị nếu backend có dropoff_eta */}
+                                {trip.dropoff_eta && (
+                                    <div className="mt-1 flex items-center gap-1 text-[12px] text-slate-500">
+                                        <Clock className="h-3.5 w-3.5 text-slate-400" />
+                                        <span>
+                                            Thời gian về:{" "}
+                                            <span className="font-medium text-slate-900 tabular-nums">
+                                                {fmtDateTime(trip.dropoff_eta)}
+                                            </span>
                                         </span>
-                                    </span>
-                                </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -403,20 +430,20 @@ function QuoteInfoCard({ quote }) {
 }
 
 /* 4. Thanh toán / Cọc */
-function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr, isConsultant = false, isCoordinator = false, pickupTime = null }) {
+function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr, isConsultant = false, isCoordinator = false, pickupTime = null, onDeletePayment, onRefreshPayments }) {
     const remain = Math.max(0, Number(payment.remaining || 0));
     const paid = Math.max(0, Number(payment.paid || 0));
-    
+
     // Kiểm tra xem đơn hàng đã quá thời gian bắt đầu chưa
     const isStartTimePassed = React.useMemo(() => {
         if (!pickupTime) return false; // Không có thời gian thì coi như chưa quá
-        
+
         try {
             // Parse ngày giống như fmtDateTime: replace space thành T để parse đúng ISO format
             const safe = String(pickupTime).replace(" ", "T");
             const pickupDate = new Date(safe);
             const now = new Date();
-            
+
             // Kiểm tra xem parse có thành công không
             if (!isNaN(pickupDate.getTime())) {
                 // Nếu thời gian bắt đầu đã qua (nhỏ hơn hoặc bằng thời gian hiện tại)
@@ -425,7 +452,7 @@ function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr, i
         } catch (e) {
             console.error("Error parsing pickup time:", e);
         }
-        
+
         return false; // Nếu parse lỗi thì coi như chưa quá
     }, [pickupTime]);
 
@@ -494,13 +521,13 @@ function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr, i
                     </div>
 
                     <div className="text-[11px] text-slate-500 text-center leading-relaxed px-2">
-                        {isConsultant 
+                        {isConsultant
                             ? "Tạo yêu cầu thu cọc/thanh toán để kế toán xác nhận, hoặc gửi QR cho khách."
                             : "Ghi nhận tiền mặt/chuyển khoản hoặc gửi mã QR để khách tự thanh toán."}
                     </div>
                 </>
             )}
-            
+
             {/* Thông báo khi đơn đã quá thời gian bắt đầu */}
             {remain > 0 && !isCoordinator && isStartTimePassed && (
                 <div className="rounded-lg border border-info-200 bg-info-50 px-3 py-2 text-[12px] text-info-700 flex items-center gap-2">
@@ -508,7 +535,7 @@ function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr, i
                     <span>Đơn hàng đã quá thời gian bắt đầu. Không thể đặt cọc hoặc tạo QR thanh toán.</span>
                 </div>
             )}
-            
+
             {/* Thông báo cho Coordinator khi còn tiền chưa thanh toán */}
             {remain > 0 && isCoordinator && (
                 <div className="rounded-lg border border-info-200 bg-info-50 px-3 py-2 text-[12px] text-info-700 flex items-center gap-2">
@@ -522,41 +549,70 @@ function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr, i
                 <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Lịch sử thanh toán</div>
                 {history.length ? (
                     <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                        {history.map((item) => (
-                            <div
-                                key={item.invoiceId}
-                                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-[12px] space-y-1.5"
-                            >
-                                <div className="flex justify-between items-start gap-2">
-                                    <span className="font-bold text-base text-slate-900 tabular-nums">{fmtVND(item.amount || 0)}</span>
-                                    <span className="text-[11px] text-slate-500 whitespace-nowrap">{item.createdAt ? fmtDateTime(item.createdAt) : "--"}</span>
+                        {history.map((item) => {
+                            // Xác định trạng thái dựa trên confirmationStatus và paymentStatus
+                            const confirmationStatus = item.confirmationStatus || "";
+                            const paymentStatus = item.paymentStatus || "";
+
+                            // Logic hiển thị trạng thái:
+                            // - PENDING → "Chờ xác nhận" (màu info)
+                            // - CONFIRMED + PAID → "Đã thanh toán" (màu xanh)
+                            // - CONFIRMED + UNPAID → "Chưa thanh toán" (màu đỏ)
+                            // - REJECTED → có thể hiển thị "Đã từ chối" hoặc không hiển thị
+                            let statusText = "Chưa thanh toán";
+                            let statusClass = "bg-slate-100 text-slate-700";
+
+                            if (confirmationStatus === "PENDING") {
+                                statusText = "Chờ xác nhận";
+                                statusClass = "bg-info-100 text-info-700";
+                            } else if (confirmationStatus === "CONFIRMED") {
+                                if (paymentStatus === "PAID") {
+                                    statusText = "Đã thanh toán";
+                                    statusClass = "bg-emerald-100 text-emerald-700";
+                                } else {
+                                    statusText = "Chưa thanh toán";
+                                    statusClass = "bg-rose-100 text-rose-700";
+                                }
+                            } else if (confirmationStatus === "REJECTED") {
+                                statusText = "Đã từ chối";
+                                statusClass = "bg-slate-200 text-slate-600";
+                            }
+
+                            const canDelete = isConsultant && confirmationStatus === "PENDING" && item.paymentId;
+
+                            return (
+                                <div
+                                    key={item.paymentId || item.invoiceId}
+                                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-[12px] space-y-1.5"
+                                >
+                                    <div className="flex justify-between items-start gap-2">
+                                        <span className="font-bold text-base text-slate-900 tabular-nums">{fmtVND(item.amount || 0)}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[11px] text-slate-500 whitespace-nowrap">{item.createdAt ? fmtDateTime(item.createdAt) : "--"}</span>
+                                            {canDelete && onDeletePayment && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onDeletePayment(item.paymentId)}
+                                                    className="text-rose-500 hover:text-rose-700 p-1 rounded hover:bg-rose-50 transition-colors"
+                                                    title="Hủy yêu cầu"
+                                                >
+                                                    <X className="h-3.5 w-3.5" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-between items-center text-[11px]">
+                                        <span className="text-slate-600">{item.paymentMethod || "Không có"}</span>
+                                        <span className={cls("font-semibold px-2 py-0.5 rounded-md", statusClass)}>
+                                            {statusText}
+                                        </span>
+                                    </div>
+                                    {item.note ? (
+                                        <div className="text-[11px] text-slate-600 break-words leading-relaxed pt-1 border-t border-slate-200">{item.note}</div>
+                                    ) : null}
                                 </div>
-                                <div className="flex justify-between items-center text-[11px]">
-                                    <span className="text-slate-600">{item.paymentMethod || "Không có"}</span>
-                                    <span
-                                        className={cls(
-                                            "font-semibold px-2 py-0.5 rounded-md",
-                                            item.paymentStatus === "PAID"
-                                                ? "bg-emerald-100 text-emerald-700"
-                                                : item.paymentStatus === "PENDING"
-                                                ? "bg-info-100 text-info-700"
-                                                : "bg-slate-100 text-slate-700"
-                                        )}
-                                    >
-                                        {item.paymentStatus === "PAID" 
-                                            ? "Đã thanh toán" 
-                                            : item.paymentStatus === "PENDING"
-                                            ? "Chờ xác nhận"
-                                            : item.paymentStatus === "UNPAID"
-                                            ? "Chưa thanh toán"
-                                            : item.paymentStatus || "Chưa thanh toán"}
-                                    </span>
-                                </div>
-                                {item.note ? (
-                                    <div className="text-[11px] text-slate-600 break-words leading-relaxed pt-1 border-t border-slate-200">{item.note}</div>
-                                ) : null}
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 ) : (
                     <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-[12px] text-slate-500">
@@ -569,13 +625,15 @@ function PaymentInfoCard({ payment, history = [], onOpenDeposit, onGenerateQr, i
 }
 
 function QrPaymentModal({
-    open,
-    bookingCode,
-    customerName,
-    defaultAmount = 0,
-    onClose,
-    onGenerate,
-}) {
+                            open,
+                            bookingCode,
+                            customerName,
+                            defaultAmount = 0,
+                            onClose,
+                            onGenerate,
+                            paymentHistory = [], // Thêm prop để validate
+                            remainingAmount = 0, // Số tiền còn lại cần thu
+                        }) {
     const [amountStr, setAmountStr] = React.useState("");
     const [note, setNote] = React.useState("");
     const [deposit, setDeposit] = React.useState(true);
@@ -585,8 +643,22 @@ function QrPaymentModal({
     const [copied, setCopied] = React.useState(false);
     const [useFallbackImage, setUseFallbackImage] = React.useState(false);
 
+    // Tính tổng tiền các request "chưa thanh toán" (CONFIRMED + UNPAID hoặc PENDING)
+    const totalUnpaidRequests = React.useMemo(() => {
+        if (!paymentHistory || paymentHistory.length === 0) return 0;
+        return paymentHistory
+            .filter(item => {
+                const confStatus = item.confirmationStatus || "";
+                const payStatus = item.paymentStatus || "";
+                // Tính cả PENDING và CONFIRMED + UNPAID
+                return confStatus === "PENDING" || (confStatus === "CONFIRMED" && payStatus === "UNPAID");
+            })
+            .reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    }, [paymentHistory]);
+
     React.useEffect(() => {
         if (open) {
+            // Auto-fill số tiền còn lại khi mở modal
             const initAmount = Math.max(0, Number(defaultAmount || 0));
             setAmountStr(initAmount > 0 ? String(initAmount) : "");
 
@@ -611,6 +683,14 @@ function QrPaymentModal({
             setError("Vui lòng nhập số tiền hợp lệ");
             return;
         }
+
+        // Validate: Tổng tiền các request "chưa thanh toán" + số tiền mới không được vượt quá số tiền cần thu
+        const totalAfterNewRequest = totalUnpaidRequests + amount;
+        if (totalAfterNewRequest > remainingAmount) {
+            setError(`Tổng số tiền các yêu cầu "chưa thanh toán" (${fmtVND(totalUnpaidRequests)}) + số tiền mới (${fmtVND(amount)}) = ${fmtVND(totalAfterNewRequest)} vượt quá số tiền cần thu (${fmtVND(remainingAmount)}). Số tiền có thể tạo thêm: ${fmtVND(Math.max(0, remainingAmount - totalUnpaidRequests))}`);
+            return;
+        }
+
         setLoading(true);
         setError("");
         try {
@@ -686,8 +766,46 @@ function QrPaymentModal({
                             value={amountStr}
                             onChange={(e) => setAmountStr(e.target.value)}
                         />
-                        <div className="text-[11px] text-slate-500">
-                            Gợi ý: {fmtVND(defaultAmount || 0)}
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 mt-1 gap-2 flex-wrap">
+                            <span className="text-slate-600">
+                                {defaultAmount > 0
+                                    ? `Gợi ý: ${fmtVND(defaultAmount)} (${readAmountVi(defaultAmount)})`
+                                    : "Chưa có gợi ý số tiền"}
+                            </span>
+                            {defaultAmount > 0 && (
+                                <div className="flex items-center gap-1">
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setAmountStr(
+                                                String(
+                                                    Math.round(
+                                                        (defaultAmount * 0.3) / 1000
+                                                    ) * 1000
+                                                )
+                                            )
+                                        }
+                                        className="inline-flex items-center justify-center rounded-md border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700 hover:bg-sky-100 hover:border-sky-300 transition-colors"
+                                    >
+                                        30%
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setAmountStr(
+                                                String(
+                                                    Math.round(
+                                                        (defaultAmount * 0.5) / 1000
+                                                    ) * 1000
+                                                )
+                                            )
+                                        }
+                                        className="inline-flex items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 transition-colors"
+                                    >
+                                        50%
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -858,17 +976,43 @@ function DispatchInfoCard({ dispatch, dispatchList = [], onAssignClick, showAssi
     const hasAssign = dispatchList && dispatchList.length > 0
         ? dispatchList.some(d => d.driver_name || d.driver_phone || d.vehicle_plate)
         : (dispatch && (dispatch.driver_name || dispatch.driver_phone || dispatch.vehicle_plate));
-    
+
     // Tính số trips chưa gán
+    // QUAN TRỌNG: Trip chỉ được coi là đã gán khi có CẢ driver_name VÀ vehicle_plate (không null, không empty)
     const assignedTripIds = new Set(
         (dispatchList || [])
-            .filter(d => d.tripId && d.driver_name && d.vehicle_plate)
+            .filter(d => {
+                const hasDriver = d.driver_name && d.driver_name.trim() !== '';
+                const hasVehicle = d.vehicle_plate && d.vehicle_plate.trim() !== '';
+                return d.tripId && hasDriver && hasVehicle;
+            })
             .map(d => d.tripId)
     );
-    
+
+    // Đếm số trips chưa gán
+    // Trip chưa gán nếu:
+    // 1. Không có trong danh sách đã gán, HOẶC
+    // 2. Có trong dispatchList nhưng thiếu driver hoặc vehicle
     const unassignedCount = (allTrips || []).filter(t => {
         const tripId = t.id || t.tripId;
-        return tripId && !assignedTripIds.has(tripId);
+        if (!tripId) return false;
+
+        // Kiểm tra xem có trong danh sách đã gán không
+        if (assignedTripIds.has(tripId)) {
+            return false; // Đã gán đủ
+        }
+
+        // Kiểm tra trong dispatchList xem có thiếu driver hoặc vehicle không
+        const dispatch = (dispatchList || []).find(d => d.tripId === tripId);
+        if (dispatch) {
+            const hasDriver = dispatch.driver_name && dispatch.driver_name.trim() !== '';
+            const hasVehicle = dispatch.vehicle_plate && dispatch.vehicle_plate.trim() !== '';
+            // Nếu thiếu một trong hai thì coi là chưa gán
+            return !hasDriver || !hasVehicle;
+        }
+
+        // Không có trong dispatchList → chưa gán
+        return true;
     }).length;
 
     if (!hasAssign) {
@@ -993,25 +1137,32 @@ function DispatchInfoCard({ dispatch, dispatchList = [], onAssignClick, showAssi
                         </div>
 
                         {/* Trạng thái điều phối */}
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex flex-col gap-1">
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex flex-col gap-2">
                             <div className="text-[11px] uppercase tracking-wide font-medium text-slate-500">
-                                Trạng thái điều
-                                phối
+                                Trạng thái điều phối
                             </div>
                             <div className="text-sm font-medium text-info-700 flex items-center gap-2">
                                 <CheckCircle2 className="h-4 w-4 text-info-600" />
-                                <span>
-                                    Đã phân xe
-                                </span>
+                                <span>Đã phân xe</span>
                             </div>
                             <div className="text-[11px] text-slate-500 leading-relaxed">
-                                Hệ thống đã gửi
-                                thông tin chuyến
-                                cho tài xế.
+                                Hệ thống đã gửi thông tin chuyến cho tài xế.
                             </div>
+
+                            {/* Nút đổi tài xế/xe cho Coordinator khi đơn ở trạng thái đã phân xe */}
+                            {showAssignButton && (
+                                <button
+                                    type="button"
+                                    onClick={onAssignClick}
+                                    className="mt-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-[12px] font-medium text-slate-700 hover:border-sky-500 hover:text-sky-700 hover:bg-sky-50 transition-colors"
+                                >
+                                    <Truck className="h-3.5 w-3.5 text-sky-600" />
+                                    <span>Đổi tài xế / xe</span>
+                                </button>
+                            )}
                         </div>
                     </div>
-                    
+
                     {/* Nút gán cho xe còn lại nếu có trips chưa gán */}
                     {unassignedCount > 0 && showAssignButton && (
                         <div className="rounded-xl border border-info-200 bg-info-50 p-3 flex items-center justify-between">
@@ -1032,7 +1183,7 @@ function DispatchInfoCard({ dispatch, dispatchList = [], onAssignClick, showAssi
                     )}
                 </div>
             )}
-            
+
             {/* Nút gán cho xe còn lại nếu có nhiều xe và còn trips chưa gán */}
             {displayList.length > 1 && unassignedCount > 0 && showAssignButton && (
                 <div className="rounded-xl border border-info-200 bg-info-50 p-3 flex items-center justify-between">
@@ -1059,12 +1210,24 @@ function DispatchInfoCard({ dispatch, dispatchList = [], onAssignClick, showAssi
 export default function OrderDetailPage() {
     const { toasts, push } = useToasts();
     const { orderId } = useParams();
+    const navigate = useNavigate();
 
     // Check role - ẩn phần thanh toán cho Consultant và Accountant
     const currentRole = React.useMemo(() => getCurrentRole(), []);
     const isConsultant = currentRole === ROLES.CONSULTANT;
     const isAccountant = currentRole === ROLES.ACCOUNTANT;
     const isCoordinator = currentRole === ROLES.COORDINATOR;
+
+    // Xác định route quay về dựa trên role
+    const getBackRoute = () => {
+        if (isAccountant) return "/accountant/orders";
+        if (isCoordinator) return "/coordinator/orders";
+        return "/orders"; // Consultant hoặc default
+    };
+
+    const handleBack = () => {
+        navigate(getBackRoute());
+    };
 
     const [order, setOrder] = React.useState(null);
     const [loading, setLoading] = React.useState(true);
@@ -1079,11 +1242,11 @@ export default function OrderDetailPage() {
         const vehicleCount = Array.isArray(b.vehicles) ? b.vehicles.reduce((sum, v) => sum + (v.quantity || 0), 0) : 0;
         const vehicleCategory = Array.isArray(b.vehicles) && b.vehicles.length ? b.vehicles[0].categoryName : "";
         // Tính tổng sức chứa từ vehicles
-        const totalCapacity = Array.isArray(b.vehicles) 
-            ? b.vehicles.reduce((sum, v) => sum + ((v.capacity || 0) * (v.quantity || 1)), 0) 
+        const totalCapacity = Array.isArray(b.vehicles)
+            ? b.vehicles.reduce((sum, v) => sum + ((v.capacity || 0) * (v.quantity || 1)), 0)
             : 0;
         // Chi tiết các loại xe
-        const vehicleDetails = Array.isArray(b.vehicles) 
+        const vehicleDetails = Array.isArray(b.vehicles)
             ? b.vehicles.map(v => ({
                 name: v.categoryName || '',
                 quantity: v.quantity || 1,
@@ -1093,10 +1256,10 @@ export default function OrderDetailPage() {
         const discount = Number(b.discountAmount || 0);
         const basePrice = Number(b.estimatedCost || 0);
         const finalPrice = Number(b.totalCost || 0);
-        
+
         // Map tất cả trips với thông tin tài xế/xe
         // Lấy danh sách vehicle categories từ booking để map với từng trip
-        const vehicleCategories = Array.isArray(b.vehicles) 
+        const vehicleCategories = Array.isArray(b.vehicles)
             ? b.vehicles.flatMap(v => {
                 const qty = v.quantity || 1;
                 return Array(qty).fill(v.categoryName || '');
@@ -1106,20 +1269,23 @@ export default function OrderDetailPage() {
             Array.isArray(b.vehicles) && b.vehicles.length > 1
                 ? new Set(b.vehicles.map(v => v.categoryName || '')).size > 1
                 : false;
-        
+
         const dispatchList = trips.map((trip, idx) => ({
             tripId: trip.id || trip.tripId || null,
             driver_name: trip.driverName || '',
             driver_phone: trip.driverPhone || '',
+            // Id tài xế/xe hiện tại (dùng cho reassign để lọc khỏi dropdown)
+            driver_id: trip.driverId || trip.driver_id || null,
             vehicle_plate: trip.vehicleLicensePlate || '',
-            vehicle_id: trip.vehicleId || null,
+            vehicle_id: trip.vehicleId || trip.vehicle_id || null,
             vehicle_category: idx < vehicleCategories.length ? vehicleCategories[idx] : '',
         }));
-        
+
         return {
             id: b.id,
             code: `ORD-${b.id}`,
             status: b.status === 'CONFIRMED' ? 'ASSIGNED' : (b.status || 'PENDING'),
+            originalStatus: b.status, // Lưu status gốc từ backend để dùng cho logic check
             branchId: b.branchId,
             customerId: b.customer?.id,
             customer: {
@@ -1175,7 +1341,17 @@ export default function OrderDetailPage() {
         setLoading(true);
         try {
             const data = await getBooking(orderId);
+            console.log(`[OrderDetailPage] Booking data from API:`, {
+                id: data?.id,
+                status: data?.status,
+                originalStatus: data?.status, // Status từ backend
+            });
             const mapped = mapBookingToOrder(data);
+            console.log(`[OrderDetailPage] Mapped order:`, {
+                id: mapped?.id,
+                status: mapped?.status,
+                originalStatus: mapped?.originalStatus,
+            });
             setOrder(mapped);
         } catch (e) {
             push('Không tải được chi tiết đơn hàng', 'error');
@@ -1220,26 +1396,51 @@ export default function OrderDetailPage() {
     const handleAssignSuccess = async (payload) => {
         try {
             await fetchOrder();
-            
+
             // Kiểm tra xem còn trips chưa gán không
             const updatedOrder = await getBooking(orderId);
             const mapped = mapBookingToOrder(updatedOrder);
             const allTrips = mapped.trips || [];
             const dispatchList = mapped.dispatchList || [];
-            
+
             // Tạo map của trips đã gán
+            // QUAN TRỌNG: Trip chỉ được coi là đã gán khi có CẢ driver_name VÀ vehicle_plate (không null, không empty)
             const assignedTripIds = new Set(
                 dispatchList
-                    .filter(d => d.tripId && d.driver_name && d.vehicle_plate)
+                    .filter(d => {
+                        const hasDriver = d.driver_name && d.driver_name.trim() !== '';
+                        const hasVehicle = d.vehicle_plate && d.vehicle_plate.trim() !== '';
+                        return d.tripId && hasDriver && hasVehicle;
+                    })
                     .map(d => d.tripId)
             );
-            
+
             // Lọc ra trips chưa gán
+            // Trip chưa gán nếu:
+            // 1. Không có trong danh sách đã gán, HOẶC
+            // 2. Có trong dispatchList nhưng thiếu driver hoặc vehicle
             const unassignedTrips = allTrips.filter(t => {
                 const tripId = t.id || t.tripId;
-                return tripId && !assignedTripIds.has(tripId);
+                if (!tripId) return false;
+
+                // Kiểm tra xem có trong danh sách đã gán không
+                if (assignedTripIds.has(tripId)) {
+                    return false; // Đã gán đủ
+                }
+
+                // Kiểm tra trong dispatchList xem có thiếu driver hoặc vehicle không
+                const dispatch = dispatchList.find(d => d.tripId === tripId);
+                if (dispatch) {
+                    const hasDriver = dispatch.driver_name && dispatch.driver_name.trim() !== '';
+                    const hasVehicle = dispatch.vehicle_plate && dispatch.vehicle_plate.trim() !== '';
+                    // Nếu thiếu một trong hai thì coi là chưa gán
+                    return !hasDriver || !hasVehicle;
+                }
+
+                // Không có trong dispatchList → chưa gán
+                return true;
             });
-            
+
             if (unassignedTrips.length > 0) {
                 // Còn trips chưa gán - tự động mở lại dialog sau 1 giây
                 push(`Đã gán chuyến thành công. Còn ${unassignedTrips.length} chuyến chưa gán.`, "info");
@@ -1291,6 +1492,22 @@ export default function OrderDetailPage() {
         [order?.id, orderId, fetchPayments, push]
     );
 
+    const handleDeletePayment = React.useCallback(
+        async (paymentId) => {
+            if (!paymentId) return;
+            try {
+                const { deletePayment } = await import("../../api/invoices");
+                await deletePayment(paymentId);
+                await fetchPayments();
+                push('Đã hủy yêu cầu thanh toán', 'success');
+            } catch (e) {
+                const apiMessage = e?.data?.message || e?.message;
+                push(apiMessage || 'Hủy yêu cầu thanh toán thất bại', 'error');
+            }
+        },
+        [fetchPayments, push]
+    );
+
     // header summary numbers
     const finalPrice = order?.quote?.final_price || 0;
     const paid = order?.payment?.paid || 0;
@@ -1312,6 +1529,19 @@ export default function OrderDetailPage() {
             {/* HEADER */}
             <div className="flex flex-col lg:flex-row lg:items-start gap-4 mb-6">
                 <div className="flex-1 flex flex-col gap-2">
+                    {/* Back button */}
+                    <div className="mb-2">
+                        <button
+                            type="button"
+                            onClick={handleBack}
+                            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+                            title="Quay về danh sách đơn hàng"
+                        >
+                            <ArrowLeft className="h-4 w-4" />
+                            <span>Quay về</span>
+                        </button>
+                    </div>
+
                     {/* title row */}
                     <div className="flex flex-wrap items-start gap-3">
                         <div className="text-[20px] font-semibold text-slate-900 flex items-center gap-2">
@@ -1367,14 +1597,14 @@ export default function OrderDetailPage() {
                     {/* cảnh báo nếu huỷ / nháp */}
                     {(order.status === "CANCELLED" ||
                         order.status === "DRAFT") && (
-                            <div className="flex max-w-fit items-start gap-2 rounded-md border border-info-200 bg-info-50 px-2 py-1 text-[11px] text-info-700">
-                                <AlertTriangle className="h-3.5 w-3.5 text-info-600 shrink-0" />
-                                <span className="leading-relaxed">
+                        <div className="flex max-w-fit items-start gap-2 rounded-md border border-info-200 bg-info-50 px-2 py-1 text-[11px] text-info-700">
+                            <AlertTriangle className="h-3.5 w-3.5 text-info-600 shrink-0" />
+                            <span className="leading-relaxed">
                                     Đơn chưa xác nhận. Cần
                                     chốt lại với khách.
                                 </span>
-                            </div>
-                        )}
+                        </div>
+                    )}
                 </div>
 
                 {/* Bỏ bảng thanh toán summary - thông tin đã có trong PaymentInfoCard */}
@@ -1385,8 +1615,8 @@ export default function OrderDetailPage() {
                 <CustomerInfoCard
                     customer={order.customer}
                 />
-                <TripInfoCard 
-                    trip={order.trip} 
+                <TripInfoCard
+                    trip={order.trip}
                     hireTypeName={order.hireTypeName}
                     useHighway={order.useHighway}
                 />
@@ -1403,6 +1633,8 @@ export default function OrderDetailPage() {
                         isConsultant={isConsultant}
                         isCoordinator={isCoordinator}
                         pickupTime={order.trip?.pickup_time}
+                        onDeletePayment={handleDeletePayment}
+                        onRefreshPayments={fetchPayments}
                     />
                 )}
             </div>
@@ -1443,35 +1675,57 @@ export default function OrderDetailPage() {
                 // Lọc ra các trips chưa gán (không có driver hoặc vehicle trong dispatchList)
                 const allTrips = order.trips || [];
                 const dispatchList = order.dispatchList || [];
-                
-                // Tạo map của trips đã gán (có driver và vehicle)
+
+                // Tạo map của trips đã gán (có driver VÀ vehicle)
+                // QUAN TRỌNG: Trip chỉ được coi là đã gán khi có CẢ driver_name VÀ vehicle_plate (không null, không empty)
                 const assignedTripIds = new Set(
                     dispatchList
                         .filter(d => {
-                            // Trip được coi là đã gán nếu có cả driver_name và vehicle_plate
-                            return d.tripId && d.driver_name && d.vehicle_plate;
+                            // Trip được coi là đã gán nếu có cả driver_name và vehicle_plate (không null, không empty string)
+                            const hasDriver = d.driver_name && d.driver_name.trim() !== '';
+                            const hasVehicle = d.vehicle_plate && d.vehicle_plate.trim() !== '';
+                            return d.tripId && hasDriver && hasVehicle;
                         })
                         .map(d => d.tripId)
                 );
-                
+
                 // Lọc ra trips chưa gán
+                // Trip chưa gán nếu:
+                // 1. Không có trong danh sách đã gán, HOẶC
+                // 2. Có trong dispatchList nhưng thiếu driver hoặc vehicle
                 const unassignedTrips = allTrips.filter(t => {
                     const tripId = t.id || t.tripId;
-                    // Trip chưa gán nếu không có trong danh sách đã gán
-                    return tripId && !assignedTripIds.has(tripId);
+                    if (!tripId) return false;
+
+                    // Kiểm tra xem có trong danh sách đã gán không
+                    if (assignedTripIds.has(tripId)) {
+                        return false; // Đã gán đủ
+                    }
+
+                    // Kiểm tra trong dispatchList xem có thiếu driver hoặc vehicle không
+                    const dispatch = dispatchList.find(d => d.tripId === tripId);
+                    if (dispatch) {
+                        const hasDriver = dispatch.driver_name && dispatch.driver_name.trim() !== '';
+                        const hasVehicle = dispatch.vehicle_plate && dispatch.vehicle_plate.trim() !== '';
+                        // Nếu thiếu một trong hai thì coi là chưa gán
+                        return !hasDriver || !hasVehicle;
+                    }
+
+                    // Không có trong dispatchList → chưa gán
+                    return true;
                 });
-                
+
                 const unassignedTripIds = unassignedTrips.map(t => {
                     const tripId = t.id || t.tripId;
                     return tripId ? Number(tripId) : null;
                 }).filter(id => id !== null);
-                
+
                 // Nếu không có trip nào chưa gán, dùng trip đầu tiên (fallback)
                 const firstUnassignedTrip = unassignedTrips[0];
-                const defaultTripId = firstUnassignedTrip 
+                const defaultTripId = firstUnassignedTrip
                     ? (firstUnassignedTrip.id || firstUnassignedTrip.tripId)
                     : (order.trip?.id || order.trips?.[0]?.id || order.trips?.[0]?.tripId);
-                
+
                 // Tìm đúng vehicle_category của trip đang được gán
                 let vehicleCategoryForTrip = order.trip?.vehicle_category; // Fallback
                 if (defaultTripId && order.dispatchList) {
@@ -1487,7 +1741,7 @@ export default function OrderDetailPage() {
                         vehicleCategoryForTrip = order.dispatchList[tripIndex].vehicle_category;
                     }
                 }
-                
+
                 return (
                     <AssignDriverDialog
                         open={assignDialogOpen}
@@ -1496,11 +1750,33 @@ export default function OrderDetailPage() {
                             bookingId: order.id,
                             tripId: defaultTripId,
                             tripIds: unassignedTripIds.length > 0 ? unassignedTripIds : undefined,
+                            // Truyền đầy đủ thông tin chi tiết của các trip chưa gán
+                            trips: unassignedTrips,
                             code: order.code,
+                            status: (() => {
+                                const statusToUse = order.originalStatus || order.status;
+                                console.log(`[OrderDetailPage] Passing status to AssignDriverDialog:`, {
+                                    originalStatus: order.originalStatus,
+                                    mappedStatus: order.status,
+                                    statusToUse,
+                                });
+                                return statusToUse;
+                            })(), // QUAN TRỌNG: Dùng originalStatus (từ backend) để check, fallback về status nếu không có
                             pickup_time: order.trip?.pickup_time,
                             vehicle_type: vehicleCategoryForTrip,
                             vehicle_count: order.trip?.vehicle_count || 1,
                             branch_name: order.branch_name,
+                            // Thông tin tài xế/xe hiện tại của trip đang chọn (dùng cho reassign)
+                            driverId: (() => {
+                                if (!defaultTripId || !order.dispatchList) return null;
+                                const d = order.dispatchList.find(x => x.tripId === defaultTripId);
+                                return d && d.driver_id ? Number(d.driver_id) : null;
+                            })(),
+                            vehicleId: (() => {
+                                if (!defaultTripId || !order.dispatchList) return null;
+                                const d = order.dispatchList.find(x => x.tripId === defaultTripId);
+                                return d && d.vehicle_id ? Number(d.vehicle_id) : null;
+                            })(),
                         }}
                         onClose={() => setAssignDialogOpen(false)}
                         onAssigned={handleAssignSuccess}
@@ -1518,6 +1794,8 @@ export default function OrderDetailPage() {
                         defaultAmount={remain}
                         onClose={() => setQrModalOpen(false)}
                         onGenerate={handleQrGenerate}
+                        paymentHistory={paymentHistory}
+                        remainingAmount={remain}
                     />
 
                     {/* Deposit / Payment modal */}

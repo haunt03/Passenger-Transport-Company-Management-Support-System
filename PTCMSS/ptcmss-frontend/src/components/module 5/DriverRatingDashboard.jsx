@@ -237,9 +237,9 @@ const DriverRatingDashboard = () => {
                                     {index < 3 && sortBy === 'rating' && avgRating > 0 && (
                                         <div className="flex justify-end mb-2">
                                             <span className={`px-2 py-1 rounded-full text-xs font-bold ${index === 0 ? 'bg-primary-100 text-primary-800' :
-                                                    index === 1 ? 'bg-gray-100 text-gray-800' :
-                                                        'bg-orange-100 text-orange-800'
-                                                }`}>
+                                                index === 1 ? 'bg-gray-100 text-gray-800' :
+                                                    'bg-orange-100 text-orange-800'
+                                            }`}>
                                                 #{index + 1}
                                             </span>
                                         </div>
