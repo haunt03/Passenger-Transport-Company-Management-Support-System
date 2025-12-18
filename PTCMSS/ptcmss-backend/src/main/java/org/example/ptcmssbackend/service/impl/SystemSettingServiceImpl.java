@@ -6,8 +6,8 @@ import org.example.ptcmssbackend.dto.response.SystemSetting.SystemSettingRespons
 import org.example.ptcmssbackend.entity.Employees;
 import org.example.ptcmssbackend.entity.SystemSetting;
 import org.example.ptcmssbackend.enums.SettingStatus;
-import org.example.ptcmssbackend.repository.SystemSettingRepository;
 import org.example.ptcmssbackend.repository.EmployeeRepository;
+import org.example.ptcmssbackend.repository.SystemSettingRepository;
 import org.example.ptcmssbackend.service.SystemSettingService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,7 +41,7 @@ public class SystemSettingServiceImpl implements SystemSettingService {
     @Override
     public SystemSettingResponse getByKey(String settingKey) {
         SystemSetting setting = systemSettingRepository
-                .findBySettingKeyAndStatus(settingKey, org.example.ptcmssbackend.enums.SettingStatus.ACTIVE)
+                .findBySettingKeyAndStatus(settingKey, SettingStatus.ACTIVE)
                 .orElse(null);
         if (setting == null) {
             return null;

@@ -757,7 +757,6 @@ public class AnalyticsService {
                                         WHERE i.type = 'EXPENSE'
                                           AND i.status = 'ACTIVE'
                                           AND i.paymentStatus IN ('PAID', 'UNPAID')
-                                          AND i.costType IN ('fuel', 'toll', 'maintenance')
                                           AND i.branchId = ?
                                           AND i.invoiceDate BETWEEN ? AND ?
                                         GROUP BY tv.vehicleId
@@ -791,19 +790,18 @@ public class AnalyticsService {
                 Instant startInstant = startDate.atZone(ZoneId.systemDefault()).toInstant();
                 Instant endInstant = endDate.atZone(ZoneId.systemDefault()).toInstant();
 
+                // costType đã bị xóa - trả về tổng tất cả expenses không phân loại
                 String sql = "SELECT " +
-                                "i.costType, " +
+                                "'OTHER' as category, " +
                                 "COALESCE(SUM(i.amount), 0) as totalAmount, " +
                                 "COUNT(*) as count " +
                                 "FROM invoices i " +
                                 "WHERE i.status = 'ACTIVE' AND i.type = 'EXPENSE' " +
                                 "AND i.branchId = ? AND i.invoiceDate BETWEEN ? AND ? " +
-                                "GROUP BY i.costType " +
                                 "ORDER BY totalAmount DESC";
 
                 return jdbcTemplate.query(sql, (rs, rowNum) -> Map.of(
-                                "category",
-                                rs.getString("costType") != null ? rs.getString("costType") : "UNCATEGORIZED",
+                                "category", rs.getString("category"),
                                 "totalAmount", rs.getBigDecimal("totalAmount"),
                                 "count", rs.getLong("count")), branchId, startInstant, endInstant);
         }
