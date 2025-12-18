@@ -37,11 +37,11 @@ import { getAssignmentSuggestions, assignTrips, reassignTrips } from "../../api/
 // Endpoints đã được chuyển sang sử dụng API functions từ dispatch.js
 
 export default function AssignDriverDialog({
-                                               open,
-                                               order,
-                                               onClose,
-                                               onAssigned,
-                                           }) {
+    open,
+    order,
+    onClose,
+    onAssigned,
+}) {
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState("");
     const [suggestions, setSuggestions] = React.useState([]); // [{driver, vehicle, score, reasons[]}]
@@ -651,13 +651,11 @@ export default function AssignDriverDialog({
             onClick={onClose}
         >
             <div
-                className="w-full max-w-3xl rounded-2xl bg-white border border-slate-200 text-slate-900 shadow-2xl"
-                onClick={(e) =>
-                    e.stopPropagation()
-                }
+                className="w-full max-w-3xl max-h-[90vh] rounded-2xl bg-white border border-slate-200 text-slate-900 shadow-2xl flex flex-col"
+                onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-200">
+                <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-200 flex-shrink-0">
                     <Sparkles className="h-5 w-5 text-primary-600" />
                     <div className="font-semibold text-slate-900 text-sm">
                         Gán chuyến (Assign
@@ -673,8 +671,9 @@ export default function AssignDriverDialog({
                     </button>
                 </div>
 
-                {/* Summary */}
-                <div className="px-5 pt-4">
+                {/* Scrollable content (Summary + Body) */}
+                <div className="px-5 pt-4 pb-4 space-y-5 overflow-y-auto flex-1">
+                    {/* Summary */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[13px]">
                         <div className="flex items-center gap-2">
                             <CalendarDays className="h-4 w-4 text-slate-500" />
@@ -695,9 +694,9 @@ export default function AssignDriverDialog({
                             </span>
                             <span className="text-slate-900 font-medium">
                                 {summary?.vehicleType ||
-                                    order?.vehicle_type ||
-                                    order?.vehicleType ||
-                                    "—"}
+                                 order?.vehicle_type ||
+                                 order?.vehicleType ||
+                                 "—"}
                                 {/* Chỉ hiển thị số lượng nếu đang gán cho nhiều trips cùng loại xe */}
                                 {assignToAllTrips && unassignedTripCount > 1 && !hasMixedVehicleCategories && ` (${unassignedTripCount} xe)`}
                             </span>
@@ -710,9 +709,9 @@ export default function AssignDriverDialog({
                             </span>
                             <span className="text-slate-900 font-medium">
                                 {order?.branch_name ||
-                                    order?.branchName ||
-                                    summary?.branchName ||
-                                    "—"}
+                                 order?.branchName ||
+                                 summary?.branchName ||
+                                 "—"}
                             </span>
                         </div>
                     </div>
@@ -754,13 +753,11 @@ export default function AssignDriverDialog({
                             </div>
                         </div>
                     )}
-                </div>
-
                 {/* Body */}
-                <div className="p-5 space-y-5">
+                <div className="space-y-5">
                     {/* Suggestions block */}
                     <div className="rounded-xl border border-slate-200 overflow-hidden bg-white shadow-sm">
-                        <div className="px-3 py-2 text-[11px] text-slate-500 border-b border-slate-200 bg-slate-50 font-medium uppercase tracking-wide">
+                            <div className="px-3 py-2 text-[11px] text-slate-500 border-b border-slate-200 bg-slate-50 font-medium uppercase tracking-wide">
                             Gợi ý hệ thống
                         </div>
 
@@ -779,7 +776,7 @@ export default function AssignDriverDialog({
                                 Đang tải gợi ý…
                             </div>
                         ) : suggestions.length ===
-                        0 ? (
+                            0 ? (
                             <div className="px-3 py-6 text-[13px] text-slate-500 flex items-center gap-2">
                                 <AlertTriangle className="h-4 w-4 text-primary-600" />
                                 <span>
@@ -823,22 +820,22 @@ export default function AssignDriverDialog({
                                                                 }
                                                             >
                                                                 {s
-                                                                        ?.driver
-                                                                        ?.name ||
+                                                                    ?.driver
+                                                                    ?.name ||
                                                                     "—"}
                                                             </span>
                                                             {s
                                                                 ?.driver
                                                                 ?.id && (
-                                                                <span className="text-[11px] text-slate-500 font-normal">
+                                                                    <span className="text-[11px] text-slate-500 font-normal">
                                                                         #
-                                                                    {
-                                                                        s
-                                                                            .driver
-                                                                            .id
-                                                                    }
+                                                                        {
+                                                                            s
+                                                                                .driver
+                                                                                .id
+                                                                        }
                                                                     </span>
-                                                            )}
+                                                                )}
                                                         </div>
 
                                                         {/* vehicle */}
@@ -853,22 +850,22 @@ export default function AssignDriverDialog({
                                                                 }
                                                             >
                                                                 {s
-                                                                        ?.vehicle
-                                                                        ?.plate ||
+                                                                    ?.vehicle
+                                                                    ?.plate ||
                                                                     "—"}
                                                             </span>
                                                             {s
                                                                 ?.vehicle
                                                                 ?.type && (
-                                                                <span className="text-[11px] text-slate-500 font-normal">
+                                                                    <span className="text-[11px] text-slate-500 font-normal">
                                                                         ·{" "}
-                                                                    {
-                                                                        s
-                                                                            .vehicle
-                                                                            .type
-                                                                    }
+                                                                        {
+                                                                            s
+                                                                                .vehicle
+                                                                                .type
+                                                                        }
                                                                     </span>
-                                                            )}
+                                                                )}
                                                         </div>
 
                                                         {/* score - chỉ hiển thị nếu có lịch sử với khách hàng */}
@@ -889,8 +886,8 @@ export default function AssignDriverDialog({
 
                                                     {/* reasons */}
                                                     {Array.isArray(
-                                                            s?.reasons
-                                                        ) &&
+                                                        s?.reasons
+                                                    ) &&
                                                         s
                                                             .reasons
                                                             .length >
@@ -932,7 +929,7 @@ export default function AssignDriverDialog({
                                                 item.tripId
                                         ) || {
                                             tripId:
-                                            item.tripId,
+                                                item.tripId,
                                             driverId:
                                                 "",
                                             vehicleId:
@@ -1228,9 +1225,10 @@ export default function AssignDriverDialog({
                         )}
                     </div>
                 </div>
+                </div>
 
                 {/* Footer actions */}
-                <div className="px-5 py-4 border-t border-slate-200 flex flex-wrap items-center gap-2 justify-end text-[13px]">
+                <div className="px-5 py-4 border-t border-slate-200 flex flex-wrap items-center gap-2 justify-end text-[13px] flex-shrink-0">
                     {/* Auto-assign */}
                     <button
                         disabled={
@@ -1242,9 +1240,9 @@ export default function AssignDriverDialog({
                         className={`
                             rounded-md px-3 py-2 border text-[13px] font-medium flex items-center gap-1
                             ${autoPosting
-                            ? "opacity-60 cursor-not-allowed border-info-300 text-primary-400 bg-white"
-                            : "border-sky-500 text-sky-700 bg-white hover:bg-sky-50"
-                        }
+                                ? "opacity-60 cursor-not-allowed border-info-300 text-primary-400 bg-white"
+                                : "border-sky-500 text-sky-700 bg-white hover:bg-sky-50"
+                            }
                         `}
                     >
                         {autoPosting ? (
@@ -1269,9 +1267,9 @@ export default function AssignDriverDialog({
                         className={`
                             rounded-md px-3 py-2 border text-[13px] font-medium flex items-center gap-1
                             ${canConfirm
-                            ? "border-sky-600 text-sky-700 bg-white hover:bg-sky-50"
-                            : "opacity-60 cursor-not-allowed border-slate-300 text-slate-400 bg-white"
-                        }
+                                ? "border-sky-600 text-sky-700 bg-white hover:bg-sky-50"
+                                : "opacity-60 cursor-not-allowed border-slate-300 text-slate-400 bg-white"
+                            }
                         `}
                     >
                         <Check className="h-4 w-4 text-sky-600" />
