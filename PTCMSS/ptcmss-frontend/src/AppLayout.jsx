@@ -10,6 +10,7 @@ import {
     DollarSign,
     BarChart3,
     ChevronRight,
+    ChevronLeft,
     ChevronDown,
     Bell,
     Search,
@@ -18,6 +19,8 @@ import {
     Briefcase,
     AlertTriangle,
     FileText,
+    Bus, // Icon cho logo - vận tải hành khách
+    // Các icon khác có thể dùng: Navigation, Route, Truck, Car, MapPin
 } from "lucide-react";
 import { logout as apiLogout } from "./api/auth";
 import {
@@ -35,39 +38,39 @@ import { useNotifications } from "./hooks/useNotifications";
 
 // Menu items cho từng role - hiển thị flat list, không dùng accordion
 const SIDEBAR_ITEMS_BY_ROLE = {
-    // Consultant (Tư vấn viên - 5 options)
+    // Consultant (Tư vấn viên - 7 options)
     [ROLES.CONSULTANT]: [
-        { label: "Bảng điều khiển", to: "/orders/dashboard", icon: LayoutDashboard },
+        { label: "Bảng điều khiển", to: "/orders/dashboard", icon: LayoutDashboard, exact: true },
         { label: "Danh sách đơn hàng", to: "/orders", icon: ClipboardList },
         { label: "Tạo đơn hàng", to: "/orders/new", icon: ClipboardList },
+        { label: "Danh sách khách hàng", to: "/consultant/customers", icon: Users },
         { label: "Danh sách xe", to: "/consultant/vehicles", icon: CarFront },
         { label: "Danh sách tài xế", to: "/consultant/drivers", icon: Users },
+        { label: "Đánh giá tài xế", to: "/consultant/ratings", icon: BarChart3 },
     ],
     // Driver (Tài xế - 8 options)
     [ROLES.DRIVER]: [
-        { label: "Bảng điều khiển", to: "/driver/dashboard", icon: LayoutDashboard },
+        { label: "Bảng điều khiển", to: "/driver/dashboard", icon: LayoutDashboard, exact: true },
         { label: "Lịch làm việc", to: "/driver/schedule", icon: CalendarClock },
         { label: "Danh sách chuyến", to: "/driver/trips-list", icon: ClipboardList },
         { label: "Quản lý sự cố", to: "/driver/incidents", icon: AlertTriangle },
         { label: "Xin nghỉ phép", to: "/driver/leave-request", icon: CalendarClock },
-        { label: "Yêu cầu thanh toán chi phí", to: "/driver/expense-request", icon: DollarSign },
         { label: "Danh sách yêu cầu", to: "/driver/requests", icon: ClipboardList },
         { label: "Hồ sơ tài xế", to: "/driver/profile", icon: Users },
     ],
     // Coordinator (Điều phối viên - 7 options)
     [ROLES.COORDINATOR]: [
-        { label: "Bảng điều khiển", to: "/dispatch", icon: LayoutDashboard },
+        { label: "Bảng điều khiển", to: "/dispatch", icon: LayoutDashboard, exact: true },
         { label: "Cảnh báo chờ duyệt", to: "/dispatch/notifications-dashboard", icon: Bell },
         { label: "Sự cố chuyến đi", to: "/dispatch/incidents", icon: AlertTriangle },
         { label: "Danh sách đơn", to: "/coordinator/orders", icon: ClipboardList },
         { label: "Danh sách tài xế", to: "/coordinator/drivers", icon: Users },
         { label: "Danh sách xe", to: "/coordinator/vehicles", icon: CarFront },
         { label: "Quản lý yêu cầu", to: "/coordinator/expense-management", icon: DollarSign },
-        { label: "Đánh giá tài xế", to: "/dispatch/ratings", icon: BarChart3 },
     ],
     // Accountant (Kế toán - 8 options)
     [ROLES.ACCOUNTANT]: [
-        { label: "Bảng điều khiển", to: "/accounting", icon: LayoutDashboard },
+        { label: "Bảng điều khiển", to: "/accounting", icon: LayoutDashboard, exact: true },
         { label: "Báo cáo doanh thu", to: "/accounting/revenue-report", icon: BarChart3 },
         { label: "Báo cáo chi phí", to: "/accounting/expenses", icon: DollarSign },
         { label: "Danh sách hóa đơn", to: "/accounting/invoices", icon: ClipboardList },
@@ -76,11 +79,13 @@ const SIDEBAR_ITEMS_BY_ROLE = {
         { label: "Danh sách nhân viên", to: "/accountant/users", icon: Users },
         { label: "Danh sách xe", to: "/accountant/vehicles", icon: CarFront },
     ],
-    // Manager (Quản lý - 6 options)
+    // Manager (Quản lý - 9 options)
     [ROLES.MANAGER]: [
-        { label: "Bảng điều khiển", to: "/analytics/manager", icon: LayoutDashboard },
+        { label: "Bảng điều khiển", to: "/analytics/manager", icon: LayoutDashboard, exact: true },
         { label: "Báo cáo doanh thu", to: "/accounting/revenue-report", icon: BarChart3 },
         { label: "Báo cáo chi phí", to: "/accounting/expenses", icon: DollarSign },
+        { label: "Danh sách đơn hàng", to: "/manager/orders", icon: ClipboardList },
+        { label: "Danh sách tài xế", to: "/manager/drivers", icon: Users },
         { label: "Danh sách nhân viên", to: "/admin/users", icon: Users },
         { label: "Danh sách xe", to: "/vehicles", icon: CarFront },
         { label: "Danh sách khách hàng", to: "/manager/customers", icon: Users },
@@ -184,41 +189,154 @@ import ManagerDashboardPro from "./components/module 7/ManagerDashboard.jsx";
    - Flat list menu - không dùng accordion
    - Mỗi role có menu items riêng
 --------------------------------------------------- */
-function SidebarNav() {
+function SidebarNav({ collapsed = false, onToggleSidebar }) {
     const role = useRole();
     const location = useLocation();
+
+    // Load pending payment count for Accountant
+    const [pendingPaymentCount, setPendingPaymentCount] = React.useState(0);
+    const [pendingExpenseRequestCount, setPendingExpenseRequestCount] = React.useState(0);
+    const isAccountant = role === ROLES.ACCOUNTANT;
+
+    React.useEffect(() => {
+        if (!isAccountant) return;
+
+        let mounted = true;
+        const loadPendingCount = async () => {
+            try {
+                const { countPendingPayments } = await import("./api/invoices");
+                const count = await countPendingPayments();
+                if (mounted) {
+                    setPendingPaymentCount(Number(count) || 0);
+                }
+            } catch (err) {
+                console.error("Error loading pending payment count:", err);
+                if (mounted) {
+                    setPendingPaymentCount(0);
+                }
+            }
+        };
+
+        loadPendingCount();
+        // Refresh every 30 seconds
+        const interval = setInterval(loadPendingCount, 30000);
+
+        return () => {
+            mounted = false;
+            clearInterval(interval);
+        };
+    }, [isAccountant]);
+
+    // Load pending expense request count for Accountant
+    React.useEffect(() => {
+        if (!isAccountant) return;
+
+        let mounted = true;
+        const loadPendingExpenseCount = async () => {
+            try {
+                const { getPendingExpenseRequests } = await import("./api/expenses");
+                const { getEmployeeByUserId } = await import("./api/employees");
+                const { getStoredUserId } = await import("./utils/session");
+
+                // Get branchId for accountant
+                const userId = getStoredUserId();
+                let branchId = null;
+                if (userId) {
+                    try {
+                        const emp = await getEmployeeByUserId(Number(userId));
+                        branchId = emp?.branchId || emp?.branch?.id || emp?.branch?.branchId || null;
+                    } catch (err) {
+                        console.error("Error loading employee branch for expense count:", err);
+                    }
+                }
+
+                const response = await getPendingExpenseRequests(branchId || undefined);
+                const list = Array.isArray(response) ? response : (response?.data || response?.items || []);
+                if (mounted) {
+                    setPendingExpenseRequestCount(list.length || 0);
+                }
+            } catch (err) {
+                console.error("Error loading pending expense request count:", err);
+                if (mounted) {
+                    setPendingExpenseRequestCount(0);
+                }
+            }
+        };
+
+        loadPendingExpenseCount();
+        // Refresh every 30 seconds
+        const interval = setInterval(loadPendingExpenseCount, 30000);
+
+        return () => {
+            mounted = false;
+            clearInterval(interval);
+        };
+    }, [isAccountant]);
 
     // Lấy menu items cho role hiện tại
     const menuItems = React.useMemo(() => {
         return SIDEBAR_ITEMS_BY_ROLE[role] || [];
     }, [role]);
 
+    // Chỉ highlight mục khớp đường dẫn dài nhất để tránh chọn cả trang cha/lẫn trang con
+    const activeIndex = React.useMemo(() => {
+        let bestIdx = -1;
+        let bestLen = -1;
+        const path = location.pathname;
+        menuItems.forEach((item, idx) => {
+            const to = item.to || "";
+            if (!to) return;
+            const exact = path === to;
+            const prefix = path.startsWith(to.endsWith("/") ? to : `${to}/`);
+            if (exact || prefix) {
+                if (to.length > bestLen) {
+                    bestLen = to.length;
+                    bestIdx = idx;
+                }
+            }
+        });
+        return bestIdx;
+    }, [location.pathname, menuItems]);
+
     return (
-        <aside className="w-64 bg-white border-r border-slate-200 flex flex-col shadow-sm fixed left-0 top-0 bottom-0 z-10">
+        <aside className="bg-white border-r border-slate-200 flex flex-col shadow-sm h-screen sticky top-0">
             {/* brand / account mini */}
             <div className="px-4 py-4 border-b border-slate-200 flex items-center gap-3 bg-gradient-to-br from-white to-slate-50/50">
                 <div className="h-10 w-10 rounded-lg flex items-center justify-center text-white shadow-[0_8px_24px_rgba(0,121,188,.35)] flex-shrink-0 transition-transform duration-200 hover:scale-105 hover:shadow-[0_12px_32px_rgba(0,121,188,.45)]" style={{ backgroundColor: '#0079BC' }}>
-                    <Shield className="h-5 w-5" />
+                    <Bus className="h-5 w-5" />
                 </div>
-                <div className="flex flex-col leading-tight min-w-0 flex-1">
-                    <div className="text-slate-900 font-bold text-sm truncate">TranspoManager</div>
-                    <div className="text-[10px] text-slate-500 leading-tight">Hệ thống quản lý vận tải</div>
-                </div>
+                {!collapsed && (
+                    <div className="flex flex-col leading-tight min-w-0 flex-1">
+                        <div className="text-slate-900 font-bold text-sm truncate">TranspoManager</div>
+                        <div className="text-[10px] text-slate-500 leading-tight">Hệ thống quản lý vận tải</div>
+                    </div>
+                )}
+                {typeof onToggleSidebar === "function" && (
+                    <button
+                        type="button"
+                        onClick={onToggleSidebar}
+                        className="inline-flex items-center justify-center h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300 shadow-sm transition-colors flex-shrink-0 ml-auto"
+                        title="Ẩn/hiện menu"
+                    >
+                        {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+                    </button>
+                )}
             </div>
 
             {/* Menu items - Flat list */}
             <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1 text-sm scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent hover:scrollbar-thumb-slate-400">
                 {menuItems.map((item, index) => {
                     const Icon = item.icon;
-                    const isActive = location.pathname === item.to ||
-                        (item.to !== "/" && location.pathname.startsWith(item.to));
+                    const isActive = index === activeIndex;
 
                     return (
                         <NavLink
                             key={`${item.to}-${index}`}
                             to={item.to}
+                            end={item.exact}
                             className={({ isActive: navActive }) => {
-                                const active = navActive || isActive;
+                                // Chỉ dùng activeIndex (isActive) để tránh nhiều tab cùng sáng màu
+                                const active = isActive || (item.exact && navActive);
                                 const base = "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] transition-all duration-200 ease-in-out";
                                 if (active) {
                                     return [
@@ -241,7 +359,19 @@ function SidebarNav() {
                                         : "text-slate-500 group-hover:text-slate-700"
                                 }`} />
                             )}
-                            <span className="truncate">{item.label}</span>
+                            <span className="truncate flex-1">{item.label}</span>
+                            {/* Badge for pending payments on Invoice List */}
+                            {isAccountant && item.to === "/accounting/invoices" && pendingPaymentCount > 0 && (
+                                <span className="flex-shrink-0 ml-2 px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500 text-white min-w-[18px] text-center">
+                  {pendingPaymentCount > 99 ? "99+" : pendingPaymentCount}
+                </span>
+                            )}
+                            {/* Badge for pending expense requests */}
+                            {isAccountant && item.to === "/accounting/expense-requests" && pendingExpenseRequestCount > 0 && (
+                                <span className="flex-shrink-0 ml-2 px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500 text-white min-w-[18px] text-center">
+                  {pendingExpenseRequestCount > 99 ? "99+" : pendingExpenseRequestCount}
+                </span>
+                            )}
                         </NavLink>
                     );
                 })}
@@ -255,7 +385,7 @@ function SidebarNav() {
    - viền dưới + bóng mờ nhẹ
    - Admin info và nút đăng xuất ở bên phải
 --------------------------------------------------- */
-function Topbar() {
+function Topbar({ onToggleSidebar, sidebarCollapsed = false }) {
     const navigate = useNavigate();
     const { pushNotification } = useNotifications();
     const username = getStoredUsername() || "John Doe";
@@ -367,8 +497,10 @@ function Topbar() {
 
     return (
         <header className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-6 py-3.5 shadow-sm">
-            {/* Left side - empty or can add breadcrumb later */}
-            <div className="flex-1"></div>
+            {/* Left side - future breadcrumb */}
+            <div className="flex items-center justify-start flex-1">
+                {/* Sidebar toggle button đã được di chuyển vào SidebarNav header */}
+            </div>
 
             {/* Right side - bell (một số role) + user chip + logout */}
             <div className="flex items-center gap-2.5">
@@ -414,7 +546,7 @@ function Topbar() {
    - nền tổng thể bg-slate-50
    - vùng content scrollable
 --------------------------------------------------- */
-function ShellLayout() {
+function ShellLayout({ sidebarCollapsed = false, onToggleSidebar }) {
     let hasToken = false;
     try {
         hasToken = !!localStorage.getItem("access_token");
@@ -424,12 +556,18 @@ function ShellLayout() {
     if (!hasToken) {
         return <Navigate to="/login" replace />;
     }
+
+    // Giữ sidebar cố định và tránh cộng thêm margin khiến layout bị lệch/scroll ngang
+    const sidebarWidth = sidebarCollapsed ? "w-16" : "w-64";
+
     return (
         <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden">
-            <SidebarNav />
-            <div className="flex-1 flex flex-col min-w-0 ml-64">
-                <Topbar />
-                <main className="flex-1 overflow-y-auto min-h-0 p-5">
+            <div className={`${sidebarWidth} flex-shrink-0 transition-all duration-200`}>
+                <SidebarNav collapsed={sidebarCollapsed} onToggleSidebar={onToggleSidebar} />
+            </div>
+            <div className="flex-1 flex flex-col min-w-0">
+                <Topbar onToggleSidebar={onToggleSidebar} sidebarCollapsed={sidebarCollapsed} />
+                <main className="flex-1 overflow-y-auto min-h-0 p-0">
                     {/* Ghi chú: Một số màn con vẫn theme dark. Có thể refactor sau. */}
                     <Outlet />
                 </main>
@@ -519,6 +657,11 @@ function RequireAuth({ children }) {
    ROUTES TREE
 --------------------------------------------------- */
 export default function AppLayout() {
+    const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
+    const handleToggleSidebar = React.useCallback(() => {
+        setSidebarCollapsed((prev) => !prev);
+    }, []);
+
     return (
         <WebSocketProvider>
             <NotificationToast />
@@ -531,7 +674,7 @@ export default function AppLayout() {
                 <Route path="/" element={<RoleRedirect />} />
 
                 {/* Các route cần shell layout */}
-                <Route element={<RequireAuth><ShellLayout /></RequireAuth>}>
+                <Route element={<RequireAuth><ShellLayout sidebarCollapsed={sidebarCollapsed} onToggleSidebar={handleToggleSidebar} /></RequireAuth>}>
                     <Route index element={<RoleRedirect />} />
 
                     {/* Báo cáo & Phân tích */}
@@ -700,15 +843,6 @@ export default function AppLayout() {
                             </ProtectedRoute>
                         }
                     />
-                    <Route
-                        path="/driver/expense-request"
-                        element={
-                            <ProtectedRoute roles={[ROLES.DRIVER]}>
-                                <ExpenseRequestForm />
-                            </ProtectedRoute>
-                        }
-                    />
-
                     {/* Phương tiện */}
                     <Route
                         path="/vehicles"
@@ -839,17 +973,26 @@ export default function AppLayout() {
                         }
                     />
                     <Route
+                        path="/consultant/ratings"
+                        element={
+                            <ProtectedRoute roles={[ROLES.ADMIN, ROLES.CONSULTANT]}>
+                                <RatingManagementPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    {/* Backward compatibility: dispatch ratings now redirect to consultant view */}
+                    <Route
                         path="/dispatch/ratings"
                         element={
                             <ProtectedRoute roles={[ROLES.ADMIN, ROLES.COORDINATOR]}>
-                                <RatingManagementPage />
+                                <Navigate to="/consultant/ratings" replace />
                             </ProtectedRoute>
                         }
                     />
                     <Route
                         path="/drivers/:driverId/ratings"
                         element={
-                            <ProtectedRoute roles={[ROLES.ADMIN, ROLES.COORDINATOR]}>
+                            <ProtectedRoute roles={[ROLES.ADMIN, ROLES.CONSULTANT]}>
                                 <DriverRatingsPage />
                             </ProtectedRoute>
                         }
@@ -915,6 +1058,14 @@ export default function AppLayout() {
 
                     {/* Consultant specific routes */}
                     <Route
+                        path="/consultant/customers"
+                        element={
+                            <ProtectedRoute roles={[ROLES.CONSULTANT]}>
+                                <CustomerListPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
                         path="/consultant/vehicles"
                         element={
                             <ProtectedRoute roles={[ROLES.CONSULTANT]}>
@@ -958,6 +1109,38 @@ export default function AppLayout() {
                     />
 
                     {/* Manager specific routes */}
+                    <Route
+                        path="/manager/orders"
+                        element={
+                            <ProtectedRoute roles={[ROLES.MANAGER]}>
+                                <ConsultantOrderListPage readOnly />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/manager/drivers"
+                        element={
+                            <ProtectedRoute roles={[ROLES.MANAGER]}>
+                                <CoordinatorDriverListPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/manager/drivers/:driverId"
+                        element={
+                            <ProtectedRoute roles={[ROLES.MANAGER]}>
+                                <CoordinatorDriverDetailPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/manager/drivers/:driverId/trips"
+                        element={
+                            <ProtectedRoute roles={[ROLES.MANAGER]}>
+                                <CoordinatorDriverTripsPage />
+                            </ProtectedRoute>
+                        }
+                    />
                     <Route
                         path="/manager/customers"
                         element={

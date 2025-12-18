@@ -47,7 +47,7 @@ export default function QrPaymentSettings() {
         throw new Error("Dữ liệu ngân hàng không hợp lệ");
       }
       const sorted = [...payload.data].sort((a, b) =>
-        (a.shortName || a.name || "").localeCompare(b.shortName || b.name || "")
+          (a.shortName || a.name || "").localeCompare(b.shortName || b.name || "")
       );
       setBanks(sorted);
     } catch (err) {
@@ -163,7 +163,7 @@ export default function QrPaymentSettings() {
       });
 
       setSuccessMsg("Cập nhật cấu hình QR thành công!");
-      
+
       // Clear success message after 3s
       setTimeout(() => setSuccessMsg(""), 3000);
     } catch (error) {
@@ -178,239 +178,239 @@ export default function QrPaymentSettings() {
   const hasChanges = () => {
     if (!originalSettings) return false;
     return (
-      settings.bankCode !== originalSettings.bankCode ||
-      settings.accountNumber !== originalSettings.accountNumber ||
-      settings.accountName !== originalSettings.accountName ||
-      settings.descriptionPrefix !== originalSettings.descriptionPrefix
+        settings.bankCode !== originalSettings.bankCode ||
+        settings.accountNumber !== originalSettings.accountNumber ||
+        settings.accountName !== originalSettings.accountName ||
+        settings.descriptionPrefix !== originalSettings.descriptionPrefix
     );
   };
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg border border-slate-200 p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <QrCode className="h-5 w-5 text-emerald-600" />
-          <h3 className="text-lg font-semibold text-slate-900">Cấu hình thanh toán QR</h3>
+        <div className="bg-white rounded-lg border border-slate-200 p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <QrCode className="h-5 w-5 text-emerald-600" />
+            <h3 className="text-lg font-semibold text-slate-900">Cấu hình thanh toán QR</h3>
+          </div>
+          <div className="flex items-center justify-center py-8">
+            <RefreshCw className="h-6 w-6 text-slate-400 animate-spin" />
+            <span className="ml-2 text-slate-600">Đang tải...</span>
+          </div>
         </div>
-        <div className="flex items-center justify-center py-8">
-          <RefreshCw className="h-6 w-6 text-slate-400 animate-spin" />
-          <span className="ml-2 text-slate-600">Đang tải...</span>
-        </div>
-      </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg border border-slate-200 p-6">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <QrCode className="h-5 w-5 text-emerald-600" />
-        <h3 className="text-lg font-semibold text-slate-900">Cấu hình thanh toán QR</h3>
-      </div>
-
-      {/* Messages */}
-      {successMsg && (
-        <div className="mb-4 p-3 rounded-lg bg-emerald-50 border border-emerald-200 flex items-start gap-2">
-          <CheckCircle2 className="h-5 w-5 text-emerald-600 flex-shrink-0 mt-0.5" />
-          <span className="text-sm text-emerald-800">{successMsg}</span>
-        </div>
-      )}
-
-      {errorMsg && (
-        <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 flex items-start gap-2">
-          <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-          <span className="text-sm text-red-800">{errorMsg}</span>
-        </div>
-      )}
-
-      {/* Form */}
-      <div className="space-y-4">
-        {/* Bank Selector */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            Ngân hàng <span className="text-red-500">*</span>
-          </label>
-          <div className="flex gap-2">
-            <select
-              value={settings.bankCode && banks.find((b) => b.bin === settings.bankCode) ? settings.bankCode : ""}
-              onChange={(e) => handleBankSelect(e.target.value)}
-              className={`flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                errors.bankCode
-                  ? "border-red-300 focus:ring-red-200"
-                  : "border-slate-300 focus:ring-emerald-200"
-              }`}
-            >
-              <option value="">
-                {bankLoading ? "Đang tải danh sách..." : "Chọn ngân hàng từ VietQR"}
-              </option>
-              {banks.map((bank) => (
-                <option key={bank.bin} value={bank.bin}>
-                  {bank.shortName || bank.name} ({bank.bin})
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={loadBanks}
-              className="px-3 py-2 border border-slate-300 rounded-lg bg-white hover:bg-slate-50 text-slate-600"
-              title="Tải lại danh sách ngân hàng từ VietQR"
-            >
-              {bankLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
-            </button>
-          </div>
-          {bankError && (
-            <p className="mt-1 text-sm text-primary-600">{bankError}</p>
-          )}
-          <p className="mt-1 text-xs text-slate-500">
-            Dữ liệu lấy trực tiếp từ VietQR API. Chọn tên ngân hàng, hệ thống sẽ tự điền mã.
-          </p>
+      <div className="bg-white rounded-lg border border-slate-200 p-6">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-6">
+          <QrCode className="h-5 w-5 text-emerald-600" />
+          <h3 className="text-lg font-semibold text-slate-900">Cấu hình thanh toán QR</h3>
         </div>
 
-        {/* Bank Code */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            Mã ngân hàng <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            value={settings.bankCode}
-            placeholder="VD: 970403 (Sacombank)"
-            readOnly
-            className={`w-full px-3 py-2 border rounded-lg bg-slate-50 text-slate-700 ${
-              errors.bankCode ? "border-red-300" : "border-slate-300"
-            }`}
-          />
-          {errors.bankCode && (
-            <p className="mt-1 text-sm text-red-600">{errors.bankCode}</p>
-          )}
-          <p className="mt-1 text-xs text-slate-500">
-            Mã ngân hàng theo chuẩn VietQR (6-10 ký tự số) – tự sinh theo ngân hàng đã chọn, không chỉnh tay.
-          </p>
-        </div>
-
-        {/* Account Number */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            Số tài khoản <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            value={settings.accountNumber}
-            onChange={(e) => handleInputChange("accountNumber", e.target.value)}
-            placeholder="VD: 070122047995"
-            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-              errors.accountNumber
-                ? "border-red-300 focus:ring-red-200"
-                : "border-slate-300 focus:ring-emerald-200"
-            }`}
-          />
-          {errors.accountNumber && (
-            <p className="mt-1 text-sm text-red-600">{errors.accountNumber}</p>
-          )}
-          <p className="mt-1 text-xs text-slate-500">
-            Số tài khoản ngân hàng nhận thanh toán (8-20 ký tự số)
-          </p>
-        </div>
-
-        {/* Account Name */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            Tên tài khoản <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            value={settings.accountName}
-            onChange={(e) => handleInputChange("accountName", e.target.value)}
-            onBlur={(e) => {
-              // Auto-uppercase on blur
-              handleInputChange("accountName", e.target.value.toUpperCase());
-            }}
-            placeholder="VD: NGUYEN VAN THUAN"
-            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-              errors.accountName
-                ? "border-red-300 focus:ring-red-200"
-                : "border-slate-300 focus:ring-emerald-200"
-            }`}
-          />
-          {errors.accountName && (
-            <p className="mt-1 text-sm text-red-600">{errors.accountName}</p>
-          )}
-          <p className="mt-1 text-xs text-slate-500">
-            Tên chủ tài khoản (hiển thị trên mã QR, tự động chuyển sang chữ hoa)
-          </p>
-        </div>
-
-        {/* Description Prefix */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            Mã mô tả
-          </label>
-          <input
-            type="text"
-            value={settings.descriptionPrefix}
-            onChange={(e) => handleInputChange("descriptionPrefix", e.target.value)}
-            placeholder="VD: PTCMSS"
-            maxLength={20}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-200"
-          />
-          <p className="mt-1 text-xs text-slate-500">
-            Tiền tố cho nội dung chuyển khoản (VD: PTCMSS-123). Tối đa 20 ký tự.
-          </p>
-        </div>
-      </div>
-
-      {/* Metadata */}
-      {metadata.updatedAt && (
-        <div className="mt-4 pt-4 border-t border-slate-200">
-          <p className="text-xs text-slate-500">
-            Cập nhật lần cuối:{" "}
-            {new Date(metadata.updatedAt).toLocaleString("vi-VN")}
-            {metadata.updatedBy && ` bởi ${metadata.updatedBy}`}
-          </p>
-        </div>
-      )}
-
-      {/* Actions */}
-      <div className="mt-6 flex gap-3">
-        <button
-          onClick={handleSave}
-          disabled={saving || !hasChanges()}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-            saving || !hasChanges()
-              ? "bg-slate-100 text-slate-400 cursor-not-allowed"
-              : "bg-emerald-600 text-white hover:bg-emerald-700"
-          }`}
-        >
-          {saving ? (
-            <RefreshCw className="h-4 w-4 animate-spin" />
-          ) : (
-            <Save className="h-4 w-4" />
-          )}
-          {saving ? "Đang lưu..." : "Lưu cấu hình"}
-        </button>
-
-        {hasChanges() && (
-          <button
-            onClick={() => {
-              setSettings(originalSettings);
-              setErrors({});
-              setSuccessMsg("");
-              setErrorMsg("");
-            }}
-            className="px-4 py-2 rounded-lg font-medium text-slate-600 hover:bg-slate-100 transition-colors"
-          >
-            Hủy thay đổi
-          </button>
+        {/* Messages */}
+        {successMsg && (
+            <div className="mb-4 p-3 rounded-lg bg-emerald-50 border border-emerald-200 flex items-start gap-2">
+              <CheckCircle2 className="h-5 w-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+              <span className="text-sm text-emerald-800">{successMsg}</span>
+            </div>
         )}
-      </div>
 
-      {/* Info note */}
-      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-        <p className="text-xs text-blue-800">
-          <strong>Lưu ý:</strong> Các thông tin API keys (VIETQR_CLIENT_ID, VIETQR_API_KEY) 
-          được bảo mật và không thể điều chỉnh qua giao diện. Chỉ có thể thay đổi qua biến môi trường.
-        </p>
+        {errorMsg && (
+            <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 flex items-start gap-2">
+              <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <span className="text-sm text-red-800">{errorMsg}</span>
+            </div>
+        )}
+
+        {/* Form */}
+        <div className="space-y-4">
+          {/* Bank Selector */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Ngân hàng <span className="text-red-500">*</span>
+            </label>
+            <div className="flex gap-2">
+              <select
+                  value={settings.bankCode && banks.find((b) => b.bin === settings.bankCode) ? settings.bankCode : ""}
+                  onChange={(e) => handleBankSelect(e.target.value)}
+                  className={`flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                      errors.bankCode
+                          ? "border-red-300 focus:ring-red-200"
+                          : "border-slate-300 focus:ring-emerald-200"
+                  }`}
+              >
+                <option value="">
+                  {bankLoading ? "Đang tải danh sách..." : "Chọn ngân hàng từ VietQR"}
+                </option>
+                {banks.map((bank) => (
+                    <option key={bank.bin} value={bank.bin}>
+                      {bank.shortName || bank.name} ({bank.bin})
+                    </option>
+                ))}
+              </select>
+              <button
+                  type="button"
+                  onClick={loadBanks}
+                  className="px-3 py-2 border border-slate-300 rounded-lg bg-white hover:bg-slate-50 text-slate-600"
+                  title="Tải lại danh sách ngân hàng từ VietQR"
+              >
+                {bankLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+              </button>
+            </div>
+            {bankError && (
+                <p className="mt-1 text-sm text-primary-600">{bankError}</p>
+            )}
+            <p className="mt-1 text-xs text-slate-500">
+              Dữ liệu lấy trực tiếp từ VietQR API. Chọn tên ngân hàng, hệ thống sẽ tự điền mã.
+            </p>
+          </div>
+
+          {/* Bank Code */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Mã ngân hàng <span className="text-red-500">*</span>
+            </label>
+            <input
+                type="text"
+                value={settings.bankCode}
+                placeholder="VD: 970403 (Sacombank)"
+                readOnly
+                className={`w-full px-3 py-2 border rounded-lg bg-slate-50 text-slate-700 ${
+                    errors.bankCode ? "border-red-300" : "border-slate-300"
+                }`}
+            />
+            {errors.bankCode && (
+                <p className="mt-1 text-sm text-red-600">{errors.bankCode}</p>
+            )}
+            <p className="mt-1 text-xs text-slate-500">
+              Mã ngân hàng theo chuẩn VietQR (6-10 ký tự số) – tự sinh theo ngân hàng đã chọn, không chỉnh tay.
+            </p>
+          </div>
+
+          {/* Account Number */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Số tài khoản <span className="text-red-500">*</span>
+            </label>
+            <input
+                type="text"
+                value={settings.accountNumber}
+                onChange={(e) => handleInputChange("accountNumber", e.target.value)}
+                placeholder="VD: 070122047995"
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                    errors.accountNumber
+                        ? "border-red-300 focus:ring-red-200"
+                        : "border-slate-300 focus:ring-emerald-200"
+                }`}
+            />
+            {errors.accountNumber && (
+                <p className="mt-1 text-sm text-red-600">{errors.accountNumber}</p>
+            )}
+            <p className="mt-1 text-xs text-slate-500">
+              Số tài khoản ngân hàng nhận thanh toán (8-20 ký tự số)
+            </p>
+          </div>
+
+          {/* Account Name */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Tên tài khoản <span className="text-red-500">*</span>
+            </label>
+            <input
+                type="text"
+                value={settings.accountName}
+                onChange={(e) => handleInputChange("accountName", e.target.value)}
+                onBlur={(e) => {
+                  // Auto-uppercase on blur
+                  handleInputChange("accountName", e.target.value.toUpperCase());
+                }}
+                placeholder="VD: NGUYEN VAN THUAN"
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                    errors.accountName
+                        ? "border-red-300 focus:ring-red-200"
+                        : "border-slate-300 focus:ring-emerald-200"
+                }`}
+            />
+            {errors.accountName && (
+                <p className="mt-1 text-sm text-red-600">{errors.accountName}</p>
+            )}
+            <p className="mt-1 text-xs text-slate-500">
+              Tên chủ tài khoản (hiển thị trên mã QR, tự động chuyển sang chữ hoa)
+            </p>
+          </div>
+
+          {/* Description Prefix */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Mã mô tả
+            </label>
+            <input
+                type="text"
+                value={settings.descriptionPrefix}
+                onChange={(e) => handleInputChange("descriptionPrefix", e.target.value)}
+                placeholder="VD: PTCMSS"
+                maxLength={20}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-200"
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Tiền tố cho nội dung chuyển khoản (VD: PTCMSS-123). Tối đa 20 ký tự.
+            </p>
+          </div>
+        </div>
+
+        {/* Metadata */}
+        {metadata.updatedAt && (
+            <div className="mt-4 pt-4 border-t border-slate-200">
+              <p className="text-xs text-slate-500">
+                Cập nhật lần cuối:{" "}
+                {new Date(metadata.updatedAt).toLocaleString("vi-VN")}
+                {metadata.updatedBy && ` bởi ${metadata.updatedBy}`}
+              </p>
+            </div>
+        )}
+
+        {/* Actions */}
+        <div className="mt-6 flex gap-3">
+          <button
+              onClick={handleSave}
+              disabled={saving || !hasChanges()}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                  saving || !hasChanges()
+                      ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                      : "bg-emerald-600 text-white hover:bg-emerald-700"
+              }`}
+          >
+            {saving ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : (
+                <Save className="h-4 w-4" />
+            )}
+            {saving ? "Đang lưu..." : "Lưu cấu hình"}
+          </button>
+
+          {hasChanges() && (
+              <button
+                  onClick={() => {
+                    setSettings(originalSettings);
+                    setErrors({});
+                    setSuccessMsg("");
+                    setErrorMsg("");
+                  }}
+                  className="px-4 py-2 rounded-lg font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                Hủy thay đổi
+              </button>
+          )}
+        </div>
+
+        {/* Info note */}
+        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-xs text-blue-800">
+            <strong>Lưu ý:</strong> Các thông tin API keys (VIETQR_CLIENT_ID, VIETQR_API_KEY)
+            được bảo mật và không thể điều chỉnh qua giao diện. Chỉ có thể thay đổi qua biến môi trường.
+          </p>
+        </div>
       </div>
-    </div>
   );
 }

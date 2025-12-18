@@ -18,8 +18,8 @@ export default function NotificationToast() {
     // Only show unread notifications that should show toast (not from DB load)
     // showToast === false means loaded from DB (should only appear in bell, not as popup)
     let unread = notifications
-      .filter(n => !n.read && n.showToast !== false);
-    
+        .filter(n => !n.read && n.showToast !== false);
+
     // For Driver role, filter to only show driver-relevant notifications
     if (isDriver) {
       const driverNotificationTypes = [
@@ -28,7 +28,7 @@ export default function NotificationToast() {
         'PAYMENT_APPROVED', 'PAYMENT_REJECTED', 'PAYMENT_REQUEST_APPROVED', 'PAYMENT_REQUEST_REJECTED', // Duyệt thanh toán
         'LEAVE_APPROVED', 'LEAVE_REJECTED', 'LEAVE_APPROVAL', 'DRIVER_DAY_OFF_APPROVED', 'DRIVER_DAY_OFF_REJECTED', // Duyệt nghỉ phép
       ];
-      
+
       unread = unread.filter(n => {
         // Nếu có type, kiểm tra type
         if (n.type) {
@@ -37,51 +37,51 @@ export default function NotificationToast() {
         // Nếu không có type nhưng có message, kiểm tra message
         if (n.message) {
           const msg = n.message.toLowerCase();
-          return msg.includes('chuyến') || 
-                 msg.includes('chi phí') || 
-                 msg.includes('thanh toán') || 
-                 msg.includes('nghỉ phép') ||
-                 msg.includes('duyệt') ||
-                 msg.includes('trip') ||
-                 msg.includes('expense') ||
-                 msg.includes('payment') ||
-                 msg.includes('leave');
+          return msg.includes('chuyến') ||
+              msg.includes('chi phí') ||
+              msg.includes('thanh toán') ||
+              msg.includes('nghỉ phép') ||
+              msg.includes('duyệt') ||
+              msg.includes('trip') ||
+              msg.includes('expense') ||
+              msg.includes('payment') ||
+              msg.includes('leave');
         }
         // Nếu không có type và message không rõ, chỉ hiển thị nếu từ user-specific channel
         return true; // Hiển thị tất cả từ /topic/notifications/{userId}
       });
     }
-    
+
     // For Consultant role, filter to show payment approval/rejection notifications
     if (isConsultant) {
       const paymentNotificationTypes = [
-        'PAYMENT_APPROVED', 'PAYMENT_REJECTED', 
+        'PAYMENT_APPROVED', 'PAYMENT_REJECTED',
         'PAYMENT_REQUEST_APPROVED', 'PAYMENT_REQUEST_REJECTED',
         'PAYMENT_UPDATE'
       ];
-      
+
       unread = unread.filter(n => {
         // Nếu có type, kiểm tra type
         if (n.type) {
-          return paymentNotificationTypes.some(t => 
-            n.type.includes(t) || t.includes(n.type) || 
-            n.type === 'PAYMENT_UPDATE'
+          return paymentNotificationTypes.some(t =>
+              n.type.includes(t) || t.includes(n.type) ||
+              n.type === 'PAYMENT_UPDATE'
           );
         }
         // Nếu không có type nhưng có message, kiểm tra message
         if (n.message) {
           const msg = n.message.toLowerCase();
-          return msg.includes('thanh toán') || 
-                 msg.includes('payment') ||
-                 msg.includes('duyệt') ||
-                 msg.includes('approve') ||
-                 msg.includes('reject');
+          return msg.includes('thanh toán') ||
+              msg.includes('payment') ||
+              msg.includes('duyệt') ||
+              msg.includes('approve') ||
+              msg.includes('reject');
         }
         // Nếu từ user-specific channel và có liên quan đến payment
         return n.data?.paymentId || n.data?.requestId;
       });
     }
-    
+
     setVisibleNotifications(unread.slice(0, 3)); // Max 3 toasts
   }, [notifications, isDriver, isConsultant]);
 
@@ -92,15 +92,15 @@ export default function NotificationToast() {
   if (visibleNotifications.length === 0) return null;
 
   return (
-    <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none">
-      {visibleNotifications.map((notification) => (
-        <ToastItem
-          key={notification.id}
-          notification={notification}
-          onDismiss={handleDismiss}
-        />
-      ))}
-    </div>
+      <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none">
+        {visibleNotifications.map((notification) => (
+            <ToastItem
+                key={notification.id}
+                notification={notification}
+                onDismiss={handleDismiss}
+            />
+        ))}
+      </div>
   );
 }
 
@@ -167,8 +167,8 @@ function ToastItem({ notification, onDismiss }) {
   };
 
   return (
-    <div
-      className={`
+      <div
+          className={`
         pointer-events-auto
         min-w-[320px] max-w-md
         rounded-lg border-2 shadow-lg
@@ -177,37 +177,37 @@ function ToastItem({ notification, onDismiss }) {
         ${getColorClasses()}
         ${isVisible && !isLeaving ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'}
       `}
-    >
-      <div className="flex items-start gap-3">
-        <div className="shrink-0 mt-0.5">
-          {getIcon()}
+      >
+        <div className="flex items-start gap-3">
+          <div className="shrink-0 mt-0.5">
+            {getIcon()}
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="text-slate-900 font-semibold text-sm leading-tight">
+              {notification.title}
+            </div>
+            <div className="text-slate-700 text-sm leading-snug mt-1">
+              {notification.message}
+            </div>
+          </div>
+
+          <button
+              onClick={handleManualDismiss}
+              className="shrink-0 rounded-md p-1 hover:bg-slate-200/50 transition-colors"
+              aria-label="Đóng thông báo"
+          >
+            <X className="h-4 w-4 text-slate-600" />
+          </button>
         </div>
 
-        <div className="flex-1 min-w-0">
-          <div className="text-slate-900 font-semibold text-sm leading-tight">
-            {notification.title}
-          </div>
-          <div className="text-slate-700 text-sm leading-snug mt-1">
-            {notification.message}
-          </div>
+        {/* Progress bar for auto-dismiss */}
+        <div className="mt-3 h-1 bg-slate-200/50 rounded-full overflow-hidden">
+          <div
+              className="h-full bg-slate-400 rounded-full animate-shrink"
+              style={{ animationDuration: '5s' }}
+          />
         </div>
-
-        <button
-          onClick={handleManualDismiss}
-          className="shrink-0 rounded-md p-1 hover:bg-slate-200/50 transition-colors"
-          aria-label="Đóng thông báo"
-        >
-          <X className="h-4 w-4 text-slate-600" />
-        </button>
       </div>
-
-      {/* Progress bar for auto-dismiss */}
-      <div className="mt-3 h-1 bg-slate-200/50 rounded-full overflow-hidden">
-        <div
-          className="h-full bg-slate-400 rounded-full animate-shrink"
-          style={{ animationDuration: '5s' }}
-        />
-      </div>
-    </div>
   );
 }
