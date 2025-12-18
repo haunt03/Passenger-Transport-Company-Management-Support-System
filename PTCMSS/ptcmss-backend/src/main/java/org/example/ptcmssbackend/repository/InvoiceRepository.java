@@ -36,29 +36,11 @@ public interface InvoiceRepository extends JpaRepository<Invoices, Integer> {
     List<Invoices> findExpensesByVehicleId(@Param("vehicleId") Integer vehicleId, @Param("type") InvoiceType type);
 
     /**
-     * Lấy danh sách expenses theo costType (fuel, toll, maintenance)
-     */
-    @Query("SELECT i FROM Invoices i " +
-            "WHERE i.type = :type " +
-            "AND i.costType = :costType " +
-            "AND i.booking IS NOT NULL " +
-            "AND i.booking.id IN (" +
-            "  SELECT t.booking.id FROM TripVehicles tv " +
-            "  JOIN tv.trip t " +
-            "  WHERE tv.vehicle.id = :vehicleId" +
-            ") " +
-            "ORDER BY i.invoiceDate DESC")
-    List<Invoices> findExpensesByVehicleIdAndCostType(
-            @Param("vehicleId") Integer vehicleId,
-            @Param("type") InvoiceType type,
-            @Param("costType") String costType);
-
-    /**
      * Tổng tiền đã thanh toán (INCOME, PAID) theo bookingId
      */
     @Query("SELECT COALESCE(SUM(i.amount), 0) FROM Invoices i " +
             "WHERE i.booking.id = :bookingId AND i.type = :type AND i.paymentStatus = :paymentStatus")
-    BigDecimal sumPaidByBookingId(
+    java.math.BigDecimal sumPaidByBookingId(
             @Param("bookingId") Integer bookingId,
             @Param("type") InvoiceType type,
             @Param("paymentStatus") PaymentStatus paymentStatus
@@ -73,7 +55,7 @@ public interface InvoiceRepository extends JpaRepository<Invoices, Integer> {
             @Param("type") InvoiceType type,
             @Param("paymentStatus") PaymentStatus paymentStatus
     );
-    
+
     /**
      * Tính tổng tiền đã thu (CONFIRMED) từ payment_history cho booking
      */
@@ -82,7 +64,7 @@ public interface InvoiceRepository extends JpaRepository<Invoices, Integer> {
             "WHERE i.booking.id = :bookingId " +
             "AND ph.confirmationStatus = org.example.ptcmssbackend.enums.PaymentConfirmationStatus.CONFIRMED")
     BigDecimal calculateConfirmedPaidAmountByBookingId(@Param("bookingId") Integer bookingId);
-    
+
     /**
      * Tính tổng tiền đã thu (CONFIRMED payments) cho một consultant trong khoảng thời gian,
      * có thể lọc theo chi nhánh (branchId).
@@ -104,7 +86,7 @@ public interface InvoiceRepository extends JpaRepository<Invoices, Integer> {
             @Param("startDate") Instant startDate,
             @Param("endDate") Instant endDate
     );
-    
+
     /**
      * Tính tổng amount theo branchId, type và khoảng thời gian
      */
@@ -116,10 +98,10 @@ public interface InvoiceRepository extends JpaRepository<Invoices, Integer> {
     BigDecimal sumAmountByBranchAndTypeAndDateRange(
             @Param("branchId") Integer branchId,
             @Param("type") InvoiceType type,
-            @Param("startDate") Instant startDate,
-            @Param("endDate") Instant endDate
+            @Param("startDate") java.time.Instant startDate,
+            @Param("endDate") java.time.Instant endDate
     );
-    
+
     /**
      * Tính tổng chi phí của một trip
      * (Lấy tất cả expense invoices liên quan đến booking của trip đó)
@@ -129,13 +111,13 @@ public interface InvoiceRepository extends JpaRepository<Invoices, Integer> {
             "WHERE i.type = 'EXPENSE' " +
             "AND t.id = :tripId")
     BigDecimal sumExpensesByTrip(@Param("tripId") Integer tripId);
-    
+
     // Module 6: Additional queries
     Optional<Invoices> findByInvoiceNumber(String invoiceNumber);
-    
+
     List<Invoices> findByBranch_IdAndTypeAndStatusOrderByInvoiceDateDesc(
             Integer branchId, InvoiceType type, InvoiceStatus status);
-    
+
     @Query("SELECT DISTINCT i FROM Invoices i " +
             "JOIN FETCH i.branch " +
             "LEFT JOIN FETCH i.customer " +
@@ -156,7 +138,7 @@ public interface InvoiceRepository extends JpaRepository<Invoices, Integer> {
             @Param("endDate") Instant endDate,
             @Param("customerId") Integer customerId,
             @Param("paymentStatus") PaymentStatus paymentStatus);
-    
+
     @Query("SELECT i FROM Invoices i WHERE i.type = 'INCOME' " +
             "AND i.paymentStatus IN ('UNPAID', 'OVERDUE') " +
             "AND (:branchId IS NULL OR i.branch.id = :branchId) " +
@@ -164,12 +146,12 @@ public interface InvoiceRepository extends JpaRepository<Invoices, Integer> {
             "CASE WHEN i.paymentStatus = 'OVERDUE' THEN 0 ELSE 1 END, " +
             "i.dueDate ASC")
     List<Invoices> findUnpaidInvoices(@Param("branchId") Integer branchId);
-    
+
     @Query("SELECT i FROM Invoices i WHERE i.type = 'INCOME' " +
             "AND i.paymentStatus = 'OVERDUE' " +
             "AND (:branchId IS NULL OR i.branch.id = :branchId)")
     List<Invoices> findOverdueInvoices(@Param("branchId") Integer branchId);
-    
+
     @Query("SELECT i FROM Invoices i WHERE i.type = 'INCOME' " +
             "AND i.paymentStatus = 'UNPAID' " +
             "AND i.dueDate BETWEEN :startDate AND :endDate " +
@@ -178,7 +160,7 @@ public interface InvoiceRepository extends JpaRepository<Invoices, Integer> {
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate,
             @Param("branchId") Integer branchId);
-    
+
     @Query("SELECT i FROM Invoices i WHERE i.type = 'INCOME' " +
             "AND i.status = 'ACTIVE' " +
             "AND i.paymentStatus = 'UNPAID' " +
@@ -187,14 +169,14 @@ public interface InvoiceRepository extends JpaRepository<Invoices, Integer> {
     List<Invoices> findUnpaidInvoicesBeforeDate(
             @Param("asOfDate") LocalDate asOfDate,
             @Param("branchId") Integer branchId);
-    
+
     @Query("SELECT MAX(CAST(SUBSTRING(i.invoiceNumber, LENGTH(i.invoiceNumber) - 3) AS INTEGER)) " +
             "FROM Invoices i WHERE i.branch.id = :branchId " +
             "AND i.invoiceNumber LIKE :pattern")
     Integer findMaxSequenceNumber(
             @Param("branchId") Integer branchId,
             @Param("pattern") String pattern);
-    
+
     /**
      * Tìm invoices chưa thanh toán đủ mà trip đã hoàn thành quá 48h
      * Logic: invoice có booking, booking có trip COMPLETED, trip.endTime + 48h < now

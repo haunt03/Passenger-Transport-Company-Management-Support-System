@@ -2757,75 +2757,75 @@ function PaymentHistoryModal({ open, invoiceId, paymentHistory, loading, onClose
         </div>
     );
 }
-
-/* ===== DEMO_INVOICES ===== */
-const DEMO_INVOICES = [
-    {
-        id: 1,
-        invoice_no:
-            "INV-2025-001",
-        customer:
-            "Công ty A",
-        order_code:
-            "ORD-701",
-        total: 5_500_000,
-        paid: 2_000_000,
-        status:
-        STATUS.UNPAID,
-        created_at:
-            "2025-10-15",
-        due_at:
-            "2025-11-15",
-    },
-    {
-        id: 2,
-        invoice_no:
-            "INV-2025-002",
-        customer:
-            "Công ty B",
-        order_code:
-            "ORD-702",
-        total: 3_250_000,
-        paid: 3_250_000,
-        status:
-        STATUS.PAID,
-        created_at:
-            "2025-10-16",
-        due_at:
-            "2025-11-16",
-    },
-    {
-        id: 3,
-        invoice_no:
-            "INV-2025-003",
-        customer:
-            "Công ty C",
-        order_code:
-            "ORD-703",
-        total: 9_900_000,
-        paid: 1_900_000,
-        status:
-        STATUS.OVERDUE,
-        created_at:
-            "2025-09-10",
-        due_at:
-            "2025-10-10",
-    },
-    {
-        id: 4,
-        invoice_no:
-            "INV-2025-004",
-        customer:
-            "Công ty D",
-        order_code:
-            "ORD-704",
-        total: 1_200_000,
-        paid: 0,
-        status:
-        STATUS.UNPAID,
-        created_at:
-            "2025-10-20",
-        due_at:
-            "2025-11-20",
-    },
-];
+//
+// /* ===== DEMO_INVOICES ===== */
+// const DEMO_INVOICES = [
+//     {
+//         id: 1,
+//         invoice_no:
+//             "INV-2025-001",
+//         customer:
+//             "Công ty A",
+//         order_code:
+//             "ORD-701",
+//         total: 5_500_000,
+//         paid: 2_000_000,
+//         status:
+//         STATUS.UNPAID,
+//         created_at:
+//             "2025-10-15",
+//         due_at:
+//             "2025-11-15",
+//     },
+//     {
+//         id: 2,
+//         invoice_no:
+//             "INV-2025-002",
+//         customer:
+//             "Công ty B",
+//         order_code:
+//             "ORD-702",
+//         total: 3_250_000,
+//         paid: 3_250_000,
+//         status:
+//         STATUS.PAID,
+//         created_at:
+//             "2025-10-16",
+//         due_at:
+//             "2025-11-16",
+//     },
+//     {
+//         id: 3,
+//         invoice_no:
+//             "INV-2025-003",
+//         customer:
+//             "Công ty C",
+//         order_code:
+//             "ORD-703",
+//         total: 9_900_000,
+//         paid: 1_900_000,
+//         status:
+//         STATUS.OVERDUE,
+//         created_at:
+//             "2025-09-10",
+//         due_at:
+//             "2025-10-10",
+//     },
+//     {
+//         id: 4,
+//         invoice_no:
+//             "INV-2025-004",
+//         customer:
+//             "Công ty D",
+//         order_code:
+//             "ORD-704",
+//         total: 1_200_000,
+//         paid: 0,
+//         status:
+//         STATUS.UNPAID,
+//         created_at:
+//             "2025-10-20",
+//         due_at:
+//             "2025-11-20",
+//     },
+// ];

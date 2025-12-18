@@ -782,7 +782,7 @@ public class BookingServiceImpl implements BookingService {
      *       - Khác ngày: CT = 2 × (Số_km × PricePerKm + baseFee) = 2 × Số_km × PricePerKm + 2 × baseFee
      *
      * 2. TÍNH THEO NGÀY (DAILY):
-     *    - Nếu 1 ngày VÀ khoảng cách <= INTER_PROVINCE_DISTANCE_KM (100km):
+     *    - Nếu 1 ngày VÀ khoảng cách <= INTER_PROVINCE_DISTANCE_KM (10km):
      *      CT = SameDayFixedPrice + BaseFee (KHÔNG tính km)
      *    - Ngược lại:
      *      CT = (Số_km × PricePerKm × 1.5) + (SameDayFixedPrice × Số_ngày) + BaseFee
@@ -809,7 +809,7 @@ public class BookingServiceImpl implements BookingService {
         BigDecimal holidaySurchargeRate = getSystemSettingDecimal("HOLIDAY_SURCHARGE_RATE", new BigDecimal("0.25"));
         BigDecimal weekendSurchargeRate = getSystemSettingDecimal("WEEKEND_SURCHARGE_RATE", new BigDecimal("0.20"));
         BigDecimal roundTripMultiplier = getSystemSettingDecimal("ROUND_TRIP_MULTIPLIER", new BigDecimal("1.5"));
-        int interProvinceDistanceKm = getSystemSettingInt("INTER_PROVINCE_DISTANCE_KM", 100);
+        int interProvinceDistanceKm = getSystemSettingInt("INTER_PROVINCE_DISTANCE_KM", 10);
 
         // Tính số ngày
         int numberOfDays = calculateNumberOfDays(startTime, endTime);
@@ -817,7 +817,7 @@ public class BookingServiceImpl implements BookingService {
         // Kiểm tra chuyến trong ngày
         boolean isSameDayTrip = isSameDayTrip(startTime, endTime);
 
-        // Kiểm tra liên tỉnh (dựa trên khoảng cách > ngưỡng cấu hình, mặc định 100km)
+        // Kiểm tra liên tỉnh (dựa trên khoảng cách > ngưỡng cấu hình, mặc định 10km)
         boolean isInterProvince = distance != null && distance > interProvinceDistanceKm;
 
         // Xác định loại thuê
@@ -894,7 +894,7 @@ public class BookingServiceImpl implements BookingService {
                 // THUÊ THEO NGÀY:
                 int days = Math.max(1, numberOfDays);
 
-                // Đặc biệt: Nếu thuê 1 ngày VÀ trong bán kính 100km (<= INTER_PROVINCE_DISTANCE_KM)
+                // Đặc biệt: Nếu thuê 1 ngày VÀ trong bán kính 10km (<= INTER_PROVINCE_DISTANCE_KM)
                 // thì chỉ tính: sameDayFixedPrice + baseFee (KHÔNG tính km)
                 if (days == 1 && distance != null && distance <= interProvinceDistanceKm) {
                     basePrice = sameDayFixedPrice.add(baseFee);
@@ -2754,3 +2754,4 @@ public class BookingServiceImpl implements BookingService {
                 .build();
     }
 }
+

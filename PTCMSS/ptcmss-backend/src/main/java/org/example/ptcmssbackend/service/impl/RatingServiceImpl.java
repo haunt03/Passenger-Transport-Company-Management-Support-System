@@ -31,7 +31,7 @@ public class RatingServiceImpl implements RatingService {
     private final DriverRepository driversRepository;
     private final UsersRepository usersRepository;
     private final CustomerRepository customersRepository;
-    private final TripDriverRepository tripDriverRepository;
+    private final TripDriverRepository tripDriversRepository;
     private final BookingRepository bookingRepository;
     private final NotificationRepository notificationRepository;
     private final WebSocketNotificationService webSocketNotificationService;
@@ -57,10 +57,10 @@ public class RatingServiceImpl implements RatingService {
         // Get driver from trip (via TripDrivers)
         TripDrivers tripDriver = null;
         try {
-            tripDriver = tripDriverRepository.findFirstMainDriverByTripId(request.getTripId());
+            tripDriver = tripDriversRepository.findFirstMainDriverByTripId(request.getTripId());
         } catch (Exception e) {
             // Fallback: get first driver from trip
-            List<TripDrivers> tripDrivers = tripDriverRepository.findByTrip_Id(request.getTripId());
+            List<TripDrivers> tripDrivers = tripDriversRepository.findByTrip_Id(request.getTripId());
             if (!tripDrivers.isEmpty()) {
                 tripDriver = tripDrivers.get(0);
             }
@@ -293,11 +293,11 @@ public class RatingServiceImpl implements RatingService {
         TripDrivers tripDriver = null;
         try {
             // Try to get first main driver using native query with LIMIT
-            tripDriver = tripDriverRepository.findFirstMainDriverByTripId(trip.getId());
+            tripDriver = tripDriversRepository.findFirstMainDriverByTripId(trip.getId());
         } catch (Exception e) {
             // Fallback: get first driver from trip if native query fails
             log.warn("Error getting main driver for trip {}, using first driver: {}", trip.getId(), e.getMessage());
-            List<TripDrivers> tripDrivers = tripDriverRepository.findByTrip_Id(trip.getId());
+            List<TripDrivers> tripDrivers = tripDriversRepository.findByTrip_Id(trip.getId());
             if (!tripDrivers.isEmpty()) {
                 tripDriver = tripDrivers.get(0);
             }

@@ -249,7 +249,7 @@ class AccountingServiceImplTest {
 
         when(invoiceRepository.sumAmountByBranchAndTypeAndDateRange(branchId, InvoiceType.INCOME, start, end))
                 .thenReturn(new BigDecimal("1000000"));
-        when(invoiceRepository.findInvoicesWithFilters(eq(branchId), eq(InvoiceType.INCOME), 
+        when(invoiceRepository.findInvoicesWithFilters(eq(branchId), eq(InvoiceType.INCOME),
                 eq(InvoiceStatus.ACTIVE), eq(start), eq(end), isNull(), eq(PaymentStatus.PAID)))
                 .thenReturn(List.of(invoice));
         when(paymentHistoryRepository.sumConfirmedByInvoiceId(100))
@@ -405,7 +405,7 @@ class AccountingServiceImplTest {
         Invoices expense1 = createTestInvoice(100, PaymentStatus.PAID);
         expense1.setType(InvoiceType.EXPENSE);
         expense1.setAmount(new BigDecimal("200000"));
-        expense1.setCostType("FUEL");
+        // costType field has been removed from Invoices entity
 
         List<Invoices> expenses = List.of(expense1);
         List<ExpenseRequests> expenseRequests = Collections.emptyList();
