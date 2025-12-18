@@ -5,12 +5,20 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.ptcmssbackend.config.QrPaymentProperties;
 import org.example.ptcmssbackend.dto.request.Booking.CreatePaymentRequest;
 import org.example.ptcmssbackend.dto.response.Booking.PaymentResponse;
-import org.example.ptcmssbackend.entity.*;
+import org.example.ptcmssbackend.entity.Bookings;
+import org.example.ptcmssbackend.entity.Employees;
+import org.example.ptcmssbackend.entity.Invoices;
+import org.example.ptcmssbackend.entity.Notifications;
 import org.example.ptcmssbackend.enums.InvoiceStatus;
 import org.example.ptcmssbackend.enums.InvoiceType;
-import org.example.ptcmssbackend.enums.PaymentConfirmationStatus;
 import org.example.ptcmssbackend.enums.PaymentStatus;
-import org.example.ptcmssbackend.repository.*;
+import org.example.ptcmssbackend.entity.PaymentHistory;
+import org.example.ptcmssbackend.enums.PaymentConfirmationStatus;
+import org.example.ptcmssbackend.repository.BookingRepository;
+import org.example.ptcmssbackend.repository.EmployeeRepository;
+import org.example.ptcmssbackend.repository.InvoiceRepository;
+import org.example.ptcmssbackend.repository.PaymentHistoryRepository;
+import org.example.ptcmssbackend.repository.NotificationRepository;
 import org.example.ptcmssbackend.service.AppSettingService;
 import org.example.ptcmssbackend.service.PaymentService;
 import org.springframework.stereotype.Service;
@@ -52,20 +60,15 @@ public class PaymentServiceImpl implements PaymentService {
             // Chỉ validate cho thanh toán (không phải cọc)
             BigDecimal remainingAmount = getRemainingAmount(bookingId);
             BigDecimal totalPendingAmount = getTotalPendingPaymentAmount(bookingId);
-            
-            // Ràng buộc 1: Không được tạo yêu cầu mới nếu đã có yêu cầu PENDING
-            if (totalPendingAmount.compareTo(BigDecimal.ZERO) > 0) {
-                throw new RuntimeException(String.format(
-                    "Không thể tạo yêu cầu thanh toán mới. Đã có yêu cầu thanh toán đang chờ duyệt (tổng %s). Vui lòng đợi kế toán xác nhận các yêu cầu trước.", 
-                    totalPendingAmount));
-            }
-            
-            // Ràng buộc 2: Tổng pending + amount mới <= remaining amount
+
+            // Ràng buộc: Tổng pending + amount mới <= remaining amount
+            // Cho phép tạo nhiều request miễn tổng không vượt quá số tiền còn lại
             BigDecimal totalWithNewAmount = totalPendingAmount.add(amount);
             if (totalWithNewAmount.compareTo(remainingAmount) > 0) {
+                BigDecimal availableAmount = remainingAmount.subtract(totalPendingAmount);
                 throw new RuntimeException(String.format(
-                    "Tổng số tiền yêu cầu (%s) vượt quá số tiền còn lại (%s). Số tiền có thể tạo thêm: %s", 
-                    totalWithNewAmount, remainingAmount, remainingAmount.subtract(totalPendingAmount)));
+                        "Tổng số tiền yêu cầu (%s) vượt quá số tiền còn lại (%s). Hiện đang có %s đang chờ duyệt. Số tiền có thể tạo thêm: %s",
+                        totalWithNewAmount, remainingAmount, totalPendingAmount, availableAmount.compareTo(BigDecimal.ZERO) > 0 ? availableAmount : BigDecimal.ZERO));
             }
         }
 
@@ -187,14 +190,14 @@ public class PaymentServiceImpl implements PaymentService {
     public List<PaymentResponse> getPaymentHistory(Integer bookingId) {
         // Lấy tất cả invoices của booking
         List<Invoices> invoices = invoiceRepository.findByBooking_IdOrderByCreatedAtDesc(bookingId);
-        
+
         // Với mỗi invoice, lấy payment_history và map thành PaymentResponse
         return invoices.stream()
                 .flatMap(invoice -> {
                     // Lấy tất cả payment_history của invoice này
-                    List<PaymentHistory> paymentHistories =
+                    List<org.example.ptcmssbackend.entity.PaymentHistory> paymentHistories =
                             paymentHistoryRepository.findByInvoice_IdOrderByPaymentDateDesc(invoice.getId());
-                    
+
                     // Nếu có payment_history, trả về payment_history (để có confirmationStatus)
                     if (!paymentHistories.isEmpty()) {
                         return paymentHistories.stream()
@@ -280,7 +283,7 @@ public class PaymentServiceImpl implements PaymentService {
     /**
      * Map PaymentHistory to PaymentResponse (có thêm confirmationStatus và paymentId)
      */
-    private PaymentResponse mapPaymentHistory(PaymentHistory ph, Invoices invoice) {
+    private PaymentResponse mapPaymentHistory(org.example.ptcmssbackend.entity.PaymentHistory ph, Invoices invoice) {
         return PaymentResponse.builder()
                 .invoiceId(invoice.getId())
                 .bookingId(invoice.getBooking() != null ? invoice.getBooking().getId() : null)
@@ -372,21 +375,21 @@ public class PaymentServiceImpl implements PaymentService {
     private BigDecimal getTotalPendingPaymentAmount(Integer bookingId) {
         // Tìm tất cả invoices của booking
         List<Invoices> invoices = invoiceRepository.findByBooking_IdOrderByCreatedAtDesc(bookingId);
-        
+
         // Tính tổng payment requests PENDING của tất cả invoices
         BigDecimal totalPending = BigDecimal.ZERO;
         for (Invoices invoice : invoices) {
-            List<PaymentHistory> pendingPayments =
-                paymentHistoryRepository.findByInvoice_IdOrderByPaymentDateDesc(invoice.getId())
-                    .stream()
-                    .filter(ph -> ph.getConfirmationStatus() == PaymentConfirmationStatus.PENDING)
-                    .collect(Collectors.toList());
-            
-            for (PaymentHistory ph : pendingPayments) {
+            List<org.example.ptcmssbackend.entity.PaymentHistory> pendingPayments =
+                    paymentHistoryRepository.findByInvoice_IdOrderByPaymentDateDesc(invoice.getId())
+                            .stream()
+                            .filter(ph -> ph.getConfirmationStatus() == org.example.ptcmssbackend.enums.PaymentConfirmationStatus.PENDING)
+                            .collect(Collectors.toList());
+
+            for (org.example.ptcmssbackend.entity.PaymentHistory ph : pendingPayments) {
                 totalPending = totalPending.add(ph.getAmount() != null ? ph.getAmount() : BigDecimal.ZERO);
             }
         }
-        
+
         return totalPending;
     }
 }
