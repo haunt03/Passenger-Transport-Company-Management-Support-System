@@ -26,7 +26,7 @@ public class NotificationController {
 
     private final NotificationService notificationService;
     private final org.example.ptcmssbackend.service.WebSocketNotificationService webSocketNotificationService;
-
+    
     @Operation(
             summary = "Lấy dashboard notifications & approvals",
             description = "Trả về tổng quan cảnh báo và yêu cầu chờ duyệt"
@@ -43,7 +43,7 @@ public class NotificationController {
             return new ResponseError(HttpStatus.BAD_REQUEST.value(), e.getMessage());
         }
     }
-
+    
     @Operation(
             summary = "Lấy danh sách cảnh báo",
             description = "Lấy tất cả cảnh báo chưa xác nhận"
@@ -60,7 +60,7 @@ public class NotificationController {
             return new ResponseError(HttpStatus.BAD_REQUEST.value(), e.getMessage());
         }
     }
-
+    
     @Operation(
             summary = "Xác nhận đã biết cảnh báo",
             description = "Đánh dấu cảnh báo là đã xem/xử lý"
@@ -82,7 +82,7 @@ public class NotificationController {
             return new ResponseError(HttpStatus.BAD_REQUEST.value(), e.getMessage());
         }
     }
-
+    
     @Operation(
             summary = "Lấy danh sách yêu cầu chờ duyệt",
             description = "Lấy tất cả yêu cầu pending (nghỉ phép, tạm ứng, giảm giá, etc.)"
@@ -99,7 +99,7 @@ public class NotificationController {
             return new ResponseError(HttpStatus.BAD_REQUEST.value(), e.getMessage());
         }
     }
-
+    
     @Operation(
             summary = "Lấy danh sách yêu cầu đã xử lý",
             description = "Lấy các yêu cầu đã được duyệt hoặc từ chối (APPROVED + REJECTED). " +
@@ -119,7 +119,7 @@ public class NotificationController {
             return new ResponseError(HttpStatus.BAD_REQUEST.value(), e.getMessage());
         }
     }
-
+    
     @Operation(
             summary = "Phê duyệt yêu cầu",
             description = "Approve một yêu cầu (nghỉ phép, tạm ứng, etc.). " +
@@ -133,11 +133,11 @@ public class NotificationController {
         try {
             Integer userId = (Integer) body.get("userId");
             String note = (String) body.get("note");
-
+            
             if (userId == null) {
                 throw new IllegalArgumentException("userId is required");
             }
-
+            
             ApprovalItemResponse data = notificationService.approveRequest(historyId, userId, note);
             return new ResponseData<>(HttpStatus.OK.value(), "Request approved", data);
         } catch (Exception e) {
@@ -145,7 +145,7 @@ public class NotificationController {
             return new ResponseError(HttpStatus.BAD_REQUEST.value(), e.getMessage());
         }
     }
-
+    
     @Operation(
             summary = "Từ chối yêu cầu",
             description = "Reject một yêu cầu (nghỉ phép, tạm ứng, etc.). " +
@@ -159,11 +159,11 @@ public class NotificationController {
         try {
             Integer userId = (Integer) body.get("userId");
             String note = (String) body.get("note");
-
+            
             if (userId == null) {
                 throw new IllegalArgumentException("userId is required");
             }
-
+            
             ApprovalItemResponse data = notificationService.rejectRequest(historyId, userId, note);
             return new ResponseData<>(HttpStatus.OK.value(), "Request rejected", data);
         } catch (Exception e) {
@@ -171,7 +171,7 @@ public class NotificationController {
             return new ResponseError(HttpStatus.BAD_REQUEST.value(), e.getMessage());
         }
     }
-
+    
     @Operation(
             summary = "Tạo cảnh báo hệ thống (manual trigger)",
             description = "Trigger thủ công để tạo cảnh báo (thường chạy tự động mỗi ngày)"
@@ -226,8 +226,8 @@ public class NotificationController {
         try {
             log.info("[Notification] Get notifications for user {} (page={}, limit={})", userId, page, limit);
             Map<String, Object> result = notificationService.getUserNotifications(userId, page, limit);
-            log.info("[Notification] Returning {} notifications for user {}",
-                    ((java.util.List<?>) result.get("data")).size(), userId);
+            log.info("[Notification] Returning {} notifications for user {}", 
+                    ((List<?>) result.get("data")).size(), userId);
             return new ResponseData<>(HttpStatus.OK.value(), "Success", result);
         } catch (Exception e) {
             log.error("[Notification] Failed to load user notifications for user {}", userId, e);
@@ -236,7 +236,7 @@ public class NotificationController {
     }
 
     private final org.example.ptcmssbackend.service.impl.ApprovalSyncServiceImpl approvalSyncService;
-
+    
     @Operation(
             summary = "Sync approval history (manual trigger)",
             description = "Trigger thủ công để sync approval history từ DriverDayOff và ExpenseRequests"
@@ -267,6 +267,44 @@ public class NotificationController {
             return new ResponseData<>(HttpStatus.OK.value(), "Notification deleted", null);
         } catch (Exception e) {
             log.error("[Notification] Failed to delete notification {}", notificationId, e);
+            return new ResponseError(HttpStatus.BAD_REQUEST.value(), e.getMessage());
+        }
+    }
+    
+    @Operation(
+            summary = "Xóa notification theo approval type",
+            description = "Xóa notification dựa trên approval type và relatedEntityId"
+    )
+    @DeleteMapping("/by-approval")
+    public ResponseData<String> deleteNotificationByApproval(
+            @RequestParam String approvalType,
+            @RequestParam Integer relatedEntityId,
+            @RequestParam Integer userId) {
+        try {
+            log.info("[Notification] Delete notification by approval - type: {}, relatedEntityId: {}, userId: {}", 
+                    approvalType, relatedEntityId, userId);
+            notificationService.deleteNotificationByApproval(approvalType, relatedEntityId, userId);
+            return new ResponseData<>(HttpStatus.OK.value(), "Notification deleted", null);
+        } catch (Exception e) {
+            log.error("[Notification] Failed to delete notification by approval", e);
+            return new ResponseError(HttpStatus.BAD_REQUEST.value(), e.getMessage());
+        }
+    }
+    
+    @Operation(
+            summary = "Xóa/dismiss approval",
+            description = "Xóa approval history và notification liên quan"
+    )
+    @DeleteMapping("/approvals/{approvalHistoryId}")
+    public ResponseData<String> dismissApproval(
+            @PathVariable Integer approvalHistoryId,
+            @RequestParam Integer userId) {
+        try {
+            log.info("[Notification] Dismiss approval {} by user {}", approvalHistoryId, userId);
+            notificationService.dismissApproval(approvalHistoryId, userId);
+            return new ResponseData<>(HttpStatus.OK.value(), "Approval dismissed", null);
+        } catch (Exception e) {
+            log.error("[Notification] Failed to dismiss approval {}", approvalHistoryId, e);
             return new ResponseError(HttpStatus.BAD_REQUEST.value(), e.getMessage());
         }
     }

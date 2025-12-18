@@ -9,9 +9,6 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-
 @Getter
 @Setter
 @Entity
@@ -47,14 +44,6 @@ public class ExpenseRequests {
     @Column(name = "status", nullable = false, length = 20)
     private ExpenseRequestStatus status = ExpenseRequestStatus.PENDING;
 
-    @ElementCollection
-    @CollectionTable(
-            name = "=expense_request_attachments",
-            joinColumns = @JoinColumn(name = "expenseRequestId")
-    )
-    @Column(name = "fileUrl")
-    private List<String> attachments = new ArrayList<>();
-
     @CreationTimestamp
     @Column(name = "createdAt", updatable = false)
     private Instant createdAt;
@@ -72,4 +61,7 @@ public class ExpenseRequests {
 
     @Column(name = "rejectionReason", length = 500)
     private String rejectionReason;
+
+    @Column(name = "receiptImages", columnDefinition = "TEXT")
+    private String receiptImages; // JSON array of image URLs: ["/uploads/file1.jpg", "/uploads/file2.jpg"]
 }

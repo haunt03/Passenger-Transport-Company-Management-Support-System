@@ -17,10 +17,12 @@ public class TripResponse {
     private Double distance; // Distance in kilometers
     private Boolean useHighway;
     private String status;
-
+    
     // Thông tin điều phối (nếu đã gán)
     private Integer driverId;
     private String driverName;
+    private String driverPhone;
     private Integer vehicleId;
     private String vehicleLicensePlate;
 }
+

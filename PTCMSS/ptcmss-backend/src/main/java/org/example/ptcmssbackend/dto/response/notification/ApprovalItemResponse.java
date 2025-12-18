@@ -4,8 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.example.ptcmssbackend.enums.ApprovalStatus;
 import org.example.ptcmssbackend.enums.ApprovalType;
+import org.example.ptcmssbackend.enums.ApprovalStatus;
 
 import java.time.Instant;
 
@@ -28,7 +28,7 @@ public class ApprovalItemResponse {
     private Instant processedAt;
     private Integer branchId;
     private String branchName;
-    
+
     // Additional details based on type
     private Object details; // DriverDayOffDetails, ExpenseRequestDetails, etc.
 }

@@ -39,10 +39,10 @@ export function getRevenueReport({
 }
 
 // Get expense report
-// NOTE: expenseType filter chỉ áp dụng cho ExpenseRequests (không áp dụng cho Invoices vì costType đã bị xóa)
+// NOTE: expenseType chỉ áp dụng cho ExpenseRequests (Invoices không còn costType)
 export function getExpenseReport({
                                      branchId,
-                                     expenseType, // Filter theo loại chi phí cho ExpenseRequests
+                                     expenseType,
                                      vehicleId,
                                      startDate,
                                      endDate,

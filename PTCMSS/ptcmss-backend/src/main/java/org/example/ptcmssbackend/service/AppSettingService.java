@@ -4,7 +4,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.ptcmssbackend.config.QrPaymentProperties;
 import org.example.ptcmssbackend.entity.AppSetting;
+import org.example.ptcmssbackend.entity.Employees;
 import org.example.ptcmssbackend.repository.AppSettingRepository;
+import org.example.ptcmssbackend.repository.EmployeeRepository;
+import org.example.ptcmssbackend.repository.UsersRepository;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -14,6 +17,7 @@ import org.springframework.util.StringUtils;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -22,6 +26,8 @@ public class AppSettingService {
 
     private final AppSettingRepository appSettingRepository;
     private final QrPaymentProperties qrPaymentProperties;
+    private final UsersRepository usersRepository;
+    private final EmployeeRepository employeeRepository;
 
     // QR Setting keys
     public static final String QR_BANK_CODE = "qr.bank_code";
@@ -58,13 +64,13 @@ public class AppSettingService {
      */
     @Transactional
     @CacheEvict(value = "appSettings", key = "#key")
-    public void setValue(String key, String value, String updatedBy) {
+    public void setValue(String key, String value, String updatedByUsername) {
         AppSetting setting = appSettingRepository.findByKey(key)
                 .orElse(new AppSetting());
 
         setting.setKey(key);
         setting.setValue(value);
-        setting.setUpdatedBy(updatedBy);
+        setting.setUpdatedBy(findEmployeeByUsername(updatedByUsername).orElse(null));
 
         // Set description for new settings
         if (setting.getId() == null) {
@@ -72,7 +78,7 @@ public class AppSettingService {
         }
 
         appSettingRepository.save(setting);
-        log.info("Updated setting: {} = {} by {}", key, value, updatedBy);
+        log.info("Updated setting: {} = {} by {}", key, value, updatedByUsername);
     }
 
     /**
@@ -80,14 +86,16 @@ public class AppSettingService {
      */
     @Transactional
     @CacheEvict(value = "appSettings", allEntries = true)
-    public void updateSettings(Map<String, String> settings, String updatedBy) {
+    public void updateSettings(Map<String, String> settings, String updatedByUsername) {
+        Optional<Employees> employee = findEmployeeByUsername(updatedByUsername);
+
         settings.forEach((key, value) -> {
             AppSetting setting = appSettingRepository.findByKey(key)
                     .orElse(new AppSetting());
 
             setting.setKey(key);
             setting.setValue(value);
-            setting.setUpdatedBy(updatedBy);
+            setting.setUpdatedBy(employee.orElse(null));
 
             if (setting.getId() == null) {
                 setting.setDescription(getDescriptionForKey(key));
@@ -95,7 +103,7 @@ public class AppSettingService {
 
             appSettingRepository.save(setting);
         });
-        log.info("Bulk updated {} settings by {}", settings.size(), updatedBy);
+        log.info("Bulk updated {} settings by {}", settings.size(), updatedByUsername);
     }
 
     /**
@@ -129,5 +137,17 @@ public class AppSettingService {
             case QR_DESCRIPTION_PREFIX -> "Tiền tố nội dung chuyển khoản (vd: PTCMSS)";
             default -> "";
         };
+    }
+
+    /**
+     * Tìm Employee từ username
+     */
+    private Optional<Employees> findEmployeeByUsername(String username) {
+        if (username == null || username.trim().isEmpty()) {
+            return Optional.empty();
+        }
+
+        return usersRepository.findByUsername(username)
+                .flatMap(user -> employeeRepository.findByUserId(user.getId()));
     }
 }

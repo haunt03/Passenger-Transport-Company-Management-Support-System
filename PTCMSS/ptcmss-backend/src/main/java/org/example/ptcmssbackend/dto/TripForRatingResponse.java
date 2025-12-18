@@ -18,6 +18,8 @@ public class TripForRatingResponse {
     private String driverName;
     private Integer customerId;
     private String customerName;
+    private String customerPhone;
+    private String customerAddress;
     private String startLocation;
     private String endLocation;
     private Instant startTime;

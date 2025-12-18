@@ -22,7 +22,7 @@ public class VehicleCategoryController {
 
     @Operation(summary = "Lấy danh sách loại xe", description = "Lấy danh sách loại xe")
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT','COORDINATOR','ACCOUNTANT')")
     public ResponseEntity<ApiResponse<?>> list() {
         List<VehicleCategoryResponse> data = categoryService.listAll();
         return ResponseEntity.ok(ApiResponse.builder().success(true).message("OK").data(data).build());
@@ -30,7 +30,7 @@ public class VehicleCategoryController {
 
     @Operation(summary = "Lấy thông tin loại xe", description = "Lấy thông tin chi tiết của một loại xe")
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT','COORDINATOR','ACCOUNTANT')")
     public ResponseEntity<ApiResponse<?>> get(@PathVariable Integer id) {
         return ResponseEntity.ok(ApiResponse.builder().success(true).message("OK").data(categoryService.getById(id)).build());
     }

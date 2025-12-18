@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.ptcmssbackend.dto.request.Auth.ForgotPasswordRequest;
@@ -14,7 +15,6 @@ import org.example.ptcmssbackend.service.AuthenticationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.view.RedirectView;
-import jakarta.validation.Valid;
 
 @Slf4j(topic = "AUTH_CONTROLLER")
 @RestController
@@ -85,7 +85,7 @@ public class AuthController {
         return new RedirectView(frontendUrl);
     }
 
-    // ---------------- FORGOT PASSWORD ----------------
+    // ---------------- FORGOT PASSWORD ---------------- 
     @Operation(
             summary = "Quên mật khẩu",
             description = "Gửi email chứa link đặt lại mật khẩu đến địa chỉ email đã đăng ký.",
@@ -140,5 +140,25 @@ public class AuthController {
                     .message(e.getMessage())
                     .build());
         }
+    }
+
+    // ---------------- LOGOUT ----------------
+    @Operation(
+            summary = "Đăng xuất",
+            description = "Đăng xuất người dùng. Frontend sẽ xóa token khỏi localStorage.",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Đăng xuất thành công")
+            }
+    )
+    @PostMapping("/logout")
+    public ResponseEntity<org.example.ptcmssbackend.dto.response.common.ApiResponse<String>> logout() {
+        log.info("[LOGOUT] Logout request received");
+        // Logout chỉ cần trả về success, frontend sẽ xóa token
+        // Nếu cần invalidate token trên server, có thể thêm logic ở đây
+        return ResponseEntity.ok(org.example.ptcmssbackend.dto.response.common.ApiResponse.<String>builder()
+                .success(true)
+                .message("Đăng xuất thành công")
+                .data("Đã đăng xuất")
+                .build());
     }
 }

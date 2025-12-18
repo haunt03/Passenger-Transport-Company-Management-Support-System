@@ -82,6 +82,22 @@ public class ManagerDashboardController {
     }
 
     /**
+     * Get vehicle booking performance for branch (vehicles ordered by booking count)
+     * GET /api/v1/manager/analytics/vehicle-booking-performance?branchId=1&limit=5&period=THIS_MONTH
+     */
+    @GetMapping("/analytics/vehicle-booking-performance")
+    @Operation(summary = "Get top vehicle booking performance")
+    public ResponseEntity<List<Map<String, Object>>> getVehicleBookingPerformance(
+            @RequestParam Integer branchId,
+            @RequestParam(required = false, defaultValue = "5") Integer limit,
+            @RequestParam(required = false, defaultValue = "THIS_MONTH") String period
+    ) {
+        log.info("GET /api/v1/manager/analytics/vehicle-booking-performance - branchId: {}, limit: {}, period: {}", branchId, limit, period);
+        List<Map<String, Object>> performance = analyticsService.getVehicleBookingPerformance(branchId, limit, period);
+        return ResponseEntity.ok(performance);
+    }
+
+    /**
      * Get vehicle utilization for branch
      * GET /api/v1/manager/analytics/vehicle-utilization?branchId=1
      */

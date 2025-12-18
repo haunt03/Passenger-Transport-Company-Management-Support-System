@@ -41,7 +41,7 @@ public class RoleController {
 
     @Operation(summary = "Danh sách vai trò", description = "Lấy danh sách tất cả các vai trò trong hệ thống.")
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'ACCOUNTANT')")
     public ResponseEntity<List<Roles>> getAllRoles(
             @Parameter(description = "Từ khóa tìm kiếm") @RequestParam(required = false) String keyword,
             @Parameter(description = "Trạng thái vai trò") @RequestParam(required = false) UserStatus status) {

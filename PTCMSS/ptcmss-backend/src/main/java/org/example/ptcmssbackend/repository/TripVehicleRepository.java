@@ -39,7 +39,7 @@ public interface TripVehicleRepository extends JpaRepository<TripVehicles, Integ
     @Query("SELECT DISTINCT tv.vehicle.id FROM TripVehicles tv JOIN tv.trip t " +
             "WHERE (:branchId IS NULL OR tv.vehicle.branch.id = :branchId) " +
             "AND (:categoryId IS NULL OR tv.vehicle.category.id = :categoryId) " +
-            "AND (t.status IN (org.example.ptcmssbackend.enums.TripStatus.SCHEDULED, org.example.ptcmssbackend.enums.TripStatus.ONGOING)) " +
+            "AND (t.status IN (org.example.ptcmssbackend.enums.TripStatus.SCHEDULED, org.example.ptcmssbackend.enums.TripStatus.ASSIGNED, org.example.ptcmssbackend.enums.TripStatus.ONGOING)) " +
             "AND (:start IS NULL OR t.endTime > :start) " +
             "AND (:end IS NULL OR t.startTime < :end)")
     List<Integer> findBusyVehicleIds(
@@ -62,4 +62,11 @@ public interface TripVehicleRepository extends JpaRepository<TripVehicles, Integ
      * Lấy danh sách TripVehicles theo tripId
      */
     List<TripVehicles> findByTrip_Id(Integer tripId);
+
+    /**
+     * Lấy danh sách TripVehicles theo nhiều tripIds
+     */
+    @Query("SELECT tv FROM TripVehicles tv JOIN FETCH tv.vehicle JOIN FETCH tv.trip WHERE tv.trip.id IN :tripIds")
+    List<TripVehicles> findByTrip_IdIn(@Param("tripIds") List<Integer> tripIds);
 }
+

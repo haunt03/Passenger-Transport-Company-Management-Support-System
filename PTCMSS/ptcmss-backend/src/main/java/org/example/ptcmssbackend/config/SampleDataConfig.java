@@ -15,11 +15,11 @@ import java.util.List; // Import List
 @RequiredArgsConstructor
 public class SampleDataConfig {
 
-//    private final SystemSettingRepository repo;
-//
-//    @Bean
-//    CommandLineRunner seed() {
-//        return args -> {
+    private final SystemSettingRepository repo;
+
+    @Bean
+    CommandLineRunner seed() {
+        return args -> {
 //            // Chỉ seed khi database chưa có setting nào
 //            if (repo.count() == 0) {
 //
@@ -56,6 +56,6 @@ public class SampleDataConfig {
 //
 //                System.out.println("Đã seed 3 system settings vào database.");
 //            }
-//        };
-//    }
+        };
+    }
 }

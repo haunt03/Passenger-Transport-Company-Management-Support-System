@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hóa đơn</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #0079BC;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #0079BC;
+            margin: 0;
+            font-size: 28px;
+        }
+        .invoice-details {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+        .label {
+            font-weight: 600;
+            color: #555;
+        }
+        .value {
+            color: #333;
+            font-weight: 500;
+        }
+        .amount {
+            font-size: 24px;
+            color: #0079BC;
+            font-weight: bold;
+        }
+        .note {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+            color: #666;
+            font-size: 14px;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 30px;
+            background-color: #0079BC;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-weight: 600;
+        }
+        .button:hover {
+            background-color: #005a8c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧾 HÓA ĐƠN</h1>
+            <p style="color: #666; margin: 10px 0 0 0;">PTCMSS - Hệ thống quản lý vận tải</p>
+        </div>
+
+        <p>Kính gửi: <strong th:text="${customerName}">Quý khách</strong>,</p>
+        
+        <p>Chúng tôi gửi đến quý khách hóa đơn với thông tin chi tiết như sau:</p>
+
+        <div class="invoice-details">
+            <div class="detail-row">
+                <span class="label">Số hóa đơn:</span>
+                <span class="value" th:text="${invoiceNumber}">INV-2025-001</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Số tiền:</span>
+                <span class="value amount" th:text="${amount} + ' VNĐ'">5,000,000 VNĐ</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Hạn thanh toán:</span>
+                <span class="value" th:text="${dueDate}">2025-12-31</span>
+            </div>
+        </div>
+
+        <div th:if="${note != null and note != ''}" class="note">
+            <strong>📝 Ghi chú:</strong><br>
+            <span th:text="${note}">Ghi chú về hóa đơn</span>
+        </div>
+
+        <div style="text-align: center;">
+            <a th:if="${invoiceUrl != null and invoiceUrl != ''}" 
+               th:href="${invoiceUrl}" 
+               class="button">
+                Xem chi tiết hóa đơn
+            </a>
+        </div>
+
+        <p style="margin-top: 30px;">
+            Vui lòng thanh toán trước ngày <strong th:text="${dueDate}">hạn thanh toán</strong> 
+            để tránh phát sinh phí chậm thanh toán.
+        </p>
+
+        <p>
+            Nếu quý khách có bất kỳ thắc mắc nào, vui lòng liên hệ với chúng tôi qua email này 
+            hoặc hotline: <strong>1900-xxxx</strong>
+        </p>
+
+        <div class="footer">
+            <p style="margin: 5px 0;">
+                <strong>PTCMSS - Hệ thống quản lý vận tải</strong>
+            </p>
+            <p style="margin: 5px 0; color: #999; font-size: 12px;">
+                Email này được gửi tự động, vui lòng không trả lời trực tiếp.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

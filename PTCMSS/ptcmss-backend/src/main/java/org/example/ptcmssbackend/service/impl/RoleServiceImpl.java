@@ -20,7 +20,7 @@ public class RoleServiceImpl implements RoleService {
     @Override
     public Roles createRole(CreateRoleRequest request) {
         if (rolesRepository.findByRoleName(request.getRoleName()).isPresent()) {
-            throw new RuntimeException("Role name already exists");
+            throw new RuntimeException("Tên vai trò đã tồn tại");
         }
         Roles role = new Roles();
         role.setRoleName(request.getRoleName());
@@ -32,7 +32,7 @@ public class RoleServiceImpl implements RoleService {
     @Override
     public Roles updateRole(Integer id, UpdateRoleRequest request) {
         Roles role = rolesRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Role not found"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy vai trò"));
         if (request.getRoleName() != null)
             role.setRoleName(request.getRoleName());
         if (request.getDescription() != null)
@@ -53,7 +53,7 @@ public class RoleServiceImpl implements RoleService {
     @Override
     public Roles getRoleById(Integer id) {
         return rolesRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Role not found"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy vai trò"));
     }
 
     @Override

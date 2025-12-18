@@ -31,6 +31,11 @@ public interface CustomerService {
     CustomerResponse toResponse(Customers customer);
 
     /**
+     * Lấy thông tin khách hàng theo ID
+     */
+    CustomerResponse getById(Integer customerId);
+
+    /**
      * Danh sách customer với filter và phân trang
      * Nếu userId được cung cấp và user là MANAGER, tự động filter theo chi nhánh của manager
      */

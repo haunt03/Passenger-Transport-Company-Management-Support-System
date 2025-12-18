@@ -12,7 +12,6 @@ export async function createPayment(payload) {
     let branchId = payload.branchId;
     if (!branchId) {
         try {
-            // Lấy thông tin booking để có branchId
             const bookingRes = await axios.get(`/api/bookings/${bookingId}`);
             branchId = bookingRes.data?.data?.branchId || bookingRes.data?.branchId;
         } catch (e) {
@@ -22,12 +21,15 @@ export async function createPayment(payload) {
 
     // Gọi API deposit endpoint (cho phép DRIVER)
     const res = await axios.post(`/api/deposits/bookings/${bookingId}`, {
-        branchId: branchId,
-        bookingId: bookingId,
-        type: "INCOME", // Required field
-        amount: amount,
-        paymentMethod: paymentMethod === "TRANSFER" ? "BANK_TRANSFER" : (paymentMethod || "CASH"),
-        isDeposit: false, // Đây là thanh toán, không phải cọc
+        branchId,
+        bookingId,
+        type: "INCOME",
+        amount,
+        paymentMethod:
+            paymentMethod === "TRANSFER"
+                ? "BANK_TRANSFER"
+                : paymentMethod || "CASH",
+        isDeposit: false,
         note: note || `Thu tiền từ khách - Booking #${bookingId}`,
         paymentTerms: "NET_0",
         dueDate: new Date().toISOString().split("T")[0],
@@ -48,8 +50,10 @@ export async function getPaymentHistory(invoiceId) {
  * Xác nhận thanh toán (kế toán)
  */
 export async function confirmPayment(paymentId, status) {
-    const res = await axios.patch(`/api/invoices/payments/${paymentId}/confirm`, null, {
-        params: { status }
-    });
+    const res = await axios.patch(
+        `/api/invoices/payments/${paymentId}/confirm`,
+        null,
+        { params: { status } }
+    );
     return res.data?.data || res.data;
 }

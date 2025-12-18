@@ -1,14 +1,39 @@
 spring:
+  config:
+    activate:
+      on-profile: prod
+
   datasource:
-    url: jdbc:mysql://mysql:3306/ptcmss_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-    username: root
-    password: root
+    url: jdbc:mysql://${DB_HOST:mysql}:${DB_PORT:3306}/${DB_NAME:ptcmss_db}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
+
   jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
+    show-sql: ${JPA_SHOW_SQL:false}
+    properties:
+      hibernate:
+        format_sql: ${HIBERNATE_FORMAT_SQL:false}
+        dialect: org.hibernate.dialect.MySQLDialect
+
+  sql:
+    init:
+      mode: ${SQL_INIT_MODE:never}   # nếu bạn cần seed demo trên prod => set ENV SQL_INIT_MODE=always
+      continue-on-error: false
+
 server:
-  port: 8080
-management:
-  endpoints:
-    web.exposure.include: health,info
+  port: ${SERVER_PORT:8080}
+  address: 0.0.0.0
+
+springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_ENABLED:false}
+  swagger-ui:
+    enabled: ${SWAGGER_UI_ENABLED:false}
+
+openapi:
+  service:
+    server: ${OPENAPI_SERVER:https://api.hethongvantai.site}
+
+app:
+  base-url: ${APP_BASE_URL:https://api.hethongvantai.site}
+  frontend-url: ${APP_FRONTEND_URL:https://hethongvantai.site}

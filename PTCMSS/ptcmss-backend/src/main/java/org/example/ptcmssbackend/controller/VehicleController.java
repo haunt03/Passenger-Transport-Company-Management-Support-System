@@ -74,7 +74,7 @@ public class VehicleController {
                         .data(pageResponse)
                         .build());
             }
-
+            
             // Nếu không có pagination, trả về list như cũ (backward compatible)
             List<VehicleResponse> list;
             if (licensePlate != null && !licensePlate.isBlank()) {
@@ -99,7 +99,7 @@ public class VehicleController {
 
     @Operation(summary = "Chi tiết phương tiện theo ID")
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT','CONSULTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT','CONSULTANT','COORDINATOR')")
     public ResponseEntity<ApiResponse<?>> getById(@PathVariable Integer id) {
         try {
             VehicleResponse response = vehicleService.getById(id);
@@ -118,7 +118,7 @@ public class VehicleController {
 
     @Operation(summary = "Cập nhật thông tin xe")
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','COORDINATOR')")
     public ResponseEntity<ApiResponse<?>> update(@PathVariable Integer id, @RequestBody VehicleRequest request) {
         try {
             VehicleResponse response = vehicleService.update(id, request);
@@ -157,7 +157,7 @@ public class VehicleController {
 
     @Operation(summary = "Lịch sử chuyến đi của phương tiện", description = "Tab 3 trong Vehicle Detail")
     @GetMapping("/{id}/trips")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT','CONSULTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT','CONSULTANT','COORDINATOR')")
     public ResponseEntity<ApiResponse<?>> getVehicleTrips(
             @Parameter(description = "ID phương tiện") @PathVariable Integer id) {
         try {
@@ -176,7 +176,7 @@ public class VehicleController {
 
     @Operation(summary = "Lịch sử chi phí vận hành của phương tiện", description = "Tab 2 trong Vehicle Detail (xăng dầu, cầu đường, sửa chữa)")
     @GetMapping("/{id}/expenses")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT','COORDINATOR')")
     public ResponseEntity<ApiResponse<?>> getVehicleExpenses(
             @Parameter(description = "ID phương tiện") @PathVariable Integer id) {
         try {
@@ -195,7 +195,7 @@ public class VehicleController {
 
     @Operation(summary = "Lịch sử bảo trì và đăng kiểm của phương tiện", description = "Tab 1 trong Vehicle Detail")
     @GetMapping("/{id}/maintenance")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT','COORDINATOR')")
     public ResponseEntity<ApiResponse<?>> getVehicleMaintenance(
             @Parameter(description = "ID phương tiện") @PathVariable Integer id) {
         try {
@@ -256,9 +256,19 @@ public class VehicleController {
 
     @Operation(summary = "Lọc xe theo chi nhánh", description = "Lấy danh sách xe theo chi nhánh")
     @GetMapping("/branch/{branchId}")
-    public ResponseEntity<?> getVehiclesByBranch(@PathVariable Integer branchId) {
+    public ResponseEntity<?> getVehiclesByBranch(
+            @PathVariable Integer branchId,
+            @RequestParam(required = false) Integer driverId
+    ) {
         try {
-            List<VehicleResponse> vehicles = vehicleService.getVehiclesByBranch(branchId);
+            List<VehicleResponse> vehicles;
+            if (driverId != null) {
+                // Nếu có driverId, chỉ trả về xe mà driver đã lái
+                vehicles = vehicleService.getVehiclesByBranchAndDriver(branchId, driverId);
+            } else {
+                // Nếu không có driverId, trả về tất cả xe của branch
+                vehicles = vehicleService.getVehiclesByBranch(branchId);
+            }
             return ResponseEntity.ok(vehicles);
         } catch (Exception ex) {
             log.error("[Vehicle] Error get vehicles for branch {}: {}", branchId, ex.getMessage());

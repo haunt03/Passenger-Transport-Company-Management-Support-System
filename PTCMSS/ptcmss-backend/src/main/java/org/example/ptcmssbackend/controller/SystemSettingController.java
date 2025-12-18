@@ -23,14 +23,22 @@ public class SystemSettingController {
 
     @Operation(summary = "Lấy danh sách system settings")
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT')")
     public ResponseEntity<List<SystemSettingResponse>> getAll() {
         return ResponseEntity.ok(repo.getAll());
     }
 
+    @Operation(summary = "Lấy system setting theo key")
+    @GetMapping("/key/{settingKey}")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT','COORDINATOR','DRIVER')")
+    public ResponseEntity<SystemSettingResponse> getByKey(
+            @Parameter(description = "KEY setting") @PathVariable String settingKey) {
+        return ResponseEntity.ok(repo.getByKey(settingKey));
+    }
+
     @Operation(summary = "Lấy chi tiết system setting")
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT')")
     public ResponseEntity<SystemSettingResponse> getById(
             @Parameter(description = "ID setting") @PathVariable Integer id) {
         return ResponseEntity.ok(repo.getById(id));

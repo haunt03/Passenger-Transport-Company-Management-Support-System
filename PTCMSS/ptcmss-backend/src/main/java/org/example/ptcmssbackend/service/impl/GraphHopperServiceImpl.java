@@ -129,12 +129,12 @@ public class GraphHopperServiceImpl implements GraphHopperService {
         try {
             Map<String, Object> response = restTemplate.postForObject(url, requestBody, Map.class);
             if (response == null || !response.containsKey("paths")) {
-                throw new RuntimeException("GraphHopper Routing API returned null or no paths");
+                throw new RuntimeException("API tính tuyến đường không trả về kết quả");
             }
 
             List<Map<String, Object>> paths = (List<Map<String, Object>>) response.get("paths");
             if (paths == null || paths.isEmpty()) {
-                throw new RuntimeException("No route found between the two addresses");
+                throw new RuntimeException("Không tìm thấy tuyến đường giữa hai địa chỉ");
             }
 
             // Get the first (best) route
@@ -191,7 +191,7 @@ public class GraphHopperServiceImpl implements GraphHopperService {
         try {
             Map<String, Object> response = restTemplate.postForObject(url, requestBody, Map.class);
             if (response == null || !response.containsKey("paths")) {
-                throw new RuntimeException("No routes returned");
+                throw new RuntimeException("Không tìm được tuyến đường");
             }
 
             List<Map<String, Object>> paths = (List<Map<String, Object>>) response.get("paths");

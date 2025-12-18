@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 import org.example.ptcmssbackend.dto.validator.PhoneNumber;
+import org.example.ptcmssbackend.enums.UserStatus;
 
 @Getter
 @Setter
@@ -30,4 +31,7 @@ public class CreateUserRequest {
 
     @NotNull(message = "Branch id is required")
     private Integer branchId;
+
+    // Optional: Nếu không set, mặc định là INACTIVE
+    private UserStatus status;
 }

@@ -8,8 +8,7 @@ import org.example.ptcmssbackend.dto.response.Vehicle.VehicleMaintenanceResponse
 import org.example.ptcmssbackend.dto.response.Vehicle.VehicleResponse;
 import org.example.ptcmssbackend.dto.response.Vehicle.VehicleTripResponse;
 import org.example.ptcmssbackend.dto.response.common.PageResponse;
-import org.example.ptcmssbackend.entity.Vehicles;
-import org.example.ptcmssbackend.enums.VehicleStatus;
+
 import java.util.List;
 
 public interface VehicleService {
@@ -21,7 +20,7 @@ public interface VehicleService {
     List<VehicleResponse> filter(Integer categoryId, Integer branchId, String status);
     PageResponse<?> getAllWithPagination(String licensePlate, Integer categoryId, Integer branchId, String status, int page, int size, String sortBy);
     void delete(Integer id);
-
+    
     // New methods for vehicle detail tabs
     List<VehicleTripResponse> getVehicleTrips(Integer vehicleId);
     List<VehicleExpenseResponse> getVehicleExpenses(Integer vehicleId);
@@ -31,5 +30,6 @@ public interface VehicleService {
     VehicleMaintenanceResponse createMaintenance(Integer vehicleId, CreateMaintenanceRequest request);
     VehicleExpenseResponse createExpense(Integer vehicleId, CreateExpenseRequest request);
     List<VehicleResponse> getVehiclesByBranch(Integer branchId);
+    List<VehicleResponse> getVehiclesByBranchAndDriver(Integer branchId, Integer driverId);
 }
 

@@ -293,7 +293,7 @@ public class BookingController {
     }
 
     @GetMapping("/{id}/payments")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT','ACCOUNTANT','DRIVER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT','ACCOUNTANT','DRIVER','COORDINATOR')")
     public ResponseEntity<ApiResponse<java.util.List<PaymentResponse>>> listPayments(
             @PathVariable Integer id
     ) {
@@ -382,10 +382,18 @@ public class BookingController {
             @Parameter(description = "Thời gian kết thúc (ISO format) - để check chuyến trong ngày") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant endTime
     ) {
         try {
+            // 🔍 LOG BACKEND: Request nhận được
+            log.info("🔴 [BACKEND] Calculate Price Request received: vehicleCategoryIds={}, quantities={}, distance={}, useHighway={}, hireTypeId={}, isHoliday={}, isWeekend={}, startTime={}, endTime={}",
+                    vehicleCategoryIds, quantities, distance, useHighway, hireTypeId, isHoliday, isWeekend, startTime, endTime);
+
             // Sử dụng overloaded method với các tham số mới
             java.math.BigDecimal price = ((org.example.ptcmssbackend.service.impl.BookingServiceImpl) bookingService)
                     .calculatePrice(vehicleCategoryIds, quantities, distance, useHighway,
                             hireTypeId, isHoliday, isWeekend, startTime, endTime);
+
+            // 🔍 LOG BACKEND: Kết quả trả về
+            log.info("🟢 [BACKEND] Calculate Price Response: price={} VNĐ", price);
+
             return ResponseEntity.ok(ApiResponse.<java.math.BigDecimal>builder()
                     .success(true)
                     .message("Tính giá thành công")

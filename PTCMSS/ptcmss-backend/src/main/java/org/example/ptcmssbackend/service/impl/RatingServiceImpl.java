@@ -31,7 +31,7 @@ public class RatingServiceImpl implements RatingService {
     private final DriverRepository driversRepository;
     private final UsersRepository usersRepository;
     private final CustomerRepository customersRepository;
-    private final TripDriverRepository tripDriversRepository;
+    private final TripDriverRepository tripDriverRepository;
     private final BookingRepository bookingRepository;
     private final NotificationRepository notificationRepository;
     private final WebSocketNotificationService webSocketNotificationService;
@@ -55,8 +55,20 @@ public class RatingServiceImpl implements RatingService {
         }
 
         // Get driver from trip (via TripDrivers)
-        TripDrivers tripDriver = tripDriversRepository.findMainDriverByTripId(request.getTripId())
-                .orElseThrow(() -> new RuntimeException("Chưa có tài xế được phân công cho chuyến đi này"));
+        TripDrivers tripDriver = null;
+        try {
+            tripDriver = tripDriverRepository.findFirstMainDriverByTripId(request.getTripId());
+        } catch (Exception e) {
+            // Fallback: get first driver from trip
+            List<TripDrivers> tripDrivers = tripDriverRepository.findByTrip_Id(request.getTripId());
+            if (!tripDrivers.isEmpty()) {
+                tripDriver = tripDrivers.get(0);
+            }
+        }
+
+        if (tripDriver == null) {
+            throw new RuntimeException("Chưa có tài xế được phân công cho chuyến đi này");
+        }
         Drivers driver = tripDriver.getDriver();
 
         // Get customer
@@ -78,7 +90,16 @@ public class RatingServiceImpl implements RatingService {
         rating.setRatedBy(ratedByUser);
         rating.setRatedAt(Instant.now());
 
-        // Save (trigger will calculate overallRating)
+        // Calculate overallRating as average of 4 criteria
+        BigDecimal overallRating = calculateOverallRating(
+                request.getPunctualityRating(),
+                request.getAttitudeRating(),
+                request.getSafetyRating(),
+                request.getComplianceRating()
+        );
+        rating.setOverallRating(overallRating);
+
+        // Save
         rating = ratingsRepository.save(rating);
 
         // Update driver's overall rating (30-day average)
@@ -167,6 +188,38 @@ public class RatingServiceImpl implements RatingService {
         }
     }
 
+    /**
+     * Calculate overall rating as average of 4 criteria
+     */
+    private BigDecimal calculateOverallRating(Integer punctuality, Integer attitude,
+                                              Integer safety, Integer compliance) {
+        int count = 0;
+        BigDecimal sum = BigDecimal.ZERO;
+
+        if (punctuality != null) {
+            sum = sum.add(BigDecimal.valueOf(punctuality));
+            count++;
+        }
+        if (attitude != null) {
+            sum = sum.add(BigDecimal.valueOf(attitude));
+            count++;
+        }
+        if (safety != null) {
+            sum = sum.add(BigDecimal.valueOf(safety));
+            count++;
+        }
+        if (compliance != null) {
+            sum = sum.add(BigDecimal.valueOf(compliance));
+            count++;
+        }
+
+        if (count == 0) {
+            return BigDecimal.ZERO;
+        }
+
+        return sum.divide(BigDecimal.valueOf(count), 2, RoundingMode.HALF_UP);
+    }
+
     private BigDecimal calculateAverage(List<DriverRatings> ratings,
                                         java.util.function.Function<DriverRatings, Object> getter) {
         if (ratings.isEmpty()) {
@@ -222,10 +275,13 @@ public class RatingServiceImpl implements RatingService {
     }
 
     @Override
-    public List<TripForRatingResponse> getCompletedTripsForRating() {
-        log.info("Getting completed trips for rating");
+    public List<TripForRatingResponse> getCompletedTripsForRating(Integer branchId) {
+        log.info("Getting completed trips for rating, branchId: {}", branchId);
 
-        List<Trips> completedTrips = tripsRepository.findByStatusOrderByEndTimeDesc(TripStatus.COMPLETED);
+        List<Trips> completedTrips = tripsRepository.findByStatusAndBranchIdOrderByEndTimeDesc(
+                TripStatus.COMPLETED,
+                branchId
+        );
 
         return completedTrips.stream()
                 .map(this::mapTripToResponse)
@@ -233,8 +289,19 @@ public class RatingServiceImpl implements RatingService {
     }
 
     private TripForRatingResponse mapTripToResponse(Trips trip) {
-        // Get main driver
-        TripDrivers tripDriver = tripDriversRepository.findMainDriverByTripId(trip.getId()).orElse(null);
+        // Get main driver - handle case where multiple main drivers exist (take first one)
+        TripDrivers tripDriver = null;
+        try {
+            // Try to get first main driver using native query with LIMIT
+            tripDriver = tripDriverRepository.findFirstMainDriverByTripId(trip.getId());
+        } catch (Exception e) {
+            // Fallback: get first driver from trip if native query fails
+            log.warn("Error getting main driver for trip {}, using first driver: {}", trip.getId(), e.getMessage());
+            List<TripDrivers> tripDrivers = tripDriverRepository.findByTrip_Id(trip.getId());
+            if (!tripDrivers.isEmpty()) {
+                tripDriver = tripDrivers.get(0);
+            }
+        }
 
         String driverName = null;
         Integer driverId = null;
@@ -249,9 +316,14 @@ public class RatingServiceImpl implements RatingService {
         // Get customer
         String customerName = null;
         Integer customerId = null;
+        String customerPhone = null;
+        String customerAddress = null;
         if (trip.getBooking() != null && trip.getBooking().getCustomer() != null) {
-            customerId = trip.getBooking().getCustomer().getId();
-            customerName = trip.getBooking().getCustomer().getFullName();
+            var customer = trip.getBooking().getCustomer();
+            customerId = customer.getId();
+            customerName = customer.getFullName();
+            customerPhone = customer.getPhone();
+            customerAddress = customer.getAddress();
         }
 
         return TripForRatingResponse.builder()
@@ -261,6 +333,8 @@ public class RatingServiceImpl implements RatingService {
                 .driverName(driverName)
                 .customerId(customerId)
                 .customerName(customerName)
+                .customerPhone(customerPhone)
+                .customerAddress(customerAddress)
                 .startLocation(trip.getStartLocation())
                 .endLocation(trip.getEndLocation())
                 .startTime(trip.getStartTime())

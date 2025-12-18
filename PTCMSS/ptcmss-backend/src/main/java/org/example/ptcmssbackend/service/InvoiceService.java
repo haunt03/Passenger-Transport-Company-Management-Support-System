@@ -27,6 +27,7 @@ public interface InvoiceService {
             LocalDate startDate,
             LocalDate endDate,
             Integer customerId,
+            String keyword,
             Pageable pageable
     );
     InvoiceResponse updateInvoice(Integer invoiceId, CreateInvoiceRequest request);

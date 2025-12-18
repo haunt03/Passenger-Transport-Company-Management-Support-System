@@ -52,14 +52,6 @@ public class Bookings {
     @Column(name = "isWeekend")
     private Boolean isWeekend = false;
 
-    @ColumnDefault("0")
-    @Column(name = "additionalPickupPoints")
-    private Integer additionalPickupPoints = 0;
-
-    @ColumnDefault("0")
-    @Column(name = "additionalDropoffPoints")
-    private Integer additionalDropoffPoints = 0;
-
     @CreationTimestamp // Gán thời gian khi tạo booking
     @Column(name = "bookingDate")
     private Instant bookingDate;

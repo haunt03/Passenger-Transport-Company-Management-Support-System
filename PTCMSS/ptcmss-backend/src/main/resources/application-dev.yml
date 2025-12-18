@@ -1,68 +1,36 @@
 spring:
+  config:
+    activate:
+      on-profile: dev
+
+
   datasource:
-    url: jdbc:mysql://localhost:3306/ptcmss_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-    username: root
-    password: root
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:ptcmss_db}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
+
   jpa:
-    hibernate:
-      ddl-auto: update  # Disable DDL auto (DB already exists with correct schema)
     show-sql: true
     properties:
       hibernate:
-        # Use physical naming strategy to match database column names exactly
-        physical_naming_strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
-  mail:
-    host: smtp.gmail.com
-    port: 587
-    username: hethonghotroquanlycongtyvantai@gmail.com
-    password: fzzqyukjsbvegvym
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
-            required: true
-          connectiontimeout: 5000
-          timeout: 5000
-          writetimeout: 5000
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
 
-# GraphHopper Configuration
-graphhopper:
-  api-key: ${GRAPHHOPPER_KEY:56f6f3a5-1958-408c-8788-225991ec1d3d}
+  sql:
+    init:
+      mode: always
+      continue-on-error: false
 
-# VietQR Payment Configuration
-payment:
-  qr:
-    provider-url: https://img.vietqr.io/image
-    bank-code: ${PAYMENT_BANK_CODE:970423}
-    account-number: ${PAYMENT_BANK_ACCOUNT_NUMBER:00005505543}
-    account-name: ${PAYMENT_BANK_ACCOUNT_NAME:NGUYEN THUY HAU}
-    template: compact
-    description-prefix: PTCMSS
-    expires-in-minutes: 120
 springdoc:
   api-docs:
     enabled: true
-    path: /v3/api-docs
   swagger-ui:
     enabled: true
-    path: /swagger-ui.html
+
 openapi:
   service:
-    api-docs: Computer_sell
     server: http://localhost:8080
-    title: Hệ thống hỗ trợ quản lý công ty vận tải hành khách
-    version: 1.0.0
-jwt:
-  expriMinutes: 3600
-  expireDate: 5
-  accesskey: 2mfGKBhdCa0K8X2uV1Fzn9o6sR8V0s5GUelGlxsFQAc=
-  refreshkey: /AqIfLpfbWqy36D3VBmkskYtmnpsJrLpRx00WVRnJlE=
 
-server:
-  port: 8080
-
-management:
-  endpoints:
-    web.exposure.include: health,info
+app:
+  base-url: http://localhost:8080
+  frontend-url: http://localhost:5173

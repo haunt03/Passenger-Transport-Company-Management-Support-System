@@ -153,15 +153,15 @@ public class DebtServiceImpl implements DebtService {
             String invoiceNumber = invoice.getInvoiceNumber();
             String amount = invoice.getAmount().toString();
             String dueDate = invoice.getDueDate() != null ? invoice.getDueDate().toString() : "N/A";
-
+            
             LocalDate today = LocalDate.now();
             Integer daysOverdue = invoice.getDueDate() != null && invoice.getDueDate().isBefore(today)
                     ? (int) java.time.temporal.ChronoUnit.DAYS.between(invoice.getDueDate(), today)
                     : 0;
-
-            String message = request.getMessage() != null ? request.getMessage() :
+            
+            String message = request.getMessage() != null ? request.getMessage() : 
                     "Vui lòng thanh toán hóa đơn #" + invoiceNumber + " sớm nhất có thể.";
-
+            
             switch (reminderType) {
                 case "EMAIL":
                     if (customerEmail != null) {
@@ -255,7 +255,7 @@ public class DebtServiceImpl implements DebtService {
         response.setBookingId(invoice.getBooking() != null ? invoice.getBooking().getId() : null);
         response.setTotalAmount(invoice.getAmount());
 
-        BigDecimal paidAmount = paymentHistoryRepository.sumByInvoiceId(invoice.getId());
+        BigDecimal paidAmount = paymentHistoryRepository.sumConfirmedByInvoiceId(invoice.getId());
         response.setPaidAmount(paidAmount != null ? paidAmount : BigDecimal.ZERO);
         response.setBalance(invoiceService.calculateBalance(invoice.getId()));
 
@@ -295,3 +295,4 @@ public class DebtServiceImpl implements DebtService {
         return response;
     }
 }
+

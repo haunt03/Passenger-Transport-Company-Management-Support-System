@@ -41,13 +41,21 @@ public class AdminSettingsController {
                     .findFirst()
                     .orElse(null);
 
+            // Get username from Employee if exists
+            String updatedByUsername = null;
+            if (bankCodeSetting != null && bankCodeSetting.getUpdatedBy() != null) {
+                updatedByUsername = bankCodeSetting.getUpdatedBy().getUser() != null
+                        ? bankCodeSetting.getUpdatedBy().getUser().getUsername()
+                        : null;
+            }
+
             QrSettingsResponse response = QrSettingsResponse.builder()
                     .bankCode(settings.get(AppSettingService.QR_BANK_CODE))
                     .accountNumber(settings.get(AppSettingService.QR_ACCOUNT_NUMBER))
                     .accountName(settings.get(AppSettingService.QR_ACCOUNT_NAME))
                     .descriptionPrefix(settings.get(AppSettingService.QR_DESCRIPTION_PREFIX))
                     .updatedAt(bankCodeSetting != null ? bankCodeSetting.getUpdatedAt() : null)
-                    .updatedBy(bankCodeSetting != null ? bankCodeSetting.getUpdatedBy() : null)
+                    .updatedBy(updatedByUsername)
                     .source(bankCodeSetting != null ? "database" : "config")
                     .build();
 

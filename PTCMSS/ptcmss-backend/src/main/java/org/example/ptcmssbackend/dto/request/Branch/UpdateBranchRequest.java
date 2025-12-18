@@ -1,5 +1,6 @@
 package org.example.ptcmssbackend.dto.request.Branch;
 
+import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 import org.example.ptcmssbackend.enums.BranchStatus;

@@ -25,6 +25,7 @@ public class AdminDashboardResponse {
     private Integer completedTrips;
     private Integer ongoingTrips;
     private Integer scheduledTrips;
+    private BigDecimal totalKm; // Total kilometers driven in completed trips
     private Double fleetUtilization; // Percentage (0-100)
 
     // Vehicle stats

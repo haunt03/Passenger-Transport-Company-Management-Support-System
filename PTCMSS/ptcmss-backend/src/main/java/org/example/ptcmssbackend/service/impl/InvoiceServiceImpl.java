@@ -89,7 +89,6 @@ public class InvoiceServiceImpl implements InvoiceService {
         invoice.setAmount(request.getAmount());
         invoice.setSubtotal(request.getSubtotal());
         invoice.setVatAmount(request.getVatAmount() != null ? request.getVatAmount() : BigDecimal.ZERO);
-        invoice.setPaymentMethod(request.getPaymentMethod());
         invoice.setPaymentTerms(request.getPaymentTerms() != null ? request.getPaymentTerms() : "NET_7");
         invoice.setPaymentStatus(PaymentStatus.UNPAID);
         invoice.setStatus(InvoiceStatus.ACTIVE);
@@ -104,12 +103,6 @@ public class InvoiceServiceImpl implements InvoiceService {
         } else {
             invoice.setDueDate(request.getDueDate());
         }
-
-        // Bank transfer info
-        invoice.setBankName(request.getBankName());
-        invoice.setBankAccount(request.getBankAccount());
-        invoice.setReferenceNumber(request.getReferenceNumber());
-        invoice.setCashierName(request.getCashierName());
 
         // Generate invoice number
         LocalDate invoiceDate = invoice.getInvoiceDate() != null
@@ -134,7 +127,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     @Override
     public Page<InvoiceListResponse> getInvoices(
             Integer branchId, String type, String status, String paymentStatus,
-            LocalDate startDate, LocalDate endDate, Integer customerId, Pageable pageable) {
+            LocalDate startDate, LocalDate endDate, Integer customerId, String keyword, Pageable pageable) {
 
         InvoiceType invoiceType = null;
         if (type != null) {
@@ -152,6 +145,25 @@ public class InvoiceServiceImpl implements InvoiceService {
 
         List<Invoices> invoices = invoiceRepository.findInvoicesWithFilters(
                 branchId, invoiceType, invoiceStatus, startInstant, endInstant, customerId, paymentStatusEnum);
+
+        // Filter by keyword if provided
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            String keywordLower = keyword.trim().toLowerCase();
+            invoices = invoices.stream()
+                    .filter(inv -> {
+                        String invoiceNo = (inv.getInvoiceNumber() != null ? inv.getInvoiceNumber() : "").toLowerCase();
+                        String customerName = (inv.getCustomer() != null && inv.getCustomer().getFullName() != null
+                                ? inv.getCustomer().getFullName() : "").toLowerCase();
+                        String bookingCode = "";
+                        if (inv.getBooking() != null && inv.getBooking().getId() != null) {
+                            bookingCode = ("ORD-" + inv.getBooking().getId()).toLowerCase();
+                        }
+                        return invoiceNo.contains(keywordLower)
+                                || customerName.contains(keywordLower)
+                                || bookingCode.contains(keywordLower);
+                    })
+                    .collect(Collectors.toList());
+        }
 
         // Manual pagination
         int start = (int) pageable.getOffset();
@@ -180,7 +192,6 @@ public class InvoiceServiceImpl implements InvoiceService {
         if (request.getAmount() != null) invoice.setAmount(request.getAmount());
         if (request.getSubtotal() != null) invoice.setSubtotal(request.getSubtotal());
         if (request.getVatAmount() != null) invoice.setVatAmount(request.getVatAmount());
-        if (request.getPaymentMethod() != null) invoice.setPaymentMethod(request.getPaymentMethod());
         if (request.getPaymentTerms() != null) invoice.setPaymentTerms(request.getPaymentTerms());
         if (request.getDueDate() != null) invoice.setDueDate(request.getDueDate());
         if (request.getNote() != null) invoice.setNote(request.getNote());
@@ -407,18 +418,12 @@ public class InvoiceServiceImpl implements InvoiceService {
         response.setAmount(invoice.getAmount());
         response.setSubtotal(invoice.getSubtotal());
         response.setVatAmount(invoice.getVatAmount());
-        response.setPaymentMethod(invoice.getPaymentMethod());
         response.setPaymentStatus(invoice.getPaymentStatus().toString());
         response.setStatus(invoice.getStatus().toString());
         response.setPaymentTerms(invoice.getPaymentTerms());
         response.setDueDate(invoice.getDueDate());
         response.setInvoiceDate(invoice.getInvoiceDate());
         response.setCreatedAt(invoice.getCreatedAt());
-        response.setBankName(invoice.getBankName());
-        response.setBankAccount(invoice.getBankAccount());
-        response.setReferenceNumber(invoice.getReferenceNumber());
-        response.setCashierName(invoice.getCashierName());
-        response.setReceiptNumber(invoice.getReceiptNumber());
         response.setPromiseToPayDate(invoice.getPromiseToPayDate());
         response.setDebtLabel(invoice.getDebtLabel());
         response.setContactNote(invoice.getContactNote());
@@ -458,6 +463,7 @@ public class InvoiceServiceImpl implements InvoiceService {
         response.setBranchName(invoice.getBranch().getBranchName());
         response.setCustomerId(invoice.getCustomer() != null ? invoice.getCustomer().getId() : null);
         response.setCustomerName(invoice.getCustomer() != null ? invoice.getCustomer().getFullName() : null);
+        response.setCustomerPhone(invoice.getCustomer() != null ? invoice.getCustomer().getPhone() : null);
         response.setCustomerEmail(invoice.getCustomer() != null ? invoice.getCustomer().getEmail() : null);
         response.setBookingId(invoice.getBooking() != null ? invoice.getBooking().getId() : null);
         response.setType(invoice.getType().toString());
@@ -478,6 +484,10 @@ public class InvoiceServiceImpl implements InvoiceService {
                 response.setDaysOverdue((int) java.time.temporal.ChronoUnit.DAYS.between(invoice.getDueDate(), today));
             }
         }
+
+        // Đếm số payment requests đang chờ xác nhận
+        Integer pendingCount = paymentHistoryRepository.countPendingPaymentsByInvoiceId(invoice.getId());
+        response.setPendingPaymentCount(pendingCount != null ? pendingCount : 0);
 
         return response;
     }
@@ -751,20 +761,37 @@ public class InvoiceServiceImpl implements InvoiceService {
             // Tìm tất cả Accountants trong chi nhánh
             List<Employees> accountants = employeeRepository.findByRoleNameAndBranchId("Accountant", branchId);
 
+            String title = "Yêu cầu thanh toán mới";
+            String message = String.format(
+                    "Có yêu cầu thanh toán %s từ %s cho hóa đơn %s cần xác nhận.",
+                    amountStr,
+                    customerName,
+                    invoice.getInvoiceNumber()
+            );
+
             for (Employees accountant : accountants) {
                 if (accountant.getUser() != null) {
+                    // 1. Lưu notification vào DB
                     org.example.ptcmssbackend.entity.Notifications notification = new org.example.ptcmssbackend.entity.Notifications();
                     notification.setUser(accountant.getUser());
-                    notification.setTitle("Yêu cầu thanh toán mới");
-                    notification.setMessage(String.format(
-                            "Có yêu cầu thanh toán %s từ %s cho hóa đơn %s cần xác nhận.",
-                            amountStr,
-                            customerName,
-                            invoice.getInvoiceNumber()
-                    ));
+                    notification.setTitle(title);
+                    notification.setMessage(message);
                     notification.setIsRead(false);
                     notificationRepository.save(notification);
-                    log.debug("[InvoiceService] Sent notification to accountant: {}", accountant.getUser().getUsername());
+
+                    // 2. Gửi WebSocket notification để hiển thị realtime
+                    try {
+                        webSocketNotificationService.sendUserNotification(
+                                accountant.getUser().getId(),
+                                title,
+                                message,
+                                "INFO"
+                        );
+                        log.debug("[InvoiceService] Sent WebSocket notification to accountant: {}", accountant.getUser().getUsername());
+                    } catch (Exception wsErr) {
+                        log.warn("[InvoiceService] Failed to send WebSocket notification to accountant {}: {}",
+                                accountant.getUser().getUsername(), wsErr.getMessage());
+                    }
                 }
             }
 

@@ -18,6 +18,14 @@ public interface TripRepository extends JpaRepository<Trips, Integer> {
     @Query("SELECT t FROM Trips t WHERE t.status = :status ORDER BY t.endTime DESC")
     List<Trips> findByStatusOrderByEndTimeDesc(@Param("status") TripStatus status);
 
+    @Query("SELECT t FROM Trips t WHERE t.status = :status " +
+            "AND (:branchId IS NULL OR t.booking.branch.id = :branchId) " +
+            "ORDER BY t.endTime DESC")
+    List<Trips> findByStatusAndBranchIdOrderByEndTimeDesc(
+            @Param("status") TripStatus status,
+            @Param("branchId") Integer branchId
+    );
+
     // Methods needed by DispatchServiceImpl
     List<Trips> findByBooking_Id(Integer bookingId);
 
@@ -39,4 +47,6 @@ public interface TripRepository extends JpaRepository<Trips, Integer> {
             Instant startTime,
             Instant endTime
     );
+
+
 }
