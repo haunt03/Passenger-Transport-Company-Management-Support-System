@@ -280,7 +280,7 @@ export default function ConsultantDashboardPage() {
                     <div className="flex flex-wrap items-start gap-3">
                         <div className="text-[20px] font-semibold text-slate-900 flex items-center gap-2">
                             <ClipboardList className="h-6 w-6 text-sky-600" />
-                            <span>Consultant Dashboard</span>
+                            <span>Bảng điều khiển tư vấn viên</span>
                         </div>
 
                         <div className="rounded-md border border-slate-200 bg-slate-100 text-[11px] text-slate-600 font-medium px-2 py-[2px] flex items-center gap-1">

@@ -28,6 +28,14 @@ public class SystemSettingController {
         return ResponseEntity.ok(repo.getAll());
     }
 
+    @Operation(summary = "Lấy system setting theo key")
+    @GetMapping("/key/{settingKey}")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT','COORDINATOR','DRIVER')")
+    public ResponseEntity<SystemSettingResponse> getByKey(
+            @Parameter(description = "KEY setting") @PathVariable String settingKey) {
+        return ResponseEntity.ok(repo.getByKey(settingKey));
+    }
+
     @Operation(summary = "Lấy chi tiết system setting")
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT')")

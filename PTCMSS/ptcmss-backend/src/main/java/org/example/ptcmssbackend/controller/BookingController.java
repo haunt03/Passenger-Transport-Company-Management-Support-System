@@ -6,7 +6,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.example.ptcmssbackend.dto.request.Booking.*;
+import org.example.ptcmssbackend.dto.request.Booking.CreateBookingRequest;
+import org.example.ptcmssbackend.dto.request.Booking.CreatePaymentRequest;
+import org.example.ptcmssbackend.dto.request.Booking.AssignRequest;
+import org.example.ptcmssbackend.dto.request.Booking.CheckAvailabilityRequest;
+import org.example.ptcmssbackend.dto.request.Booking.UpdateBookingRequest;
 import org.example.ptcmssbackend.dto.response.Booking.BookingListResponse;
 import org.example.ptcmssbackend.dto.response.Booking.BookingResponse;
 import org.example.ptcmssbackend.dto.response.Booking.ConsultantDashboardResponse;
@@ -244,21 +248,21 @@ public class BookingController {
 
     @PostMapping("/{id}/payments/qr")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT','ACCOUNTANT','DRIVER')")
-    public ResponseEntity<ApiResponse<PaymentResponse>> createQrPayment(
+    public ResponseEntity<ApiResponse<org.example.ptcmssbackend.dto.response.Booking.PaymentResponse>> createQrPayment(
             @Parameter(description = "ID đơn hàng") @PathVariable Integer id,
             @Valid @RequestBody CreatePaymentRequest request
     ) {
         try {
             Integer consultantEmployeeId = getCurrentConsultantEmployeeId();
             var response = paymentService.generateQRCode(id, request.getAmount(), request.getNote(), request.getDeposit(), consultantEmployeeId);
-            return ResponseEntity.ok(ApiResponse.<PaymentResponse>builder()
+            return ResponseEntity.ok(ApiResponse.<org.example.ptcmssbackend.dto.response.Booking.PaymentResponse>builder()
                     .success(true)
                     .message("Đã tạo yêu cầu thanh toán QR")
                     .data(response)
                     .build());
         } catch (Exception e) {
             log.error("Create QR payment failed", e);
-            return ResponseEntity.badRequest().body(ApiResponse.<PaymentResponse>builder()
+            return ResponseEntity.badRequest().body(ApiResponse.<org.example.ptcmssbackend.dto.response.Booking.PaymentResponse>builder()
                     .success(false)
                     .message("Lỗi khi tạo QR thanh toán: " + e.getMessage())
                     .build());
@@ -290,19 +294,19 @@ public class BookingController {
 
     @GetMapping("/{id}/payments")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CONSULTANT','ACCOUNTANT','DRIVER','COORDINATOR')")
-    public ResponseEntity<ApiResponse<List<PaymentResponse>>> listPayments(
+    public ResponseEntity<ApiResponse<java.util.List<PaymentResponse>>> listPayments(
             @PathVariable Integer id
     ) {
         try {
             var payments = paymentService.getPaymentHistory(id);
-            return ResponseEntity.ok(ApiResponse.<List<PaymentResponse>>builder()
+            return ResponseEntity.ok(ApiResponse.<java.util.List<PaymentResponse>>builder()
                     .success(true)
                     .message("OK")
                     .data(payments)
                     .build());
         } catch (Exception e) {
             log.error("Get payment history failed", e);
-            return ResponseEntity.badRequest().body(ApiResponse.<List<PaymentResponse>>builder()
+            return ResponseEntity.badRequest().body(ApiResponse.<java.util.List<PaymentResponse>>builder()
                     .success(false)
                     .message("Lỗi khi lấy lịch sử thanh toán: " + e.getMessage())
                     .build());
@@ -381,15 +385,15 @@ public class BookingController {
             // 🔍 LOG BACKEND: Request nhận được
             log.info("🔴 [BACKEND] Calculate Price Request received: vehicleCategoryIds={}, quantities={}, distance={}, useHighway={}, hireTypeId={}, isHoliday={}, isWeekend={}, startTime={}, endTime={}",
                     vehicleCategoryIds, quantities, distance, useHighway, hireTypeId, isHoliday, isWeekend, startTime, endTime);
-            
+
             // Sử dụng overloaded method với các tham số mới
             java.math.BigDecimal price = ((org.example.ptcmssbackend.service.impl.BookingServiceImpl) bookingService)
                     .calculatePrice(vehicleCategoryIds, quantities, distance, useHighway,
                             hireTypeId, isHoliday, isWeekend, startTime, endTime);
-            
+
             // 🔍 LOG BACKEND: Kết quả trả về
             log.info("🟢 [BACKEND] Calculate Price Response: price={} VNĐ", price);
-            
+
             return ResponseEntity.ok(ApiResponse.<java.math.BigDecimal>builder()
                     .success(true)
                     .message("Tính giá thành công")
@@ -403,7 +407,7 @@ public class BookingController {
                     .build());
         }
     }
-    
+
     /**
      * Tìm customer theo số điện thoại
      */
@@ -438,7 +442,7 @@ public class BookingController {
                             .build());
         }
     }
-    
+
     /**
      * Helper method: Lấy employeeId của consultant hiện tại
      */

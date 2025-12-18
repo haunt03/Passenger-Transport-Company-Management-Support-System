@@ -114,12 +114,19 @@ public class CustomerServiceImpl implements CustomerService {
     }
 
     @Override
+    public CustomerResponse getById(Integer customerId) {
+        Customers customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy khách hàng"));
+        return toResponse(customer);
+    }
+
+    @Override
     public Page<CustomerResponse> listCustomers(String keyword, Integer branchId, Integer userId, LocalDate fromDate, LocalDate toDate, int page, int size) {
         log.info("[CustomerService] List customers - keyword={}, branchId={}, userId={}, from={}, to={}, page={}, size={}",
                 keyword, branchId, userId, fromDate, toDate, page, size);
 
-        // Nếu có userId, kiểm tra xem user có phải là MANAGER không
-        // Nếu là MANAGER, tự động filter theo chi nhánh của manager
+        // Nếu có userId, kiểm tra xem user có phải là MANAGER hoặc CONSULTANT không
+        // Nếu là MANAGER hoặc CONSULTANT, tự động filter theo chi nhánh của họ
         Integer effectiveBranchId = branchId;
         if (userId != null && effectiveBranchId == null) {
             log.info("[CustomerService] Checking user role for userId={}", userId);
@@ -132,9 +139,9 @@ public class CustomerServiceImpl implements CustomerService {
                     if (employee.getUser() != null && employee.getUser().getRole() != null) {
                         String role = employee.getUser().getRole().getRoleName();
                         log.info("[CustomerService] User role: {}", role);
-                        if ("MANAGER".equals(role)) {
+                        if ("MANAGER".equals(role) || "CONSULTANT".equals(role)) {
                             effectiveBranchId = employee.getBranch().getId();
-                            log.info("[CustomerService] Manager detected - auto filtering by branchId={}", effectiveBranchId);
+                            log.info("[CustomerService] {} detected - auto filtering by branchId={}", role, effectiveBranchId);
                         }
                     } else {
                         log.warn("[CustomerService] User or role is null for employee employeeId={}", employee.getEmployeeId());

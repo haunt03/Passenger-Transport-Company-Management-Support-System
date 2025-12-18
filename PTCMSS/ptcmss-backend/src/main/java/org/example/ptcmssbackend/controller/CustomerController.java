@@ -65,6 +65,19 @@ public class CustomerController {
         }
     }
 
+    @Operation(summary = "Lấy thông tin khách hàng theo ID")
+    @GetMapping("/{customerId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'CONSULTANT', 'COORDINATOR', 'ACCOUNTANT')")
+    public ResponseData<?> getCustomerById(@PathVariable Integer customerId) {
+        try {
+            log.info("[Customer] Get customer detail id={}", customerId);
+            return new ResponseData<>(HttpStatus.OK.value(), "Success", customerService.getById(customerId));
+        } catch (Exception e) {
+            log.error("[Customer] Failed to get customer detail: {}", e.getMessage(), e);
+            return new ResponseError(HttpStatus.BAD_REQUEST.value(), e.getMessage());
+        }
+    }
+
     @Operation(summary = "Lấy danh sách đơn hàng của khách hàng", description = "Lấy danh sách đơn hàng (bookings) của một khách hàng cụ thể với phân trang")
     @GetMapping("/{customerId}/bookings")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'CONSULTANT', 'COORDINATOR', 'ACCOUNTANT')")
