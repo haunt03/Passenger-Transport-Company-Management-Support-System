@@ -12,7 +12,6 @@ public class VehicleExpenseResponse {
     private Integer invoiceId;
     private String costType; // fuel, toll, maintenance, etc.
     private BigDecimal amount;
-    private String paymentMethod;
     private String paymentStatus;
     private String note;
     private Instant invoiceDate;

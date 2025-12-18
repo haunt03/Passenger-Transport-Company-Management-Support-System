@@ -12,5 +12,5 @@ public interface RatingService {
     RatingResponse getRatingByTrip(Integer tripId);
     List<RatingResponse> getDriverRatings(Integer driverId, Integer limit);
     DriverPerformanceResponse getDriverPerformance(Integer driverId, Integer days);
-    List<TripForRatingResponse> getCompletedTripsForRating();
+    List<TripForRatingResponse> getCompletedTripsForRating(Integer branchId);
 }

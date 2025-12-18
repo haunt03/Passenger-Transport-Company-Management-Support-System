@@ -85,9 +85,10 @@ public class RatingController {
     }
 
     @GetMapping("/trips/completed")
-    public ResponseEntity<ResponseData<List<TripForRatingResponse>>> getCompletedTrips() {
+    public ResponseEntity<ResponseData<List<TripForRatingResponse>>> getCompletedTrips(
+            @RequestParam(required = false) Integer branchId) {
         try {
-            List<TripForRatingResponse> trips = ratingService.getCompletedTripsForRating();
+            List<TripForRatingResponse> trips = ratingService.getCompletedTripsForRating(branchId);
             return ResponseEntity.ok(new ResponseData<>(200, "Success", trips));
         } catch (Exception e) {
             log.error("Error getting completed trips", e);
