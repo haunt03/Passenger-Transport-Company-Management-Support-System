@@ -11,7 +11,6 @@ import java.time.Instant;
 public class VehicleMaintenanceResponse {
     private Integer invoiceId;
     private BigDecimal amount;
-    private String paymentMethod;
     private String paymentStatus;
     private String note;
     private Instant invoiceDate;
