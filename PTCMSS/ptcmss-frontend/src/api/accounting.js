@@ -39,9 +39,10 @@ export function getRevenueReport({
 }
 
 // Get expense report
+// NOTE: expenseType filter chỉ áp dụng cho ExpenseRequests (không áp dụng cho Invoices vì costType đã bị xóa)
 export function getExpenseReport({
                                      branchId,
-                                     costType,
+                                     expenseType, // Filter theo loại chi phí cho ExpenseRequests
                                      vehicleId,
                                      startDate,
                                      endDate,
@@ -51,7 +52,7 @@ export function getExpenseReport({
                                  } = {}) {
     const params = new URLSearchParams();
     if (branchId != null) params.append("branchId", String(branchId));
-    if (costType) params.append("expenseType", costType); // Backend expects expenseType
+    if (expenseType) params.append("expenseType", expenseType);
     if (vehicleId != null) params.append("vehicleId", String(vehicleId));
     if (startDate) params.append("startDate", startDate);
     if (endDate) params.append("endDate", endDate);
@@ -107,4 +108,3 @@ export function getOverdueInvoices({ branchId } = {}) {
     const qs = params.toString();
     return apiFetch(`/api/accounting/stats/overdue${qs ? `?${qs}` : ""}`);
 }
-

@@ -19,8 +19,13 @@ export function getDriverDashboard(driverId) {
   return apiFetch(`/api/drivers/${driverId}/dashboard`);
 }
 
-export function getDriverSchedule(driverId) {
-  return apiFetch(`/api/drivers/${driverId}/schedule`);
+export function getDriverSchedule(driverId, { startDate, endDate } = {}) {
+  const params = new URLSearchParams();
+  if (startDate) params.append("startDate", startDate);
+  if (endDate) params.append("endDate", endDate);
+  const qs = params.toString();
+  const suffix = qs ? `?${qs}` : "";
+  return apiFetch(`/api/drivers/${driverId}/schedule${suffix}`);
 }
 
 export function requestDayOff(driverId, payload) {
@@ -60,7 +65,7 @@ export function reportIncident({ driverId, tripId, severity, description }) {
 }
 
 export function listDriversByBranch(branchId) {
-  if (branchId == null || branchId === "") throw new Error("BRANCH_ID_REQUIRED");
+  if (branchId == null || branchId === "") throw new Error("Vui lòng chọn chi nhánh trước khi tải danh sách tài xế.");
   return apiFetch(`/api/drivers/branch/${branchId}`);
 }
 
@@ -73,10 +78,9 @@ export function listDriversByBranch(branchId) {
 export async function uploadDriverAvatar(userId, file) {
   const formData = new FormData();
   formData.append("file", file);
-  
+
   return apiFetch(`/api/users/${userId}/avatar`, {
     method: "POST",
     body: formData,
   });
 }
-

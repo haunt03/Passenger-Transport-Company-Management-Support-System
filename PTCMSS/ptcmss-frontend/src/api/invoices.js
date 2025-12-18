@@ -158,4 +158,3 @@ export function countPendingPayments(branchId = null) {
     const qs = params.toString();
     return apiFetch(`/api/invoices/payments/pending/count${qs ? `?${qs}` : ""}`);
 }
-

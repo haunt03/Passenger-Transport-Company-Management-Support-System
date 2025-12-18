@@ -3,13 +3,13 @@ import { getStoredUserId } from "../utils/session";
 
 export function getMyProfile() {
   const id = getStoredUserId();
-  if (!id) throw new Error("NO_USER_ID");
+  if (!id) throw new Error("Không tìm thấy tài khoản. Vui lòng đăng nhập lại.");
   return apiFetch(`/api/users/${id}`);
 }
 
 export function updateMyProfile(body) {
   const id = getStoredUserId();
-  if (!id) throw new Error("NO_USER_ID");
+  if (!id) throw new Error("Không tìm thấy tài khoản. Vui lòng đăng nhập lại.");
   // Sử dụng endpoint mới /profile cho user tự cập nhật
   return apiFetch(`/api/users/${id}/profile`, { method: "PATCH", body });
 }

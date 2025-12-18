@@ -11,7 +11,7 @@ export function listUsers({ keyword, roleId, status } = {}) {
 
 export function listUsersByBranch(branchId) {
     const id = Number(branchId);
-    if (!Number.isFinite(id)) throw new Error("INVALID_BRANCH_ID");
+    if (!Number.isFinite(id)) throw new Error("Mã chi nhánh không hợp lệ.");
     return apiFetch(`/api/users/branch/${id}`);
 }
 
@@ -42,4 +42,3 @@ export function listRoles() {
     // Admin only
     return apiFetch("/api/roles");
 }
-

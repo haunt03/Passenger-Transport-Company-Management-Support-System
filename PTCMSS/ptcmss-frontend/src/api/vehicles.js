@@ -76,7 +76,7 @@ export function deleteVehicleCategory(id) {
 }
 
 export function listVehiclesByBranch(branchId, driverId = null) {
-  if (branchId == null || branchId === "") throw new Error("BRANCH_ID_REQUIRED");
+  if (branchId == null || branchId === "") throw new Error("Vui lòng chọn chi nhánh trước khi tải danh sách xe.");
   const params = driverId != null ? `?driverId=${driverId}` : "";
   return apiFetch(`/api/vehicles/branch/${branchId}${params}`);
 }
@@ -132,4 +132,3 @@ export function addVehicleExpense(id, body) {
     body,
   });
 }
-

@@ -20,6 +20,7 @@ export function getDriverPerformance(driverId, days = 30) {
     return apiFetch(`/api/ratings/driver/${driverId}/performance?days=${days}`);
 }
 
-export function getCompletedTripsForRating() {
-    return apiFetch('/api/ratings/trips/completed');
+export function getCompletedTripsForRating(branchId = null) {
+    const params = branchId ? `?branchId=${branchId}` : '';
+    return apiFetch(`/api/ratings/trips/completed${params}`);
 }

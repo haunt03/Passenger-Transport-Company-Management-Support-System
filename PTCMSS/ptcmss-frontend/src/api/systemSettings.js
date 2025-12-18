@@ -1,5 +1,10 @@
 import { apiFetch } from "./http";
 
+export function getSystemSettingByKey(settingKey) {
+    if (!settingKey) throw new Error("settingKey is required");
+    return apiFetch(`/api/system-settings/key/${encodeURIComponent(settingKey)}`);
+}
+
 /**
  * System Settings API
  * Module 1 - System Administration
@@ -56,4 +61,3 @@ export function deleteSystemSetting(id) {
         method: "DELETE",
     });
 }
-
