@@ -1083,9 +1083,9 @@ INSERT IGNORE INTO system_settings (settingId, settingKey, settingValue, effecti
 -- App Settings (for VietQR)
 INSERT IGNORE INTO app_settings (id, description, setting_key, updated_at, updated_by, setting_value) VALUES
 (1,'Tiền tố nội dung chuyển khoản','qr.description_prefix',NOW(),'admin','VANTAI'),
-(2,'Mã ngân hàng theo chuẩn VietQR','qr.bank_code',NOW(),'admin','970403'),
-(3,'Tên chủ tài khoản','qr.account_name',NOW(),'admin','CONG TY VANTAI'),
-(4,'Số tài khoản ngân hàng','qr.account_number',NOW(),'admin','070122047995');
+(2,'Mã ngân hàng theo chuẩn VietQR','qr.bank_code',NOW(),'admin','970422'),
+(3,'Tên chủ tài khoản','qr.account_name',NOW(),'admin','Cong Ty Van Tai Hanh Khach'),
+(4,'Số tài khoản ngân hàng','qr.account_number',NOW(),'admin','6842012039999');
 
 -- Approval History
 INSERT IGNORE INTO approval_history (historyId, approvalNote, approvalType, processedAt, relatedEntityId, requestReason, requestedAt, status, approvedBy, branchId, requestedBy) VALUES

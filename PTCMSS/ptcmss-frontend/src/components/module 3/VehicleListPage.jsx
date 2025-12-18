@@ -1727,6 +1727,7 @@ export default function VehicleListPage({ readOnly: readOnlyProp = false }) {
         <div className="relative min-h-screen bg-slate-50 text-slate-900 p-6">
             <Toasts toasts={toasts} />
 
+            {/* Header */}
             <div className="flex flex-col md:flex-row md:items-start gap-4 mb-6">
                 <div className="flex-1 flex flex-col gap-2 min-w-0">
                     <div className="flex flex-wrap items-start gap-3">
@@ -1736,36 +1737,25 @@ export default function VehicleListPage({ readOnly: readOnlyProp = false }) {
                             </div>
 
                             <div className="flex flex-col leading-tight">
-                                {/* TITLE + BADGE */}
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <div className="text-[16px] font-semibold text-slate-900">
-                                        Quản lý phương tiện
-                                    </div>
-
-                                    <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-100 text-[11px] px-2 py-[2px] text-slate-600 font-medium leading-none">
-                            Danh sách xe
-                        </span>
+                                <div className="text-[16px] font-semibold text-slate-900">
+                                    Quản lý phương tiện
                                 </div>
-
-                                {/* DESCRIPTION */}
                                 <div className="text-[12px] text-slate-500 leading-snug max-w-xl">
                                     {isManager && managerBranchName ? (
-                                        <>
-                                            Chi nhánh:{" "}
-                                            <span className="font-medium text-slate-700">
-                                    {managerBranchName}
-                                </span>
-                                        </>
+                                        <>Chi nhánh: <span className="font-medium text-slate-700">{managerBranchName}</span></>
                                     ) : (
                                         "Theo dõi tình trạng xe, hiện đang kiểm, và phân bổ theo chi nhánh."
                                     )}
                                 </div>
                             </div>
                         </div>
+
+                        <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-100 text-[11px] px-2 py-[2px] text-slate-600 font-medium leading-none">
+                            Danh sách xe
+                        </span>
                     </div>
                 </div>
             </div>
-
 
             {/* Filter card */}
             <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-4 mb-5">

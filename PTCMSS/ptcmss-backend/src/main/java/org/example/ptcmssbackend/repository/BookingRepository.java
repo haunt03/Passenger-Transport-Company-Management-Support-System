@@ -18,20 +18,13 @@ public interface BookingRepository extends JpaRepository<Bookings, Integer> {
     // Tìm booking theo status
     List<Bookings> findByStatus(BookingStatus status);
 
-    // Tìm booking theo consultant
-    List<Bookings> findByConsultant_EmployeeId(Integer consultantId);
-
-    // Tìm booking theo branch
-    List<Bookings> findByBranch_Id(Integer branchId);
-
     // Tìm booking theo customer phone
     @Query("SELECT b FROM Bookings b WHERE b.customer.phone = :phone")
     List<Bookings> findByCustomerPhone(@Param("phone") String phone);
+
     // Tìm booking theo customer ID với phân trang
     @Query("SELECT b FROM Bookings b WHERE b.customer.id = :customerId ORDER BY b.createdAt DESC")
     Page<Bookings> findByCustomerId(@Param("customerId") Integer customerId, Pageable pageable);
-    // Tìm booking theo customer ID (không phân trang)
-    List<Bookings> findByCustomer_IdOrderByCreatedAtDesc(Integer customerId);
 
     // Tìm booking theo bookingId hoặc customer phone (search)
     @Query("SELECT b FROM Bookings b WHERE " +

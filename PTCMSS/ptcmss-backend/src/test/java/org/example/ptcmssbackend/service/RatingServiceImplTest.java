@@ -38,7 +38,7 @@ class RatingServiceImplTest {
     @Mock
     private CustomerRepository customersRepository;
     @Mock
-    private TripDriversRepository tripDriversRepository;
+    private TripDriverRepository tripDriversRepository;
     @Mock
     private BookingRepository bookingRepository;
     @Mock
@@ -70,7 +70,7 @@ class RatingServiceImplTest {
         Users user = createTestUser(userId);
 
         when(tripsRepository.findById(200)).thenReturn(Optional.of(trip));
-        when(tripDriversRepository.findMainDriverByTripId(200)).thenReturn(Optional.of(tripDriver));
+        when(tripDriversRepository.findFirstMainDriverByTripId(200)).thenReturn(tripDriver);
         when(ratingsRepository.findByTrip_Id(200)).thenReturn(Optional.empty());
         when(usersRepository.findById(userId)).thenReturn(Optional.of(user));
         when(ratingsRepository.save(any())).thenAnswer(inv -> {
@@ -280,16 +280,35 @@ class RatingServiceImplTest {
         Trips trip2 = createTestTrip(201, TripStatus.COMPLETED);
         List<Trips> trips = List.of(trip1, trip2);
 
-        when(tripsRepository.findByStatusOrderByEndTimeDesc(TripStatus.COMPLETED)).thenReturn(trips);
-        when(tripDriversRepository.findMainDriverByTripId(anyInt())).thenReturn(Optional.empty());
+        when(tripsRepository.findByStatusAndBranchIdOrderByEndTimeDesc(TripStatus.COMPLETED, null)).thenReturn(trips);
+        when(tripDriversRepository.findFirstMainDriverByTripId(anyInt())).thenReturn(null);
 
         // When
-        List<TripForRatingResponse> result = ratingService.getCompletedTripsForRating();
+        List<TripForRatingResponse> result = ratingService.getCompletedTripsForRating(null);
 
         // Then
         assertThat(result).isNotNull();
         assertThat(result.size()).isEqualTo(2);
-        verify(tripsRepository).findByStatusOrderByEndTimeDesc(TripStatus.COMPLETED);
+        verify(tripsRepository).findByStatusAndBranchIdOrderByEndTimeDesc(TripStatus.COMPLETED, null);
+    }
+
+    @Test
+    void getCompletedTripsForRating_whenBranchIdProvided_shouldFilterByBranch() {
+        // Given
+        Integer branchId = 1;
+        Trips trip1 = createTestTrip(200, TripStatus.COMPLETED);
+        List<Trips> trips = List.of(trip1);
+
+        when(tripsRepository.findByStatusAndBranchIdOrderByEndTimeDesc(TripStatus.COMPLETED, branchId)).thenReturn(trips);
+        when(tripDriversRepository.findFirstMainDriverByTripId(anyInt())).thenReturn(null);
+
+        // When
+        List<TripForRatingResponse> result = ratingService.getCompletedTripsForRating(branchId);
+
+        // Then
+        assertThat(result).isNotNull();
+        assertThat(result.size()).isEqualTo(1);
+        verify(tripsRepository).findByStatusAndBranchIdOrderByEndTimeDesc(TripStatus.COMPLETED, branchId);
     }
 
     // ==================== Helper Methods ====================

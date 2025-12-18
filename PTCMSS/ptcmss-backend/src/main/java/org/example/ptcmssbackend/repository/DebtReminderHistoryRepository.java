@@ -12,7 +12,6 @@ import java.util.Optional;
 @Repository
 public interface DebtReminderHistoryRepository extends JpaRepository<DebtReminderHistory, Integer> {
 
-    List<DebtReminderHistory> findByInvoice_IdOrderByReminderDateDesc(Integer invoiceId);
 
     @Query("SELECT drh FROM DebtReminderHistory drh WHERE drh.invoice.id = :invoiceId ORDER BY drh.reminderDate DESC")
     List<DebtReminderHistory> findAllByInvoiceId(@Param("invoiceId") Integer invoiceId);

@@ -299,84 +299,84 @@ function SidebarNav({ collapsed = false, onToggleSidebar }) {
   }, [location.pathname, menuItems]);
 
   return (
-    <aside className="bg-white border-r border-slate-200 flex flex-col shadow-sm h-screen sticky top-0">
-      {/* brand / account mini */}
-      <div className="px-4 py-4 border-b border-slate-200 flex items-center gap-3 bg-gradient-to-br from-white to-slate-50/50">
-        <div className="h-10 w-10 rounded-lg flex items-center justify-center text-white shadow-[0_8px_24px_rgba(0,121,188,.35)] flex-shrink-0 transition-transform duration-200 hover:scale-105 hover:shadow-[0_12px_32px_rgba(0,121,188,.45)]" style={{ backgroundColor: '#0079BC' }}>
-          <Bus className="h-5 w-5" />
-        </div>
-        {!collapsed && (
-          <div className="flex flex-col leading-tight min-w-0 flex-1">
-            <div className="text-slate-900 font-bold text-sm truncate">TranspoManager</div>
-            <div className="text-[10px] text-slate-500 leading-tight">Hệ thống quản lý vận tải</div>
+      <aside className="bg-white border-r border-slate-200 flex flex-col shadow-sm h-screen sticky top-0">
+        {/* brand / account mini */}
+        <div className="px-4 py-4 border-b border-slate-200 flex items-center gap-3 bg-gradient-to-br from-white to-slate-50/50">
+          <div className="h-10 w-10 rounded-lg flex items-center justify-center text-white shadow-[0_8px_24px_rgba(0,121,188,.35)] flex-shrink-0 transition-transform duration-200 hover:scale-105 hover:shadow-[0_12px_32px_rgba(0,121,188,.45)]" style={{ backgroundColor: '#0079BC' }}>
+            <Bus className="h-5 w-5" />
           </div>
-        )}
-        {typeof onToggleSidebar === "function" && (
-          <button
-            type="button"
-            onClick={onToggleSidebar}
-            className="inline-flex items-center justify-center h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300 shadow-sm transition-colors flex-shrink-0 ml-auto"
-            title="Ẩn/hiện menu"
-          >
-            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-          </button>
-        )}
-      </div>
+          {!collapsed && (
+              <div className="flex flex-col leading-tight min-w-0 flex-1">
+                <div className="text-slate-900 font-bold text-sm truncate">TranspoManager</div>
+                <div className="text-[10px] text-slate-500 leading-tight">Hệ thống quản lý vận tải</div>
+              </div>
+          )}
+          {typeof onToggleSidebar === "function" && (
+              <button
+                  type="button"
+                  onClick={onToggleSidebar}
+                  className="inline-flex items-center justify-center h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300 shadow-sm transition-colors flex-shrink-0 ml-auto"
+                  title="Ẩn/hiện menu"
+              >
+                {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+              </button>
+          )}
+        </div>
 
-      {/* Menu items - Flat list */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1 text-sm scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent hover:scrollbar-thumb-slate-400">
-        {menuItems.map((item, index) => {
-          const Icon = item.icon;
-          const isActive = index === activeIndex;
+        {/* Menu items - Flat list */}
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1 text-sm scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent hover:scrollbar-thumb-slate-400">
+          {menuItems.map((item, index) => {
+            const Icon = item.icon;
+            const isActive = index === activeIndex;
 
-          return (
-            <NavLink
-              key={`${item.to}-${index}`}
-              to={item.to}
-              end={item.exact}
-              className={({ isActive: navActive }) => {
-                // Chỉ dùng activeIndex (isActive) để tránh nhiều tab cùng sáng màu
-                const active = isActive || (item.exact && navActive);
-                const base = "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] transition-all duration-200 ease-in-out";
-                if (active) {
-                  return [
-                    base,
-                    "bg-gradient-to-r from-[#0079BC]/10 to-sky-50 text-[#0079BC] font-semibold shadow-sm",
-                    "border-l-[3px] border-[#0079BC]",
-                  ].join(" ");
-                }
-                return [
-                  base,
-                  "text-slate-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-slate-100/50",
-                  "hover:text-slate-900 border-l-[3px] border-transparent hover:border-slate-300",
-                ].join(" ");
-              }}
-            >
-              {Icon && (
-                <Icon className={`h-4 w-4 flex-shrink-0 transition-colors duration-200 ${
-                  location.pathname === item.to || (item.to !== "/" && location.pathname.startsWith(item.to))
-                    ? "text-[#0079BC]"
-                    : "text-slate-500 group-hover:text-slate-700"
-                }`} />
-              )}
-              <span className="truncate flex-1">{item.label}</span>
-              {/* Badge for pending payments on Invoice List */}
-              {isAccountant && item.to === "/accounting/invoices" && pendingPaymentCount > 0 && (
-                <span className="flex-shrink-0 ml-2 px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500 text-white min-w-[18px] text-center">
+            return (
+                <NavLink
+                    key={`${item.to}-${index}`}
+                    to={item.to}
+                    end={item.exact}
+                    className={({ isActive: navActive }) => {
+                      // Chỉ dùng activeIndex (isActive) để tránh nhiều tab cùng sáng màu
+                      const active = isActive || (item.exact && navActive);
+                      const base = "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] transition-all duration-200 ease-in-out";
+                      if (active) {
+                        return [
+                          base,
+                          "bg-gradient-to-r from-[#0079BC]/10 to-sky-50 text-[#0079BC] font-semibold shadow-sm",
+                          "border-l-[3px] border-[#0079BC]",
+                        ].join(" ");
+                      }
+                      return [
+                        base,
+                        "text-slate-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-slate-100/50",
+                        "hover:text-slate-900 border-l-[3px] border-transparent hover:border-slate-300",
+                      ].join(" ");
+                    }}
+                >
+                  {Icon && (
+                      <Icon className={`h-4 w-4 flex-shrink-0 transition-colors duration-200 ${
+                          location.pathname === item.to || (item.to !== "/" && location.pathname.startsWith(item.to))
+                              ? "text-[#0079BC]"
+                              : "text-slate-500 group-hover:text-slate-700"
+                      }`} />
+                  )}
+                  <span className="truncate flex-1">{item.label}</span>
+                  {/* Badge for pending payments on Invoice List */}
+                  {isAccountant && item.to === "/accounting/invoices" && pendingPaymentCount > 0 && (
+                      <span className="flex-shrink-0 ml-2 px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500 text-white min-w-[18px] text-center">
                   {pendingPaymentCount > 99 ? "99+" : pendingPaymentCount}
                 </span>
-              )}
-              {/* Badge for pending expense requests */}
-              {isAccountant && item.to === "/accounting/expense-requests" && pendingExpenseRequestCount > 0 && (
-                <span className="flex-shrink-0 ml-2 px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500 text-white min-w-[18px] text-center">
+                  )}
+                  {/* Badge for pending expense requests */}
+                  {isAccountant && item.to === "/accounting/expense-requests" && pendingExpenseRequestCount > 0 && (
+                      <span className="flex-shrink-0 ml-2 px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-rose-500 text-white min-w-[18px] text-center">
                   {pendingExpenseRequestCount > 99 ? "99+" : pendingExpenseRequestCount}
                 </span>
-              )}
-            </NavLink>
-          );
-        })}
-      </nav>
-    </aside>
+                  )}
+                </NavLink>
+            );
+          })}
+        </nav>
+      </aside>
   );
 }
 /* ---------------------------------------------------
@@ -391,14 +391,14 @@ function Topbar({ onToggleSidebar, sidebarCollapsed = false }) {
   const username = getStoredUsername() || "John Doe";
   const roleName = getStoredRoleLabel() || "Quản trị viên";
   const initials =
-    String(username)
-      .trim()
-      .split(/\s+/)
-      .map((s) => s && s[0])
-      .filter(Boolean)
-      .slice(0, 2)
-      .join("")
-      .toUpperCase() || "JD";
+      String(username)
+          .trim()
+          .split(/\s+/)
+          .map((s) => s && s[0])
+          .filter(Boolean)
+          .slice(0, 2)
+          .join("")
+          .toUpperCase() || "JD";
 
   const [avatarUrl, setAvatarUrl] = React.useState(null);
   const [avatarKey, setAvatarKey] = React.useState(0);
@@ -419,8 +419,8 @@ function Topbar({ onToggleSidebar, sidebarCollapsed = false }) {
         if (imgPath && mounted) {
           // Add cache buster to force reload
           const fullUrl = /^https?:\/\//i.test(imgPath)
-            ? imgPath
-            : `${apiBase}${imgPath.startsWith("/") ? "" : "/"}${imgPath}`;
+              ? imgPath
+              : `${apiBase}${imgPath.startsWith("/") ? "" : "/"}${imgPath}`;
           const urlWithCacheBuster = `${fullUrl}${fullUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
 
           // Fetch with auth
@@ -491,54 +491,54 @@ function Topbar({ onToggleSidebar, sidebarCollapsed = false }) {
 
   const currentRole = getCurrentRole();
   const shouldShowNotifications =
-    currentRole === ROLES.CONSULTANT ||
-    currentRole === ROLES.COORDINATOR ||
-    currentRole === ROLES.ACCOUNTANT;
+      currentRole === ROLES.CONSULTANT ||
+      currentRole === ROLES.COORDINATOR ||
+      currentRole === ROLES.ACCOUNTANT;
 
   return (
-    <header className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-6 py-3.5 shadow-sm">
-      {/* Left side - future breadcrumb */}
-      <div className="flex items-center justify-start flex-1">
-        {/* Sidebar toggle button đã được di chuyển vào SidebarNav header */}
-      </div>
+      <header className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-6 py-3.5 shadow-sm">
+        {/* Left side - future breadcrumb */}
+        <div className="flex items-center justify-start flex-1">
+          {/* Sidebar toggle button đã được di chuyển vào SidebarNav header */}
+        </div>
 
-      {/* Right side - bell (một số role) + user chip + logout */}
-      <div className="flex items-center gap-2.5">
-        {/* bell - WebSocket Notifications (chỉ cho các role tham gia điều phối/thu chi) */}
-        {shouldShowNotifications && <NotificationsWidget />}
+        {/* Right side - bell (một số role) + user chip + logout */}
+        <div className="flex items-center gap-2.5">
+          {/* bell - WebSocket Notifications (chỉ cho các role tham gia điều phối/thu chi) */}
+          {shouldShowNotifications && <NotificationsWidget />}
 
-        {/* user chip */}
-        <button
-          onClick={handleProfileClick}
-          className="flex items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm shadow-sm hover:shadow-md hover:border-[#0079BC]/50 transition-all cursor-pointer active:scale-[0.98]"
-        >
-          {avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt={username}
-              className="h-9 w-9 rounded-full object-cover shadow-sm"
-              onError={() => setAvatarUrl(null)}
-            />
-          ) : (
-            <div className="h-9 w-9 rounded-full flex items-center justify-center text-xs font-semibold text-white shadow-sm" style={{ backgroundColor: '#0079BC' }}>
-              {initials}
+          {/* user chip */}
+          <button
+              onClick={handleProfileClick}
+              className="flex items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm shadow-sm hover:shadow-md hover:border-[#0079BC]/50 transition-all cursor-pointer active:scale-[0.98]"
+          >
+            {avatarUrl ? (
+                <img
+                    src={avatarUrl}
+                    alt={username}
+                    className="h-9 w-9 rounded-full object-cover shadow-sm"
+                    onError={() => setAvatarUrl(null)}
+                />
+            ) : (
+                <div className="h-9 w-9 rounded-full flex items-center justify-center text-xs font-semibold text-white shadow-sm" style={{ backgroundColor: '#0079BC' }}>
+                  {initials}
+                </div>
+            )}
+            <div className="hidden sm:flex flex-col leading-tight text-left">
+              <span className="text-slate-900 text-xs font-semibold">{username}</span>
+              <span className="text-slate-500 text-[10px]">{roleName}</span>
             </div>
-          )}
-          <div className="hidden sm:flex flex-col leading-tight text-left">
-            <span className="text-slate-900 text-xs font-semibold">{username}</span>
-            <span className="text-slate-500 text-[10px]">{roleName}</span>
-          </div>
-        </button>
+          </button>
 
-        {/* logout button */}
-        <button
-          onClick={onLogout}
-          className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 shadow-sm transition-all active:scale-[0.98]"
-        >
-          Đăng xuất
-        </button>
-      </div>
-    </header>
+          {/* logout button */}
+          <button
+              onClick={onLogout}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 shadow-sm transition-all active:scale-[0.98]"
+          >
+            Đăng xuất
+          </button>
+        </div>
+      </header>
   );
 }
 /* ---------------------------------------------------
@@ -561,18 +561,18 @@ function ShellLayout({ sidebarCollapsed = false, onToggleSidebar }) {
   const sidebarWidth = sidebarCollapsed ? "w-16" : "w-64";
 
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden">
-      <div className={`${sidebarWidth} flex-shrink-0 transition-all duration-200`}>
-        <SidebarNav collapsed={sidebarCollapsed} onToggleSidebar={onToggleSidebar} />
+      <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden">
+        <div className={`${sidebarWidth} flex-shrink-0 transition-all duration-200`}>
+          <SidebarNav collapsed={sidebarCollapsed} onToggleSidebar={onToggleSidebar} />
+        </div>
+        <div className="flex-1 flex flex-col min-w-0">
+          <Topbar onToggleSidebar={onToggleSidebar} sidebarCollapsed={sidebarCollapsed} />
+          <main className="flex-1 overflow-y-auto min-h-0 p-0">
+            {/* Ghi chú: Một số màn con vẫn theme dark. Có thể refactor sau. */}
+            <Outlet />
+          </main>
+        </div>
       </div>
-      <div className="flex-1 flex flex-col min-w-0">
-        <Topbar onToggleSidebar={onToggleSidebar} sidebarCollapsed={sidebarCollapsed} />
-        <main className="flex-1 overflow-y-auto min-h-0 p-0">
-          {/* Ghi chú: Một số màn con vẫn theme dark. Có thể refactor sau. */}
-          <Outlet />
-        </main>
-      </div>
-    </div>
   );
 }
 
@@ -598,15 +598,15 @@ function ProtectedRoute({ roles = ALL_ROLES, children }) {
 
   if (!hasActiveSession()) {
     return (
-      <RedirectWithToast
-        to="/login"
-        state={{ from: `${location.pathname}${location.search}` }}
-        toast={{
-          title: "Phiên đăng nhập đã hết hạn",
-          message: "Bạn không có quyền truy cập, vui lòng đăng nhập lại.",
-          type: "ERROR",
-        }}
-      />
+        <RedirectWithToast
+            to="/login"
+            state={{ from: `${location.pathname}${location.search}` }}
+            toast={{
+              title: "Phiên đăng nhập đã hết hạn",
+              message: "Bạn không có quyền truy cập, vui lòng đăng nhập lại.",
+              type: "ERROR",
+            }}
+        />
     );
   }
 
@@ -621,15 +621,15 @@ function RoleRedirect() {
   const location = useLocation();
   if (!hasActiveSession()) {
     return (
-      <RedirectWithToast
-        to="/login"
-        state={{ from: `${location.pathname}${location.search}` }}
-        toast={{
-          title: "Vui lòng đăng nhập",
-          message: "Bạn cần đăng nhập để tiếp tục sử dụng hệ thống.",
-          type: "WARNING",
-        }}
-      />
+        <RedirectWithToast
+            to="/login"
+            state={{ from: `${location.pathname}${location.search}` }}
+            toast={{
+              title: "Vui lòng đăng nhập",
+              message: "Bạn cần đăng nhập để tiếp tục sử dụng hệ thống.",
+              type: "WARNING",
+            }}
+        />
     );
   }
   return <Navigate to={getHomePathForRole(role)} replace />;
@@ -639,15 +639,15 @@ function RequireAuth({ children }) {
   const location = useLocation();
   if (!hasActiveSession()) {
     return (
-      <RedirectWithToast
-        to="/login"
-        state={{ from: `${location.pathname}${location.search}` }}
-        toast={{
-          title: "Phiên đăng nhập không hợp lệ",
-          message: "Bạn cần đăng nhập để truy cập trang này.",
-          type: "ERROR",
-        }}
-      />
+        <RedirectWithToast
+            to="/login"
+            state={{ from: `${location.pathname}${location.search}` }}
+            toast={{
+              title: "Phiên đăng nhập không hợp lệ",
+              message: "Bạn cần đăng nhập để truy cập trang này.",
+              type: "ERROR",
+            }}
+        />
     );
   }
   return children;
@@ -663,539 +663,539 @@ export default function AppLayout() {
   }, []);
 
   return (
-    <WebSocketProvider>
-      <NotificationToast />
-      <Routes>
-        {/* Trang đăng nhập không dùng shell */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/set-password" element={<SetPasswordPage />} />
-        <Route path="/verification-success" element={<VerificationSuccessPage />} />
-        <Route path="/verification-error" element={<VerificationErrorPage />} />
-        <Route path="/" element={<RoleRedirect />} />
+      <WebSocketProvider>
+        <NotificationToast />
+        <Routes>
+          {/* Trang đăng nhập không dùng shell */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/set-password" element={<SetPasswordPage />} />
+          <Route path="/verification-success" element={<VerificationSuccessPage />} />
+          <Route path="/verification-error" element={<VerificationErrorPage />} />
+          <Route path="/" element={<RoleRedirect />} />
 
-        {/* Các route cần shell layout */}
-        <Route element={<RequireAuth><ShellLayout sidebarCollapsed={sidebarCollapsed} onToggleSidebar={handleToggleSidebar} /></RequireAuth>}>
-          <Route index element={<RoleRedirect />} />
+          {/* Các route cần shell layout */}
+          <Route element={<RequireAuth><ShellLayout sidebarCollapsed={sidebarCollapsed} onToggleSidebar={handleToggleSidebar} /></RequireAuth>}>
+            <Route index element={<RoleRedirect />} />
 
-          {/* Báo cáo & Phân tích */}
-          <Route
-            path="/analytics/admin"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN]}>
-                <AdminDashboardPro />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/analytics/manager"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
-                <ManagerDashboardPro />
-              </ProtectedRoute>
-            }
-          />
+            {/* Báo cáo & Phân tích */}
+            <Route
+                path="/analytics/admin"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN]}>
+                    <AdminDashboardPro />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/analytics/manager"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
+                    <ManagerDashboardPro />
+                  </ProtectedRoute>
+                }
+            />
 
-          {/* Quản trị hệ thống */}
-          <Route
-            path="/admin/settings"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN]}>
-                <SystemSettingsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/branches"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
-                <AdminBranchesPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/branches/new"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN]}>
-                <CreateBranchPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/branches/:branchId"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
-                <AdminBranchDetailPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/managers"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN]}>
-                <AdminManagersPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/users"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
-                <AdminUsersPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/users/new"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
-                <CreateEmployeeWithUserPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/users/:userId"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
-                <UserDetailPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/customers"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN]}>
-                <CustomerListPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/me/profile"
-            element={
-              <ProtectedRoute>
-                <UpdateProfilePage />
-              </ProtectedRoute>
-            }
-          />
+            {/* Quản trị hệ thống */}
+            <Route
+                path="/admin/settings"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN]}>
+                    <SystemSettingsPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/admin/branches"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
+                    <AdminBranchesPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/admin/branches/new"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN]}>
+                    <CreateBranchPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/admin/branches/:branchId"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
+                    <AdminBranchDetailPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/admin/managers"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN]}>
+                    <AdminManagersPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/admin/users"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
+                    <AdminUsersPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/admin/users/new"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
+                    <CreateEmployeeWithUserPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/admin/users/:userId"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
+                    <UserDetailPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/admin/customers"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN]}>
+                    <CustomerListPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/me/profile"
+                element={
+                  <ProtectedRoute>
+                    <UpdateProfilePage />
+                  </ProtectedRoute>
+                }
+            />
 
 
-          {/* Tài xế - Only for actual drivers */}
-          <Route
-            path="/driver/dashboard"
-            element={
-              <ProtectedRoute roles={[ROLES.DRIVER]}>
-                <DriverDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/driver/profile"
-            element={
-              <ProtectedRoute roles={[ROLES.DRIVER]}>
-                <DriverProfilePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/driver/schedule"
-            element={
-              <ProtectedRoute roles={[ROLES.DRIVER]}>
-                <DriverSchedulePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/driver/trips-list"
-            element={
-              <ProtectedRoute roles={[ROLES.DRIVER]}>
-                <DriverTripsListPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/driver/leave-request"
-            element={
-              <ProtectedRoute roles={[ROLES.DRIVER]}>
-                <DriverLeaveRequestPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/driver/requests"
-            element={
-              <ProtectedRoute roles={[ROLES.DRIVER]}>
-                <DriverRequestsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/driver/incidents"
-            element={
-              <ProtectedRoute roles={[ROLES.DRIVER]}>
-                <DriverIncidentManagementPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/driver/trips/:tripId"
-            element={
-              <ProtectedRoute roles={[ROLES.DRIVER]}>
-                <DriverTripDetailPage />
-              </ProtectedRoute>
-            }
-          />
-          {/* Phương tiện */}
-          <Route
-            path="/vehicles"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
-                <VehicleListPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/vehicles/new"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
-                <VehicleCreatePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/vehicles/:vehicleId"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.COORDINATOR, ROLES.ACCOUNTANT]}>
-                <VehicleDetailPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/vehicles/categories"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
-                <VehicleCategoryManagePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/vehicles/categories/new"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN]}>
-                <VehicleCategoryPage />
-              </ProtectedRoute>
-            }
-          />
+            {/* Tài xế - Only for actual drivers */}
+            <Route
+                path="/driver/dashboard"
+                element={
+                  <ProtectedRoute roles={[ROLES.DRIVER]}>
+                    <DriverDashboard />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/driver/profile"
+                element={
+                  <ProtectedRoute roles={[ROLES.DRIVER]}>
+                    <DriverProfilePage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/driver/schedule"
+                element={
+                  <ProtectedRoute roles={[ROLES.DRIVER]}>
+                    <DriverSchedulePage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/driver/trips-list"
+                element={
+                  <ProtectedRoute roles={[ROLES.DRIVER]}>
+                    <DriverTripsListPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/driver/leave-request"
+                element={
+                  <ProtectedRoute roles={[ROLES.DRIVER]}>
+                    <DriverLeaveRequestPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/driver/requests"
+                element={
+                  <ProtectedRoute roles={[ROLES.DRIVER]}>
+                    <DriverRequestsPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/driver/incidents"
+                element={
+                  <ProtectedRoute roles={[ROLES.DRIVER]}>
+                    <DriverIncidentManagementPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/driver/trips/:tripId"
+                element={
+                  <ProtectedRoute roles={[ROLES.DRIVER]}>
+                    <DriverTripDetailPage />
+                  </ProtectedRoute>
+                }
+            />
+            {/* Phương tiện */}
+            <Route
+                path="/vehicles"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
+                    <VehicleListPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/vehicles/new"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
+                    <VehicleCreatePage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/vehicles/:vehicleId"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.COORDINATOR, ROLES.ACCOUNTANT]}>
+                    <VehicleDetailPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/vehicles/categories"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
+                    <VehicleCategoryManagePage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/vehicles/categories/new"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN]}>
+                    <VehicleCategoryPage />
+                  </ProtectedRoute>
+                }
+            />
 
-          {/* Báo giá & Đơn hàng */}
-          <Route
-            path="/orders/dashboard"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.CONSULTANT]}>
-                <ConsultantDashboardPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/orders"
-            element={
-              <ProtectedRoute
-                roles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.CONSULTANT, ROLES.COORDINATOR, ROLES.ACCOUNTANT]}
-              >
-                <ConsultantOrderListPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/orders/new"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN, ROLES.CONSULTANT]}>
-                <CreateOrderPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/orders/:orderId"
-            element={
-              <ProtectedRoute
-                roles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.CONSULTANT, ROLES.COORDINATOR, ROLES.ACCOUNTANT]}
-              >
-                <OrderDetailPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/orders/:orderId/edit"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN, ROLES.CONSULTANT, ROLES.COORDINATOR]}>
-                <EditOrderPage />
-              </ProtectedRoute>
-            }
-          />
+            {/* Báo giá & Đơn hàng */}
+            <Route
+                path="/orders/dashboard"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.CONSULTANT]}>
+                    <ConsultantDashboardPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/orders"
+                element={
+                  <ProtectedRoute
+                      roles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.CONSULTANT, ROLES.COORDINATOR, ROLES.ACCOUNTANT]}
+                  >
+                    <ConsultantOrderListPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/orders/new"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.CONSULTANT]}>
+                    <CreateOrderPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/orders/:orderId"
+                element={
+                  <ProtectedRoute
+                      roles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.CONSULTANT, ROLES.COORDINATOR, ROLES.ACCOUNTANT]}
+                  >
+                    <OrderDetailPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/orders/:orderId/edit"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.CONSULTANT, ROLES.COORDINATOR]}>
+                    <EditOrderPage />
+                  </ProtectedRoute>
+                }
+            />
 
-          {/* Điều phối / Lịch chạy */}
-          <Route
-            path="/dispatch"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN, ROLES.COORDINATOR]}>
-                <CoordinatorTimelinePro />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/dispatch/pending"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN, ROLES.COORDINATOR]}>
-                <PendingTripsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/dispatch/notifications-dashboard"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN, ROLES.COORDINATOR]}>
-                <NotificationsDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/dispatch/incidents"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN, ROLES.COORDINATOR, ROLES.MANAGER]}>
-                <CoordinatorIncidentListPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/dispatch/expense-request"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN, ROLES.CONSULTANT, ROLES.DRIVER]}>
-                <ExpenseRequestForm />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/consultant/ratings"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN, ROLES.CONSULTANT]}>
-                <RatingManagementPage />
-              </ProtectedRoute>
-            }
-          />
-          {/* Backward compatibility: dispatch ratings now redirect to consultant view */}
-          <Route
-            path="/dispatch/ratings"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN, ROLES.COORDINATOR]}>
-                <Navigate to="/consultant/ratings" replace />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/drivers/:driverId/ratings"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN, ROLES.CONSULTANT]}>
-                <DriverRatingsPage />
-              </ProtectedRoute>
-            }
-          />
+            {/* Điều phối / Lịch chạy */}
+            <Route
+                path="/dispatch"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.COORDINATOR]}>
+                    <CoordinatorTimelinePro />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/dispatch/pending"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.COORDINATOR]}>
+                    <PendingTripsPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/dispatch/notifications-dashboard"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.COORDINATOR]}>
+                    <NotificationsDashboard />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/dispatch/incidents"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.COORDINATOR, ROLES.MANAGER]}>
+                    <CoordinatorIncidentListPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/dispatch/expense-request"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.CONSULTANT, ROLES.DRIVER]}>
+                    <ExpenseRequestForm />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/consultant/ratings"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.CONSULTANT]}>
+                    <RatingManagementPage />
+                  </ProtectedRoute>
+                }
+            />
+            {/* Backward compatibility: dispatch ratings now redirect to consultant view */}
+            <Route
+                path="/dispatch/ratings"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.COORDINATOR]}>
+                    <Navigate to="/consultant/ratings" replace />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/drivers/:driverId/ratings"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.CONSULTANT]}>
+                    <DriverRatingsPage />
+                  </ProtectedRoute>
+                }
+            />
 
-          {/* Coordinator specific routes */}
-          <Route
-            path="/coordinator/orders"
-            element={
-              <ProtectedRoute roles={[ROLES.COORDINATOR]}>
-                <CoordinatorOrderListPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/coordinator/drivers"
-            element={
-              <ProtectedRoute roles={[ROLES.COORDINATOR]}>
-                <CoordinatorDriverListPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/coordinator/drivers/:driverId"
-            element={
-              <ProtectedRoute roles={[ROLES.COORDINATOR]}>
-                <CoordinatorDriverDetailPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/coordinator/drivers/:driverId/trips"
-            element={
-              <ProtectedRoute roles={[ROLES.COORDINATOR]}>
-                <CoordinatorDriverTripsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/coordinator/vehicles"
-            element={
-              <ProtectedRoute roles={[ROLES.COORDINATOR]}>
-                <CoordinatorVehicleListPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/coordinator/vehicles/:vehicleId"
-            element={
-              <ProtectedRoute roles={[ROLES.COORDINATOR]}>
-                <CoordinatorVehicleDetailPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/coordinator/expense-management"
-            element={
-              <ProtectedRoute roles={[ROLES.COORDINATOR]}>
-                <CoordinatorExpenseManagementPage />
-              </ProtectedRoute>
-            }
-          />
+            {/* Coordinator specific routes */}
+            <Route
+                path="/coordinator/orders"
+                element={
+                  <ProtectedRoute roles={[ROLES.COORDINATOR]}>
+                    <CoordinatorOrderListPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/coordinator/drivers"
+                element={
+                  <ProtectedRoute roles={[ROLES.COORDINATOR]}>
+                    <CoordinatorDriverListPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/coordinator/drivers/:driverId"
+                element={
+                  <ProtectedRoute roles={[ROLES.COORDINATOR]}>
+                    <CoordinatorDriverDetailPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/coordinator/drivers/:driverId/trips"
+                element={
+                  <ProtectedRoute roles={[ROLES.COORDINATOR]}>
+                    <CoordinatorDriverTripsPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/coordinator/vehicles"
+                element={
+                  <ProtectedRoute roles={[ROLES.COORDINATOR]}>
+                    <CoordinatorVehicleListPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/coordinator/vehicles/:vehicleId"
+                element={
+                  <ProtectedRoute roles={[ROLES.COORDINATOR]}>
+                    <CoordinatorVehicleDetailPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/coordinator/expense-management"
+                element={
+                  <ProtectedRoute roles={[ROLES.COORDINATOR]}>
+                    <CoordinatorExpenseManagementPage />
+                  </ProtectedRoute>
+                }
+            />
 
-          {/* Consultant specific routes */}
-          <Route
-            path="/consultant/customers"
-            element={
-              <ProtectedRoute roles={[ROLES.CONSULTANT]}>
-                <CustomerListPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/consultant/vehicles"
-            element={
-              <ProtectedRoute roles={[ROLES.CONSULTANT]}>
-                <VehicleListPage readOnly />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/consultant/drivers"
-            element={
-              <ProtectedRoute roles={[ROLES.CONSULTANT]}>
-                <CoordinatorDriverListPage readOnly />
-              </ProtectedRoute>
-            }
-          />
+            {/* Consultant specific routes */}
+            <Route
+                path="/consultant/customers"
+                element={
+                  <ProtectedRoute roles={[ROLES.CONSULTANT]}>
+                    <CustomerListPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/consultant/vehicles"
+                element={
+                  <ProtectedRoute roles={[ROLES.CONSULTANT]}>
+                    <VehicleListPage readOnly />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/consultant/drivers"
+                element={
+                  <ProtectedRoute roles={[ROLES.CONSULTANT]}>
+                    <CoordinatorDriverListPage readOnly />
+                  </ProtectedRoute>
+                }
+            />
 
-          {/* Accountant specific routes */}
-          <Route
-            path="/accountant/orders"
-            element={
-              <ProtectedRoute roles={[ROLES.ACCOUNTANT]}>
-                <ConsultantOrderListPage readOnly />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/accountant/users"
-            element={
-              <ProtectedRoute roles={[ROLES.ACCOUNTANT]}>
-                <AdminUsersPage readOnly />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/accountant/vehicles"
-            element={
-              <ProtectedRoute roles={[ROLES.ACCOUNTANT]}>
-                <VehicleListPage readOnly />
-              </ProtectedRoute>
-            }
-          />
+            {/* Accountant specific routes */}
+            <Route
+                path="/accountant/orders"
+                element={
+                  <ProtectedRoute roles={[ROLES.ACCOUNTANT]}>
+                    <ConsultantOrderListPage readOnly />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/accountant/users"
+                element={
+                  <ProtectedRoute roles={[ROLES.ACCOUNTANT]}>
+                    <AdminUsersPage readOnly />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/accountant/vehicles"
+                element={
+                  <ProtectedRoute roles={[ROLES.ACCOUNTANT]}>
+                    <VehicleListPage readOnly />
+                  </ProtectedRoute>
+                }
+            />
 
-          {/* Manager specific routes */}
-          <Route
-            path="/manager/orders"
-            element={
-              <ProtectedRoute roles={[ROLES.MANAGER]}>
-                <ConsultantOrderListPage readOnly />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/manager/drivers"
-            element={
-              <ProtectedRoute roles={[ROLES.MANAGER]}>
-                <CoordinatorDriverListPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/manager/drivers/:driverId"
-            element={
-              <ProtectedRoute roles={[ROLES.MANAGER]}>
-                <CoordinatorDriverDetailPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/manager/drivers/:driverId/trips"
-            element={
-              <ProtectedRoute roles={[ROLES.MANAGER]}>
-                <CoordinatorDriverTripsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/manager/customers"
-            element={
-              <ProtectedRoute roles={[ROLES.MANAGER]}>
-                <CustomerListPage />
-              </ProtectedRoute>
-            }
-          />
+            {/* Manager specific routes */}
+            <Route
+                path="/manager/orders"
+                element={
+                  <ProtectedRoute roles={[ROLES.MANAGER]}>
+                    <ConsultantOrderListPage readOnly />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/manager/drivers"
+                element={
+                  <ProtectedRoute roles={[ROLES.MANAGER]}>
+                    <CoordinatorDriverListPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/manager/drivers/:driverId"
+                element={
+                  <ProtectedRoute roles={[ROLES.MANAGER]}>
+                    <CoordinatorDriverDetailPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/manager/drivers/:driverId/trips"
+                element={
+                  <ProtectedRoute roles={[ROLES.MANAGER]}>
+                    <CoordinatorDriverTripsPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/manager/customers"
+                element={
+                  <ProtectedRoute roles={[ROLES.MANAGER]}>
+                    <CustomerListPage />
+                  </ProtectedRoute>
+                }
+            />
 
-          {/* Kế toán & Thanh toán */}
-          <Route
-            path="/accounting"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN, ROLES.ACCOUNTANT]}>
-                <AccountantDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/accounting/invoices"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN, ROLES.ACCOUNTANT]}>
-                <InvoiceManagement />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/accounting/expenses"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.ACCOUNTANT]}>
-                <ExpenseReportPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/accounting/expense-requests"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.ACCOUNTANT]}>
-                <ExpenseRequestManagementPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/accounting/revenue-report"
-            element={
-              <ProtectedRoute roles={[ROLES.ADMIN, ROLES.ACCOUNTANT, ROLES.CONSULTANT, ROLES.MANAGER]}>
-                <ReportRevenuePage />
-              </ProtectedRoute>
-            }
-          />
-        </Route>
+            {/* Kế toán & Thanh toán */}
+            <Route
+                path="/accounting"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.ACCOUNTANT]}>
+                    <AccountantDashboard />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/accounting/invoices"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.ACCOUNTANT]}>
+                    <InvoiceManagement />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/accounting/expenses"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.ACCOUNTANT]}>
+                    <ExpenseReportPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/accounting/expense-requests"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.ACCOUNTANT]}>
+                    <ExpenseRequestManagementPage />
+                  </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/accounting/revenue-report"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.ACCOUNTANT, ROLES.CONSULTANT, ROLES.MANAGER]}>
+                    <ReportRevenuePage />
+                  </ProtectedRoute>
+                }
+            />
+          </Route>
 
-        {/* fallback */}
-        <Route path="*" element={<RoleRedirect />} />
-      </Routes>
-    </WebSocketProvider>
+          {/* fallback */}
+          <Route path="*" element={<RoleRedirect />} />
+        </Routes>
+      </WebSocketProvider>
   );
 }

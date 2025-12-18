@@ -170,26 +170,13 @@ const DriverRatingManagement = () => {
     return (
         <div className="p-6 max-w-7xl mx-auto">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-start gap-4 mb-6">
-                <div className="flex items-start gap-3">
-                    {/* ICON */}
-                    <div className="h-12 w-12 rounded-xl bg-sky-600 border border-sky-600 shadow-sm flex items-center justify-center shrink-0">
-                        <Users className="h-6 w-6 text-white" />
-                    </div>
-
-                    {/* TITLE */}
-                    <div className="flex flex-col leading-tight">
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-[16px] font-semibold text-slate-900">
-                                Quản lý đánh giá tài xế
-                            </h1>
-                        </div>
-
-                        <p className="text-[12px] text-slate-500 leading-snug max-w-xl">
-                            Theo dõi, đánh giá và quản lý chất lượng tài xế trong hệ thống.
-                        </p>
-                    </div>
-                </div>
+            <div className="mb-6">
+                <h1 className="text-3xl font-bold text-gray-800 mb-2">
+                    Quản lý đánh giá tài xế
+                </h1>
+                <p className="text-gray-600">
+                    Đánh giá hiệu suất tài xế sau các chuyến đã hoàn thành
+                </p>
             </div>
 
             {/* Stats Cards */}

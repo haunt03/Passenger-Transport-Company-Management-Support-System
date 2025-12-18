@@ -15,7 +15,6 @@ import org.example.ptcmssbackend.repository.RolesRepository;
 import org.example.ptcmssbackend.repository.DriverRepository;
 import org.example.ptcmssbackend.service.EmployeeService;
 import org.example.ptcmssbackend.service.EmailService;
-import org.springframework.core.env.Environment;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -36,7 +35,6 @@ public class EmployeeServiceImpl implements EmployeeService {
     private final DriverRepository driverRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
-    private final Environment environment;
 
     @Override
     public List<Employees> findAll() {
@@ -321,8 +319,7 @@ public class EmployeeServiceImpl implements EmployeeService {
         // 3. Gửi email verification (nếu có email)
         if (savedUser.getEmail() != null && !savedUser.getEmail().isEmpty()) {
             try {
-                // Lấy baseUrl từ config, fallback về localhost nếu không có
-                String baseUrl = environment.getProperty("app.base-url", "https://api.hethongvantai.site");
+                String baseUrl = "http://localhost:8080"; // TODO: Get from config
                 // Link verification sẽ vừa verify email vừa cho phép set password
                 String verificationUrl = baseUrl + "/api/auth/verify?token=" + savedUser.getVerificationToken();
                 emailService.sendVerificationEmail(
@@ -352,7 +349,7 @@ public class EmployeeServiceImpl implements EmployeeService {
         List<Employees> allManagers = findByRoleName("Manager");
 
         // Lấy danh sách chi nhánh
-        List<Branches> branches = branchesRepository.findAll();
+        List<org.example.ptcmssbackend.entity.Branches> branches = branchesRepository.findAll();
 
         // Lọc ra managers chưa được gán hoặc đang quản lý chi nhánh excludeBranchId
         return allManagers.stream()

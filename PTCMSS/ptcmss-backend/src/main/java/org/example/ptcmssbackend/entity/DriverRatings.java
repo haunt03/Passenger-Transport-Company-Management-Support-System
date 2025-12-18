@@ -54,8 +54,7 @@ public class DriverRatings {
     
     @Column(name = "complianceRating")
     private Integer complianceRating; // Tuân thủ quy trình
-    
-    // Tổng điểm (tự động tính bởi trigger)
+
     @Column(name = "overallRating", precision = 3, scale = 2)
     private BigDecimal overallRating;
     

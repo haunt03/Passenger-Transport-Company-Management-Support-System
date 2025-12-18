@@ -27,10 +27,7 @@ public interface DriverRatingsRepository extends JpaRepository<DriverRatings, In
     // Tính rating trung bình của driver
     @Query("SELECT AVG(dr.overallRating) FROM DriverRatings dr WHERE dr.driver.id = :driverId AND dr.ratedAt >= :since")
     BigDecimal getAverageRatingForDriver(@Param("driverId") Integer driverId, @Param("since") Instant since);
-    
-    // Đếm số ratings của driver
-    long countByDriver_Id(Integer driverId);
-    
+
     // Lấy ratings theo branch
     @Query("SELECT dr FROM DriverRatings dr WHERE dr.driver.branch.id = :branchId ORDER BY dr.ratedAt DESC")
     List<DriverRatings> findByBranchId(@Param("branchId") Integer branchId);

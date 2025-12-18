@@ -14,12 +14,6 @@ import java.util.Optional;
 @Repository
 public interface CustomerRepository extends JpaRepository<Customers, Integer> {
     
-    // Tìm customer theo phone (unique identifier)
-    Optional<Customers> findByPhone(String phone);
-    
-    // Tìm customer theo email
-    Optional<Customers> findByEmail(String email);
-    
     // Tìm customer theo phone hoặc email
     @Query("SELECT c FROM Customers c WHERE c.phone = :phone OR c.email = :email")
     Optional<Customers> findByPhoneOrEmail(@Param("phone") String phone, @Param("email") String email);

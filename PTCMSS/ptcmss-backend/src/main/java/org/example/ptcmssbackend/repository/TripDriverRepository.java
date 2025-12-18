@@ -65,4 +65,5 @@ public interface TripDriverRepository extends JpaRepository<TripDrivers, TripDri
     @Query(value = "SELECT td.* FROM trip_drivers td WHERE td.trip_id = :tripId AND td.driver_role = 'Main Driver' ORDER BY td.id ASC LIMIT 1", nativeQuery = true)
     TripDrivers findFirstMainDriverByTripId(@Param("tripId") Integer tripId);
 
+    List<TripDrivers> findByDriver_Id(Integer driverId);
 }

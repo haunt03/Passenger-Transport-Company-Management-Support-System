@@ -48,10 +48,6 @@ public class Invoices {
     @Column(name = "type", nullable = false)
     private InvoiceType type;
 
-    @Size(max = 50)
-    @Column(name = "costType", length = 50)
-    private String costType;
-
     @NotNull
     @ColumnDefault("0")
     @Column(name = "isDeposit", nullable = false)
@@ -60,13 +56,6 @@ public class Invoices {
     @NotNull
     @Column(name = "amount", nullable = false, precision = 18, scale = 2)
     private BigDecimal amount;
-
-    @ColumnDefault("0.00")
-    @Column(name = "vatAmount", precision = 18, scale = 2)
-    private BigDecimal vatAmount = BigDecimal.ZERO;
-
-    @Column(name = "subtotal", precision = 18, scale = 2)
-    private BigDecimal subtotal;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "paymentStatus")
@@ -98,10 +87,6 @@ public class Invoices {
     @Size(max = 255)
     @Column(name = "note")
     private String note;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "requestedBy")
-    private Drivers requestedBy;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "createdBy")

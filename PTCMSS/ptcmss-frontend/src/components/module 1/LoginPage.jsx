@@ -164,7 +164,7 @@ export default function LoginPage() {
                 <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-100 rounded-full blur-3xl opacity-30"></div>
             </div>
 
-            <div className="w-full max-w-md relative z-10">
+            <div className="w-full max-w-xl relative z-10">
                 {/* LOGIN CARD */}
                 <form
                     onSubmit={handleLogin}
@@ -186,10 +186,11 @@ export default function LoginPage() {
                         {/* Title */}
                         <div className="space-y-2">
                             <div className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
-                                FleetOps Console
+                                Hệ thống hỗ trợ quản lý công
+                                ty vận tải hành khách
                             </div>
                             <div className="text-sm text-slate-500 font-medium">
-                                Đăng nhập hệ thống điều hành
+                                Đăng nhập hệ thống
                             </div>
                         </div>
                     </div>
@@ -347,12 +348,13 @@ export default function LoginPage() {
                     {/* SECURITY INFO */}
                     <div className="flex items-center justify-center gap-2 text-xs text-slate-500 pt-2">
                         <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                        <span>Kết nối bảo mật · Mã hóa end-to-end</span>
+                        <span>Kết nối bảo mật</span>
                     </div>
 
                     {/* FOOTER */}
                     <div className="text-center text-xs text-slate-400 pt-4 border-t border-slate-100">
-                        © 2025 FleetOps Console · Internal Access Portal
+                        Để thực hiện chức năng quên mật khẩu, cần điền đúng email của bạn.
+                        Nếu gặp khó khăn, vui lòng liên hệ quản trị viên hệ thống.
                     </div>
                 </form>
             </div>
