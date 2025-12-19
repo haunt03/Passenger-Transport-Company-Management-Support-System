@@ -137,12 +137,24 @@ public class BookingServiceImpl implements BookingService {
         }
 
         // 4. Tính totalCost (estimatedCost - discountAmount)
-        BigDecimal discountAmount = request.getDiscountAmount() != null
-                ? request.getDiscountAmount()
-                : BigDecimal.ZERO;
-        BigDecimal totalCost = estimatedCost != null
-                ? estimatedCost.subtract(discountAmount)
-                : BigDecimal.ZERO;
+        BigDecimal totalCost;
+
+        // Ưu tiên giá báo khách nhập tay
+        if (request.getTotalCost() != null && request.getTotalCost().compareTo(BigDecimal.ZERO) > 0) {
+            totalCost = request.getTotalCost();
+            log.info("[Booking] Using manual totalCost from request: {}", totalCost);
+        } else {
+            BigDecimal discountAmount = request.getDiscountAmount() != null
+                    ? request.getDiscountAmount()
+                    : BigDecimal.ZERO;
+
+            totalCost = estimatedCost != null
+                    ? estimatedCost.subtract(discountAmount)
+                    : BigDecimal.ZERO;
+
+            log.info("[Booking] Using system calculated totalCost: {}", totalCost);
+        }
+
 
         // 5. Tạo booking
         Bookings booking = new Bookings();
@@ -977,7 +989,7 @@ public class BookingServiceImpl implements BookingService {
 
     /**
      * Helper method: Kiểm tra xem có phải chuyến trong ngày không
-     *
+     * <p>
      * Định nghĩa:
      * - Khởi hành từ >= 00:00
      * - Kết thúc trong cùng ngày
@@ -991,13 +1003,13 @@ public class BookingServiceImpl implements BookingService {
         try {
             // Cấu hình từ SystemSettings
             int startHour = getSystemSettingInt("SAME_DAY_TRIP_START_HOUR", 0);
-            int endHour   = getSystemSettingInt("SAME_DAY_TRIP_END_HOUR", 23);
+            int endHour = getSystemSettingInt("SAME_DAY_TRIP_END_HOUR", 23);
 
             // Timezone Việt Nam
             ZoneId zone = ZoneId.of("Asia/Ho_Chi_Minh");
 
             ZonedDateTime start = startTime.atZone(zone);
-            ZonedDateTime end   = endTime.atZone(zone);
+            ZonedDateTime end = endTime.atZone(zone);
 
             // 1. Phải cùng ngày
             if (!start.toLocalDate().equals(end.toLocalDate())) {
