@@ -10,6 +10,9 @@ spring:
 
   jpa:
     show-sql: ${JPA_SHOW_SQL:false}
+    hibernate:
+      ddl-auto: update   # PROD an toàn, không drop data
+    defer-datasource-initialization: true
     properties:
       hibernate:
         format_sql: ${HIBERNATE_FORMAT_SQL:false}
