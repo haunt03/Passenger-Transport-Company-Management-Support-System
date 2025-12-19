@@ -48,6 +48,10 @@ public class Invoices {
     @Column(name = "type", nullable = false)
     private InvoiceType type;
 
+    @Size(max = 50)
+    @Column(name = "costType", length = 50)
+    private String costType;
+
     @NotNull
     @ColumnDefault("0")
     @Column(name = "isDeposit", nullable = false)
