@@ -10,14 +10,19 @@ import java.util.Arrays;
 
 @Configuration
 public class CorsConfig {
-
     @Bean
     public CorsFilter corsFilter() {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
 
         config.setAllowCredentials(true);
-        config.setAllowedOriginPatterns(Arrays.asList("*")); // Allow all origins in dev
+//        config.setAllowedOriginPatterns(Arrays.asList("*")); // Allow all origins in dev
+        // ✅ CHỈ ĐỊNH DOMAIN THẬT
+        config.setAllowedOrigins(Arrays.asList(
+                "https://hethongvantai.site",
+                "https://api.hethongvantai.site"
+        ));
+
         config.setAllowedHeaders(Arrays.asList("*"));
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setExposedHeaders(Arrays.asList("Authorization", "Content-Type"));
