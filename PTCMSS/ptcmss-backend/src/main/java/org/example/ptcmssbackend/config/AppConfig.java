@@ -54,6 +54,7 @@ public class AppConfig implements WebMvcConfigurer {
         configuration.setAllowCredentials(true);
         configuration.setAllowedOrigins(Arrays.asList(
                 "http://localhost:5173",
+                "http://localhost:5174",
                 "http://localhost:8080",
                 "https://hethongvantai.site",
                 "https://www.hethongvantai.site",
@@ -113,6 +114,7 @@ public class AppConfig implements WebMvcConfigurer {
         registry.addMapping("/**")
                 .allowedOrigins(
                         "http://localhost:5173",
+                        "http://localhost:5174",
                         "http://localhost:8080",
                         "https://hethongvantai.site",
                         "https://www.hethongvantai.site",

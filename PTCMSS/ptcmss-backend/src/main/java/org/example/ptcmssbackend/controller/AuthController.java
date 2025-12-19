@@ -20,7 +20,7 @@ import org.springframework.web.servlet.view.RedirectView;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:5174"})
 @Tag(name = "Authentication API", description = "Xử lý đăng nhập, refresh token và đăng xuất người dùng")
 public class AuthController {
 

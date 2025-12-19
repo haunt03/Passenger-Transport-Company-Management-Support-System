@@ -20,6 +20,7 @@ public class CorsConfig {
         // Cho phép cả localhost và domain production
         config.setAllowedOrigins(Arrays.asList(
                 "http://localhost:5173",
+                "http://localhost:5174",
                 "http://localhost:8080",
                 "https://hethongvantai.site",
                 "https://www.hethongvantai.site",
