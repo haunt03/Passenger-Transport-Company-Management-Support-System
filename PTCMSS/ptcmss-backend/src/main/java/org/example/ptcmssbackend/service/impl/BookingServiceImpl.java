@@ -28,10 +28,7 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.YearMonth;
-import java.time.ZoneId;
+import java.time.*;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -980,7 +977,11 @@ public class BookingServiceImpl implements BookingService {
 
     /**
      * Helper method: Kiểm tra xem có phải chuyến trong ngày không
-     * Chuyến trong ngày: Khởi hành từ 6h sáng, về 7-8h tối (hoặc đến 10-11h đêm cùng ngày)
+     *
+     * Định nghĩa:
+     * - Khởi hành từ >= 00:00
+     * - Kết thúc trong cùng ngày
+     * - Giờ về <= 23h59
      */
     private boolean isSameDayTrip(Instant startTime, Instant endTime) {
         if (startTime == null || endTime == null) {
@@ -988,36 +989,38 @@ public class BookingServiceImpl implements BookingService {
         }
 
         try {
-            // Lấy cấu hình từ SystemSettings
-            int startHour = getSystemSettingInt("SAME_DAY_TRIP_START_HOUR", 6);
-            int endHour = getSystemSettingInt("SAME_DAY_TRIP_END_HOUR", 23);
+            // Cấu hình từ SystemSettings
+            int startHour = getSystemSettingInt("SAME_DAY_TRIP_START_HOUR", 0);
+            int endHour   = getSystemSettingInt("SAME_DAY_TRIP_END_HOUR", 23);
 
-            java.time.ZonedDateTime startZoned = startTime.atZone(java.time.ZoneId.systemDefault());
-            java.time.ZonedDateTime endZoned = endTime.atZone(java.time.ZoneId.systemDefault());
+            // Timezone Việt Nam
+            ZoneId zone = ZoneId.of("Asia/Ho_Chi_Minh");
 
-            // Check cùng ngày
-            if (!startZoned.toLocalDate().equals(endZoned.toLocalDate())) {
+            ZonedDateTime start = startTime.atZone(zone);
+            ZonedDateTime end   = endTime.atZone(zone);
+
+            // 1. Phải cùng ngày
+            if (!start.toLocalDate().equals(end.toLocalDate())) {
                 return false;
             }
 
-            // Check giờ khởi hành >= 6h sáng
-            int startHourOfDay = startZoned.getHour();
-            if (startHourOfDay < startHour) {
+            // 2. Giờ khởi hành >= 00:00
+            if (start.toLocalTime().isBefore(LocalTime.of(startHour, 0))) {
                 return false;
             }
 
-            // Check giờ về <= 11h đêm (23h)
-            int endHourOfDay = endZoned.getHour();
-            if (endHourOfDay > endHour) {
+            // 3. Giờ về <= 23:59
+            if (end.toLocalTime().isAfter(LocalTime.of(endHour, 59))) {
                 return false;
             }
 
             return true;
         } catch (Exception e) {
-            log.warn("Error checking same day trip: {}", e.getMessage());
+            log.warn("Error checking same day trip", e);
             return false;
         }
     }
+
 
     /**
      * Helper method: Lấy giá trị int từ SystemSettings
