@@ -61,8 +61,8 @@ openapi:
 jwt:
   expriMinutes: 3600
   expireDate: 5
-  accesskey: 2mfGKBhdCa0K8X2uV1Fzn9o6sR8V0s5GUelGlxsFQAc=
-  refreshkey: /AqIfLpfbWqy36D3VBmkskYtmnpsJrLpRx00WVRnJlE=
+  accesskey: ${JWT_ACCESS_KEY}
+  refreshkey: ${JWT_REFRESH_KEY}
 server:
   port: ${SERVER_PORT:8080}
 
