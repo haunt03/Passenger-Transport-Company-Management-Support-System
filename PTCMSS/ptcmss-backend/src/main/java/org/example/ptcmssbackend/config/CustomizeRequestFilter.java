@@ -74,7 +74,7 @@ public class CustomizeRequestFilter extends OncePerRequestFilter {
             if (username != null) {
                 UserDetails userDetails = userServiceDetail.loadUserByUsername(username);
 
-                log.debug("[Filter] Setting authentication for user: {} with authorities: {}",
+                log.info("[Filter] Setting authentication for user: {} with authorities: {}",
                         username, userDetails.getAuthorities());
 
                 UsernamePasswordAuthenticationToken authentication =
@@ -86,7 +86,8 @@ public class CustomizeRequestFilter extends OncePerRequestFilter {
                 context.setAuthentication(authentication);
                 SecurityContextHolder.setContext(context);
 
-                log.debug("[Filter] Authentication set successfully for user: {}", username);
+                log.info("[Filter] Authentication set successfully for user: {} with roles: {}",
+                        username, userDetails.getAuthorities());
             }
         } catch (Exception e) {
             log.error("JWT validation error: {}", e.getMessage(), e);
@@ -104,3 +105,4 @@ public class CustomizeRequestFilter extends OncePerRequestFilter {
         return false;
     }
 }
+

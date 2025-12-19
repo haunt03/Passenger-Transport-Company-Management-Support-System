@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -189,7 +190,9 @@ public class DepositServiceImpl implements DepositService {
 
     @Override
     public String generateReceiptNumber(Integer branchId) {
-        LocalDate today = LocalDate.now();
+        // Sử dụng timezone cố định để tránh lỗi khi deploy lên VPS (timezone khác với local)
+        // Asia/Ho_Chi_Minh = UTC+7 (múi giờ Việt Nam)
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
         String year = String.valueOf(today.getYear());
         String month = String.format("%02d", today.getMonthValue());
         String day = String.format("%02d", today.getDayOfMonth());

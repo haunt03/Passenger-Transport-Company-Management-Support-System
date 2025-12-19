@@ -6,45 +6,31 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
 
-import java.util.List;
+import java.util.Arrays;
 
 @Configuration
 public class CorsConfig {
 
     @Bean
     public CorsFilter corsFilter() {
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
 
-        // ✅ BẮT BUỘC khi dùng JWT / Cookie
         config.setAllowCredentials(true);
-
-        // ✅ Chỉ cho phép frontend thật
-        config.setAllowedOriginPatterns(List.of(
+        // Cho phép cả localhost và domain production
+        config.setAllowedOrigins(Arrays.asList(
+                "http://localhost:5173",
+                "http://localhost:8080",
                 "https://hethongvantai.site",
+                "https://www.hethongvantai.site",
                 "https://api.hethongvantai.site"
         ));
-
-        // ✅ Cho phép mọi header (Authorization, Content-Type, ...)
-        config.setAllowedHeaders(List.of("*"));
-
-        // ✅ Đủ cho REST API
-        config.setAllowedMethods(List.of(
-                "GET",
-                "POST",
-                "PUT",
-                "PATCH",
-                "DELETE",
-                "OPTIONS"
-        ));
-
-        // ✅ Expose để frontend đọc được
-        config.setExposedHeaders(List.of("Authorization"));
-
+        config.setAllowedHeaders(Arrays.asList("*"));
+        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        config.setExposedHeaders(Arrays.asList("Authorization", "Content-Type"));
         config.setMaxAge(3600L);
 
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
-
         return new CorsFilter(source);
     }
 }

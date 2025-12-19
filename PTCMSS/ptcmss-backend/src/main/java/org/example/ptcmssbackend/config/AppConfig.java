@@ -41,8 +41,7 @@ public class AppConfig implements WebMvcConfigurer {
             "/set-password",
             "/ws/**",                // WebSocket endpoint
             "/topic/**",             // WebSocket topic subscriptions
-            "/app/**",               // WebSocket app destination prefix
-            "/actuator/**"           // Spring Boot Actuator endpoints (health, info)
+            "/app/**"                // WebSocket app destination prefix
     };
 
     @Bean
@@ -82,8 +81,15 @@ public class AppConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                .allowedOrigins("http://localhost:5173", "http://localhost:8080")
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                .allowedOrigins(
+                        "http://localhost:5173",
+                        "http://localhost:8080",
+                        "https://hethongvantai.site",
+                        "https://www.hethongvantai.site",
+                        "https://api.hethongvantai.site"
+                )
+                // Cho phép thêm cả PATCH để các API cập nhật profile (và các PATCH khác) không bị chặn CORS
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true)
                 .maxAge(3600);
@@ -96,3 +102,4 @@ public class AppConfig implements WebMvcConfigurer {
                 .addResourceLocations("file:uploads/");
     }
 }
+
