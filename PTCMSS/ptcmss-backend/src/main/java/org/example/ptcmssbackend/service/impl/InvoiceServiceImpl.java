@@ -345,15 +345,40 @@ public class InvoiceServiceImpl implements InvoiceService {
 
         payment = paymentHistoryRepository.save(payment);
 
+        // Flush để đảm bảo payment được lưu vào DB trước khi query
+        paymentHistoryRepository.flush();
+
         // Gửi thông báo cho Accountant nếu payment có status PENDING (cần xác nhận)
         if (payment.getConfirmationStatus() == PaymentConfirmationStatus.PENDING) {
             notifyAccountantsAboutPendingPayment(invoice, payment);
         }
 
         // Update invoice payment status
-        BigDecimal newBalance = calculateBalance(invoiceId);
-        if (newBalance.compareTo(BigDecimal.ZERO) <= 0) {
-            invoice.setPaymentStatus(PaymentStatus.PAID);
+        // Nếu payment là CONFIRMED, tính balance bao gồm payment này
+        BigDecimal newBalance;
+        if (payment.getConfirmationStatus() == PaymentConfirmationStatus.CONFIRMED) {
+            // Tính balance: lấy balance cũ trừ đi amount của payment vừa ghi nhận
+            BigDecimal oldBalance = balance; // balance đã tính ở đầu method
+            newBalance = oldBalance.subtract(payment.getAmount());
+
+            // Cập nhật paymentStatus dựa trên balance mới
+            if (newBalance.compareTo(BigDecimal.ZERO) <= 0) {
+                // Đã thanh toán đủ → đánh dấu PAID
+                invoice.setPaymentStatus(PaymentStatus.PAID);
+                log.info("[InvoiceService] Invoice {} marked as PAID after recording CONFIRMED payment {} (balance: {})",
+                        invoiceId, payment.getId(), newBalance);
+            } else {
+                // Chưa đủ tiền → đánh dấu UNPAID (không phải OVERDUE vì đã có payment)
+                invoice.setPaymentStatus(PaymentStatus.UNPAID);
+                log.info("[InvoiceService] Invoice {} status updated to UNPAID after recording CONFIRMED payment {} (balance: {})",
+                        invoiceId, payment.getId(), newBalance);
+            }
+        } else {
+            // Nếu PENDING, balance không thay đổi (chưa được xác nhận)
+            // Không cập nhật paymentStatus vì payment chưa được xác nhận
+            newBalance = balance;
+            log.info("[InvoiceService] Payment {} recorded with PENDING status, invoice {} balance unchanged: {}",
+                    payment.getId(), invoiceId, newBalance);
         }
 
         invoiceRepository.save(invoice);
