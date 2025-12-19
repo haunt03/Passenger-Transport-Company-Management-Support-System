@@ -858,8 +858,8 @@ function InvoiceTable({
 
     return (
         <div className="overflow-x-auto bg-white">
-            <table className="w-full text-left text-sm">
-                <thead className="text-xs text-gray-500 border-b border-gray-200 bg-gray-50">
+            <table className="w-full table-fixed text-left text-sm">
+            <thead className="text-xs text-gray-500 border-b border-gray-200 bg-gray-50">
                 <tr>
                     {headerCell(
                         "invoice_no",
@@ -877,25 +877,26 @@ function InvoiceTable({
                         "total",
                         "Tổng tiền"
                     )}
-                    {headerCell(
-                        "paid",
-                        "Đã thanh toán"
-                    )}
-                    {headerCell(
-                        "balance",
-                        "Còn lại"
-                    )}
+                    {/*{headerCell(*/}
+                    {/*    "paid",*/}
+                    {/*    "Đã thanh toán"*/}
+                    {/*)}*/}
+                    {/*{headerCell(*/}
+                    {/*    "balance",*/}
+                    {/*    "Còn lại"*/}
+                    {/*)}*/}
                     {headerCell(
                         "due_at",
-                        "Hạn TT"
+                        "Ngày TT"
                     )}
                     {headerCell(
                         "status",
                         "Trạng thái"
                     )}
-                    <th className="px-3 py-2 font-medium text-gray-600 text-xs sm:text-[13px] whitespace-nowrap">
+                    <th className="px-2 py-2 font-medium text-gray-600 text-xs sm:text-[13px] text-center whitespace-nowrap">
                         Hành động
                     </th>
+
                 </tr>
                 </thead>
 
@@ -935,12 +936,12 @@ function InvoiceTable({
                                 <td className="px-3 py-2 text-sm font-semibold tabular-nums text-gray-900">
                                     {fmtVND(iv.total || 0)} đ
                                 </td>
-                                <td className="px-3 py-2 text-sm tabular-nums text-gray-800">
-                                    {fmtVND(iv.paid || 0)} đ
-                                </td>
-                                <td className="px-3 py-2 text-sm tabular-nums text-gray-800">
-                                    {fmtVND(balance)} đ
-                                </td>
+                                {/*<td className="px-3 py-2 text-sm tabular-nums text-gray-800">*/}
+                                {/*    {fmtVND(iv.paid || 0)} đ*/}
+                                {/*</td>*/}
+                                {/*<td className="px-3 py-2 text-sm tabular-nums text-gray-800">*/}
+                                {/*    {fmtVND(balance)} đ*/}
+                                {/*</td>*/}
                                 <td className="px-3 py-2 text-[11px] text-gray-500 whitespace-nowrap">
                                     {iv.due_at || "—"}
                                 </td>
@@ -2098,8 +2099,7 @@ export default function InvoiceManagement() {
                     }}
                 />
                 <h1 className="text-2xl font-semibold text-gray-900">
-                    Invoice
-                    Management
+                    Quản lý hóa đơn
                 </h1>
 
                 {debtMode ? (
@@ -2225,29 +2225,29 @@ export default function InvoiceManagement() {
                                     onDirectRecord={onDirectRecord}
                                 />
                                 {/* Pagination */}
-                                {totalPages > 1 && (
-                                    <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
-                                        <div className="text-sm text-gray-700">
-                                            Trang {page + 1} / {totalPages}
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={() => setPage(Math.max(0, page - 1))}
-                                                disabled={page === 0}
-                                                className="px-3 py-1 rounded border border-gray-300 bg-white text-gray-700 disabled:opacity-50"
-                                            >
-                                                Trước
-                                            </button>
-                                            <button
-                                                onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
-                                                disabled={page >= totalPages - 1}
-                                                className="px-3 py-1 rounded border border-gray-300 bg-white text-gray-700 disabled:opacity-50"
-                                            >
-                                                Sau
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
+                                {/*{totalPages > 1 && (*/}
+                                {/*    <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between">*/}
+                                {/*        <div className="text-sm text-gray-700">*/}
+                                {/*            Trang {page + 1} / {totalPages}*/}
+                                {/*        </div>*/}
+                                {/*        <div className="flex gap-2">*/}
+                                {/*            <button*/}
+                                {/*                onClick={() => setPage(Math.max(0, page - 1))}*/}
+                                {/*                disabled={page === 0}*/}
+                                {/*                className="px-3 py-1 rounded border border-gray-300 bg-white text-gray-700 disabled:opacity-50"*/}
+                                {/*            >*/}
+                                {/*                Trước*/}
+                                {/*            </button>*/}
+                                {/*            <button*/}
+                                {/*                onClick={() => setPage(Math.min(totalPages - 1, page + 1))}*/}
+                                {/*                disabled={page >= totalPages - 1}*/}
+                                {/*                className="px-3 py-1 rounded border border-gray-300 bg-white text-gray-700 disabled:opacity-50"*/}
+                                {/*            >*/}
+                                {/*                Sau*/}
+                                {/*            </button>*/}
+                                {/*        </div>*/}
+                                {/*    </div>*/}
+                                {/*)}*/}
                             </>
                         )}
 

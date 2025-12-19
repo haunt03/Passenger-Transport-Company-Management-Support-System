@@ -1699,7 +1699,7 @@ export default function AccountantDashboard() {
                         </div>
 
                         <h1 className="text-lg font-semibold text-slate-900 leading-tight">
-                            Dashboard Kế toán
+                            Bảng điều khiển Kế toán
                         </h1>
 
                         <p className="text-slate-500 text-[13px]">
@@ -1812,7 +1812,7 @@ export default function AccountantDashboard() {
                 {/* KPIs */}
                 <div className="grid grid-rows-3 gap-5">
                     <KpiCard
-                        title="Công nợ phải thu (A/R)"
+                        title="Công nợ phải thu"
                         value={Number(dashboardData.arBalance || 0)}
                         delta={dashboardData.collectionRate ? Number(dashboardData.collectionRate) : 0}
                         up={true}

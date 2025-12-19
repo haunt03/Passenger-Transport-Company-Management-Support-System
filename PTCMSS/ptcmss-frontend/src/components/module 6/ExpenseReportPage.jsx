@@ -989,21 +989,21 @@ function ExpenseTable({
                     </select>
                 </div>
 
-                <div className="text-[11px] text-slate-500 flex items-start gap-1 max-w-[320px] leading-relaxed">
-                    <Info className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                    <div>
-                        Prototype.
-                        Khi nối
-                        API
-                        thật:
-                        bảng hỗ
-                        trợ phân
-                        trang
-                        server &
-                        sort
-                        server-side.
-                    </div>
-                </div>
+                {/*<div className="text-[11px] text-slate-500 flex items-start gap-1 max-w-[320px] leading-relaxed">*/}
+                {/*    <Info className="h-3.5 w-3.5 text-slate-400 shrink-0" />*/}
+                {/*    <div>*/}
+                {/*        Prototype.*/}
+                {/*        Khi nối*/}
+                {/*        API*/}
+                {/*        thật:*/}
+                {/*        bảng hỗ*/}
+                {/*        trợ phân*/}
+                {/*        trang*/}
+                {/*        server &*/}
+                {/*        sort*/}
+                {/*        server-side.*/}
+                {/*    </div>*/}
+                {/*</div>*/}
             </div>
         </div>
     );

@@ -1,10 +1,10 @@
 ﻿import React from "react";
-import { useNavigate } from "react-router-dom";
-import { listVehicles, createVehicle, updateVehicle, listVehicleCategories, getVehicleTrips } from "../../api/vehicles";
-import { listBranches } from "../../api/branches";
-import { getEmployeeByUserId } from "../../api/employees";
-import { getCurrentRole, getStoredUserId, ROLES } from "../../utils/session";
-import { checkVehicleAvailability } from "../../api/bookings";
+import {useNavigate} from "react-router-dom";
+import {listVehicles, createVehicle, updateVehicle, listVehicleCategories, getVehicleTrips} from "../../api/vehicles";
+import {listBranches} from "../../api/branches";
+import {getEmployeeByUserId} from "../../api/employees";
+import {getCurrentRole, getStoredUserId, ROLES} from "../../utils/session";
+import {checkVehicleAvailability} from "../../api/bookings";
 import {
     CarFront,
     PlusCircle,
@@ -40,20 +40,21 @@ const cls = (...a) => a.filter(Boolean).join(" ");
 
 /* -------------------------------- */
 /* Toast system (light)             */
+
 /* -------------------------------- */
 function useToasts() {
     const [toasts, setToasts] = React.useState([]);
     const push = React.useCallback((msg, kind = "info", ttl = 2400) => {
         const id = Math.random().toString(36).slice(2);
-        setToasts((arr) => [...arr, { id, msg, kind }]);
+        setToasts((arr) => [...arr, {id, msg, kind}]);
         setTimeout(() => {
             setToasts((arr) => arr.filter((t) => t.id !== id));
         }, ttl);
     }, []);
-    return { toasts, push };
+    return {toasts, push};
 }
 
-function Toasts({ toasts }) {
+function Toasts({toasts}) {
     return (
         <div className="fixed top-4 right-4 z-[999] space-y-2 text-[13px]">
             {toasts.map((t) => (
@@ -68,7 +69,7 @@ function Toasts({ toasts }) {
                     )}
                 >
                     {t.kind === "success" ? (
-                        <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+                        <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0"/>
                     ) : null}
                     <div className="leading-snug">{t.msg}</div>
                 </div>
@@ -94,7 +95,7 @@ const STATUS_LABEL = {
     INACTIVE: "Ngừng hoạt động",
 };
 
-function VehicleStatusBadge({ status }) {
+function VehicleStatusBadge({status}) {
     // light-style pill
     let clsColor = "";
     let IconEl = null;
@@ -103,25 +104,25 @@ function VehicleStatusBadge({ status }) {
         clsColor =
             "bg-green-50 text-green-700 border-green-200";
         IconEl = (
-            <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+            <CheckCircle2 className="h-3.5 w-3.5 text-green-600"/>
         );
     } else if (status === "INUSE") {
         clsColor =
             "bg-sky-50 text-sky-700 border-sky-200";
         IconEl = (
-            <CarFront className="h-3.5 w-3.5 text-sky-600" />
+            <CarFront className="h-3.5 w-3.5 text-sky-600"/>
         );
     } else if (status === "INACTIVE") {
         clsColor =
             "bg-gray-50 text-gray-700 border-gray-200";
         IconEl = (
-            <X className="h-3.5 w-3.5 text-gray-600" />
+            <X className="h-3.5 w-3.5 text-gray-600"/>
         );
     } else {
         clsColor =
             "bg-info-50 text-info-700 border-info-200";
         IconEl = (
-            <AlertTriangle className="h-3.5 w-3.5 text-primary-600" />
+            <AlertTriangle className="h-3.5 w-3.5 text-primary-600"/>
         );
     }
 
@@ -140,6 +141,7 @@ function VehicleStatusBadge({ status }) {
 
 /* -------------------------------- */
 /* Modal: Thêm xe mới (light)        */
+
 /* -------------------------------- */
 function CreateVehicleModal({
                                 open,
@@ -270,8 +272,9 @@ function CreateVehicleModal({
             >
                 {/* header */}
                 <div className="px-5 py-4 border-b border-slate-200 flex items-start gap-2">
-                    <div className="h-10 w-10 rounded-md border border-sky-200 bg-sky-50 text-sky-600 flex items-center justify-center shadow-sm">
-                        <CarFront className="h-5 w-5" />
+                    <div
+                        className="h-10 w-10 rounded-md border border-sky-200 bg-sky-50 text-sky-600 flex items-center justify-center shadow-sm">
+                        <CarFront className="h-5 w-5"/>
                     </div>
                     <div className="flex flex-col leading-tight min-w-0">
                         <div className="font-semibold text-slate-900 text-[14px]">
@@ -286,7 +289,7 @@ function CreateVehicleModal({
                         className="ml-auto rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                         title="─É├│ng"
                     >
-                        <X className="h-4 w-4" />
+                        <X className="h-4 w-4"/>
                     </button>
                 </div>
 
@@ -464,7 +467,8 @@ function CreateVehicleModal({
                                 )}
                             </div>
                             {isManager ? (
-                                <div className="w-full rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-[13px] text-slate-600">
+                                <div
+                                    className="w-full rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-[13px] text-slate-600">
                                     {managerBranchName || `Chi nhánh #${managerBranchId}`}
                                 </div>
                             ) : (
@@ -492,7 +496,7 @@ function CreateVehicleModal({
                         {/* Ngày Đăng kiểm tiếp theo */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1 flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-slate-400" />
+                                <Calendar className="h-4 w-4 text-slate-400"/>
                                 <span>Hạn đăng kiểm (ngày trong tương lai)</span>
                             </div>
                             <input
@@ -520,7 +524,7 @@ function CreateVehicleModal({
                         {/* Ngày hết hạn bảo hiểm TNDS */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1 flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-slate-400" />
+                                <Calendar className="h-4 w-4 text-slate-400"/>
                                 <span>Hạn bảo hiểm TNDS (ngày trong tương lai)</span>
                             </div>
                             <input
@@ -554,7 +558,8 @@ function CreateVehicleModal({
                 </div>
 
                 {/* footer */}
-                <div className="px-5 py-4 border-t border-slate-200 bg-slate-50 flex flex-wrap justify-end gap-2 text-[13px]">
+                <div
+                    className="px-5 py-4 border-t border-slate-200 bg-slate-50 flex flex-wrap justify-end gap-2 text-[13px]">
                     <button
                         onClick={onClose}
                         className="rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-700 hover:bg-slate-100 shadow-sm"
@@ -568,7 +573,7 @@ function CreateVehicleModal({
                             "bg-sky-600 hover:bg-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
                         )}
                     >
-                        <PlusCircle className="h-4 w-4" />
+                        <PlusCircle className="h-4 w-4"/>
                         Lưu xe mới
                     </button>
                 </div>
@@ -579,6 +584,7 @@ function CreateVehicleModal({
 
 /* -------------------------------- */
 /* Modal: Sß╗¡a xe (light)            */
+
 /* -------------------------------- */
 function EditVehicleModal({
                               open,
@@ -653,8 +659,9 @@ function EditVehicleModal({
             >
                 {/* header */}
                 <div className="px-5 py-4 border-b border-slate-200 flex items-start gap-2">
-                    <div className="h-10 w-10 rounded-md border border-sky-200 bg-sky-50 text-sky-600 flex items-center justify-center shadow-sm">
-                        <Wrench className="h-5 w-5" />
+                    <div
+                        className="h-10 w-10 rounded-md border border-sky-200 bg-sky-50 text-sky-600 flex items-center justify-center shadow-sm">
+                        <Wrench className="h-5 w-5"/>
                     </div>
                     <div className="flex flex-col leading-tight min-w-0">
                         <div className="font-semibold text-slate-900 text-[14px]">
@@ -669,7 +676,7 @@ function EditVehicleModal({
                         className="ml-auto rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                         title="Đóng"
                     >
-                        <X className="h-4 w-4" />
+                        <X className="h-4 w-4"/>
                     </button>
                 </div>
 
@@ -681,7 +688,8 @@ function EditVehicleModal({
                             <div className="text-[12px] text-slate-600 mb-1">
                                 Biển số xe
                             </div>
-                            <div className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 font-medium shadow-inner">
+                            <div
+                                className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 font-medium shadow-inner">
                                 {vehicle.license_plate}
                             </div>
                         </div>
@@ -692,7 +700,8 @@ function EditVehicleModal({
                                 {!readOnly && <span className="text-red-500">*</span>}
                             </div>
                             {readOnly ? (
-                                <div className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 font-medium shadow-inner">
+                                <div
+                                    className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 font-medium shadow-inner">
                                     {STATUS_LABEL[status] || status}
                                 </div>
                             ) : (
@@ -720,7 +729,8 @@ function EditVehicleModal({
                             <div className="text-[12px] text-slate-600 mb-1">
                                 Model xe
                             </div>
-                            <div className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 font-medium shadow-inner">
+                            <div
+                                className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 font-medium shadow-inner">
                                 {vehicle.model || "—"}
                             </div>
                         </div>
@@ -730,7 +740,8 @@ function EditVehicleModal({
                             <div className="text-[12px] text-slate-600 mb-1">
                                 Năm sản xuất
                             </div>
-                            <div className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 font-medium shadow-inner">
+                            <div
+                                className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 font-medium shadow-inner">
                                 {vehicle.year || "—"}
                             </div>
                         </div>
@@ -740,7 +751,8 @@ function EditVehicleModal({
                             <div className="text-[12px] text-slate-600 mb-1">
                                 Danh mục xe
                             </div>
-                            <div className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 font-medium shadow-inner">
+                            <div
+                                className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 font-medium shadow-inner">
                                 {vehicle.category_name || "—"}
                             </div>
                         </div>
@@ -770,7 +782,8 @@ function EditVehicleModal({
                                     ))}
                                 </select>
                             ) : (
-                                <div className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 font-medium shadow-inner">
+                                <div
+                                    className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 font-medium shadow-inner">
                                     {vehicle.branch_name || "—"}
                                 </div>
                             )}
@@ -779,11 +792,12 @@ function EditVehicleModal({
                         {/* Ngày đăng kiểm tiếp theo */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1 flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-slate-400" />
+                                <Calendar className="h-4 w-4 text-slate-400"/>
                                 <span>Hạn đăng kiểm{!readOnly && " (ngày trong tương lai)"}</span>
                             </div>
                             {readOnly ? (
-                                <div className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 font-medium shadow-inner">
+                                <div
+                                    className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 font-medium shadow-inner">
                                     {regDueDate || "—"}
                                 </div>
                             ) : (
@@ -815,11 +829,12 @@ function EditVehicleModal({
                         {/* Ngày hết hạn bảo hiểm */}
                         <div>
                             <div className="text-[12px] text-slate-600 mb-1 flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-slate-400" />
+                                <Calendar className="h-4 w-4 text-slate-400"/>
                                 <span>Hết hạn bảo hiểm xe TNDS</span>
                             </div>
                             {readOnly ? (
-                                <div className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 font-medium shadow-inner">
+                                <div
+                                    className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 font-medium shadow-inner">
                                     {insDueDate || "—"}
                                 </div>
                             ) : (
@@ -847,7 +862,8 @@ function EditVehicleModal({
                 </div>
 
                 {/* footer */}
-                <div className="px-5 py-4 border-t border-slate-200 bg-slate-50 flex flex-wrap justify-end gap-2 text-[13px]">
+                <div
+                    className="px-5 py-4 border-t border-slate-200 bg-slate-50 flex flex-wrap justify-end gap-2 text-[13px]">
                     <button
                         onClick={onClose}
                         className="rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-700 hover:bg-slate-100 shadow-sm"
@@ -863,7 +879,7 @@ function EditVehicleModal({
                                 "bg-sky-600 hover:bg-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
                             )}
                         >
-                            <Wrench className="h-4 w-4" />
+                            <Wrench className="h-4 w-4"/>
                             Lưu Thay Đổi
                         </button>
                     )}
@@ -875,6 +891,7 @@ function EditVehicleModal({
 
 /* -------------------------------- */
 /* Thanh filter (light)             */
+
 /* -------------------------------- */
 function FilterBar({
                        branchFilter,
@@ -894,9 +911,11 @@ function FilterBar({
                        // Time filter for Consultant
                        isConsultant = false,
                        timeFilterStart = "",
-                       setTimeFilterStart = () => {},
+                       setTimeFilterStart = () => {
+                       },
                        timeFilterEnd = "",
-                       setTimeFilterEnd = () => {},
+                       setTimeFilterEnd = () => {
+                       },
                    }) {
     return (
         <div className="flex flex-col lg:flex-row lg:flex-wrap gap-3 text-[13px] text-slate-700">
@@ -910,21 +929,22 @@ function FilterBar({
                         )}
                         onClick={onClickCreate}
                     >
-                        <PlusCircle className="h-4 w-4" />
+                        <PlusCircle className="h-4 w-4"/>
                         <span>Thêm xe</span>
                     </button>
                 </div>
             )}
 
             {/* Bộ lọc sang phải trên màn lớn */}
-            <div className="flex-1" />
+            <div className="flex-1"/>
 
             {/* filter controls */}
             <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-center">
                 {/* Chi nhánh - Hidden for Manager */}
                 {showBranchFilter && (
-                    <div className="flex items-center gap-2 rounded-md border border-slate-300 bg-white shadow-sm px-3 py-2 min-w-[180px]">
-                        <Building2 className="h-4 w-4 text-slate-400" />
+                    <div
+                        className="flex items-center gap-2 rounded-md border border-slate-300 bg-white shadow-sm px-3 py-2 min-w-[180px]">
+                        <Building2 className="h-4 w-4 text-slate-400"/>
                         <select
                             value={branchFilter}
                             onChange={(e) => setBranchFilter(e.target.value)}
@@ -941,8 +961,9 @@ function FilterBar({
                 )}
 
                 {/* Danh mục xe */}
-                <div className="flex items-center gap-2 rounded-md border border-slate-300 bg-white shadow-sm px-3 py-2 min-w-[160px]">
-                    <Filter className="h-4 w-4 text-slate-400" />
+                <div
+                    className="flex items-center gap-2 rounded-md border border-slate-300 bg-white shadow-sm px-3 py-2 min-w-[160px]">
+                    <Filter className="h-4 w-4 text-slate-400"/>
                     <select
                         value={categoryFilter}
                         onChange={(e) => setCategoryFilter(e.target.value)}
@@ -958,8 +979,9 @@ function FilterBar({
                 </div>
 
                 {/* Trß║íng th├íi */}
-                <div className="flex items-center gap-2 rounded-md border border-slate-300 bg-white shadow-sm px-3 py-2 min-w-[150px]">
-                    <Wrench className="h-4 w-4 text-slate-400" />
+                <div
+                    className="flex items-center gap-2 rounded-md border border-slate-300 bg-white shadow-sm px-3 py-2 min-w-[150px]">
+                    <Wrench className="h-4 w-4 text-slate-400"/>
                     <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
@@ -976,8 +998,9 @@ function FilterBar({
                 {/* Time filter for Consultant - Check vehicle availability */}
                 {isConsultant && (
                     <>
-                        <div className="flex items-center gap-2 rounded-md border border-slate-300 bg-white shadow-sm px-3 py-2 min-w-[160px]">
-                            <Calendar className="h-4 w-4 text-slate-400 shrink-0" />
+                        <div
+                            className="flex items-center gap-2 rounded-md border border-slate-300 bg-white shadow-sm px-3 py-2 min-w-[160px]">
+                            <Calendar className="h-4 w-4 text-slate-400 shrink-0"/>
                             <input
                                 type="date"
                                 value={timeFilterStart || ""}
@@ -995,8 +1018,9 @@ function FilterBar({
                             />
                         </div>
                         <span className="text-slate-400 text-[13px]">→</span>
-                        <div className="flex items-center gap-2 rounded-md border border-slate-300 bg-white shadow-sm px-3 py-2 min-w-[160px]">
-                            <Calendar className="h-4 w-4 text-slate-400 shrink-0" />
+                        <div
+                            className="flex items-center gap-2 rounded-md border border-slate-300 bg-white shadow-sm px-3 py-2 min-w-[160px]">
+                            <Calendar className="h-4 w-4 text-slate-400 shrink-0"/>
                             <input
                                 type="date"
                                 value={timeFilterEnd || ""}
@@ -1023,7 +1047,7 @@ function FilterBar({
                                 className="rounded-md border border-slate-300 bg-white hover:bg-slate-100 text-[13px] text-slate-700 px-3 py-2 flex items-center gap-2"
                                 title="Xóa filter thời gian"
                             >
-                                <X className="h-4 w-4" />
+                                <X className="h-4 w-4"/>
                             </button>
                         )}
                     </>
@@ -1035,9 +1059,9 @@ function FilterBar({
                     className="rounded-md border border-slate-300 bg-white hover:bg-slate-100 text-[13px] text-slate-700 px-3 py-2 flex items-center gap-2 min-w-[110px] justify-center shadow-sm"
                 >
                     {loadingRefresh ? (
-                        <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                        <Loader2 className="h-4 w-4 animate-spin text-slate-400"/>
                     ) : (
-                        <Wrench className="h-4 w-4 text-slate-400" />
+                        <Wrench className="h-4 w-4 text-slate-400"/>
                     )}
                     <span>Làm mới</span>
                 </button>
@@ -1051,7 +1075,7 @@ function FilterBar({
                         )}
                         onClick={onClickCreate}
                     >
-                        <PlusCircle className="h-4 w-4" />
+                        <PlusCircle className="h-4 w-4"/>
                         <span>Thêm xe</span>
                     </button>
                 )}
@@ -1072,6 +1096,7 @@ const fmtDate = (iso) => {
 
 /* -------------------------------- */
 /* Bảng danh sách xe (light)        */
+
 /* -------------------------------- */
 function VehicleTable({
                           items,
@@ -1108,9 +1133,9 @@ function VehicleTable({
                 {label}
                 {sortKey === key ? (
                     sortDir === "asc" ? (
-                        <ChevronUp className="h-3 w-3 text-slate-400" />
+                        <ChevronUp className="h-3 w-3 text-slate-400"/>
                     ) : (
-                        <ChevronDown className="h-3 w-3 text-slate-400" />
+                        <ChevronDown className="h-3 w-3 text-slate-400"/>
                     )
                 ) : null}
             </span>
@@ -1123,7 +1148,8 @@ function VehicleTable({
     return (
         <div className="overflow-x-auto text-[13px] text-slate-700">
             <table className="w-full text-left">
-                <thead className="bg-slate-100/60 border-b border-slate-200 text-[11px] uppercase tracking-wide text-slate-500">
+                <thead
+                    className="bg-slate-100/60 border-b border-slate-200 text-[11px] uppercase tracking-wide text-slate-500">
                 <tr>
                     {headerCell("license_plate", "Biển số")}
                     {headerCell("category_name", "Loại xe")}
@@ -1165,7 +1191,7 @@ function VehicleTable({
                         <td className="px-3 py-2 whitespace-nowrap">
                             <div className="flex flex-col gap-1">
                                 {/* Nếu xe đang trong chuyến, hiển thị INUSE thay vì status gốc */}
-                                <VehicleStatusBadge status={vehicleOngoingTrips[v.id] ? "INUSE" : v.status} />
+                                <VehicleStatusBadge status={vehicleOngoingTrips[v.id] ? "INUSE" : v.status}/>
                                 {/* Availability badge for Consultant with time filter */}
                                 {isConsultant && timeFilterStart && timeFilterEnd && vehicleAvailability[v.id] && (
                                     <span className={cls(
@@ -1176,12 +1202,12 @@ function VehicleTable({
                                     )}>
                                             {vehicleAvailability[v.id].available ? (
                                                 <>
-                                                    <CheckCircle2 className="h-3 w-3" />
+                                                    <CheckCircle2 className="h-3 w-3"/>
                                                     Rảnh
                                                 </>
                                             ) : (
                                                 <>
-                                                    <AlertTriangle className="h-3 w-3" />
+                                                    <AlertTriangle className="h-3 w-3"/>
                                                     Bận
                                                 </>
                                             )}
@@ -1214,7 +1240,7 @@ function VehicleTable({
                                         "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100"
                                     )}
                                 >
-                                    <Wrench className="h-3.5 w-3.5 text-sky-600" />
+                                    <Wrench className="h-3.5 w-3.5 text-sky-600"/>
                                     <span>{isAccountant ? "Chi tiết" : "Chi tiết / Sửa"}</span>
                                 </button>
                             )}
@@ -1239,7 +1265,8 @@ function VehicleTable({
             </table>
 
             {/* Footer ph├ón trang */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-3 py-3 border-t border-slate-200 bg-slate-50 text-[13px] text-slate-700">
+            <div
+                className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-3 py-3 border-t border-slate-200 bg-slate-50 text-[13px] text-slate-700">
                 <div className="flex items-center gap-2 flex-wrap">
                     <button
                         disabled={page <= 1}
@@ -1248,7 +1275,7 @@ function VehicleTable({
                             "rounded-md border border-slate-300 bg-white px-2 py-1.5 shadow-sm hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center text-slate-700"
                         )}
                     >
-                        <ChevronLeft className="h-4 w-4 text-slate-500" />
+                        <ChevronLeft className="h-4 w-4 text-slate-500"/>
                     </button>
 
                     <div className="text-slate-700">
@@ -1266,7 +1293,7 @@ function VehicleTable({
                             "rounded-md border border-slate-300 bg-white px-2 py-1.5 shadow-sm hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center text-slate-700"
                         )}
                     >
-                        <ChevronRight className="h-4 w-4 text-slate-500" />
+                        <ChevronRight className="h-4 w-4 text-slate-500"/>
                     </button>
 
                     <select
@@ -1301,16 +1328,16 @@ function VehicleTable({
 /* MOCK DATA DEMO                   */
 /* -------------------------------- */
 const MOCK_BRANCHES = [
-    { id: "HN", name: "Hà Nội" },
-    { id: "HP", name: "Hải Phòng" },
-    { id: "DN", name: "Đà Nẵng" },
-    { id: "HCM", name: "TP.HCM" },
+    {id: "HN", name: "Hà Nội"},
+    {id: "HP", name: "Hải Phòng"},
+    {id: "DN", name: "Đà Nẵng"},
+    {id: "HCM", name: "TP.HCM"},
 ];
 
 const MOCK_CATEGORIES = [
-    { id: "SEDAN4", name: "Sedan", seats: 4 },
-    { id: "SUV7", name: "SUV", seats: 7 },
-    { id: "BUS16", name: "Minibus", seats: 16 },
+    {id: "SEDAN4", name: "Sedan", seats: 4},
+    {id: "SUV7", name: "SUV", seats: 7},
+    {id: "BUS16", name: "Minibus", seats: 16},
 ];
 
 const MOCK_VEHICLES = [
@@ -1389,8 +1416,8 @@ const MOCK_VEHICLES = [
 /* -------------------------------- */
 /* MAIN PAGE                        */
 /* -------------------------------- */
-export default function VehicleListPage({ readOnly: readOnlyProp = false }) {
-    const { toasts, push } = useToasts();
+export default function VehicleListPage({readOnly: readOnlyProp = false}) {
+    const {toasts, push} = useToasts();
     const navigate = useNavigate();
 
     // Check current user role
@@ -1474,13 +1501,18 @@ export default function VehicleListPage({ readOnly: readOnlyProp = false }) {
                 const [brData, catData, vehData] = await Promise.all([
                     // Luôn cố gắng load chi nhánh + loại xe để filter cho mọi role.
                     // Nếu role nào không có quyền, catch sẽ trả mảng rỗng, UI vẫn hoạt động.
-                    listBranches({ size: 1000 }).catch(() => ({ content: [] })),
+                    listBranches({size: 1000}).catch(() => ({content: []})),
                     listVehicleCategories().catch(() => []),
                     listVehicles().catch(() => []),
                 ]);
                 const brs = Array.isArray(brData) ? brData : (brData?.items || brData?.content || []);
-                setBranches(brs.map(b => ({ id: b.id, name: b.branchName || b.name || b.branch_name })));
-                setCategories((catData || []).map(c => ({ id: c.id, name: c.categoryName || c.name, seats: c.seats, status: c.status })));
+                setBranches(brs.map(b => ({id: b.id, name: b.branchName || b.name || b.branch_name})));
+                setCategories((catData || []).map(c => ({
+                    id: c.id,
+                    name: c.categoryName || c.name,
+                    seats: c.seats,
+                    status: c.status
+                })));
                 const mappedVehicles = (vehData || []).map(mapVehicle);
                 // Debug: kiểm tra dữ liệu category_name
                 if (mappedVehicles.length > 0) {
@@ -1509,7 +1541,8 @@ export default function VehicleListPage({ readOnly: readOnlyProp = false }) {
                     }
                 }));
                 setVehicleOngoingTrips(ongoingTripsMap);
-            } catch { }
+            } catch {
+            }
         })();
     }, [mapVehicle]);
 
@@ -1553,7 +1586,7 @@ export default function VehicleListPage({ readOnly: readOnlyProp = false }) {
                     } catch (err) {
                         console.warn(`Failed to check availability for vehicle ${v.id}:`, err);
                         // Mặc định là available nếu không check được
-                        availabilityMap[v.id] = { available: true, reason: "" };
+                        availabilityMap[v.id] = {available: true, reason: ""};
                     }
                 }));
                 setVehicleAvailability(availabilityMap);
@@ -1725,37 +1758,48 @@ export default function VehicleListPage({ readOnly: readOnlyProp = false }) {
 
     return (
         <div className="relative min-h-screen bg-slate-50 text-slate-900 p-6">
-            <Toasts toasts={toasts} />
+            <Toasts toasts={toasts}/>
 
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-start gap-4 mb-6">
                 <div className="flex-1 flex flex-col gap-2 min-w-0">
-                    <div className="flex flex-wrap items-start gap-3">
-                        <div className="flex items-start gap-3">
-                            <div className="h-12 w-12 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-center">
-                                <CarFront className="h-6 w-6 text-sky-600" />
-                            </div>
+                    <div className="flex items-start gap-3">
+                        {/* ICON */}
+                        <div
+                            className="h-12 w-12 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-center">
+                            <CarFront className="h-6 w-6 text-sky-600"/>
+                        </div>
 
-                            <div className="flex flex-col leading-tight">
+                        {/* TITLE + BADGE */}
+                        <div className="flex flex-col leading-tight">
+                            <div className="flex items-center gap-2 flex-wrap">
                                 <div className="text-[16px] font-semibold text-slate-900">
                                     Quản lý phương tiện
                                 </div>
-                                <div className="text-[12px] text-slate-500 leading-snug max-w-xl">
-                                    {isManager && managerBranchName ? (
-                                        <>Chi nhánh: <span className="font-medium text-slate-700">{managerBranchName}</span></>
-                                    ) : (
-                                        "Theo dõi tình trạng xe, hiện đang kiểm, và phân bổ theo chi nhánh."
-                                    )}
-                                </div>
+
+                                <span
+                                    className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-100 text-[11px] px-2 py-[2px] text-slate-600 font-medium leading-none">
+                        Danh sách xe
+                    </span>
+                            </div>
+
+                            <div className="text-[12px] text-slate-500 leading-snug max-w-xl">
+                                {isManager && managerBranchName ? (
+                                    <>
+                                        Chi nhánh:{" "}
+                                        <span className="font-medium text-slate-700">
+                                {managerBranchName}
+                            </span>
+                                    </>
+                                ) : (
+                                    "Theo dõi tình trạng xe, hiện đang kiểm, và phân bổ theo chi nhánh."
+                                )}
                             </div>
                         </div>
-
-                        <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-100 text-[11px] px-2 py-[2px] text-slate-600 font-medium leading-none">
-                            Danh sách xe
-                        </span>
                     </div>
                 </div>
             </div>
+
 
             {/* Filter card */}
             <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-4 mb-5">
@@ -1786,8 +1830,9 @@ export default function VehicleListPage({ readOnly: readOnlyProp = false }) {
             {/* Table card */}
             <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                 {/* header row of table card */}
-                <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 text-[13px] text-slate-600 flex items-center gap-2">
-                    <CarFront className="h-4 w-4 text-sky-600" />
+                <div
+                    className="px-4 py-3 border-b border-slate-200 bg-slate-50 text-[13px] text-slate-600 flex items-center gap-2">
+                    <CarFront className="h-4 w-4 text-sky-600"/>
                     <div className="font-medium text-slate-800">
                         Danh sách xe
                     </div>

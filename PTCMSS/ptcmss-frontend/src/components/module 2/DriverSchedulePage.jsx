@@ -325,17 +325,17 @@ function DriverHeader({
           </div>
 
           {/* stats: số buổi nghỉ trong tháng */}
-          <div className="rounded-md border border-slate-200 bg-white px-4 py-3 text-left shadow-sm flex flex-col justify-between min-w-[180px]">
-            <div className="text-[11px] text-slate-500 leading-none mb-1">
-              Số buổi nghỉ trong tháng
-            </div>
-            <div className="text-[20px] font-semibold text-slate-900 leading-tight">
-              {monthlyLeaveDays}/{maxMonthlyLeaveDays}
-            </div>
-            <div className="text-[11px] text-slate-500 mt-1">
-              Đã nghỉ / Cho phép
-            </div>
-          </div>
+          {/*<div className="rounded-md border border-slate-200 bg-white px-4 py-3 text-left shadow-sm flex flex-col justify-between min-w-[180px]">*/}
+          {/*  <div className="text-[11px] text-slate-500 leading-none mb-1">*/}
+          {/*    Số buổi nghỉ trong tháng*/}
+          {/*  </div>*/}
+          {/*  <div className="text-[20px] font-semibold text-slate-900 leading-tight">*/}
+          {/*    {monthlyLeaveDays}/{maxMonthlyLeaveDays}*/}
+          {/*  </div>*/}
+          {/*  <div className="text-[11px] text-slate-500 mt-1">*/}
+          {/*    Đã nghỉ / Cho phép*/}
+          {/*  </div>*/}
+          {/*</div>*/}
         </div>
       </div>
   );

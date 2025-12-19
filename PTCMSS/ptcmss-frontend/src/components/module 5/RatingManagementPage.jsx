@@ -277,7 +277,7 @@ const RatingManagementPage = () => {
         <div className="p-6 max-w-7xl mx-auto">
             {/* Header */}
             <div className="mb-6">
-                <h1 className="text-3xl font-bold text-gray-800 mb-2">Quản lý đánh giá tài xế</h1>
+                <h1 className="text-3xl font-bold text-gray-800 mb-2">Đánh giá tài xế</h1>
                 <p className="text-gray-600">Đánh giá hiệu suất tài xế sau các chuyến hoàn thành</p>
             </div>
 
