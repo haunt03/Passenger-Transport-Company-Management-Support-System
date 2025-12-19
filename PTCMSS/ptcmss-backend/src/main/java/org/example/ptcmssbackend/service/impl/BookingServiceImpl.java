@@ -774,21 +774,21 @@ public class BookingServiceImpl implements BookingService {
 
     /**
      * Tính giá với logic mới theo yêu cầu:
-     *
+     * <p>
      * 1. TÍNH THEO CHIỀU:
-     *    a. Một chiều: CT = Số_km × PricePerKm + baseFee
-     *    b. Hai chiều:
-     *       - Cùng ngày: CT = Số_km × PricePerKm × 1.5 + baseFee
-     *       - Khác ngày: CT = 2 × (Số_km × PricePerKm + baseFee) = 2 × Số_km × PricePerKm + 2 × baseFee
-     *
+     * a. Một chiều: CT = Số_km × PricePerKm + baseFee
+     * b. Hai chiều:
+     * - Cùng ngày: CT = Số_km × PricePerKm × 1.5 + baseFee
+     * - Khác ngày: CT = (2 × Số_km × PricePerKm) + baseFee = 2 × Số_km × PricePerKm +  baseFee
+     * <p>
      * 2. TÍNH THEO NGÀY (DAILY):
-     *    - Nếu 1 ngày VÀ khoảng cách <= INTER_PROVINCE_DISTANCE_KM (10km):
-     *      CT = SameDayFixedPrice + BaseFee (KHÔNG tính km)
-     *    - Ngược lại:
-     *      CT = (Số_km × PricePerKm × 1.5) + (SameDayFixedPrice × Số_ngày) + BaseFee
-     *
+     * - Nếu 1 ngày VÀ khoảng cách <= INTER_PROVINCE_DISTANCE_KM (10km):
+     * CT = SameDayFixedPrice + BaseFee (KHÔNG tính km)
+     * - Ngược lại:
+     * CT = (Số_km × PricePerKm × 1.5) + (SameDayFixedPrice × Số_ngày) + BaseFee
+     * <p>
      * 3. THUÊ NHIỀU NGÀY (MULTI_DAY):
-     *    CT = (Số_km × PricePerKm × 1.5) + (SameDayFixedPrice × Số_ngày) + BaseFee
+     * CT = (Số_km × PricePerKm × 1.5) + (SameDayFixedPrice × Số_ngày) + BaseFee
      */
     public BigDecimal calculatePrice(
             List<Integer> vehicleCategoryIds,
@@ -805,233 +805,128 @@ public class BookingServiceImpl implements BookingService {
             return BigDecimal.ZERO;
         }
 
-        // Lấy cấu hình từ SystemSettings
+        // ===== System settings =====
         BigDecimal holidaySurchargeRate = getSystemSettingDecimal("HOLIDAY_SURCHARGE_RATE", new BigDecimal("0.25"));
         BigDecimal weekendSurchargeRate = getSystemSettingDecimal("WEEKEND_SURCHARGE_RATE", new BigDecimal("0.20"));
         BigDecimal roundTripMultiplier = getSystemSettingDecimal("ROUND_TRIP_MULTIPLIER", new BigDecimal("1.5"));
         int interProvinceDistanceKm = getSystemSettingInt("INTER_PROVINCE_DISTANCE_KM", 10);
 
-        // Tính số ngày
         int numberOfDays = calculateNumberOfDays(startTime, endTime);
-
-        // Kiểm tra chuyến trong ngày
         boolean isSameDayTrip = isSameDayTrip(startTime, endTime);
 
-        // Kiểm tra liên tỉnh (dựa trên khoảng cách > ngưỡng cấu hình, mặc định 10km)
-        boolean isInterProvince = distance != null && distance > interProvinceDistanceKm;
+        // ===== Hire type =====
+        HireTypes hireType = hireTypesRepository.findById(hireTypeId)
+                .orElseThrow(() -> new RuntimeException("HireType not found: " + hireTypeId));
+        String hireTypeCode = hireType.getCode();
 
-        // Xác định loại thuê
-        String hireTypeCode = null;
-        if (hireTypeId != null) {
-            HireTypes hireType = hireTypesRepository.findById(hireTypeId).orElse(null);
-            if (hireType != null) {
-                hireTypeCode = hireType.getCode();
-                log.debug("[Price] hireTypeId={}, hireTypeCode={}", hireTypeId, hireTypeCode);
-            } else {
-                log.warn("[Price] hireTypeId={} not found in database", hireTypeId);
-            }
-        }
-
-        // Auto-detect hình thức thuê nếu không có hireType
-        // Nếu numberOfDays >= 1 và chưa có hireType → mặc định là DAILY
-        if (hireTypeCode == null && numberOfDays >= 1) {
-            // Với khoảng cách rất ngắn (< 10km), mặc định là ONE_WAY để tính đúng theo km
-            if (isSameDayTrip && distance != null && distance > 0 && distance < 10) {
-                hireTypeCode = "ONE_WAY";
-                log.debug("[Price] Auto-detected hireType: ONE_WAY (short distance={} km, sameDayTrip)", distance);
-            } else if (isSameDayTrip && distance != null && distance <= interProvinceDistanceKm) {
-                // Khoảng cách trung bình (10-100km) trong ngày → để logic SAME_DAY xử lý
-                log.debug("[Price] Auto-detect: isSameDayTrip=true, distance={}, will use SAME_DAY logic", distance);
-            } else if (numberOfDays > 1) {
-                hireTypeCode = "MULTI_DAY";
-                log.debug("[Price] Auto-detected hireType: MULTI_DAY (days={})", numberOfDays);
-            } else {
-                hireTypeCode = "DAILY";
-                log.debug("[Price] Auto-detected hireType: DAILY (days={})", numberOfDays);
-            }
-        }
-
-        log.debug("[Price] Final hireTypeCode={}, distance={}, isSameDayTrip={}, isInterProvince={}, numberOfDays={}",
-                hireTypeCode, distance, isSameDayTrip, isInterProvince, numberOfDays);
-
-        // Tính hệ số phụ phí ngày lễ/cuối tuần
+        // ===== Surcharge rate =====
         BigDecimal surchargeRate = BigDecimal.ZERO;
-        if (isHoliday != null && isHoliday) {
-            surchargeRate = surchargeRate.add(holidaySurchargeRate);
-        }
-        if (isWeekend != null && isWeekend) {
-            surchargeRate = surchargeRate.add(weekendSurchargeRate);
-        }
+        if (Boolean.TRUE.equals(isHoliday)) surchargeRate = surchargeRate.add(holidaySurchargeRate);
+        if (Boolean.TRUE.equals(isWeekend)) surchargeRate = surchargeRate.add(weekendSurchargeRate);
 
         BigDecimal totalPrice = BigDecimal.ZERO;
 
-        log.info("🔵 [BACKEND] Starting price calculation for {} categories", vehicleCategoryIds.size());
-
         for (int i = 0; i < vehicleCategoryIds.size(); i++) {
             Integer categoryId = vehicleCategoryIds.get(i);
-            Integer quantity = i < quantities.size() ? quantities.get(i) : 1;
+            int quantity = i < quantities.size() ? quantities.get(i) : 1;
 
             VehicleCategoryPricing category = vehicleCategoryRepository.findById(categoryId)
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy loại xe: " + categoryId));
 
-            if (category.getStatus() != VehicleCategoryStatus.ACTIVE) {
-                continue;
+            if (category.getStatus() != VehicleCategoryStatus.ACTIVE) continue;
+
+            BigDecimal pricePerKm = defaultZero(category.getPricePerKm());
+            BigDecimal baseFee = defaultZero(category.getBaseFare());
+            BigDecimal highwayFee = defaultZero(category.getHighwayFee());
+            BigDecimal sameDayFixedPrice = defaultZero(category.getSameDayFixedPrice());
+
+            BigDecimal basePrice;
+
+            // =====================================================
+            // 1️⃣ ONE WAY
+            // =====================================================
+            if ("ONE_WAY".equals(hireTypeCode)) {
+                BigDecimal kmCost = pricePerKm.multiply(BigDecimal.valueOf(distance));
+                basePrice = kmCost.add(baseFee);
             }
 
-            BigDecimal pricePerKm = category.getPricePerKm() != null ? category.getPricePerKm() : BigDecimal.ZERO;
-            BigDecimal baseFee = category.getBaseFare() != null ? category.getBaseFare() : BigDecimal.ZERO;
-            BigDecimal highwayFee = category.getHighwayFee() != null ? category.getHighwayFee() : BigDecimal.ZERO;
-            BigDecimal sameDayFixedPrice = category.getSameDayFixedPrice() != null ? category.getSameDayFixedPrice() : BigDecimal.ZERO;
-
-            // 🔍 LOG BACKEND: Category pricing values
-            log.info("🔵 [BACKEND] Category[{}] pricing: pricePerKm={}, baseFee={}, sameDayFixedPrice={}, highwayFee={}, isPremium={}",
-                    category.getCategoryName(), pricePerKm, baseFee, sameDayFixedPrice, highwayFee, category.getIsPremium());
-
-            BigDecimal basePrice = BigDecimal.ZERO;
-
-            // Áp dụng công thức tính giá theo hình thức thuê
-            if ("DAILY".equals(hireTypeCode)) {
-                // THUÊ THEO NGÀY:
-                int days = Math.max(1, numberOfDays);
-
-                // Đặc biệt: Nếu thuê 1 ngày VÀ trong bán kính 10km (<= INTER_PROVINCE_DISTANCE_KM)
-                // thì chỉ tính: sameDayFixedPrice + baseFee (KHÔNG tính km)
-                if (days == 1 && distance != null && distance <= interProvinceDistanceKm) {
-                    basePrice = sameDayFixedPrice.add(baseFee);
-                    log.debug("[Price] DAILY (1 ngày, <= {}km): sameDayFixedPrice={}, baseFee={}, total={} (KHÔNG tính km)",
-                            interProvinceDistanceKm, sameDayFixedPrice, baseFee, basePrice);
-                } else {
-                    // Công thức thông thường: km × PricePerKm × 1.5 + sameDayFixedPrice × số_ngày + baseFee
-                    BigDecimal kmCost = BigDecimal.ZERO;
-                    if (distance != null && distance > 0 && pricePerKm.compareTo(BigDecimal.ZERO) > 0) {
-                        kmCost = pricePerKm
-                                .multiply(BigDecimal.valueOf(distance))
-                                .multiply(roundTripMultiplier);
-                    }
-
-                    BigDecimal dailyCost = sameDayFixedPrice.multiply(BigDecimal.valueOf(days));
-                    basePrice = kmCost.add(dailyCost).add(baseFee);
-                    log.debug("[Price] DAILY: days={}, km={}, kmCost={}, dailyRate={}, dailyCost={}, baseFee={}, total={}",
-                            days, distance, kmCost, sameDayFixedPrice, dailyCost, baseFee, basePrice);
-                }
-
-            } else if ("MULTI_DAY".equals(hireTypeCode) && numberOfDays > 1) {
-                // THUÊ NHIỀU NGÀY (đi xa): km × PricePerKm × 1.5 + sameDayFixedPrice × số_ngày + baseFee
-                BigDecimal kmCost = BigDecimal.ZERO;
-                if (distance != null && distance > 0 && pricePerKm.compareTo(BigDecimal.ZERO) > 0) {
-                    kmCost = pricePerKm
+            // =====================================================
+            // 2️⃣ ROUND TRIP
+            // =====================================================
+            else if ("ROUND_TRIP".equals(hireTypeCode)) {
+                if (isSameDayTrip) {
+                    // km × PricePerKm × 1.5 + baseFee
+                    BigDecimal kmCost = pricePerKm
                             .multiply(BigDecimal.valueOf(distance))
                             .multiply(roundTripMultiplier);
-                }
-                BigDecimal dailyCost = sameDayFixedPrice.multiply(BigDecimal.valueOf(numberOfDays));
-                basePrice = kmCost.add(dailyCost).add(baseFee);
-                log.debug("[Price] MULTI_DAY: km={}, days={}, kmCost={}, dailyCost={}, baseFee={}, total={}",
-                        distance, numberOfDays, kmCost, dailyCost, baseFee, basePrice);
-
-            } else if ("ONE_WAY".equals(hireTypeCode)) {
-                // MỘT CHIỀU: km × PricePerKm + baseFee
-                // LUÔN tính theo công thức này khi user chọn "Một chiều", bất kể isSameDayTrip
-                BigDecimal kmCost = BigDecimal.ZERO;
-                if (distance != null && distance > 0 && pricePerKm.compareTo(BigDecimal.ZERO) > 0) {
-                    kmCost = pricePerKm.multiply(BigDecimal.valueOf(distance));
-                }
-                basePrice = kmCost.add(baseFee);
-                log.info("🟡 [BACKEND] ONE_WAY calculation: km={}, pricePerKm={}, kmCost={}, baseFee={}, basePrice={}",
-                        distance, pricePerKm, kmCost, baseFee, basePrice);
-
-            } else if ("ROUND_TRIP".equals(hireTypeCode)) {
-                // KHỨ HỒI (Hai chiều):
-                // - Cùng ngày: km × PricePerKm × 1.5 + baseFee
-                // - Khác ngày: 2 × (km × PricePerKm + baseFee) = 2 × km × PricePerKm + 2 × baseFee
-                if (isSameDayTrip) {
-                    // Cùng ngày: tính như cũ
-                    BigDecimal kmCost = BigDecimal.ZERO;
-                    if (distance != null && distance > 0 && pricePerKm.compareTo(BigDecimal.ZERO) > 0) {
-                        kmCost = pricePerKm.multiply(BigDecimal.valueOf(distance)).multiply(roundTripMultiplier);
-                    }
                     basePrice = kmCost.add(baseFee);
-                    log.debug("[Price] ROUND_TRIP (cùng ngày): km={}, kmCost={}, multiplier={}, baseFee={}, total={}",
-                            distance, kmCost, roundTripMultiplier, baseFee, basePrice);
                 } else {
-                    // Khác ngày: tính 2 lần ONE_WAY
-                    BigDecimal oneWayKmCost = BigDecimal.ZERO;
-                    if (distance != null && distance > 0 && pricePerKm.compareTo(BigDecimal.ZERO) > 0) {
-                        oneWayKmCost = pricePerKm.multiply(BigDecimal.valueOf(distance));
-                    }
-                    BigDecimal oneWayPrice = oneWayKmCost.add(baseFee);
-                    basePrice = oneWayPrice.multiply(BigDecimal.valueOf(2));
-                    log.debug("[Price] ROUND_TRIP (khác ngày): km={}, oneWayKmCost={}, oneWayPrice={}, basePrice (2x)={}",
-                            distance, oneWayKmCost, oneWayPrice, basePrice);
+                    // 2 × km × PricePerKm + baseFee
+                    BigDecimal kmCost = pricePerKm
+                            .multiply(BigDecimal.valueOf(distance))
+                            .multiply(BigDecimal.valueOf(2));
+                    basePrice = kmCost.add(baseFee);
                 }
-
-            } else if (isSameDayTrip && sameDayFixedPrice.compareTo(BigDecimal.ZERO) > 0 && hireTypeCode == null) {
-                // CHUYẾN TRONG NGÀY (chỉ áp dụng khi KHÔNG có hireType cụ thể)
-                // Nếu user đã chọn hireType (ONE_WAY/ROUND_TRIP/DAILY), thì không chạy vào đây
-                // CHUYẾN TRONG NGÀY (không có hireType cụ thể)
-                if (isInterProvince) {
-                    // Liên tỉnh 1 ngày: km × PricePerKm × 1.5 + sameDayFixedPrice + baseFee
-                    BigDecimal kmCost = BigDecimal.ZERO;
-                    if (distance != null && distance > 0 && pricePerKm.compareTo(BigDecimal.ZERO) > 0) {
-                        kmCost = pricePerKm
-                                .multiply(BigDecimal.valueOf(distance))
-                                .multiply(roundTripMultiplier);
-                    }
-                    basePrice = kmCost.add(sameDayFixedPrice).add(baseFee);
-                    log.debug("[Price] INTER_PROVINCE_SAME_DAY: km={}, kmCost={}, sameDayPrice={}, baseFee={}, total={}",
-                            distance, kmCost, sameDayFixedPrice, baseFee, basePrice);
-                } else {
-                    // Trong tỉnh / nội thành: sameDayFixedPrice + baseFee
-                    basePrice = sameDayFixedPrice.add(baseFee);
-                    log.info("🟠 [BACKEND] SAME_DAY_LOCAL calculation (⚠️ KHÔNG tính km!): distance={}, sameDayFixedPrice={}, baseFee={}, basePrice={}",
-                            distance, sameDayFixedPrice, baseFee, basePrice);
-                }
-
-            } else {
-                // MẶC ĐỊNH: Tính theo km × 1.5 + baseFee
-                BigDecimal kmCost = BigDecimal.ZERO;
-                if (distance != null && distance > 0 && pricePerKm.compareTo(BigDecimal.ZERO) > 0) {
-                    kmCost = pricePerKm.multiply(BigDecimal.valueOf(distance)).multiply(roundTripMultiplier);
-                }
-                basePrice = kmCost.add(baseFee);
-                log.debug("[Price] DEFAULT: km={}, kmCost={}, baseFee={}, total={}",
-                        distance, kmCost, baseFee, basePrice);
             }
 
-            // Phụ phí cao tốc
-            if (useHighway != null && useHighway && highwayFee.compareTo(BigDecimal.ZERO) > 0) {
+            // =====================================================
+            // 3️⃣ DAILY
+            // =====================================================
+            else if ("DAILY".equals(hireTypeCode)) {
+                int days = Math.max(1, numberOfDays);
+
+                if (days == 1 && distance <= interProvinceDistanceKm) {
+                    // SameDayFixedPrice + BaseFee (NO km)
+                    basePrice = sameDayFixedPrice.add(baseFee);
+                } else {
+                    BigDecimal kmCost = pricePerKm
+                            .multiply(BigDecimal.valueOf(distance))
+                            .multiply(roundTripMultiplier);
+                    BigDecimal dailyCost = sameDayFixedPrice.multiply(BigDecimal.valueOf(days));
+                    basePrice = kmCost.add(dailyCost).add(baseFee);
+                }
+            }
+
+            // =====================================================
+            // 4️⃣ MULTI DAY
+            // =====================================================
+            else if ("MULTI_DAY".equals(hireTypeCode)) {
+                BigDecimal kmCost = pricePerKm
+                        .multiply(BigDecimal.valueOf(distance))
+                        .multiply(roundTripMultiplier);
+                BigDecimal dailyCost = sameDayFixedPrice.multiply(BigDecimal.valueOf(numberOfDays));
+                basePrice = kmCost.add(dailyCost).add(baseFee);
+            } else {
+                throw new IllegalStateException("Unsupported hire type: " + hireTypeCode);
+            }
+
+            // ===== Highway fee =====
+            if (Boolean.TRUE.equals(useHighway)) {
                 basePrice = basePrice.add(highwayFee);
             }
 
-            // Phụ phí xe hạng sang
-            if (category.getIsPremium() != null && category.getIsPremium()) {
-                BigDecimal premiumSurcharge = category.getPremiumSurcharge() != null
-                        ? category.getPremiumSurcharge()
-                        : new BigDecimal("1000000");
-                basePrice = basePrice.add(premiumSurcharge);
+            // ===== Premium surcharge =====
+            if (Boolean.TRUE.equals(category.getIsPremium())) {
+                BigDecimal premiumFee = defaultZero(category.getPremiumSurcharge());
+                basePrice = basePrice.add(premiumFee);
             }
 
-            // Phụ phí ngày lễ/cuối tuần
-            BigDecimal surchargeAmount = BigDecimal.ZERO;
+            // ===== Holiday / weekend surcharge =====
             if (surchargeRate.compareTo(BigDecimal.ZERO) > 0) {
-                surchargeAmount = basePrice.multiply(surchargeRate);
-                basePrice = basePrice.add(surchargeAmount);
-                log.info("🟣 [BACKEND] Surcharge applied: rate={}, amount={}, basePrice after surcharge={}",
-                        surchargeRate, surchargeAmount, basePrice);
+                basePrice = basePrice.add(basePrice.multiply(surchargeRate));
             }
 
-            // Nhân với số lượng xe
-            BigDecimal priceForThisCategory = basePrice.multiply(BigDecimal.valueOf(quantity));
-            log.info("🟢 [BACKEND] Category[{}] final: basePrice={}, quantity={}, priceForThisCategory={}",
-                    category.getCategoryName(), basePrice, quantity, priceForThisCategory);
-
-            totalPrice = totalPrice.add(priceForThisCategory);
+            totalPrice = totalPrice.add(basePrice.multiply(BigDecimal.valueOf(quantity)));
         }
 
-        BigDecimal finalPrice = totalPrice.setScale(2, RoundingMode.HALF_UP);
-        log.info("✅ [BACKEND] FINAL TOTAL PRICE: {} VNĐ", finalPrice);
-
-        return finalPrice;
+        return totalPrice.setScale(2, RoundingMode.HALF_UP);
     }
+
+    // Helper
+    private BigDecimal defaultZero(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
+    }
+
 
     /**
      * Helper method: Tính số ngày giữa startTime và endTime
@@ -1936,7 +1831,8 @@ public class BookingServiceImpl implements BookingService {
                     boolean hasConflict = vehicleTrips.stream().anyMatch(tv -> {
                         Trips overlapTrip = tv.getTrip();
                         if (overlapTrip == null || overlapTrip.getBooking() == null) return false;
-                        if (overlapTrip.getStatus() == TripStatus.CANCELLED || overlapTrip.getStatus() == TripStatus.COMPLETED) return false;
+                        if (overlapTrip.getStatus() == TripStatus.CANCELLED || overlapTrip.getStatus() == TripStatus.COMPLETED)
+                            return false;
                         if (targetTripIds.contains(overlapTrip.getId())) return false;
                         if (overlapTrip.getStartTime() == null) return true; // unknown -> treat as busy
 
@@ -2046,7 +1942,8 @@ public class BookingServiceImpl implements BookingService {
                             boolean hasConflict = vehicleTrips.stream().anyMatch(tv -> {
                                 Trips overlapTrip = tv.getTrip();
                                 if (overlapTrip == null || overlapTrip.getBooking() == null) return false;
-                                if (overlapTrip.getStatus() == TripStatus.CANCELLED || overlapTrip.getStatus() == TripStatus.COMPLETED) return false;
+                                if (overlapTrip.getStatus() == TripStatus.CANCELLED || overlapTrip.getStatus() == TripStatus.COMPLETED)
+                                    return false;
                                 if (targetTripIds.contains(overlapTrip.getId())) return false;
                                 if (overlapTrip.getStartTime() == null) return true;
 
