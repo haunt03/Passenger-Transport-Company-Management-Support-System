@@ -230,18 +230,15 @@ const STATUS_LABEL = {
 /* trạng thái hóa đơn */
 function StatusBadge({ status }) {
     const map = {
-        UNPAID:
-            "bg-info-50 text-info-700 border-info-300",
-        PAID: "bg-emerald-50 text-emerald-700 border-emerald-300",
-        OVERDUE:
-            "bg-rose-50 text-rose-700 border-rose-300",
+        UNPAID: "bg-blue-50 text-blue-700 border-blue-200",
+        PAID: "bg-emerald-50 text-emerald-700 border-emerald-200",
+        OVERDUE: "bg-rose-50 text-rose-700 border-rose-200",
     };
     return (
         <span
             className={cls(
-                "inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium",
-                map[status] ||
-                "bg-gray-100 text-gray-700 border-gray-300"
+                "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold shadow-sm",
+                map[status] || "bg-gray-100 text-gray-700 border-gray-200"
             )}
         >
             {STATUS_LABEL[status] || status}
@@ -816,153 +813,159 @@ function InvoiceTable({
         label
     ) => (
         <th
-            className="px-3 py-2 font-medium cursor-pointer select-none text-gray-600 whitespace-nowrap text-xs sm:text-[13px]"
+            className={cls(
+                "px-4 py-3.5 font-semibold text-gray-700 text-xs uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100/50 transition-colors whitespace-nowrap",
+                sortKey === key && "bg-gray-100 text-gray-900"
+            )}
             onClick={() => {
-                if (
-                    sortKey ===
-                    key
-                )
-                    setSortDir(
-                        (
-                            d
-                        ) =>
-                            d ===
-                            "asc"
-                                ? "desc"
-                                : "asc"
-                    );
-                else {
-                    setSortKey(
-                        key
-                    );
-                    setSortDir(
-                        "asc"
-                    );
+                if (sortKey === key) {
+                    setSortDir((d) => d === "asc" ? "desc" : "asc");
+                } else {
+                    setSortKey(key);
+                    setSortDir("asc");
                 }
             }}
         >
-            <span className="inline-flex items-center gap-1">
+            <span className="inline-flex items-center gap-1.5">
                 {label}
-                {sortKey ===
-                key ? (
-                    sortDir ===
-                    "asc" ? (
-                        <ChevronUp className="h-3 w-3 text-gray-500" />
+                {sortKey === key ? (
+                    sortDir === "asc" ? (
+                        <ChevronUp className="h-3.5 w-3.5 text-gray-600" />
                     ) : (
-                        <ChevronDown className="h-3 w-3 text-gray-500" />
+                        <ChevronDown className="h-3.5 w-3.5 text-gray-600" />
                     )
-                ) : null}
+                ) : (
+                    <span className="w-3.5 h-3.5" />
+                )}
             </span>
         </th>
     );
 
     return (
-        <div className="overflow-x-auto bg-white">
-            <table className="w-full table-fixed text-left text-sm">
-            <thead className="text-xs text-gray-500 border-b border-gray-200 bg-gray-50">
-                <tr>
-                    {headerCell(
-                        "invoice_no",
-                        "Số hóa đơn"
-                    )}
-                    {headerCell(
-                        "customer",
-                        "Tên khách hàng"
-                    )}
-                    {headerCell(
-                        "order_code",
-                        "Mã đơn hàng"
-                    )}
-                    {headerCell(
-                        "total",
-                        "Tổng tiền"
-                    )}
-                    {/*{headerCell(*/}
-                    {/*    "paid",*/}
-                    {/*    "Đã thanh toán"*/}
-                    {/*)}*/}
-                    {/*{headerCell(*/}
-                    {/*    "balance",*/}
-                    {/*    "Còn lại"*/}
-                    {/*)}*/}
-                    {headerCell(
-                        "due_at",
-                        "Ngày TT"
-                    )}
-                    {headerCell(
-                        "status",
-                        "Trạng thái"
-                    )}
-                    <th className="px-2 py-2 font-medium text-gray-600 text-xs sm:text-[13px] text-center whitespace-nowrap">
-                        Hành động
-                    </th>
-
-                </tr>
+        <div className="overflow-x-auto bg-white rounded-lg border border-gray-100 shadow-sm">
+            <table className="w-full text-left">
+                <thead>
+                    <tr className="border-b border-gray-100 bg-gradient-to-r from-gray-50 to-gray-50/50">
+                        {headerCell(
+                            "invoice_no",
+                            "Số hóa đơn"
+                        )}
+                        {headerCell(
+                            "customer",
+                            "Khách hàng"
+                        )}
+                        {headerCell(
+                            "order_code",
+                            "Mã đơn"
+                        )}
+                        {headerCell(
+                            "total",
+                            "Tổng tiền"
+                        )}
+                        {headerCell(
+                            "due_at",
+                            "Ngày TT"
+                        )}
+                        {headerCell(
+                            "status",
+                            "Trạng thái"
+                        )}
+                        <th className="px-4 py-3.5 font-semibold text-gray-700 text-xs uppercase tracking-wider text-center whitespace-nowrap">
+                            Thao tác
+                        </th>
+                    </tr>
                 </thead>
 
-                <tbody className="divide-y divide-gray-200">
-                {current.map(
-                    (iv) => {
-                        const balance =
-                            Math.max(
-                                0,
-                                (iv.total ||
-                                    0) -
-                                (iv.paid ||
-                                    0)
-                            );
+                <tbody className="divide-y divide-gray-50">
+                    {current.map((iv) => {
+                        const balance = Math.max(0, (iv.total || 0) - (iv.paid || 0));
+                        const invoiceNumber = iv.invoice_no || iv.invoiceNumber || `INV-${iv.id || iv.invoiceId}`;
+                        
                         return (
                             <tr
-                                key={
-                                    iv.id
-                                }
-                                className="hover:bg-gray-50"
+                                key={iv.id || iv.invoiceId}
+                                className="group hover:bg-gradient-to-r hover:from-blue-50/30 hover:to-transparent transition-all duration-150"
                             >
-                                <td className="px-3 py-2 text-sm text-gray-900 font-medium">
-                                    {iv.invoice_no || `INV-${iv.id}`}
-                                </td>
-                                <td className="px-3 py-2 text-sm text-gray-800">
-                                    <div>{iv.customer || "—"}</div>
-                                    {iv.customerPhone && (
-                                        <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
-                                            <Phone className="h-3 w-3" />
-                                            {iv.customerPhone}
+                                {/* Số hóa đơn */}
+                                <td className="px-4 py-4">
+                                    <div className="flex items-center">
+                                        <div className="flex-shrink-0 w-8 h-8 rounded-md bg-blue-50 flex items-center justify-center mr-3 group-hover:bg-blue-100 transition-colors">
+                                            <FileDown className="h-4 w-4 text-blue-600" />
                                         </div>
-                                    )}
-                                </td>
-                                <td className="px-3 py-2 text-sm text-gray-800">
-                                    {iv.order_code || "—"}
-                                </td>
-                                <td className="px-3 py-2 text-sm font-semibold tabular-nums text-gray-900">
-                                    {fmtVND(iv.total || 0)} đ
-                                </td>
-                                {/*<td className="px-3 py-2 text-sm tabular-nums text-gray-800">*/}
-                                {/*    {fmtVND(iv.paid || 0)} đ*/}
-                                {/*</td>*/}
-                                {/*<td className="px-3 py-2 text-sm tabular-nums text-gray-800">*/}
-                                {/*    {fmtVND(balance)} đ*/}
-                                {/*</td>*/}
-                                <td className="px-3 py-2 text-[11px] text-gray-500 whitespace-nowrap">
-                                    {iv.due_at || "—"}
-                                </td>
-                                <td className="px-3 py-2 text-sm">
-                                    <StatusBadge status={iv.status} />
-                                    {isAccountant && (iv.pendingPaymentCount || 0) > 0 && (
-                                        <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 text-[11px] font-medium">
-                                            <Clock className="h-3.5 w-3.5" />
-                                            <span>Chờ kế toán xác nhận ({iv.pendingPaymentCount})</span>
+                                        <div>
+                                            <div className="text-sm font-semibold text-gray-900">
+                                                {invoiceNumber}
+                                            </div>
                                         </div>
-                                    )}
+                                    </div>
                                 </td>
-                                <td className="px-3 py-2">
-                                    <div className="flex flex-wrap gap-2">
-                                        {/* Ghi nhận thanh toán - cho role khác (Driver, Consultant...) */}
+
+                                {/* Khách hàng */}
+                                <td className="px-4 py-4">
+                                    <div>
+                                        <div className="text-sm font-medium text-gray-900 mb-1">
+                                            {iv.customer || iv.customerName || "—"}
+                                        </div>
+                                        {iv.customerPhone && (
+                                            <div className="text-xs text-gray-500 flex items-center gap-1.5 mt-1">
+                                                <Phone className="h-3 w-3 text-gray-400" />
+                                                <span>{iv.customerPhone}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </td>
+
+                                {/* Mã đơn hàng */}
+                                <td className="px-4 py-4">
+                                    <div className="inline-flex items-center px-2.5 py-1 rounded-md bg-gray-50 text-gray-700 text-sm font-mono">
+                                        {iv.order_code || "—"}
+                                    </div>
+                                </td>
+
+                                {/* Tổng tiền */}
+                                <td className="px-4 py-4">
+                                    <div className="text-right">
+                                        <div className="text-sm font-bold text-gray-900 tabular-nums">
+                                            {fmtVND(iv.total || iv.amount || 0)} đ
+                                        </div>
+                                        {balance > 0 && (
+                                            <div className="text-xs text-amber-600 mt-0.5">
+                                                Còn lại: {fmtVND(balance)} đ
+                                            </div>
+                                        )}
+                                    </div>
+                                </td>
+
+                                {/* Ngày thanh toán */}
+                                <td className="px-4 py-4">
+                                    <div className="text-sm text-gray-600 whitespace-nowrap">
+                                        {iv.due_at || iv.dueDate || "—"}
+                                    </div>
+                                </td>
+
+                                {/* Trạng thái */}
+                                <td className="px-4 py-4">
+                                    <div className="flex flex-col gap-1.5">
+                                        <StatusBadge status={iv.status || iv.paymentStatus} />
+                                        {isAccountant && (iv.pendingPaymentCount || 0) > 0 && (
+                                            <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 text-xs font-medium">
+                                                <Clock className="h-3.5 w-3.5" />
+                                                <span>Chờ xác nhận ({iv.pendingPaymentCount})</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </td>
+
+                                {/* Hành động */}
+                                <td className="px-4 py-4">
+                                    <div className="flex items-center justify-center flex-wrap gap-2">
+                                        {/* Ghi nhận thanh toán - cho role khác */}
                                         {iv.status !== STATUS.PAID && !isAccountant && (
                                             <button
                                                 onClick={() => onRecordPayment(iv)}
-                                                className="rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 px-2.5 py-1.5 text-[11px] font-medium shadow-sm flex items-center gap-1"
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 text-gray-700 text-xs font-medium shadow-sm transition-all duration-150"
                                             >
-                                                <BadgeDollarSign className="h-3.5 w-3.5 text-gray-500" />
+                                                <BadgeDollarSign className="h-3.5 w-3.5" />
                                                 <span>Ghi nhận</span>
                                             </button>
                                         )}
@@ -971,86 +974,69 @@ function InvoiceTable({
                                         {iv.status !== STATUS.PAID && isAccountant && (iv.pendingPaymentCount || 0) > 0 && (
                                             <button
                                                 onClick={() => onRecordPayment(iv)}
-                                                className="rounded-lg border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-700 px-2.5 py-1.5 text-[11px] font-medium shadow-sm flex items-center gap-1"
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-300 bg-blue-50 hover:bg-blue-100 hover:border-blue-400 text-blue-700 text-xs font-medium shadow-sm transition-all duration-150"
                                             >
-                                                <CheckCircle className="h-3.5 w-3.5 text-blue-500" />
-                                                <span>Xác nhận ({(iv.pendingPaymentCount || 0)})</span>
+                                                <CheckCircle className="h-3.5 w-3.5" />
+                                                <span>Xác nhận ({iv.pendingPaymentCount})</span>
                                             </button>
                                         )}
 
-                                        {/* Accountant: Ghi nhận trực tiếp khi không còn pending request */}
+                                        {/* Accountant: Ghi nhận trực tiếp */}
                                         {iv.status !== STATUS.PAID && isAccountant && (iv.pendingPaymentCount || 0) === 0 && (
                                             <button
                                                 onClick={() => onDirectRecord(iv)}
-                                                className="rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2.5 py-1.5 text-[11px] font-medium shadow-sm flex items-center gap-1"
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-400 text-emerald-700 text-xs font-medium shadow-sm transition-all duration-150"
                                             >
-                                                <BadgeDollarSign className="h-3.5 w-3.5 text-emerald-600" />
+                                                <BadgeDollarSign className="h-3.5 w-3.5" />
                                                 <span>Ghi nhận</span>
                                             </button>
                                         )}
 
-                                        {/* Xem lịch sử thanh toán - chỉ hiển thị nếu có bookingId (mã đơn) */}
+                                        {/* Xem lịch sử */}
                                         {onViewPaymentHistory && iv.bookingId && (
                                             <button
                                                 onClick={() => onViewPaymentHistory(iv)}
-                                                className="rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 px-2.5 py-1.5 text-[11px] font-medium shadow-sm flex items-center gap-1"
-                                                title="Xem lịch sử thanh toán theo mã đơn"
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 text-gray-700 text-xs font-medium shadow-sm transition-all duration-150"
                                             >
-                                                <History className="h-3.5 w-3.5 text-gray-500" />
+                                                <History className="h-3.5 w-3.5" />
                                                 <span>Lịch sử</span>
                                             </button>
                                         )}
 
-                                        {/* Gửi HĐ qua email */}
+                                        {/* Gửi HĐ */}
                                         <button
-                                            onClick={() =>
-                                                onSendInvoice(
-                                                    iv
-                                                )
-                                            }
-                                            className="rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 px-2.5 py-1.5 text-[11px] font-medium shadow-sm flex items-center gap-1"
+                                            onClick={() => onSendInvoice(iv)}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 text-gray-700 text-xs font-medium shadow-sm transition-all duration-150"
                                         >
-                                            <Mail className="h-3.5 w-3.5 text-gray-500" />
-                                            <span>
-                                                    Gửi
-                                                    HĐ
-                                                </span>
+                                            <Mail className="h-3.5 w-3.5" />
+                                            <span>Gửi HĐ</span>
                                         </button>
 
                                         {/* Xuất PDF */}
                                         <button
-                                            onClick={() =>
-                                                onExportPdf(
-                                                    iv
-                                                )
-                                            }
-                                            className="rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 px-2.5 py-1.5 text-[11px] font-medium shadow-sm flex items-center gap-1"
+                                            onClick={() => onExportPdf(iv)}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 text-gray-700 text-xs font-medium shadow-sm transition-all duration-150"
                                         >
-                                            <FileDown className="h-3.5 w-3.5 text-gray-500" />
-                                            <span>
-                                                    PDF
-                                                </span>
+                                            <FileDown className="h-3.5 w-3.5" />
+                                            <span>PDF</span>
                                         </button>
                                     </div>
                                 </td>
                             </tr>
                         );
-                    }
-                )}
+                    })}
 
-                {current.length ===
-                    0 && (
+                    {current.length === 0 && (
                         <tr>
                             <td
-                                colSpan={
-                                    9
-                                }
-                                className="px-3 py-6 text-center text-gray-500 text-sm"
+                                colSpan={7}
+                                className="px-4 py-12 text-center"
                             >
-                                Không
-                                có hóa
-                                đơn
-                                nào.
+                                <div className="flex flex-col items-center justify-center text-gray-400">
+                                    <FileDown className="h-12 w-12 mb-3 opacity-50" />
+                                    <p className="text-sm font-medium">Không có hóa đơn nào</p>
+                                    <p className="text-xs mt-1">Danh sách hóa đơn sẽ hiển thị ở đây</p>
+                                </div>
                             </td>
                         </tr>
                     )}
@@ -1530,26 +1516,64 @@ export default function InvoiceManagement() {
             let invoiceList = [];
             if (response && response.content) {
                 invoiceList = response.content || [];
-                setInvoices(invoiceList);
                 setTotalPages(response.totalPages || 1);
             } else if (Array.isArray(response)) {
                 invoiceList = response;
-                setInvoices(invoiceList);
                 setTotalPages(1);
             } else {
                 setInvoices([]);
+                return;
             }
+
+            // Map backend response to frontend format
+            // Backend trả về: invoiceId, invoiceNumber, customerName, customerEmail, amount, paidAmount, balance
+            // Frontend expect: id, invoice_no, customer, customer_email, total, paid, remaining
+            const mappedInvoices = invoiceList.map(iv => ({
+                // ID mapping - ưu tiên invoiceId từ backend
+                id: iv.invoiceId || iv.id,
+                invoiceId: iv.invoiceId || iv.id,
+                // Invoice number
+                invoice_no: iv.invoiceNumber || iv.invoice_no,
+                invoiceNumber: iv.invoiceNumber || iv.invoice_no,
+                // Customer info
+                customer: iv.customerName || iv.customer,
+                customerName: iv.customerName || iv.customer,
+                customerPhone: iv.customerPhone,
+                customer_email: iv.customerEmail || iv.customer_email,
+                customerEmail: iv.customerEmail || iv.customer_email,
+                // Amounts
+                total: iv.amount || iv.total,
+                amount: iv.amount || iv.total,
+                paid: iv.paidAmount || iv.paid,
+                paidAmount: iv.paidAmount || iv.paid,
+                remaining: iv.balance || iv.remaining,
+                balance: iv.balance || iv.remaining,
+                // Other fields
+                bookingId: iv.bookingId,
+                order_code: iv.order_code,
+                branchId: iv.branchId,
+                status: iv.status || iv.paymentStatus,
+                paymentStatus: iv.paymentStatus || iv.status,
+                due_at: iv.dueDate ? new Date(iv.dueDate).toLocaleDateString('vi-VN') : iv.due_at,
+                dueDate: iv.dueDate,
+                pendingPaymentCount: iv.pendingPaymentCount || 0,
+                // Keep all original fields
+                ...iv
+            }));
+
+            setInvoices(mappedInvoices);
 
             // Debug: Log danh sách hóa đơn
             console.log("[InvoiceManagement] Loaded invoices:", {
-                total: invoiceList.length,
-                invoices: invoiceList.map(iv => ({
+                total: mappedInvoices.length,
+                invoices: mappedInvoices.map(iv => ({
                     id: iv.id,
+                    invoiceId: iv.invoiceId,
                     invoice_no: iv.invoice_no,
                     customer: iv.customer,
                     bookingId: iv.bookingId,
                     order_code: iv.order_code,
-                    branchId: iv.branchId || iv.branch?.id || iv.branch?.branchId,
+                    branchId: iv.branchId,
                     total: iv.total,
                     paid: iv.paid,
                     remaining: iv.remaining,
@@ -1921,23 +1945,35 @@ export default function InvoiceManagement() {
 
     // Gửi HĐ qua email
     const onSendInvoice = async (iv) => {
+        // Get invoice ID - backend trả về invoiceId, nhưng có thể có id từ mapping
+        const invoiceId = iv.invoiceId || iv.id;
+        
+        if (!invoiceId) {
+            console.error("Invoice ID is missing. Invoice object:", iv);
+            push("❌ Không tìm thấy ID hóa đơn. Vui lòng thử lại sau.", "error", 3000);
+            return;
+        }
+
         // Get customer email from invoice
-        const customerEmail = iv.customer_email || iv.customerEmail;
+        const customerEmail = iv.customerEmail || iv.customer_email;
 
         if (!customerEmail) {
             push("❌ Không tìm thấy email khách hàng", "error", 3000);
             return;
         }
 
+        // Get invoice number
+        const invoiceNumber = iv.invoiceNumber || iv.invoice_no || iv.invoiceNumber || `INV-${invoiceId}`;
+
         // Show loading notification
-        push(`📧 Đang gửi hóa đơn ${iv.invoice_no}...`, "info", 2000);
+        push(`📧 Đang gửi hóa đơn ${invoiceNumber}...`, "info", 2000);
 
         try {
-            await sendInvoice(iv.id, {
+            await sendInvoice(invoiceId, {
                 email: customerEmail,
-                message: `Hóa đơn ${iv.invoice_no} từ TranspoManager`
+                message: `Hóa đơn ${invoiceNumber} từ TranspoManager`
             });
-            push(`✅ Đã gửi hóa đơn ${iv.invoice_no} đến ${customerEmail}`, "success", 4000);
+            push(`✅ Đã gửi hóa đơn ${invoiceNumber} đến ${customerEmail}`, "success", 4000);
         } catch (err) {
             console.error("Error sending invoice:", err);
             const errorMsg = err?.data?.message || err?.message || "Lỗi không xác định";
@@ -1947,12 +1983,22 @@ export default function InvoiceManagement() {
 
     // Xuất PDF
     const onExportPdf = async (iv) => {
+        // Get invoice ID - backend trả về invoiceId, nhưng có thể có id từ mapping
+        const invoiceId = iv.invoiceId || iv.id;
+        
+        if (!invoiceId) {
+            console.error("Invoice ID is missing. Invoice object:", iv);
+            push("❌ Không tìm thấy ID hóa đơn. Vui lòng thử lại sau.", "error", 3000);
+            return;
+        }
+
         try {
-            await exportInvoiceToPdf(iv.id);
-            push(`Đã xuất PDF cho ${iv.invoice_no}`, "success");
+            await exportInvoiceToPdf(invoiceId);
+            const invoiceNumber = iv.invoiceNumber || iv.invoice_no || `INV-${invoiceId}`;
+            push(`✅ Đã xuất PDF cho ${invoiceNumber}`, "success");
         } catch (err) {
             console.error("Error exporting PDF:", err);
-            push("Lỗi khi xuất PDF: " + (err.message || "Lỗi không xác định"), "error");
+            push("❌ Lỗi khi xuất PDF: " + (err.message || "Lỗi không xác định"), "error");
         }
     };
 

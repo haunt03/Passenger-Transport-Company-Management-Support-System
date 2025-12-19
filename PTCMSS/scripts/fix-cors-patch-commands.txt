@@ -1,0 +1,14 @@
+# Chạy các lệnh sau trên Ubuntu server để sửa CORS PATCH:
+
+# 1. Backup nginx config
+sudo cp /etc/nginx/sites-available/ptcmss /etc/nginx/sites-available/ptcmss.backup
+
+# 2. Sửa file nginx config để thêm PATCH method
+sudo sed -i 's/add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS" always;/add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD" always;/g' /etc/nginx/sites-available/ptcmss
+
+# 3. Kiểm tra cấu hình
+sudo nginx -t
+
+# 4. Nếu OK, reload nginx
+sudo systemctl reload nginx
+
