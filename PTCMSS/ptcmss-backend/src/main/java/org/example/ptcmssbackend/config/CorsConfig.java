@@ -6,29 +6,45 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
 
-import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 public class CorsConfig {
+
     @Bean
     public CorsFilter corsFilter() {
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
 
+        // ✅ BẮT BUỘC khi dùng JWT / Cookie
         config.setAllowCredentials(true);
-//        config.setAllowedOriginPatterns(Arrays.asList("*")); // Allow all origins in dev
-        // ✅ CHỈ ĐỊNH DOMAIN THẬT
-        config.setAllowedOrigins(Arrays.asList(
+
+        // ✅ Chỉ cho phép frontend thật
+        config.setAllowedOriginPatterns(List.of(
                 "https://hethongvantai.site",
                 "https://api.hethongvantai.site"
         ));
 
-        config.setAllowedHeaders(Arrays.asList("*"));
-        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        config.setExposedHeaders(Arrays.asList("Authorization", "Content-Type"));
+        // ✅ Cho phép mọi header (Authorization, Content-Type, ...)
+        config.setAllowedHeaders(List.of("*"));
+
+        // ✅ Đủ cho REST API
+        config.setAllowedMethods(List.of(
+                "GET",
+                "POST",
+                "PUT",
+                "PATCH",
+                "DELETE",
+                "OPTIONS"
+        ));
+
+        // ✅ Expose để frontend đọc được
+        config.setExposedHeaders(List.of("Authorization"));
+
         config.setMaxAge(3600L);
 
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
+
         return new CorsFilter(source);
     }
 }
