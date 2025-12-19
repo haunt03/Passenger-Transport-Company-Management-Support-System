@@ -113,8 +113,17 @@ public class BookingServiceImpl implements BookingService {
             Instant endTime = null;
             if (request.getTrips() != null && !request.getTrips().isEmpty()) {
                 TripRequest firstTrip = request.getTrips().get(0);
-                startTime = firstTrip.getStartTime();
-                endTime = firstTrip.getEndTime();
+                startTime = request.getTrips().stream()
+                        .map(TripRequest::getStartTime)
+                        .filter(java.util.Objects::nonNull)
+                        .min(Instant::compareTo)
+                        .orElse(null);
+
+                endTime = request.getTrips().stream()
+                        .map(TripRequest::getEndTime)
+                        .filter(java.util.Objects::nonNull)
+                        .max(Instant::compareTo)
+                        .orElse(null);
             }
 
             estimatedCost = calculatePrice(
@@ -887,16 +896,17 @@ public class BookingServiceImpl implements BookingService {
                 }
             }
 
-            // =====================================================
-            // 4️⃣ MULTI DAY
-            // =====================================================
-            else if ("MULTI_DAY".equals(hireTypeCode)) {
-                BigDecimal kmCost = pricePerKm
-                        .multiply(BigDecimal.valueOf(distance))
-                        .multiply(roundTripMultiplier);
-                BigDecimal dailyCost = sameDayFixedPrice.multiply(BigDecimal.valueOf(numberOfDays));
-                basePrice = kmCost.add(dailyCost).add(baseFee);
-            } else {
+//            // =====================================================
+//            // 4️⃣ MULTI DAY
+//            // =====================================================
+//            else if ("MULTI_DAY".equals(hireTypeCode)) {
+//                BigDecimal kmCost = pricePerKm
+//                        .multiply(BigDecimal.valueOf(distance))
+//                        .multiply(roundTripMultiplier);
+//                BigDecimal dailyCost = sameDayFixedPrice.multiply(BigDecimal.valueOf(numberOfDays));
+//                basePrice = kmCost.add(dailyCost).add(baseFee);
+//            }
+            else {
                 throw new IllegalStateException("Unsupported hire type: " + hireTypeCode);
             }
 
