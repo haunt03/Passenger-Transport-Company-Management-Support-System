@@ -128,7 +128,9 @@ public class ExpenseRequestServiceImpl implements ExpenseRequestService {
                 receiptImages = objectMapper.readValue(entity.getReceiptImages(),
                         objectMapper.getTypeFactory().constructCollectionType(List.class, String.class));
             } catch (Exception e) {
-                log.warn("[ExpenseRequest] Error parsing receipt images: {}", e.getMessage());
+                log.warn("[ExpenseRequest] Error parsing receipt images for expense request {}: {}",
+                        entity.getId(), e.getMessage());
+                // Continue with empty list instead of failing
             }
         }
 
@@ -170,13 +172,23 @@ public class ExpenseRequestServiceImpl implements ExpenseRequestService {
     @Override
     public List<ExpenseRequestResponse> getPendingRequests(Integer branchId) {
         log.info("[ExpenseRequest] getPendingRequests - branchId: {}", branchId);
-        List<ExpenseRequests> list;
-        if (branchId != null) {
-            list = expenseRequestRepository.findByStatusAndBranch_Id(ExpenseRequestStatus.PENDING, branchId);
-        } else {
-            list = expenseRequestRepository.findByStatus(ExpenseRequestStatus.PENDING);
+        try {
+            List<ExpenseRequests> list;
+            if (branchId != null) {
+                list = expenseRequestRepository.findByStatusAndBranch_Id(ExpenseRequestStatus.PENDING, branchId);
+            } else {
+                list = expenseRequestRepository.findByStatus(ExpenseRequestStatus.PENDING);
+            }
+            log.info("[ExpenseRequest] Found {} pending requests", list.size());
+            List<ExpenseRequestResponse> responses = list.stream()
+                    .map(this::mapToResponse)
+                    .collect(Collectors.toList());
+            log.info("[ExpenseRequest] getPendingRequests completed successfully");
+            return responses;
+        } catch (Exception e) {
+            log.error("[ExpenseRequest] Error in getPendingRequests for branchId: {}", branchId, e);
+            throw new RuntimeException("Lỗi khi lấy danh sách yêu cầu chi phí chờ duyệt: " + e.getMessage(), e);
         }
-        return list.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
     @Override
