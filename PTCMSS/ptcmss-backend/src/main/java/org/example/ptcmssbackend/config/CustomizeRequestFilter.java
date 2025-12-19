@@ -44,7 +44,14 @@ public class CustomizeRequestFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String uri = request.getRequestURI();
-        log.info("{} {}", request.getMethod(), uri);
+        String method = request.getMethod();
+        log.info("{} {}", method, uri);
+
+        // QUAN TRỌNG: Bỏ qua OPTIONS request (CORS preflight) - để CORS filter xử lý
+        if ("OPTIONS".equalsIgnoreCase(method)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         // Bỏ qua các endpoint công khai
         if (isPublicEndpoint(uri)) {
@@ -105,4 +112,3 @@ public class CustomizeRequestFilter extends OncePerRequestFilter {
         return false;
     }
 }
-
