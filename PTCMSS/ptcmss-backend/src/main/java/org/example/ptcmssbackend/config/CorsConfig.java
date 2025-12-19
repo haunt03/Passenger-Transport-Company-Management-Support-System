@@ -26,8 +26,9 @@ public class CorsConfig {
                 "https://api.hethongvantai.site"
         ));
         config.setAllowedHeaders(Arrays.asList("*"));
-        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        config.setExposedHeaders(Arrays.asList("Authorization", "Content-Type"));
+        // QUAN TRỌNG: Phải có PATCH trong allowedMethods để cho phép confirmPayment API
+        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"));
+        config.setExposedHeaders(Arrays.asList("Authorization", "Content-Type", "Access-Control-Allow-Origin", "Access-Control-Allow-Methods"));
         config.setMaxAge(3600L);
 
         source.registerCorsConfiguration("/**", config);
