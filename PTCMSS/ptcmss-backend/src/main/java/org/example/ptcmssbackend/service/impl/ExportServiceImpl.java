@@ -238,7 +238,12 @@ public class ExportServiceImpl implements ExportService {
                     .setMarginBottom(20);
 
             // Left column
-            infoTable.addCell(new Paragraph("Invoice Number: " + (invoice.getInvoiceNumber() != null ? removeVietnameseAccents(invoice.getInvoiceNumber()) : "N/A"))
+            // Use invoiceNumber if available, otherwise use invoiceId to generate a number
+            String invoiceNumberDisplay = invoice.getInvoiceNumber();
+            if (invoiceNumberDisplay == null || invoiceNumberDisplay.isEmpty()) {
+                invoiceNumberDisplay = invoice.getInvoiceId() != null ? "INV-" + invoice.getInvoiceId() : "N/A";
+            }
+            infoTable.addCell(new Paragraph("Invoice Number: " + removeVietnameseAccents(invoiceNumberDisplay))
                     .setFont(font)
                     .setFontSize(11)
                     .setBorder(null));
