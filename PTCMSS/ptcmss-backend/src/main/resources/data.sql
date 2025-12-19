@@ -1,6 +1,6 @@
 -- PTCMSS Seed Data - 3 branches, 10 employees each, and complete related data
 -- Assumes schema already created. Uses INSERT IGNORE to avoid duplicate errors.
--- 
+--
 -- NOTE: Warnings about duplicate entries are NORMAL when running this script multiple times.
 -- INSERT IGNORE will skip existing records and only show warnings, not errors.
 
@@ -89,11 +89,11 @@ INSERT INTO employees (employeeId, userId, branchId, roleId, status) VALUES
 (26,26,3,4,'ACTIVE'), -- Driver HCM B
 (27,27,3,4,'ACTIVE'), -- Driver HCM C
 (28,28,3,4,'ACTIVE')  -- Driver HCM D
-AS new_emp
+    AS new_emp
 ON DUPLICATE KEY UPDATE
-    branchId = new_emp.branchId,
-    roleId = new_emp.roleId,
-    status = new_emp.status;
+                     branchId = new_emp.branchId,
+                     roleId = new_emp.roleId,
+                     status = new_emp.status;
 
 -- Update branch managers after employees are created (to avoid circular FK dependency)
 UPDATE branches SET managerId = 2 WHERE branchId = 1;  -- Manager HN
@@ -1127,7 +1127,7 @@ INSERT IGNORE INTO invoices (
 (12,2,9,3,'INCOME',NULL,0,600000.00,'PAID','ACTIVE',DATE_SUB(NOW(),INTERVAL 3 DAY),NOW(),NULL,'Thanh toán Booking 9',13,14,NOW(),NULL,NULL,NULL,'NORMAL',DATE_ADD(CURDATE(),INTERVAL 7 DAY),'INV-DN-2025-0003','NET_7',NULL,NULL,'hr@xyz.com',NULL);
 
 -- Invoice Items table has been removed from schema
-    
+
 -- Payment History
 INSERT IGNORE INTO payment_history (paymentId, amount, bankAccount, bankName, cashierName, createdAt, note, paymentDate, paymentMethod, receiptNumber, referenceNumber, createdBy, invoiceId, confirmationStatus) VALUES
 (1,600000.00,'070122047995','Sacombank','Kế toán HN',NOW(),'Cọc Booking 1',DATE_SUB(NOW(),INTERVAL 10 DAY),'BANK_TRANSFER','REC-2025-0001',NULL,5,1,'CONFIRMED'),
