@@ -219,7 +219,7 @@ export default function CoordinatorDriverListPage({ readOnly = false }) {
                         </div>
                         <div>
                             <h1 className="text-2xl font-bold text-slate-900">Danh sách tài xế</h1>
-                            <p className="text-sm text-slate-600">Quản lý hồ sơ tài xế chi nhánh</p>
+                            <p className="text-sm text-slate-600">Kiểm tra trạng thái làm việc của tài xế</p>
                         </div>
                     </div>
                 </div>
@@ -262,7 +262,7 @@ export default function CoordinatorDriverListPage({ readOnly = false }) {
                                 ) : (
                                     <RefreshCw className="h-4 w-4" />
                                 )}
-                                Refresh
+                                Tải lại
                             </button>
 
                             {/* Branch info */}

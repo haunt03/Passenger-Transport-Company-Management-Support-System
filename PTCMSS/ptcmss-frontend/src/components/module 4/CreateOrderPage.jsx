@@ -2457,10 +2457,7 @@ export default function CreateOrderPage() {
                                         Hãy xác nhận lại điểm
                                         đón, số lượng hành lý
                                         cồng kềnh và thời gian
-                                        chờ khách (nếu có). Nếu
-                                        xe hết, báo quản lý điều
-                                        phối để mượn xe chi
-                                        nhánh khác.
+                                        chờ khách (nếu có).
                                     </div>
                                 </div>
                             </div>

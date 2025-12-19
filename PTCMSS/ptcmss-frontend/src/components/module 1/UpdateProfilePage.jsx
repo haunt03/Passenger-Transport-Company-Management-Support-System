@@ -426,7 +426,7 @@ export default function UpdateProfilePage() {
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-2">
                     Họ và tên
-                    <span className="text-slate-400 font-normal ml-1">(chỉ đọc)</span>
+                    <span className="text-slate-400 font-normal ml-1"></span>
                   </label>
                   <input
                       value={fullName}
@@ -470,7 +470,7 @@ export default function UpdateProfilePage() {
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-2">
                     Email
-                    <span className="text-slate-400 font-normal ml-1">(chỉ đọc)</span>
+                    <span className="text-slate-400 font-normal ml-1">(cần liên hệ Admin để thay đổi được email)</span>
                   </label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />

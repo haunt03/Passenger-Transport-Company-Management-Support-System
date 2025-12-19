@@ -331,7 +331,7 @@ export default function AdminUsersPage() {
                 </div>
                 <div className="flex-1">
                   <div className="font-semibold text-sky-800 text-sm mb-1">
-                    {isManagerView ? "Chế độ Manager" : "Chế độ Kế toán"}
+                    {isManagerView ? "Vai trò quản lý" : "Vai trò kế toán"}
                   </div>
                   <div className="text-sm text-sky-800">
                     {managerBranchLoading

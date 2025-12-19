@@ -606,7 +606,7 @@ export default function SystemSettingsPage() {
                             <h1 className="text-xl font-bold text-slate-900 leading-tight">
                                 Cấu hình hệ thống
                             </h1>
-                            <p className="text-xs text-slate-500 mt-1">Quản lý tham số hệ thống (VAT, hạn đặt cọc, số ngày nghỉ tối đa...)</p>
+                            <p className="text-xs text-slate-500 mt-1">Quản lý tham số hệ thống (Phụ thu, Giờ lái xe của tài xế, số ngày nghỉ tối đa...)</p>
                         </div>
                     </div>
 
