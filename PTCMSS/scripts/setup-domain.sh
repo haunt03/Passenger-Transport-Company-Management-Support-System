@@ -98,7 +98,7 @@ server {
     error_log /var/log/nginx/ptcmss-backend-error.log;
 
     add_header Access-Control-Allow-Origin "http://$DOMAIN" always;
-    add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS" always;
+    add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD" always;
     add_header Access-Control-Allow-Headers "Authorization, Content-Type" always;
     add_header Access-Control-Allow-Credentials "true" always;
 
@@ -280,7 +280,7 @@ server {
     error_log /var/log/nginx/ptcmss-backend-error.log;
 
     add_header Access-Control-Allow-Origin "https://$DOMAIN" always;
-    add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS" always;
+    add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD" always;
     add_header Access-Control-Allow-Headers "Authorization, Content-Type" always;
     add_header Access-Control-Allow-Credentials "true" always;
 

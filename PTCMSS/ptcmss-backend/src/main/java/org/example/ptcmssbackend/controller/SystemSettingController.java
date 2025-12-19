@@ -16,7 +16,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/system-settings")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:5174"})
 public class SystemSettingController {
 
     private final SystemSettingService repo;
