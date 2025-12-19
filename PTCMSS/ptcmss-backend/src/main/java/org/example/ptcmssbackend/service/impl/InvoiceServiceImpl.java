@@ -593,7 +593,9 @@ public class InvoiceServiceImpl implements InvoiceService {
     }
 
     @Override
+    @Transactional
     public PaymentHistoryResponse confirmPayment(Integer paymentId, String status) {
+        log.info("[InvoiceService] confirmPayment - paymentId: {}, status: {}", paymentId, status);
         PaymentHistory payment = paymentHistoryRepository.findById(paymentId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy thanh toán: " + paymentId));
 
@@ -601,6 +603,7 @@ public class InvoiceServiceImpl implements InvoiceService {
             PaymentConfirmationStatus confirmationStatus = PaymentConfirmationStatus.valueOf(status.toUpperCase());
             payment.setConfirmationStatus(confirmationStatus);
             payment = paymentHistoryRepository.save(payment);
+            log.info("[InvoiceService] Payment {} confirmation status updated to {}", paymentId, confirmationStatus);
 
             // Update invoice payment status nếu cần
             Invoices invoice = payment.getInvoice();
@@ -652,15 +655,17 @@ public class InvoiceServiceImpl implements InvoiceService {
                         if (requiredTrips > 0) {
                             // Tạo trips mặc định (chưa có trips nào, nên không có template)
                             // Thông tin chi tiết (startTime, endTime, locations) sẽ được cập nhật sau khi có thông tin từ booking
+                            List<Trips> newTrips = new java.util.ArrayList<>();
                             for (int i = 0; i < requiredTrips; i++) {
                                 Trips trip = new Trips();
                                 trip.setBooking(booking);
                                 trip.setUseHighway(booking.getUseHighway());
                                 trip.setStatus(org.example.ptcmssbackend.enums.TripStatus.SCHEDULED);
                                 // startTime, endTime, locations sẽ được cập nhật sau khi có thông tin từ booking hoặc từ consultant
-
-                                tripRepository.save(trip);
+                                newTrips.add(trip);
                             }
+                            // Batch save để tối ưu performance trên VPS
+                            tripRepository.saveAll(newTrips);
                             log.info("[InvoiceService] Created {} trips for booking {} after deposit confirmation", requiredTrips, booking.getId());
                         }
                     } else {
@@ -674,6 +679,7 @@ public class InvoiceServiceImpl implements InvoiceService {
                             // Tạo thêm trips nếu thiếu
                             Trips template = existingTrips.get(0);
                             int needMore = requiredTrips - existingTrips.size();
+                            List<Trips> newTrips = new java.util.ArrayList<>();
                             for (int i = 0; i < needMore; i++) {
                                 Trips clone = new Trips();
                                 clone.setBooking(booking);
@@ -685,8 +691,10 @@ public class InvoiceServiceImpl implements InvoiceService {
                                 clone.setDistance(template.getDistance());
                                 clone.setIncidentalCosts(template.getIncidentalCosts());
                                 clone.setStatus(org.example.ptcmssbackend.enums.TripStatus.SCHEDULED);
-                                tripRepository.save(clone);
+                                newTrips.add(clone);
                             }
+                            // Batch save để tối ưu performance trên VPS
+                            tripRepository.saveAll(newTrips);
                             log.info("[InvoiceService] Created {} additional trips for booking {} after deposit confirmation", needMore, booking.getId());
                         }
                     }
@@ -769,9 +777,14 @@ public class InvoiceServiceImpl implements InvoiceService {
                 // Không throw exception để không ảnh hưởng đến flow chính
             }
 
+            log.info("[InvoiceService] confirmPayment completed successfully for paymentId: {}", paymentId);
             return mapToPaymentHistoryResponse(payment);
         } catch (IllegalArgumentException e) {
+            log.error("[InvoiceService] Invalid confirmation status: {}", status, e);
             throw new RuntimeException("Trạng thái xác nhận không hợp lệ: " + status + ". Phải là CONFIRMED hoặc REJECTED");
+        } catch (Exception e) {
+            log.error("[InvoiceService] Error in confirmPayment for paymentId: {}", paymentId, e);
+            throw new RuntimeException("Lỗi khi xác nhận thanh toán: " + e.getMessage(), e);
         }
     }
 

@@ -7,7 +7,13 @@ spring:
     url: jdbc:mysql://${DB_HOST:mysql}:${DB_PORT:3306}/${DB_NAME:ptcmss_db}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:root}
-
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
   jpa:
     show-sql: ${JPA_SHOW_SQL:false}
     hibernate:
@@ -17,6 +23,15 @@ spring:
       hibernate:
         format_sql: ${HIBERNATE_FORMAT_SQL:false}
         dialect: org.hibernate.dialect.MySQLDialect
+        jdbc:
+          time_zone: UTC
+          connection:
+            provider_disables_autocommit: true
+          spring:
+            jpa:
+              properties:
+                jakarta.persistence.query.timeout: 30000
+
 
   sql:
     init:
