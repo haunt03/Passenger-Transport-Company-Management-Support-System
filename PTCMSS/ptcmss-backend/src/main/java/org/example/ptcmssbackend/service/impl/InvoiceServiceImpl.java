@@ -39,6 +39,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class InvoiceServiceImpl implements InvoiceService {
 
+    // Sử dụng timezone cố định để tránh lỗi khi deploy lên VPS (timezone khác với local)
+    private static final ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+
     private final InvoiceRepository invoiceRepository;
     private final BranchesRepository branchesRepository;
     private final CustomerRepository customerRepository;
@@ -135,8 +138,8 @@ public class InvoiceServiceImpl implements InvoiceService {
 
         // Generate invoice number
         LocalDate invoiceDate = invoice.getInvoiceDate() != null
-                ? invoice.getInvoiceDate().atZone(ZoneId.systemDefault()).toLocalDate()
-                : LocalDate.now();
+                ? invoice.getInvoiceDate().atZone(VIETNAM_ZONE).toLocalDate()
+                : LocalDate.now(VIETNAM_ZONE);
         invoice.setInvoiceNumber(generateInvoiceNumber(branch.getId(), invoiceDate));
 
         // Save
@@ -437,13 +440,13 @@ public class InvoiceServiceImpl implements InvoiceService {
             return false;
         }
 
-        return invoice.getDueDate().isBefore(LocalDate.now());
+        return invoice.getDueDate().isBefore(LocalDate.now(VIETNAM_ZONE));
     }
 
     @Override
     @Transactional
     public void checkAndUpdateOverdueInvoices() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(VIETNAM_ZONE);
         List<Invoices> unpaidInvoices = invoiceRepository.findUnpaidInvoicesBeforeDate(today, null);
 
         unpaidInvoices.forEach(invoice -> {
@@ -494,7 +497,7 @@ public class InvoiceServiceImpl implements InvoiceService {
 
         // Calculate days overdue
         if (invoice.getDueDate() != null && invoice.getPaymentStatus() != PaymentStatus.PAID) {
-            LocalDate today = LocalDate.now();
+            LocalDate today = LocalDate.now(VIETNAM_ZONE);
             if (invoice.getDueDate().isBefore(today)) {
                 response.setDaysOverdue((int) java.time.temporal.ChronoUnit.DAYS.between(invoice.getDueDate(), today));
             }
@@ -531,7 +534,7 @@ public class InvoiceServiceImpl implements InvoiceService {
         response.setBalance(calculateBalance(invoice.getId()));
 
         if (invoice.getDueDate() != null && invoice.getPaymentStatus() != PaymentStatus.PAID) {
-            LocalDate today = LocalDate.now();
+            LocalDate today = LocalDate.now(VIETNAM_ZONE);
             if (invoice.getDueDate().isBefore(today)) {
                 response.setDaysOverdue((int) java.time.temporal.ChronoUnit.DAYS.between(invoice.getDueDate(), today));
             }
