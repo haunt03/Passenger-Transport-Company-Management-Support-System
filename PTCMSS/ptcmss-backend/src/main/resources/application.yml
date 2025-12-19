@@ -6,7 +6,10 @@ spring:
     properties:
       hibernate:
         physical_naming_strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
-
+  sql:
+    init:
+      mode: always
+      
   mail:
     host: smtp.gmail.com
     port: 587
