@@ -300,17 +300,17 @@ const MOCK_ORDERS = [
 /* FILTER BAR                                                */
 /* --------------------------------------------------------- */
 function FilterBar({
-                       statusFilter,
-                       setStatusFilter,
-                       dateFilter,
-                       setDateFilter,
-                       searchText,
-                       setSearchText,
-                       onClickCreate,
-                       onRefresh,
-                       loadingRefresh,
-                       showCreateButton = true, // Add prop to control button visibility
-                   }) {
+    statusFilter,
+    setStatusFilter,
+    dateFilter,
+    setDateFilter,
+    searchText,
+    setSearchText,
+    onClickCreate,
+    onRefresh,
+    loadingRefresh,
+    showCreateButton = true, // Add prop to control button visibility
+}) {
     return (
         <div className="flex flex-col lg:flex-row lg:flex-wrap gap-3">
             {/* CTA tạo đơn hàng mới - Hidden for Manager */}
@@ -396,22 +396,22 @@ function FilterBar({
 /* --------------------------------------------------------- */
 
 function OrdersTable({
-                         items,
-                         page,
-                         setPage,
-                         pageSize,
-                         setPageSize,
-                         totalPages,
-                         sortKey,
-                         setSortKey,
-                         sortDir,
-                         setSortDir,
-                         onViewDetail,
-                         onEdit,
-                         onCancel,
-                         showActions = true, // Add prop to control actions column visibility
-                         onViewCustomerTrips, // Handler để mở popup danh sách chuyến đi của khách hàng
-                     }) {
+    items,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    totalPages,
+    sortKey,
+    setSortKey,
+    sortDir,
+    setSortDir,
+    onViewDetail,
+    onEdit,
+    onCancel,
+    showActions = true, // Add prop to control actions column visibility
+    onViewCustomerTrips, // Handler để mở popup danh sách chuyến đi của khách hàng
+}) {
     const headerCell = (key, label) => (
         <th
             className="px-3 py-2 font-medium cursor-pointer select-none text-slate-500 text-[12px]"
@@ -506,184 +506,184 @@ function OrdersTable({
         <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
                 <thead className="text-xs border-b border-slate-200 bg-slate-100/70">
-                <tr>
-                    {headerCell("code", "Mã đơn")}
-                    {headerCell("customer_name", "Khách hàng")}
-                    {headerCell("pickup", "Lịch trình")}
-                    {headerCell("pickup_time", "Ngày đi")}
-                    {headerCell("estimated_cost", "Chi phí tạm tính")}
-                    {headerCell("deposit_amount", "Đã thu")}
-                    {headerCell("quoted_price", "Tổng tiền")}
-                    {headerCell("status", "Trạng thái")}
-                    <th className="px-3 py-2 font-medium text-slate-500 text-[12px]">
-                        Hành động
-                    </th>
-                </tr>
+                    <tr>
+                        {headerCell("code", "Mã đơn")}
+                        {headerCell("customer_name", "Khách hàng")}
+                        {headerCell("pickup", "Lịch trình")}
+                        {headerCell("pickup_time", "Ngày đi")}
+                        {headerCell("estimated_cost", "Chi phí tạm tính")}
+                        {headerCell("deposit_amount", "Đã thu")}
+                        {headerCell("quoted_price", "Tổng tiền")}
+                        {headerCell("status", "Trạng thái")}
+                        <th className="px-3 py-2 font-medium text-slate-500 text-[12px]">
+                            Hành động
+                        </th>
+                    </tr>
                 </thead>
 
                 <tbody>
-                {current.map((o) => (
-                    <tr
-                        key={o.id}
-                        className="border-b border-slate-200 hover:bg-slate-50"
-                    >
-                        {/* Mã đơn */}
-                        <td className="px-3 py-2 text-[13px] font-semibold text-slate-900 whitespace-nowrap">
-                            {o.code}
-                        </td>
+                    {current.map((o) => (
+                        <tr
+                            key={o.id}
+                            className="border-b border-slate-200 hover:bg-slate-50"
+                        >
+                            {/* Mã đơn */}
+                            <td className="px-3 py-2 text-[13px] font-semibold text-slate-900 whitespace-nowrap">
+                                {o.code}
+                            </td>
 
-                        {/* Khách hàng */}
-                        <td className="px-3 py-2 text-[13px] text-slate-700 whitespace-nowrap">
-                            <div className="flex items-start gap-2">
-                                <User className="h-3.5 w-3.5 text-sky-600 shrink-0 mt-0.5" />
-                                <div>
+                            {/* Khách hàng */}
+                            <td className="px-3 py-2 text-[13px] text-slate-700 whitespace-nowrap">
+                                <div className="flex items-start gap-2">
+                                    <User className="h-3.5 w-3.5 text-sky-600 shrink-0 mt-0.5" />
+                                    <div>
+                                        <button
+                                            type="button"
+                                            onClick={() => onViewCustomerTrips && onViewCustomerTrips(o.customerId, o.customer_name)}
+                                            className="font-medium text-slate-900 leading-tight hover:text-sky-600 hover:underline cursor-pointer text-left"
+                                        >
+                                            {o.customer_name}
+                                        </button>
+                                        <div className="text-[11px] text-slate-500 leading-tight break-all">
+                                            {o.customer_phone}
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+
+                            {/* Lịch trình */}
+                            <td className="px-3 py-2 text-[13px] text-slate-700 min-w-[180px]">
+                                <div className="flex items-start gap-2 leading-snug">
+                                    <MapPin className="h-3.5 w-3.5 text-primary-600 shrink-0 mt-0.5" />
+                                    <div className="space-y-1">
+                                        <div className="text-slate-900 font-medium">
+                                            {o.pickup} → {o.dropoff}
+                                        </div>
+                                        <div className="text-[11px] text-slate-500">
+                                            {o.vehicle_category} ·{" "}
+                                            {o.vehicle_count} xe
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+
+                            {/* Ngày đi */}
+                            <td className="px-3 py-2 text-[13px] text-slate-700 whitespace-nowrap">
+                                <div className="leading-tight">
+                                    <div className="text-slate-900 font-medium tabular-nums">
+                                        {fmtDateOnly(o.pickup_time)}
+                                    </div>
+                                    <div className="text-[11px] text-slate-500 tabular-nums">
+                                        {fmtDateTime(o.pickup_time).slice(-5)}{" "}
+                                        ~{" "}
+                                        {fmtDateTime(
+                                            o.dropoff_eta
+                                        ).slice(-5)}
+                                    </div>
+                                </div>
+                            </td>
+
+                            {/* Chi phí tạm tính (estimatedCost) */}
+                            <td className="px-3 py-2 text-[13px] whitespace-nowrap tabular-nums text-slate-700">
+                                {fmtVND((o.estimated_cost || o.quoted_price || 0) + (o.discount_amount || 0))}
+                            </td>
+
+                            {/* Đã thu (paid amount) */}
+                            <td className="px-3 py-2 text-[13px] whitespace-nowrap tabular-nums">
+                                <div className="text-emerald-700 font-semibold">
+                                    {fmtVND(o.paid_amount || 0)}
+                                </div>
+                                {o.deposit_amount > 0 && (
+                                    <div className="text-[11px] text-slate-500">
+                                        Cọc: {fmtVND(o.deposit_amount)}
+                                    </div>
+                                )}
+                            </td>
+
+                            {/* Tổng tiền (renamed from Giá trị) */}
+                            <td className="px-3 py-2 text-[13px] whitespace-nowrap tabular-nums">
+                                <div className="flex items-start gap-1 text-primary-600 font-semibold">
+                                    <DollarSign className="h-3.5 w-3.5 text-primary-600 mt-0.5" />
+                                    <span>{fmtVND(o.quoted_price)}</span>
+                                </div>
+                                {o.discount_amount > 0 ? (
+                                    <div className="text-[11px] text-slate-500 leading-tight">
+                                        Giảm: {fmtVND(o.discount_amount)}
+                                    </div>
+                                ) : null}
+                            </td>
+
+                            {/* Trạng thái - Vietnamese labels */}
+                            <td className="px-3 py-2 text-[13px] whitespace-nowrap">
+                                <OrderStatusPill status={o.status} order={o} />
+                            </td>
+
+                            {/* Actions - Always show "Chi tiết", hide "Sửa" for Manager/Accountant */}
+                            <td className="px-3 py-2 text-[13px] whitespace-nowrap">
+                                <div className="flex items-center gap-2 flex-wrap">
                                     <button
                                         type="button"
-                                        onClick={() => onViewCustomerTrips && onViewCustomerTrips(o.customerId, o.customer_name)}
-                                        className="font-medium text-slate-900 leading-tight hover:text-sky-600 hover:underline cursor-pointer text-left"
+                                        onClick={() => onViewDetail(o)}
+                                        className="rounded-md border border-sky-300 text-sky-700 bg-white hover:bg-sky-50 px-2.5 py-1.5 text-[12px] flex items-center gap-1 shadow-sm"
                                     >
-                                        {o.customer_name}
+                                        <Eye className="h-3.5 w-3.5" />
+                                        <span>Chi tiết</span>
                                     </button>
-                                    <div className="text-[11px] text-slate-500 leading-tight break-all">
-                                        {o.customer_phone}
-                                    </div>
+
+                                    {showActions && (
+                                        <>
+                                            <button
+                                                type="button"
+                                                disabled={!canEdit(o.status, o.pickup_time)}
+                                                onClick={() => {
+                                                    if (canEdit(o.status, o.pickup_time)) onEdit(o);
+                                                }}
+                                                className={cls(
+                                                    "rounded-md border px-2.5 py-1.5 text-[12px] flex items-center gap-1 shadow-sm",
+                                                    canEdit(o.status, o.pickup_time)
+                                                        ? "border-primary-300 text-primary-700 bg-white hover:bg-primary-50"
+                                                        : "border-slate-200 text-slate-400 bg-white cursor-not-allowed opacity-50"
+                                                )}
+                                                title={isStartTimePassed(o.pickup_time) ? "Không thể sửa đơn đã quá thời gian bắt đầu" : ""}
+                                            >
+                                                <Pencil className="h-3.5 w-3.5" />
+                                                <span>Sửa</span>
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                disabled={!canCancel(o.status, o.pickup_time)}
+                                                onClick={() => {
+                                                    if (canCancel(o.status, o.pickup_time)) onCancel(o);
+                                                }}
+                                                className={cls(
+                                                    "rounded-md border px-2.5 py-1.5 text-[12px] flex items-center gap-1 shadow-sm",
+                                                    canCancel(o.status, o.pickup_time)
+                                                        ? "border-rose-300 text-rose-700 bg-white hover:bg-rose-50"
+                                                        : "border-slate-200 text-slate-400 bg-white cursor-not-allowed opacity-50"
+                                                )}
+                                                title={isStartTimePassed(o.pickup_time) ? "Không thể hủy đơn đã quá thời gian bắt đầu" : ""}
+                                            >
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                                <span>Hủy</span>
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
-                            </div>
-                        </td>
+                            </td>
+                        </tr>
+                    ))}
 
-                        {/* Lịch trình */}
-                        <td className="px-3 py-2 text-[13px] text-slate-700 min-w-[180px]">
-                            <div className="flex items-start gap-2 leading-snug">
-                                <MapPin className="h-3.5 w-3.5 text-primary-600 shrink-0 mt-0.5" />
-                                <div className="space-y-1">
-                                    <div className="text-slate-900 font-medium">
-                                        {o.pickup} → {o.dropoff}
-                                    </div>
-                                    <div className="text-[11px] text-slate-500">
-                                        {o.vehicle_category} ·{" "}
-                                        {o.vehicle_count} xe
-                                    </div>
-                                </div>
-                            </div>
-                        </td>
-
-                        {/* Ngày đi */}
-                        <td className="px-3 py-2 text-[13px] text-slate-700 whitespace-nowrap">
-                            <div className="leading-tight">
-                                <div className="text-slate-900 font-medium tabular-nums">
-                                    {fmtDateOnly(o.pickup_time)}
-                                </div>
-                                <div className="text-[11px] text-slate-500 tabular-nums">
-                                    {fmtDateTime(o.pickup_time).slice(-5)}{" "}
-                                    ~{" "}
-                                    {fmtDateTime(
-                                        o.dropoff_eta
-                                    ).slice(-5)}
-                                </div>
-                            </div>
-                        </td>
-
-                        {/* Chi phí tạm tính (estimatedCost) */}
-                        <td className="px-3 py-2 text-[13px] whitespace-nowrap tabular-nums text-slate-700">
-                            {fmtVND((o.estimated_cost || o.quoted_price || 0) + (o.discount_amount || 0))}
-                        </td>
-
-                        {/* Đã thu (paid amount) */}
-                        <td className="px-3 py-2 text-[13px] whitespace-nowrap tabular-nums">
-                            <div className="text-emerald-700 font-semibold">
-                                {fmtVND(o.paid_amount || 0)}
-                            </div>
-                            {o.deposit_amount > 0 && (
-                                <div className="text-[11px] text-slate-500">
-                                    Cọc: {fmtVND(o.deposit_amount)}
-                                </div>
-                            )}
-                        </td>
-
-                        {/* Tổng tiền (renamed from Giá trị) */}
-                        <td className="px-3 py-2 text-[13px] whitespace-nowrap tabular-nums">
-                            <div className="flex items-start gap-1 text-primary-600 font-semibold">
-                                <DollarSign className="h-3.5 w-3.5 text-primary-600 mt-0.5" />
-                                <span>{fmtVND(o.quoted_price)}</span>
-                            </div>
-                            {o.discount_amount > 0 ? (
-                                <div className="text-[11px] text-slate-500 leading-tight">
-                                    Giảm: {fmtVND(o.discount_amount)}
-                                </div>
-                            ) : null}
-                        </td>
-
-                        {/* Trạng thái - Vietnamese labels */}
-                        <td className="px-3 py-2 text-[13px] whitespace-nowrap">
-                            <OrderStatusPill status={o.status} order={o} />
-                        </td>
-
-                        {/* Actions - Always show "Chi tiết", hide "Sửa" for Manager/Accountant */}
-                        <td className="px-3 py-2 text-[13px] whitespace-nowrap">
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <button
-                                    type="button"
-                                    onClick={() => onViewDetail(o)}
-                                    className="rounded-md border border-sky-300 text-sky-700 bg-white hover:bg-sky-50 px-2.5 py-1.5 text-[12px] flex items-center gap-1 shadow-sm"
-                                >
-                                    <Eye className="h-3.5 w-3.5" />
-                                    <span>Chi tiết</span>
-                                </button>
-
-                                {showActions && (
-                                    <>
-                                        <button
-                                            type="button"
-                                            disabled={!canEdit(o.status, o.pickup_time)}
-                                            onClick={() => {
-                                                if (canEdit(o.status, o.pickup_time)) onEdit(o);
-                                            }}
-                                            className={cls(
-                                                "rounded-md border px-2.5 py-1.5 text-[12px] flex items-center gap-1 shadow-sm",
-                                                canEdit(o.status, o.pickup_time)
-                                                    ? "border-primary-300 text-primary-700 bg-white hover:bg-primary-50"
-                                                    : "border-slate-200 text-slate-400 bg-white cursor-not-allowed opacity-50"
-                                            )}
-                                            title={isStartTimePassed(o.pickup_time) ? "Không thể sửa đơn đã quá thời gian bắt đầu" : ""}
-                                        >
-                                            <Pencil className="h-3.5 w-3.5" />
-                                            <span>Sửa</span>
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            disabled={!canCancel(o.status, o.pickup_time)}
-                                            onClick={() => {
-                                                if (canCancel(o.status, o.pickup_time)) onCancel(o);
-                                            }}
-                                            className={cls(
-                                                "rounded-md border px-2.5 py-1.5 text-[12px] flex items-center gap-1 shadow-sm",
-                                                canCancel(o.status, o.pickup_time)
-                                                    ? "border-rose-300 text-rose-700 bg-white hover:bg-rose-50"
-                                                    : "border-slate-200 text-slate-400 bg-white cursor-not-allowed opacity-50"
-                                            )}
-                                            title={isStartTimePassed(o.pickup_time) ? "Không thể hủy đơn đã quá thời gian bắt đầu" : ""}
-                                        >
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                            <span>Hủy</span>
-                                        </button>
-                                    </>
-                                )}
-                            </div>
-                        </td>
-                    </tr>
-                ))}
-
-                {current.length === 0 && (
-                    <tr>
-                        <td
-                            colSpan={9}
-                            className="px-3 py-6 text-center text-slate-500 text-[13px]"
-                        >
-                            Không có đơn hàng phù hợp.
-                        </td>
-                    </tr>
-                )}
+                    {current.length === 0 && (
+                        <tr>
+                            <td
+                                colSpan={9}
+                                className="px-3 py-6 text-center text-slate-500 text-[13px]"
+                            >
+                                Không có đơn hàng phù hợp.
+                            </td>
+                        </tr>
+                    )}
                 </tbody>
             </table>
 
@@ -868,7 +868,7 @@ function OrderDetailModal({ open, order, onClose }) {
                         </div>
 
                         {order.status === ORDER_STATUS.CANCELLED ||
-                        order.status === ORDER_STATUS.DRAFT ? (
+                            order.status === ORDER_STATUS.DRAFT ? (
                             <div className="text-[11px] text-info-700 bg-info-50 border border-info-200 rounded-md px-2 py-1 max-w-fit flex items-start gap-2">
                                 <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-info-600" />
                                 <span>
@@ -913,12 +913,12 @@ function OrderDetailModal({ open, order, onClose }) {
  *   - mode: "create" | "edit"
  */
 function OrderFormModal({
-                            open,
-                            mode,
-                            initialOrder,
-                            onClose,
-                            onSave,
-                        }) {
+    open,
+    mode,
+    initialOrder,
+    onClose,
+    onSave,
+}) {
     const isEdit = mode === "edit";
 
     // ------- form state
@@ -1130,8 +1130,8 @@ function OrderFormModal({
     // build object chuẩn shape table
     const buildOrderPayload = (statusOverride) => {
         const catObj = (categories && categories.length
-                ? categories.map(c => ({ id: String(c.categoryId), label: c.categoryName }))
-                : VEHICLE_CATEGORIES
+            ? categories.map(c => ({ id: String(c.categoryId), label: c.categoryName }))
+            : VEHICLE_CATEGORIES
         ).find((c) => String(c.id) === String(categoryId));
         return {
             branch_id: branchId ? String(branchId) : "",
@@ -1884,18 +1884,18 @@ export default function ConsultantOrdersPage() {
     }, [scopedBranchId]);
 
     const mapApiBookings = React.useCallback((response) => {
-        let list = [];
-        if (Array.isArray(response)) {
-            list = response;
-        } else if (Array.isArray(response?.content)) {
-            list = response.content;
-        } else if (Array.isArray(response?.data)) {
-            list = response.data;
-        } else if (Array.isArray(response?.data?.content)) {
-            list = response.data.content;
-        } else if (Array.isArray(response?.items)) {
-            list = response.items;
-        }
+                let list = [];
+                if (Array.isArray(response)) {
+                    list = response;
+                } else if (Array.isArray(response?.content)) {
+                    list = response.content;
+                } else if (Array.isArray(response?.data)) {
+                    list = response.data;
+                } else if (Array.isArray(response?.data?.content)) {
+                    list = response.data.content;
+                } else if (Array.isArray(response?.items)) {
+                    list = response.items;
+                }
 
         return (list || []).map((b) => {
             const bookingBranchId =
@@ -1916,13 +1916,14 @@ export default function ConsultantOrdersPage() {
             // Chuẩn hoá status theo logic mới:
             // - Đơn chưa đặt cọc: "Đã gửi báo giá" (QUOTATION_SENT)
             // - Đơn đã đặt cọc: "Khách đã xác nhận" (CONFIRMED)
-            // - Đơn đã được phân công tài xế/xe: "Đã phân xe" (ASSIGNED)
+            // - Đơn đã được phân công tài xế/xe: "Đã phân xe" (ASSIGNED) - QUAN TRỌNG: check isAssigned
             // - Đơn được tài xế xác nhận bắt đầu: "Đang thực hiện" (INPROGRESS)
             // - Đơn được tài xế đánh dấu hoàn thành + Thu đủ tiền: "Hoàn thành" (COMPLETED)
             let rawStatus = b.status || "QUOTATION_SENT";
             const normalizedRawStatus = normalizeStatusValue(rawStatus);
             const hasDeposit = Number(paidAmount || 0) > 0 || Number(b.depositAmount || b.deposit_amount || 0) > 0;
             const isFullyPaid = Number(paidAmount || 0) >= Number(quotedPrice || 0);
+            const isAssigned = b.isAssigned === true || b.is_assigned === true; // Check field isAssigned từ backend
 
             // Map các status về format chuẩn của frontend
             // Workflow: QUOTATION_SENT → CONFIRMED (đặt cọc) → ASSIGNED (phân xe) → INPROGRESS (bắt đầu) → COMPLETED
@@ -1937,8 +1938,9 @@ export default function ConsultantOrdersPage() {
             } else if (normalizedRawStatus === "INPROGRESS" || normalizedRawStatus === "ONGOING" || normalizedRawStatus === "IN_PROGRESS") {
                 // INPROGRESS: tài xế đã bắt đầu chuyến
                 rawStatus = ORDER_STATUS.INPROGRESS;
-            } else if (normalizedRawStatus === "ASSIGNED") {
+            } else if (normalizedRawStatus === "ASSIGNED" || isAssigned) {
                 // ASSIGNED: đã phân xe/tài xế
+                // QUAN TRỌNG: Nếu isAssigned = true thì dù status là CONFIRMED hay QUOTATION_SENT cũng convert thành ASSIGNED
                 rawStatus = ORDER_STATUS.ASSIGNED;
             } else if (normalizedRawStatus === "CONFIRMED") {
                 // CONFIRMED: khách đã xác nhận (đã đặt cọc)
@@ -1958,8 +1960,15 @@ export default function ConsultantOrdersPage() {
                 rawStatus = hasDeposit ? ORDER_STATUS.CONFIRMED : ORDER_STATUS.QUOTATION_SENT;
             }
 
-            return {
-                id: b.id || b.bookingId,
+            // Override: Nếu isAssigned = true, luôn hiển thị ASSIGNED (đã phân xe)
+            // Điều này đảm bảo đơn đã được phân công tài xế/xe luôn hiển thị "Đã phân xe"
+            if (isAssigned && rawStatus !== ORDER_STATUS.COMPLETED && rawStatus !== ORDER_STATUS.CANCELLED
+                && rawStatus !== ORDER_STATUS.INPROGRESS) {
+                rawStatus = ORDER_STATUS.ASSIGNED;
+            }
+
+                    return {
+                        id: b.id || b.bookingId,
                 code:
                     b.bookingCode ||
                     b.code ||
@@ -1986,24 +1995,24 @@ export default function ConsultantOrdersPage() {
                     (b.routeSummary || b.dropoffLocation || "").split(" → ")[1] ||
                     b.endLocation ||
                     "",
-                pickup_time: b.startDate || b.pickupTime || b.startTime,
+                        pickup_time: b.startDate || b.pickupTime || b.startTime,
                 dropoff_eta:
                     b.endDate || b.dropoffTime || b.endTime || b.startDate,
-                vehicle_category: b.vehicleCategory || "",
-                vehicle_category_id: b.vehicleCategoryId || "",
-                vehicle_count: b.vehicleCount || b.quantity || 1,
-                pax_count: b.passengerCount || b.paxCount || 0,
-                estimated_cost: b.estimatedCost || b.estimated_cost || 0,
+                        vehicle_category: b.vehicleCategory || "",
+                        vehicle_category_id: b.vehicleCategoryId || "",
+                        vehicle_count: b.vehicleCount || b.quantity || 1,
+                        pax_count: b.passengerCount || b.paxCount || 0,
+                        estimated_cost: b.estimatedCost || b.estimated_cost || 0,
                 deposit_amount:
                     b.depositAmount || b.deposit_amount || b.deposit || 0,
                 paid_amount: paidAmount,
                 quoted_price: quotedPrice,
-                discount_amount: b.discountAmount || b.discount || 0,
-                notes: b.notes || b.note || "",
+                        discount_amount: b.discountAmount || b.discount || 0,
+                        notes: b.notes || b.note || "",
                 branchId: bookingBranchId,
-                customerId: customerId,
-            };
-        });
+                        customerId: customerId,
+                    };
+                });
     }, []);
 
     const fetchBookings = React.useCallback(async () => {
@@ -2076,21 +2085,21 @@ export default function ConsultantOrdersPage() {
         const st = location.state;
         if (!(st && st.refresh)) return;
         let cancelled = false;
-        (async () => {
-            try {
+            (async () => {
+                try {
                 const mapped = await fetchBookings();
                 if (!cancelled && mapped) {
                     setOrders(mapped);
                     if (st.toast) push(st.toast, "success");
                 }
-            } catch (err) {
+                } catch (err) {
                 if (!cancelled) {
                     console.error("Failed to refresh orders:", err);
                 }
             } finally {
                 if (!cancelled) {
-                    navigate(location.pathname, { replace: true, state: {} });
-                }
+                navigate(location.pathname, { replace: true, state: {} });
+        }
             }
         })();
         return () => { cancelled = true; };
@@ -2285,8 +2294,8 @@ export default function ConsultantOrdersPage() {
         try {
             const mapped = await fetchBookings();
             if (mapped) {
-                setOrders(mapped);
-                push("Đã làm mới danh sách đơn hàng", "success");
+            setOrders(mapped);
+            push("Đã làm mới danh sách đơn hàng", "success");
             }
         } catch (e) {
             push("Không tải được danh sách đơn hàng", "error");

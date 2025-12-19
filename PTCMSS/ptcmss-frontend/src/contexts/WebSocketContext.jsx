@@ -96,9 +96,23 @@ export const WebSocketProvider = ({ children }) => {
   }, [initialLoaded]);
 
   useEffect(() => {
+    // Determine WebSocket URL based on environment
+    // On HTTPS (production), use secure connection; on localhost, use http
+    const getWebSocketUrl = () => {
+      if (window.location.protocol === 'https:') {
+        // Production: use secure WebSocket endpoint
+        // If API is on different domain, use full URL; otherwise use relative
+        const apiUrl = import.meta.env.VITE_API_URL || 'https://api.hethongvantai.site';
+        return `${apiUrl}/ws`;
+      } else {
+        // Development: use localhost
+        return 'http://localhost:8080/ws';
+      }
+    };
+
     // Create STOMP client with SockJS
     const client = new Client({
-      webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
+      webSocketFactory: () => new SockJS(getWebSocketUrl()),
       debug: (str) => {
         console.log('[WebSocket Debug]', str);
       },

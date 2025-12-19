@@ -21,8 +21,14 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         // Register WebSocket endpoint that clients will connect to
+        // QUAN TRỌNG: Cho phép cả HTTP và HTTPS origins để tránh lỗi SecurityError trên HTTPS
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*")
+                .setAllowedOriginPatterns(
+                        "http://localhost:*",
+                        "https://hethongvantai.site",
+                        "https://www.hethongvantai.site",
+                        "https://api.hethongvantai.site"
+                )
                 .withSockJS();
     }
 }
