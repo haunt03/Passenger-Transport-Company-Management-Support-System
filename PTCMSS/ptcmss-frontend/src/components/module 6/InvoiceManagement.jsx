@@ -1680,7 +1680,7 @@ export default function InvoiceManagement() {
     // Transform API response to UI format
     const transformedInvoices = React.useMemo(() => {
         return invoices.map((iv) => ({
-            id: iv.invoiceId,
+            id: iv.id,
             invoice_no: iv.invoiceNumber || `INV-${iv.invoiceId}`,
             customer: iv.customerName || "—",
             customerEmail: iv.customerEmail,
