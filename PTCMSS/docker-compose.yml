@@ -46,7 +46,7 @@ services:
       APP_FRONTEND_URL: "https://hethongvantai.site"
 
       # 5) Nếu bạn muốn prod cũng chạy data.sql thì bật (không thì bỏ)
-      # SQL_INIT_MODE: "always"
+      SQL_INIT_MODE: "always"
     ports:
       - "8080:8080"
 
